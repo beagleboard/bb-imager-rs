@@ -1,5 +1,8 @@
 use clap::Parser;
-use std::path::PathBuf;
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 use tracing::{error, info};
 
 #[derive(Parser)]
@@ -23,6 +26,20 @@ fn main() {
         return;
     }
 
-    info!("Writing image {:?} to {:?}", opt.img, opt.dst);
-    std::fs::copy(opt.img, opt.dst).unwrap();
+    format(&opt.dst).expect("Failed to format disk");
+    // flash(&opt.img, &opt.dst).expect("Failed to flash");
+}
+
+fn flash(img: &Path, dev: &Path) -> io::Result<()> {
+    info!("Writing image {:?} to {:?}", img, dev);
+    std::fs::copy(img, dev).map(|_| ())
+}
+
+fn format(dev: &Path) -> io::Result<()> {
+    info!("Formatting device to fat32");
+    let disk = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(dev)?;
+    fatfs::format_volume(disk, fatfs::FormatVolumeOptions::new())
 }
