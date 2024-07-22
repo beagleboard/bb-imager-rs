@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+crc32fast = "1.4.2"
 fatfs = "0.3.6"
+serialport = "4.4.0"
+thiserror = "1.0.63"
+tracing = "0.1.40"

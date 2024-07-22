@@ -1,3 +1,5 @@
+pub mod bcf;
+
 use std::{io, path::Path};
 
 pub fn flash(img: &Path, dev: &Path) -> io::Result<()> {
