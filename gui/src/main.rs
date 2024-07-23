@@ -1,15 +1,19 @@
-use std::{ops::RangeInclusive, path::PathBuf};
+use std::path::PathBuf;
 
 use iced::{
     executor,
     futures::{SinkExt, Stream, StreamExt},
-    Application, Command, Element, Length, Settings, Theme,
+    Application, Command, Element, Settings,
 };
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
 
-    BBImager::run(Settings::default())
+    let mut settings = Settings::default();
+
+    settings.window.size = iced::Size::new(700.0, 500.0);
+
+    BBImager::run(settings)
 }
 
 #[derive(Default, Debug)]
@@ -33,6 +37,7 @@ enum BBImagerMessage {
 
     FlashingStatus(bb_imager::Status),
     FlashingFail(String),
+    Reset,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -73,7 +78,7 @@ impl Application for BBImager {
     type Message = BBImagerMessage;
     type Executor = executor::Default;
     type Flags = ();
-    type Theme = Theme;
+    type Theme = iced::theme::Theme;
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         (Self::default(), Command::none())
@@ -123,93 +128,55 @@ impl Application for BBImager {
                 self.flashing_status = Some(Err(x));
                 Command::none()
             }
+            BBImagerMessage::Reset => {
+                self.selected_dst = None;
+                self.selected_image = None;
+                self.selected_board = None;
+                Command::none()
+            }
         }
     }
 
     fn view(&self) -> Element<Self::Message> {
-        let device_list =
-            iced::widget::pick_list(BeagleBoardDevice::ALL, self.selected_board, |x| {
-                BBImagerMessage::BoardSelected(x)
-            })
-            .placeholder("Choose Device");
+        const BTN_PADDING: u16 = 10;
 
-        let mut items = Vec::from([device_list.into()]);
+        let logo = iced::widget::image("icons/logo_sxs_imager.png").width(500);
 
-        if self.selected_board.is_some() {
-            let file = self
-                .selected_image
-                .clone()
-                .map_or(iced::widget::text("Choose Image"), |x| {
-                    iced::widget::text(x.to_string_lossy())
-                });
-            items.push(
-                iced::widget::button(file)
-                    .on_press(BBImagerMessage::SelectImage)
-                    .into(),
-            );
-        }
+        let choose_device_btn = iced::widget::button("CHOOSE DEVICE").padding(BTN_PADDING);
+        let choose_image_btn = iced::widget::button("CHOOSE IMAGE").padding(BTN_PADDING);
+        let choose_dst_btn = iced::widget::button("CHOOSE DESTINATION").padding(BTN_PADDING);
 
-        if self.selected_image.is_some() {
-            if let Some(x) = self.selected_board {
-                let destinations = x.destinations();
-                items.push(
-                    iced::widget::pick_list(destinations, self.selected_dst.clone(), |x| {
-                        BBImagerMessage::SelectPort(x)
-                    })
-                    .into(),
-                )
-            }
-        }
+        let reset_btn = iced::widget::button("RESET")
+            .on_press(BBImagerMessage::Reset)
+            .padding(BTN_PADDING);
+        let write_btn = iced::widget::button("WRITE").padding(BTN_PADDING);
 
-        if let (Some(board), Some(img), Some(port)) = (
-            self.selected_board,
-            self.selected_image.clone(),
-            self.selected_dst.clone(),
-        ) {
-            items.push(
-                iced::widget::button("Flash")
-                    .on_press(BBImagerMessage::FlashImage { board, img, port })
-                    .into(),
-            )
-        }
+        let choice_btn_row = iced::widget::row![
+            choose_device_btn,
+            iced::widget::horizontal_space(),
+            choose_image_btn,
+            iced::widget::horizontal_space(),
+            choose_dst_btn
+        ]
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .align_items(iced::Alignment::Center);
 
-        if let Some(status) = &self.flashing_status {
-            match status {
-                Ok(x) => match x {
-                    bb_imager::Status::Preparing => {
-                        items.push(iced::widget::text("Preparing").into());
-                        items.push(
-                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), 0.0).into(),
-                        );
-                    }
-                    bb_imager::Status::Flashing(x) => {
-                        items.push(iced::widget::text("Flashing").into());
-                        items.push(
-                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), *x).into(),
-                        );
-                    }
-                    bb_imager::Status::Verifying => {
-                        items.push(iced::widget::text("Verifying").into());
-                        items.push(
-                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), 0.0).into(),
-                        );
-                    }
-                    bb_imager::Status::Finished => {
-                        items.push(iced::widget::text("Flashed Successfull").into());
-                    }
-                },
-                Err(x) => {
-                    items.push(iced::widget::text(format!("Flashed failed: {x}")).into());
-                }
-            }
-        }
+        let action_btn_row =
+            iced::widget::row![reset_btn, iced::widget::horizontal_space(), write_btn]
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .align_items(iced::Alignment::Center);
 
-        iced::widget::column(items)
+        iced::widget::column![logo, choice_btn_row, action_btn_row]
+            .padding(64)
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
             .align_items(iced::Alignment::Center)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(10)
-            .spacing(20)
             .into()
+    }
+
+    fn theme(&self) -> Self::Theme {
+        iced::Theme::KanagawaLotus
     }
 }
