@@ -1,7 +1,6 @@
 use std::{
     io::{self, Read},
     path::Path,
-    ptr::copy_nonoverlapping,
     thread::sleep,
     time::Duration,
 };
