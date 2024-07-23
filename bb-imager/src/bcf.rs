@@ -1,3 +1,5 @@
+//! Helpers to enable flashing BeagleConnect Freedom firmware
+
 use std::{
     io::{self, Read},
     path::PathBuf,
