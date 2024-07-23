@@ -69,7 +69,7 @@ struct BeagleConnectFreedom {
 }
 
 impl BeagleConnectFreedom {
-    fn new(port: String) -> Result<Self> {
+    fn new(port: &str) -> Result<Self> {
         let port = serialport::new(port, 500000)
             .timeout(Duration::from_millis(500))
             .open()
@@ -306,7 +306,7 @@ impl Drop for BeagleConnectFreedom {
     }
 }
 
-pub fn flash(img: &Path, port: String) -> Result<()> {
+pub fn flash(img: &Path, port: &str) -> Result<()> {
     let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
     let mut img =
         std::fs::File::open(img).map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
@@ -337,4 +337,12 @@ pub fn flash(img: &Path, port: String) -> Result<()> {
         error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
         Err(BeagleConnectFreedomError::InvalidImage)
     }
+}
+
+pub fn possible_devices() -> Result<Vec<String>> {
+    Ok(serialport::available_ports()
+        .map_err(|_| BeagleConnectFreedomError::FailedToOpenPort)?
+        .into_iter()
+        .map(|x| x.port_name)
+        .collect())
 }

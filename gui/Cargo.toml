@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 iced = "0.12.1"
+rfd = "0.14.1"
+bb-imager = { path = "../bb-imager" }
