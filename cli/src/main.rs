@@ -12,7 +12,7 @@ fn main() {
 
     tracing_subscriber::fmt().init();
 
-    bb_imager::bcf::flash(&opt.img, opt.dst).unwrap();
+    // bb_imager::bcf::flash(&opt.img, opt.dst).unwrap();
 
     // if !opt.img.exists() {
     //     eprintln!("Provided Image does not exist {:?}", opt.img);

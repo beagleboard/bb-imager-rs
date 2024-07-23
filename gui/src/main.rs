@@ -1,8 +1,14 @@
-use std::path::PathBuf;
+use std::{ops::RangeInclusive, path::PathBuf};
 
-use iced::{executor, Application, Command, Element, Length, Settings, Theme};
+use iced::{
+    executor,
+    futures::{SinkExt, Stream, StreamExt},
+    Application, Command, Element, Length, Settings, Theme,
+};
 
 fn main() -> iced::Result {
+    tracing_subscriber::fmt().init();
+
     BBImager::run(Settings::default())
 }
 
@@ -11,6 +17,7 @@ struct BBImager {
     selected_board: Option<BeagleBoardDevice>,
     selected_image: Option<PathBuf>,
     selected_dst: Option<String>,
+    flashing_status: Option<Result<bb_imager::Status, String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +30,9 @@ enum BBImagerMessage {
         img: PathBuf,
         port: String,
     },
+
+    FlashingStatus(bb_imager::Status),
+    FlashingFail(String),
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -41,9 +51,14 @@ impl std::fmt::Display for BeagleBoardDevice {
 impl BeagleBoardDevice {
     const ALL: &[Self] = &[Self::BeagleConnectFreedom];
 
-    fn flash(&self, img: PathBuf, port: &str) {
+    fn flash(
+        &self,
+        img: PathBuf,
+        port: String,
+    ) -> impl Stream<Item = Result<bb_imager::Status, bb_imager::bcf::BeagleConnectFreedomError>>
+    {
         match self {
-            BeagleBoardDevice::BeagleConnectFreedom => bb_imager::bcf::flash(&img, port).unwrap(),
+            BeagleBoardDevice::BeagleConnectFreedom => bb_imager::bcf::flash(img, port),
         }
     }
 
@@ -84,7 +99,30 @@ impl Application for BBImager {
                 self.selected_dst = Some(x);
                 Command::none()
             }
-            BBImagerMessage::FlashImage { board, img, port } => Command::none(),
+            BBImagerMessage::FlashImage { board, img, port } => {
+                iced::command::channel(10, move |mut tx| async move {
+                    let stream = board.flash(img, port);
+
+                    tokio::pin!(stream);
+
+                    while let Some(x) = stream.next().await {
+                        let temp = match x {
+                            Ok(y) => BBImagerMessage::FlashingStatus(y),
+                            Err(y) => BBImagerMessage::FlashingFail(y.to_string()),
+                        };
+
+                        let _ = tx.send(temp).await;
+                    }
+                })
+            }
+            BBImagerMessage::FlashingStatus(x) => {
+                self.flashing_status = Some(Ok(x));
+                Command::none()
+            }
+            BBImagerMessage::FlashingFail(x) => {
+                self.flashing_status = Some(Err(x));
+                Command::none()
+            }
         }
     }
 
@@ -133,6 +171,37 @@ impl Application for BBImager {
                     .on_press(BBImagerMessage::FlashImage { board, img, port })
                     .into(),
             )
+        }
+
+        if let Some(status) = &self.flashing_status {
+            match status {
+                Ok(x) => match x {
+                    bb_imager::Status::Preparing => {
+                        items.push(iced::widget::text("Preparing").into());
+                        items.push(
+                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), 0.0).into(),
+                        );
+                    }
+                    bb_imager::Status::Flashing(x) => {
+                        items.push(iced::widget::text("Flashing").into());
+                        items.push(
+                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), *x).into(),
+                        );
+                    }
+                    bb_imager::Status::Verifying => {
+                        items.push(iced::widget::text("Verifying").into());
+                        items.push(
+                            iced::widget::progress_bar(RangeInclusive::new(0.0, 1.0), 0.0).into(),
+                        );
+                    }
+                    bb_imager::Status::Finished => {
+                        items.push(iced::widget::text("Flashed Successfull").into());
+                    }
+                },
+                Err(x) => {
+                    items.push(iced::widget::text(format!("Flashed failed: {x}")).into());
+                }
+            }
         }
 
         iced::widget::column(items)

@@ -1,10 +1,11 @@
 use std::{
     io::{self, Read},
-    path::Path,
+    path::PathBuf,
     thread::sleep,
     time::Duration,
 };
 
+use futures_core::Stream;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
@@ -274,27 +275,6 @@ impl BeagleConnectFreedom {
         self.wait_for_ack()
     }
 
-    fn flash(&mut self, firmware: Vec<u8>) -> Result<()> {
-        let mut image_offset = 0;
-        let mut reset_download = true;
-
-        while image_offset < FIRMWARE_SIZE {
-            while firmware[image_offset as usize] == 0xff {
-                image_offset += 1;
-                reset_download = true;
-            }
-
-            if reset_download {
-                self.send_download(image_offset as u32, (FIRMWARE_SIZE - image_offset) as u32)?;
-                reset_download = false;
-            }
-
-            image_offset += self.send_data(&firmware[(image_offset as usize)..])? as u32;
-        }
-
-        Ok(())
-    }
-
     fn verify(&mut self, crc32: u32) -> Result<bool> {
         self.crc32().map(|x| x == crc32)
     }
@@ -306,36 +286,64 @@ impl Drop for BeagleConnectFreedom {
     }
 }
 
-pub fn flash(img: &Path, port: &str) -> Result<()> {
-    let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
-    let mut img =
-        std::fs::File::open(img).map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
-    img.read_to_end(&mut firmware)
-        .map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
+fn progress(off: u32) -> f32 {
+    (off as f32) / (FIRMWARE_SIZE as f32)
+}
 
-    assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
-    let img_crc32 = crc32fast::hash(firmware.as_slice());
+pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Status>> {
+    async_stream::try_stream! {
+        yield crate::Status::Preparing;
 
-    let mut bcf = BeagleConnectFreedom::new(port)?;
-    info!("BeagleConnectFreedom Connected");
+        let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
+        let mut img =
+            std::fs::File::open(img).map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
+        img.read_to_end(&mut firmware)
+            .map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
 
-    if bcf.verify(img_crc32)? {
-        warn!("Skipping flashing same image");
-        return Ok(());
-    }
+        assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
+        let img_crc32 = crc32fast::hash(firmware.as_slice());
 
-    info!("Erase Flash");
-    bcf.send_bank_erase()?;
+        let mut bcf = BeagleConnectFreedom::new(&port)?;
+        info!("BeagleConnectFreedom Connected");
 
-    info!("Start Flashing");
-    bcf.flash(firmware)?;
+        yield crate::Status::Flashing(0.0);
 
-    if bcf.verify(img_crc32)? {
-        info!("Flashing Successful");
-        Ok(())
-    } else {
-        error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-        Err(BeagleConnectFreedomError::InvalidImage)
+        if bcf.verify(img_crc32)? {
+            warn!("Skipping flashing same image");
+            yield crate::Status::Finished;
+        }
+
+        info!("Erase Flash");
+        bcf.send_bank_erase()?;
+
+        info!("Start Flashing");
+
+        let mut image_offset = 0;
+        let mut reset_download = true;
+
+        while image_offset < FIRMWARE_SIZE {
+            while firmware[image_offset as usize] == 0xff {
+                image_offset += 1;
+                reset_download = true;
+            }
+
+            if reset_download {
+                bcf.send_download(image_offset as u32, (FIRMWARE_SIZE - image_offset) as u32)?;
+                reset_download = false;
+            }
+
+            image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
+            yield crate::Status::Flashing(progress(image_offset));
+        }
+
+        yield crate::Status::Verifying;
+        if bcf.verify(img_crc32)? {
+            info!("Flashing Successful");
+            yield crate::Status::Finished;
+        } else {
+            error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
+            Err(BeagleConnectFreedomError::InvalidImage)?;
+        }
     }
 }
 

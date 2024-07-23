@@ -2,6 +2,14 @@ pub mod bcf;
 
 use std::{io, path::Path};
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Status {
+    Preparing,
+    Flashing(f32),
+    Verifying,
+    Finished,
+}
+
 pub fn flash(img: &Path, dev: &Path) -> io::Result<()> {
     std::fs::copy(img, dev).map(|_| ())
 }
