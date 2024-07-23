@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use iced::{widget::rule::FillMode, Element, Length, Sandbox, Settings};
+use iced::{executor, Application, Command, Element, Length, Settings, Theme};
 
 fn main() -> iced::Result {
     BBImager::run(Settings::default())
@@ -54,29 +54,37 @@ impl BeagleBoardDevice {
     }
 }
 
-impl Sandbox for BBImager {
+impl Application for BBImager {
     type Message = BBImagerMessage;
+    type Executor = executor::Default;
+    type Flags = ();
+    type Theme = Theme;
 
-    fn new() -> Self {
-        Self::default()
+    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
+        (Self::default(), Command::none())
     }
 
     fn title(&self) -> String {
         String::from("BeagleBoard Imager")
     }
 
-    fn update(&mut self, message: Self::Message) {
+    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             BBImagerMessage::BoardSelected(x) => {
                 self.selected_board = Some(x);
+                Command::none()
             }
             BBImagerMessage::SelectImage => {
                 self.selected_image = rfd::FileDialog::new()
                     .add_filter("firmware", &["bin"])
-                    .pick_file()
+                    .pick_file();
+                Command::none()
             }
-            BBImagerMessage::SelectPort(x) => self.selected_dst = Some(x),
-            BBImagerMessage::FlashImage { board, img, port } => board.flash(img, &port),
+            BBImagerMessage::SelectPort(x) => {
+                self.selected_dst = Some(x);
+                Command::none()
+            }
+            BBImagerMessage::FlashImage { board, img, port } => Command::none(),
         }
     }
 
