@@ -28,6 +28,7 @@ struct BBImager {
     selected_image: Option<PathBuf>,
     selected_dst: Option<String>,
     flashing_status: Option<Result<bb_imager::Status, String>>,
+    search_bar: String,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,8 @@ enum BBImagerMessage {
     ImageSelectionPage,
     DestinationSelectionPage,
     HomePage,
+
+    Search(String),
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -146,10 +149,12 @@ impl Application for BBImager {
                 self.selected_dst = None;
                 self.selected_image = None;
                 self.selected_board = None;
+                self.search_bar.clear();
                 Command::none()
             }
             BBImagerMessage::HomePage => {
                 self.screen = Screen::Home;
+                self.search_bar.clear();
                 Command::none()
             }
             BBImagerMessage::BoardSectionPage => {
@@ -162,6 +167,11 @@ impl Application for BBImager {
             }
             BBImagerMessage::DestinationSelectionPage => {
                 self.screen = Screen::DestinationSelection;
+                Command::none()
+            }
+
+            BBImagerMessage::Search(x) => {
+                self.search_bar = x;
                 Command::none()
             }
         }
@@ -311,12 +321,6 @@ impl BBImager {
     }
 
     fn board_selction_view(&self) -> Element<BBImagerMessage> {
-        let back_btn = iced::widget::button("Back")
-            .on_press(BBImagerMessage::HomePage)
-            .style(iced::widget::theme::Button::Secondary);
-        let top_row =
-            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
-
         let item = iced::widget::button(
             iced::widget::row![
                 iced::widget::image("icons/bcf.webp").width(100),
@@ -337,69 +341,103 @@ impl BBImager {
 
         let items = iced::widget::scrollable(iced::widget::column![item].spacing(10));
 
-        iced::widget::column![top_row, iced::widget::horizontal_rule(2), items]
+        iced::widget::column![self.search_bar(), iced::widget::horizontal_rule(2), items]
             .spacing(10)
             .padding(10)
             .into()
     }
 
     fn image_selection_view(&self) -> Element<BBImagerMessage> {
-        let back_btn = iced::widget::button("Back")
-            .on_press(BBImagerMessage::HomePage)
-            .style(iced::widget::theme::Button::Secondary);
-        let top_row =
-            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
+        let items = [(
+            PathBuf::from("icons/use_custom.png"),
+            "Use Custom Image".to_string(),
+            BBImagerMessage::SelectImage,
+        )];
 
-        let item = iced::widget::button(
-            iced::widget::row![
-                iced::widget::image("icons/use_custom.png").width(100),
-                iced::widget::text("Use custom image")
-            ]
-            .spacing(10),
-        )
-        .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::SelectImage)
-        .style(iced::widget::theme::Button::Secondary);
-
-        let items = iced::widget::scrollable(iced::widget::column![item].spacing(10));
-
-        iced::widget::column![top_row, iced::widget::horizontal_rule(2), items]
-            .spacing(10)
-            .padding(10)
-            .into()
+        iced::widget::column![
+            self.search_bar(),
+            iced::widget::horizontal_rule(2),
+            self.search_list_img(items)
+        ]
+        .spacing(10)
+        .padding(10)
+        .into()
     }
 
     fn destination_selection_view(&self) -> Element<BBImagerMessage> {
-        let back_btn = iced::widget::button("Back")
-            .on_press(BBImagerMessage::HomePage)
-            .style(iced::widget::theme::Button::Secondary);
-        let top_row =
-            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
-
-        let board = self.selected_board.unwrap();
-        let destinations = board
+        let items = self
+            .selected_board
+            .expect("No Board Selected")
             .destinations()
             .into_iter()
             .map(|x| {
+                (
+                    PathBuf::from("icons/ic_usb_40px.svg"),
+                    x.clone(),
+                    BBImagerMessage::SelectPort(x),
+                )
+            });
+
+        iced::widget::column![
+            self.search_bar(),
+            iced::widget::horizontal_rule(2),
+            self.search_list_svg(items)
+        ]
+        .spacing(10)
+        .padding(10)
+        .into()
+    }
+
+    fn search_list_img(
+        &self,
+        items: impl IntoIterator<Item = (PathBuf, String, BBImagerMessage)>,
+    ) -> Element<BBImagerMessage> {
+        let items = items
+            .into_iter()
+            .filter(|(_, x, _)| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
+            .map(|(p, t, o)| {
                 iced::widget::button(iced::widget::row![
-                    iced::widget::svg("icons/ic_usb_40px.svg").width(100),
-                    iced::widget::text(x.clone())
+                    iced::widget::image(p).width(100),
+                    iced::widget::text(t)
                 ])
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectPort(x))
+                .on_press(o)
                 .style(iced::widget::theme::Button::Secondary)
             })
             .map(Into::into);
 
-        let destinations_column = iced::widget::column(destinations).spacing(10);
+        iced::widget::scrollable(iced::widget::column(items).spacing(10)).into()
+    }
 
-        iced::widget::column![
-            top_row,
-            iced::widget::horizontal_rule(2),
-            iced::widget::scrollable(destinations_column)
+    fn search_list_svg(
+        &self,
+        items: impl IntoIterator<Item = (PathBuf, String, BBImagerMessage)>,
+    ) -> Element<BBImagerMessage> {
+        let items = items
+            .into_iter()
+            .filter(|(_, x, _)| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
+            .map(|(p, t, o)| {
+                iced::widget::button(iced::widget::row![
+                    iced::widget::svg(p).width(100),
+                    iced::widget::text(t)
+                ])
+                .width(iced::Length::Fill)
+                .on_press(o)
+                .style(iced::widget::theme::Button::Secondary)
+            })
+            .map(Into::into);
+
+        iced::widget::scrollable(iced::widget::column(items).spacing(10)).into()
+    }
+
+    fn search_bar(&self) -> Element<BBImagerMessage> {
+        iced::widget::row![
+            iced::widget::button("Back")
+                .on_press(BBImagerMessage::HomePage)
+                .style(iced::widget::theme::Button::Secondary),
+            iced::widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search)
         ]
         .spacing(10)
-        .padding(10)
         .into()
     }
 }
