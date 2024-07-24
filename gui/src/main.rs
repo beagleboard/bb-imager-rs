@@ -340,10 +340,9 @@ impl BBImager {
                 ]
                 .width(iced::Length::Fill);
 
-                row3 = x
-                    .tags
-                    .iter()
-                    .fold(row3, |acc, t| acc.push(iced::widget::text(t)));
+                row3 = x.tags.iter().fold(row3, |acc, t| {
+                    acc.push(iced_aw::Badge::new(iced::widget::text(t)))
+                });
 
                 row3 = row3.push(iced::widget::horizontal_space());
                 row3 = row3.push(iced::widget::text(x.release_date));

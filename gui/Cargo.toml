@@ -10,3 +10,4 @@ bb-imager = { path = "../bb-imager" }
 tokio = { version = "1.39.1", features = ["rt-multi-thread"] }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
+iced_aw = "0.9.3"
