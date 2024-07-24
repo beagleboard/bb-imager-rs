@@ -9,15 +9,21 @@ use iced::{
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
 
-    let mut settings = Settings::default();
-
-    settings.window.size = iced::Size::new(700.0, 500.0);
+    let settings = Settings {
+        window: iced::window::Settings {
+            size: iced::Size::new(800.0, 500.0),
+            icon: iced::window::icon::from_file("icons/bb-imager.png").ok(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     BBImager::run(settings)
 }
 
 #[derive(Default, Debug)]
 struct BBImager {
+    screen: Screen,
     selected_board: Option<BeagleBoardDevice>,
     selected_image: Option<PathBuf>,
     selected_dst: Option<String>,
@@ -38,6 +44,11 @@ enum BBImagerMessage {
     FlashingStatus(bb_imager::Status),
     FlashingFail(String),
     Reset,
+
+    BoardSectionPage,
+    ImageSelectionPage,
+    DestinationSelectionPage,
+    HomePage,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -92,16 +103,19 @@ impl Application for BBImager {
         match message {
             BBImagerMessage::BoardSelected(x) => {
                 self.selected_board = Some(x);
+                self.screen = Screen::Home;
                 Command::none()
             }
             BBImagerMessage::SelectImage => {
                 self.selected_image = rfd::FileDialog::new()
                     .add_filter("firmware", &["bin"])
                     .pick_file();
+                self.screen = Screen::Home;
                 Command::none()
             }
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
+                self.screen = Screen::Home;
                 Command::none()
             }
             BBImagerMessage::FlashImage { board, img, port } => {
@@ -134,22 +148,94 @@ impl Application for BBImager {
                 self.selected_board = None;
                 Command::none()
             }
+            BBImagerMessage::HomePage => {
+                self.screen = Screen::Home;
+                Command::none()
+            }
+            BBImagerMessage::BoardSectionPage => {
+                self.screen = Screen::BoardSelection;
+                Command::none()
+            }
+            BBImagerMessage::ImageSelectionPage => {
+                self.screen = Screen::ImageSelection;
+                Command::none()
+            }
+            BBImagerMessage::DestinationSelectionPage => {
+                self.screen = Screen::DestinationSelection;
+                Command::none()
+            }
         }
     }
 
     fn view(&self) -> Element<Self::Message> {
+        match self.screen {
+            Screen::Home => self.home_view(),
+            Screen::BoardSelection => self.board_selction_view(),
+            Screen::ImageSelection => self.image_selection_view(),
+            Screen::DestinationSelection => self.destination_selection_view(),
+        }
+    }
+
+    fn theme(&self) -> Self::Theme {
+        iced::Theme::KanagawaLotus
+    }
+}
+
+impl BBImager {
+    fn home_view(&self) -> Element<BBImagerMessage> {
         const BTN_PADDING: u16 = 10;
 
         let logo = iced::widget::image("icons/logo_sxs_imager.png").width(500);
 
-        let choose_device_btn = iced::widget::button("CHOOSE DEVICE").padding(BTN_PADDING);
-        let choose_image_btn = iced::widget::button("CHOOSE IMAGE").padding(BTN_PADDING);
-        let choose_dst_btn = iced::widget::button("CHOOSE DESTINATION").padding(BTN_PADDING);
+        let choose_device_btn = iced::widget::button(
+            self.selected_board
+                .map_or(iced::widget::text("CHOOSE DEVICE"), |x| {
+                    iced::widget::text(x.to_string())
+                }),
+        )
+        .on_press(BBImagerMessage::BoardSectionPage)
+        .padding(BTN_PADDING);
+
+        let choose_image_btn = iced::widget::button(
+            self.selected_image
+                .clone()
+                .map_or(iced::widget::text("CHOOSE IMAGE"), |x| {
+                    iced::widget::text(x.file_name().unwrap().to_string_lossy())
+                }),
+        )
+        .on_press_maybe(
+            self.selected_board
+                .map(|_| BBImagerMessage::ImageSelectionPage),
+        )
+        .padding(BTN_PADDING);
+
+        let choose_dst_btn = iced::widget::button(
+            self.selected_dst
+                .clone()
+                .map_or(iced::widget::text("CHOOSE DESTINATION"), |x| {
+                    iced::widget::text(x)
+                }),
+        )
+        .on_press_maybe(
+            self.selected_image
+                .clone()
+                .map(|_| BBImagerMessage::DestinationSelectionPage),
+        )
+        .padding(BTN_PADDING);
 
         let reset_btn = iced::widget::button("RESET")
             .on_press(BBImagerMessage::Reset)
             .padding(BTN_PADDING);
-        let write_btn = iced::widget::button("WRITE").padding(BTN_PADDING);
+        let write_btn = if let (Some(board), Some(img), Some(port)) = (
+            self.selected_board,
+            self.selected_image.clone(),
+            self.selected_dst.clone(),
+        ) {
+            iced::widget::button("WRITE").on_press(BBImagerMessage::FlashImage { board, img, port })
+        } else {
+            iced::widget::button("WRITE")
+        }
+        .padding(BTN_PADDING);
 
         let choice_btn_row = iced::widget::row![
             choose_device_btn,
@@ -168,15 +254,161 @@ impl Application for BBImager {
                 .height(iced::Length::Fill)
                 .align_items(iced::Alignment::Center);
 
-        iced::widget::column![logo, choice_btn_row, action_btn_row]
-            .padding(64)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_items(iced::Alignment::Center)
+        let (progress_label, progress_bar) = match &self.flashing_status {
+            Some(x) => match x {
+                Ok(y) => match y {
+                    bb_imager::Status::Preparing => (
+                        iced::widget::text("Preparing..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.0),
+                    ),
+                    bb_imager::Status::Flashing => (
+                        iced::widget::text("Flashing Image..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.0),
+                    ),
+                    bb_imager::Status::FlashingProgress(p) => (
+                        iced::widget::text("Flashing Image..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
+                    ),
+                    bb_imager::Status::Verifying => (
+                        iced::widget::text("Verifying Image..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
+                    ),
+                    bb_imager::Status::VerifyingProgress(p) => (
+                        iced::widget::text("Verifying Image..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
+                    ),
+                    bb_imager::Status::Finished => (
+                        iced::widget::text(format!("Flashing Success!!")),
+                        iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                            .style(iced::widget::theme::ProgressBar::Success),
+                    ),
+                },
+                Err(e) => (
+                    iced::widget::text(format!("Flashing Failed: {e}")),
+                    iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                        .style(iced::widget::theme::ProgressBar::Danger),
+                ),
+            },
+            None => (
+                iced::widget::text(""),
+                iced::widget::progress_bar((0.0)..=1.0, 0.0),
+            ),
+        };
+
+        iced::widget::column![
+            logo,
+            choice_btn_row,
+            action_btn_row,
+            progress_label,
+            progress_bar
+        ]
+        .spacing(5)
+        .padding(64)
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .align_items(iced::Alignment::Center)
+        .into()
+    }
+
+    fn board_selction_view(&self) -> Element<BBImagerMessage> {
+        let back_btn = iced::widget::button("Back")
+            .on_press(BBImagerMessage::HomePage)
+            .style(iced::widget::theme::Button::Secondary);
+        let top_row =
+            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
+
+        let item = iced::widget::button(
+            iced::widget::row![
+                iced::widget::image("icons/bcf.webp").width(100),
+                iced::widget::column![
+                    iced::widget::text("BeagleConnect Freedom").size(18),
+                    iced::widget::horizontal_space(),
+                    iced::widget::text("BeagleConnect Freedom based on Ti CC1352P7")
+                ]
+                .padding(5)
+            ]
+            .spacing(10),
+        )
+        .width(iced::Length::Fill)
+        .on_press(BBImagerMessage::BoardSelected(
+            BeagleBoardDevice::BeagleConnectFreedom,
+        ))
+        .style(iced::widget::theme::Button::Secondary);
+
+        let items = iced::widget::scrollable(iced::widget::column![item].spacing(10));
+
+        iced::widget::column![top_row, iced::widget::horizontal_rule(2), items]
+            .spacing(10)
+            .padding(10)
             .into()
     }
 
-    fn theme(&self) -> Self::Theme {
-        iced::Theme::KanagawaLotus
+    fn image_selection_view(&self) -> Element<BBImagerMessage> {
+        let back_btn = iced::widget::button("Back")
+            .on_press(BBImagerMessage::HomePage)
+            .style(iced::widget::theme::Button::Secondary);
+        let top_row =
+            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
+
+        let item = iced::widget::button(
+            iced::widget::row![
+                iced::widget::image("icons/use_custom.png").width(100),
+                iced::widget::text("Use custom image")
+            ]
+            .spacing(10),
+        )
+        .width(iced::Length::Fill)
+        .on_press(BBImagerMessage::SelectImage)
+        .style(iced::widget::theme::Button::Secondary);
+
+        let items = iced::widget::scrollable(iced::widget::column![item].spacing(10));
+
+        iced::widget::column![top_row, iced::widget::horizontal_rule(2), items]
+            .spacing(10)
+            .padding(10)
+            .into()
     }
+
+    fn destination_selection_view(&self) -> Element<BBImagerMessage> {
+        let back_btn = iced::widget::button("Back")
+            .on_press(BBImagerMessage::HomePage)
+            .style(iced::widget::theme::Button::Secondary);
+        let top_row =
+            iced::widget::row![back_btn, iced::widget::text_input("Search", "")].spacing(10);
+
+        let board = self.selected_board.unwrap();
+        let destinations = board
+            .destinations()
+            .into_iter()
+            .map(|x| {
+                iced::widget::button(iced::widget::row![
+                    iced::widget::svg("icons/ic_usb_40px.svg").width(100),
+                    iced::widget::text(x.clone())
+                ])
+                .width(iced::Length::Fill)
+                .on_press(BBImagerMessage::SelectPort(x))
+                .style(iced::widget::theme::Button::Secondary)
+            })
+            .map(Into::into);
+
+        let destinations_column = iced::widget::column(destinations).spacing(10);
+
+        iced::widget::column![
+            top_row,
+            iced::widget::horizontal_rule(2),
+            iced::widget::scrollable(destinations_column)
+        ]
+        .spacing(10)
+        .padding(10)
+        .into()
+    }
+}
+
+#[derive(Default, Debug)]
+enum Screen {
+    #[default]
+    Home,
+    BoardSelection,
+    ImageSelection,
+    DestinationSelection,
 }

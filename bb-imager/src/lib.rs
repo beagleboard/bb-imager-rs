@@ -4,7 +4,9 @@ pub mod sd;
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Status {
     Preparing,
-    Flashing(f32),
+    Flashing,
+    FlashingProgress(f32),
     Verifying,
+    VerifyingProgress(f32),
     Finished,
 }

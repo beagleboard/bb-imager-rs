@@ -308,7 +308,7 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Sta
         let mut bcf = BeagleConnectFreedom::new(&port)?;
         info!("BeagleConnectFreedom Connected");
 
-        yield crate::Status::Flashing(0.0);
+        yield crate::Status::FlashingProgress(0.0);
 
         if bcf.verify(img_crc32)? {
             warn!("Skipping flashing same image");
@@ -335,7 +335,7 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Sta
             }
 
             image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-            yield crate::Status::Flashing(progress(image_offset));
+            yield crate::Status::FlashingProgress(progress(image_offset));
         }
 
         yield crate::Status::Verifying;
