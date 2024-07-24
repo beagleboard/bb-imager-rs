@@ -349,7 +349,7 @@ impl BBImager {
 
     fn image_selection_view(&self) -> Element<BBImagerMessage> {
         let items = [(
-            PathBuf::from("icons/use_custom.png"),
+            PathBuf::from("icons/file-add.svg"),
             "Use Custom Image".to_string(),
             BBImagerMessage::SelectImage,
         )];
@@ -357,7 +357,7 @@ impl BBImager {
         iced::widget::column![
             self.search_bar(),
             iced::widget::horizontal_rule(2),
-            self.search_list_img(items)
+            self.search_list(items)
         ]
         .spacing(10)
         .padding(10)
@@ -372,7 +372,7 @@ impl BBImager {
             .into_iter()
             .map(|x| {
                 (
-                    PathBuf::from("icons/ic_usb_40px.svg"),
+                    PathBuf::from("icons/usb.svg"),
                     x.clone(),
                     BBImagerMessage::SelectPort(x),
                 )
@@ -381,14 +381,14 @@ impl BBImager {
         iced::widget::column![
             self.search_bar(),
             iced::widget::horizontal_rule(2),
-            self.search_list_svg(items)
+            self.search_list(items)
         ]
         .spacing(10)
         .padding(10)
         .into()
     }
 
-    fn search_list_img(
+    fn search_list(
         &self,
         items: impl IntoIterator<Item = (PathBuf, String, BBImagerMessage)>,
     ) -> Element<BBImagerMessage> {
@@ -396,31 +396,11 @@ impl BBImager {
             .into_iter()
             .filter(|(_, x, _)| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
             .map(|(p, t, o)| {
-                iced::widget::button(iced::widget::row![
-                    iced::widget::image(p).width(100),
-                    iced::widget::text(t)
-                ])
-                .width(iced::Length::Fill)
-                .on_press(o)
-                .style(iced::widget::theme::Button::Secondary)
-            })
-            .map(Into::into);
-
-        iced::widget::scrollable(iced::widget::column(items).spacing(10)).into()
-    }
-
-    fn search_list_svg(
-        &self,
-        items: impl IntoIterator<Item = (PathBuf, String, BBImagerMessage)>,
-    ) -> Element<BBImagerMessage> {
-        let items = items
-            .into_iter()
-            .filter(|(_, x, _)| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
-            .map(|(p, t, o)| {
-                iced::widget::button(iced::widget::row![
-                    iced::widget::svg(p).width(100),
-                    iced::widget::text(t)
-                ])
+                iced::widget::button(
+                    iced::widget::row![iced::widget::svg(p).width(40), iced::widget::text(t),]
+                        .align_items(iced::Alignment::Center)
+                        .spacing(10),
+                )
                 .width(iced::Length::Fill)
                 .on_press(o)
                 .style(iced::widget::theme::Button::Secondary)
@@ -432,7 +412,7 @@ impl BBImager {
 
     fn search_bar(&self) -> Element<BBImagerMessage> {
         iced::widget::row![
-            iced::widget::button("Back")
+            iced::widget::button(iced::widget::svg("icons/arrow-back.svg").width(22))
                 .on_press(BBImagerMessage::HomePage)
                 .style(iced::widget::theme::Button::Secondary),
             iced::widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search)
