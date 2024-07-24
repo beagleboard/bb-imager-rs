@@ -77,19 +77,19 @@ impl Application for BBImager {
         match message {
             BBImagerMessage::BoardSelected(x) => {
                 self.selected_board = Some(x);
-                self.screen = Screen::Home;
+                self.back_home();
                 Command::none()
             }
             BBImagerMessage::SelectImage => {
                 self.selected_image = rfd::FileDialog::new()
                     .add_filter("firmware", &["bin"])
                     .pick_file();
-                self.screen = Screen::Home;
+                self.back_home();
                 Command::none()
             }
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
-                self.screen = Screen::Home;
+                self.back_home();
                 Command::none()
             }
             BBImagerMessage::FlashImage => {
@@ -128,8 +128,7 @@ impl Application for BBImager {
                 Command::none()
             }
             BBImagerMessage::HomePage => {
-                self.screen = Screen::Home;
-                self.search_bar.clear();
+                self.back_home();
                 Command::none()
             }
             BBImagerMessage::BoardSectionPage => {
@@ -167,6 +166,11 @@ impl Application for BBImager {
 }
 
 impl BBImager {
+    fn back_home(&mut self) {
+        self.search_bar.clear();
+        self.screen = Screen::Home;
+    }
+
     fn home_view(&self) -> Element<BBImagerMessage> {
         const BTN_PADDING: u16 = 10;
 
@@ -301,6 +305,11 @@ impl BBImager {
             .config
             .devices()
             .iter()
+            .filter(|x| {
+                x.name
+                    .to_lowercase()
+                    .contains(&self.search_bar.to_lowercase())
+            })
             .map(|x| {
                 iced::widget::button(
                     iced::widget::row![
@@ -333,6 +342,11 @@ impl BBImager {
         let items = self
             .config
             .images_by_device(&board)
+            .filter(|x| {
+                x.name
+                    .to_lowercase()
+                    .contains(&self.search_bar.to_lowercase())
+            })
             .map(|x| {
                 let mut row3 = iced::widget::row![
                     iced::widget::text(x.version.clone()),
@@ -396,44 +410,30 @@ impl BBImager {
             .destinations()
             .unwrap()
             .into_iter()
+            .filter(|x| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
             .map(|x| {
-                (
-                    PathBuf::from("icons/usb.svg"),
-                    x.clone(),
-                    BBImagerMessage::SelectPort(x),
-                )
-            });
-
-        iced::widget::column![
-            self.search_bar(),
-            iced::widget::horizontal_rule(2),
-            self.search_list(items)
-        ]
-        .spacing(10)
-        .padding(10)
-        .into()
-    }
-
-    fn search_list(
-        &self,
-        items: impl IntoIterator<Item = (PathBuf, String, BBImagerMessage)>,
-    ) -> Element<BBImagerMessage> {
-        let items = items
-            .into_iter()
-            .filter(|(_, x, _)| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
-            .map(|(p, t, o)| {
                 iced::widget::button(
-                    iced::widget::row![iced::widget::svg(p).width(40), iced::widget::text(t),]
-                        .align_items(iced::Alignment::Center)
-                        .spacing(10),
+                    iced::widget::row![
+                        iced::widget::svg("icons/usb.svg").width(40),
+                        iced::widget::text(x.clone()),
+                    ]
+                    .align_items(iced::Alignment::Center)
+                    .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(o)
+                .on_press(BBImagerMessage::SelectPort(x))
                 .style(iced::widget::theme::Button::Secondary)
             })
             .map(Into::into);
 
-        iced::widget::scrollable(iced::widget::column(items).spacing(10)).into()
+        iced::widget::column![
+            self.search_bar(),
+            iced::widget::horizontal_rule(2),
+            iced::widget::scrollable(iced::widget::column(items).spacing(10))
+        ]
+        .spacing(10)
+        .padding(10)
+        .into()
     }
 
     fn search_bar(&self) -> Element<BBImagerMessage> {
