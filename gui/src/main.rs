@@ -15,6 +15,8 @@ fn main() -> iced::Result {
             icon: iced::window::icon::from_file("icons/bb-imager.png").ok(),
             ..Default::default()
         },
+        flags: bb_imager::config::Config::from_json(include_bytes!("../../config.json"))
+            .expect("Failed to parse config"),
         ..Default::default()
     };
 
@@ -23,8 +25,9 @@ fn main() -> iced::Result {
 
 #[derive(Default, Debug)]
 struct BBImager {
+    config: bb_imager::config::Config,
     screen: Screen,
-    selected_board: Option<BeagleBoardDevice>,
+    selected_board: Option<bb_imager::config::Device>,
     selected_image: Option<PathBuf>,
     selected_dst: Option<String>,
     flashing_status: Option<Result<bb_imager::Status, String>>,
@@ -33,14 +36,10 @@ struct BBImager {
 
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
-    BoardSelected(BeagleBoardDevice),
+    BoardSelected(bb_imager::config::Device),
     SelectImage,
     SelectPort(String),
-    FlashImage {
-        board: BeagleBoardDevice,
-        img: PathBuf,
-        port: String,
-    },
+    FlashImage,
 
     FlashingStatus(bb_imager::Status),
     FlashingFail(String),
@@ -54,48 +53,20 @@ enum BBImagerMessage {
     Search(String),
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-enum BeagleBoardDevice {
-    BeagleConnectFreedom,
-}
-
-impl std::fmt::Display for BeagleBoardDevice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BeagleBoardDevice::BeagleConnectFreedom => write!(f, "BeagleConnect Freedom"),
-        }
-    }
-}
-
-impl BeagleBoardDevice {
-    const ALL: &[Self] = &[Self::BeagleConnectFreedom];
-
-    fn flash(
-        &self,
-        img: PathBuf,
-        port: String,
-    ) -> impl Stream<Item = Result<bb_imager::Status, bb_imager::bcf::BeagleConnectFreedomError>>
-    {
-        match self {
-            BeagleBoardDevice::BeagleConnectFreedom => bb_imager::bcf::flash(img, port),
-        }
-    }
-
-    fn destinations(&self) -> Vec<String> {
-        match self {
-            BeagleBoardDevice::BeagleConnectFreedom => bb_imager::bcf::possible_devices().unwrap(),
-        }
-    }
-}
-
 impl Application for BBImager {
     type Message = BBImagerMessage;
     type Executor = executor::Default;
-    type Flags = ();
+    type Flags = bb_imager::config::Config;
     type Theme = iced::theme::Theme;
 
-    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
-        (Self::default(), Command::none())
+    fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        (
+            Self {
+                config: flags,
+                ..Default::default()
+            },
+            Command::none(),
+        )
     }
 
     fn title(&self) -> String {
@@ -121,9 +92,13 @@ impl Application for BBImager {
                 self.screen = Screen::Home;
                 Command::none()
             }
-            BBImagerMessage::FlashImage { board, img, port } => {
+            BBImagerMessage::FlashImage => {
+                let board = self.selected_board.clone().expect("No board selected");
+                let img = self.selected_image.clone().expect("No image selected");
+                let dst = self.selected_dst.clone().expect("No destination selected");
+
                 iced::command::channel(10, move |mut tx| async move {
-                    let stream = board.flash(img, port);
+                    let stream = board.flasher.flash(img, dst);
 
                     tokio::pin!(stream);
 
@@ -199,8 +174,9 @@ impl BBImager {
 
         let choose_device_btn = iced::widget::button(
             self.selected_board
+                .clone()
                 .map_or(iced::widget::text("CHOOSE DEVICE"), |x| {
-                    iced::widget::text(x.to_string())
+                    iced::widget::text(x.name)
                 }),
         )
         .on_press(BBImagerMessage::BoardSectionPage)
@@ -215,6 +191,7 @@ impl BBImager {
         )
         .on_press_maybe(
             self.selected_board
+                .clone()
                 .map(|_| BBImagerMessage::ImageSelectionPage),
         )
         .padding(BTN_PADDING);
@@ -236,12 +213,11 @@ impl BBImager {
         let reset_btn = iced::widget::button("RESET")
             .on_press(BBImagerMessage::Reset)
             .padding(BTN_PADDING);
-        let write_btn = if let (Some(board), Some(img), Some(port)) = (
-            self.selected_board,
-            self.selected_image.clone(),
-            self.selected_dst.clone(),
-        ) {
-            iced::widget::button("WRITE").on_press(BBImagerMessage::FlashImage { board, img, port })
+        let write_btn = if self.selected_board.is_some()
+            && self.selected_image.is_some()
+            && self.selected_dst.is_some()
+        {
+            iced::widget::button("WRITE").on_press(BBImagerMessage::FlashImage)
         } else {
             iced::widget::button("WRITE")
         }
@@ -321,25 +297,30 @@ impl BBImager {
     }
 
     fn board_selction_view(&self) -> Element<BBImagerMessage> {
-        let item = iced::widget::button(
-            iced::widget::row![
-                iced::widget::image("icons/bcf.webp").width(100),
-                iced::widget::column![
-                    iced::widget::text("BeagleConnect Freedom").size(18),
-                    iced::widget::horizontal_space(),
-                    iced::widget::text("BeagleConnect Freedom based on Ti CC1352P7")
-                ]
-                .padding(5)
-            ]
-            .spacing(10),
-        )
-        .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::BoardSelected(
-            BeagleBoardDevice::BeagleConnectFreedom,
-        ))
-        .style(iced::widget::theme::Button::Secondary);
+        let items = self
+            .config
+            .devices()
+            .iter()
+            .map(|x| {
+                iced::widget::button(
+                    iced::widget::row![
+                        iced::widget::image(x.icon.to_string()).width(100),
+                        iced::widget::column![
+                            iced::widget::text(x.name.clone()).size(18),
+                            iced::widget::horizontal_space(),
+                            iced::widget::text(x.description.clone())
+                        ]
+                        .padding(5)
+                    ]
+                    .spacing(10),
+                )
+                .width(iced::Length::Fill)
+                .on_press(BBImagerMessage::BoardSelected(x.clone()))
+                .style(iced::widget::theme::Button::Secondary)
+            })
+            .map(Into::into);
 
-        let items = iced::widget::scrollable(iced::widget::column![item].spacing(10));
+        let items = iced::widget::scrollable(iced::widget::column(items).spacing(10));
 
         iced::widget::column![self.search_bar(), iced::widget::horizontal_rule(2), items]
             .spacing(10)
@@ -348,16 +329,59 @@ impl BBImager {
     }
 
     fn image_selection_view(&self) -> Element<BBImagerMessage> {
-        let items = [(
-            PathBuf::from("icons/file-add.svg"),
-            "Use Custom Image".to_string(),
-            BBImagerMessage::SelectImage,
-        )];
+        let board = self.selected_board.clone().unwrap();
+        let items = self
+            .config
+            .images_by_device(&board)
+            .map(|x| {
+                let mut row3 = iced::widget::row![
+                    iced::widget::text(x.version.clone()),
+                    iced::widget::horizontal_space(),
+                ]
+                .width(iced::Length::Fill);
+
+                row3 = x
+                    .tags
+                    .iter()
+                    .fold(row3, |acc, t| acc.push(iced::widget::text(t)));
+
+                row3 = row3.push(iced::widget::horizontal_space());
+                row3 = row3.push(iced::widget::text(x.release_date));
+
+                iced::widget::button(
+                    iced::widget::row![
+                        iced::widget::image(x.icon.to_string()).width(100),
+                        iced::widget::column![
+                            iced::widget::text(x.name.clone()).size(18),
+                            iced::widget::text(x.description.clone()),
+                            row3
+                        ]
+                        .padding(5)
+                    ]
+                    .spacing(10),
+                )
+                .width(iced::Length::Fill)
+                .on_press(BBImagerMessage::SelectImage)
+                .style(iced::widget::theme::Button::Secondary)
+            })
+            .chain(std::iter::once(
+                iced::widget::button(
+                    iced::widget::row![
+                        iced::widget::svg("icons/file-add.svg").width(100),
+                        iced::widget::text("Use Custom Image").size(18),
+                    ]
+                    .spacing(10),
+                )
+                .width(iced::Length::Fill)
+                .on_press(BBImagerMessage::SelectImage)
+                .style(iced::widget::theme::Button::Secondary),
+            ))
+            .map(Into::into);
 
         iced::widget::column![
             self.search_bar(),
             iced::widget::horizontal_rule(2),
-            self.search_list(items)
+            iced::widget::scrollable(iced::widget::column(items).spacing(10))
         ]
         .spacing(10)
         .padding(10)
@@ -367,8 +391,11 @@ impl BBImager {
     fn destination_selection_view(&self) -> Element<BBImagerMessage> {
         let items = self
             .selected_board
+            .clone()
             .expect("No Board Selected")
+            .flasher
             .destinations()
+            .unwrap()
             .into_iter()
             .map(|x| {
                 (
