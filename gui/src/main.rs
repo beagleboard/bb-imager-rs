@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use iced::{
     executor,
-    futures::{SinkExt, Stream, StreamExt},
+    futures::{SinkExt, StreamExt},
     Application, Command, Element, Settings,
 };
 
@@ -178,9 +178,9 @@ impl BBImager {
 
         let choose_device_btn = iced::widget::button(
             self.selected_board
-                .clone()
+                .as_ref()
                 .map_or(iced::widget::text("CHOOSE DEVICE"), |x| {
-                    iced::widget::text(x.name)
+                    iced::widget::text(x.name.as_str())
                 }),
         )
         .on_press(BBImagerMessage::BoardSectionPage)
@@ -188,28 +188,26 @@ impl BBImager {
 
         let choose_image_btn = iced::widget::button(
             self.selected_image
-                .clone()
+                .as_ref()
                 .map_or(iced::widget::text("CHOOSE IMAGE"), |x| {
                     iced::widget::text(x.file_name().unwrap().to_string_lossy())
                 }),
         )
         .on_press_maybe(
             self.selected_board
-                .clone()
+                .as_ref()
                 .map(|_| BBImagerMessage::ImageSelectionPage),
         )
         .padding(BTN_PADDING);
 
         let choose_dst_btn = iced::widget::button(
             self.selected_dst
-                .clone()
-                .map_or(iced::widget::text("CHOOSE DESTINATION"), |x| {
-                    iced::widget::text(x)
-                }),
+                .as_ref()
+                .map_or(iced::widget::text("CHOOSE DESTINATION"), iced::widget::text),
         )
         .on_press_maybe(
             self.selected_image
-                .clone()
+                .as_ref()
                 .map(|_| BBImagerMessage::DestinationSelectionPage),
         )
         .padding(BTN_PADDING);
@@ -315,9 +313,9 @@ impl BBImager {
                     iced::widget::row![
                         iced::widget::image(x.icon.to_string()).width(100),
                         iced::widget::column![
-                            iced::widget::text(x.name.clone()).size(18),
+                            iced::widget::text(x.name.as_str()).size(18),
                             iced::widget::horizontal_space(),
-                            iced::widget::text(x.description.clone())
+                            iced::widget::text(x.description.as_str())
                         ]
                         .padding(5)
                     ]
@@ -338,7 +336,7 @@ impl BBImager {
     }
 
     fn image_selection_view(&self) -> Element<BBImagerMessage> {
-        let board = self.selected_board.clone().unwrap();
+        let board = self.selected_board.as_ref().unwrap();
         let items = self
             .config
             .images_by_device(&board)
@@ -365,8 +363,8 @@ impl BBImager {
                     iced::widget::row![
                         iced::widget::image(x.icon.to_string()).width(100),
                         iced::widget::column![
-                            iced::widget::text(x.name.clone()).size(18),
-                            iced::widget::text(x.description.clone()),
+                            iced::widget::text(x.name.as_str()).size(18),
+                            iced::widget::text(x.description.as_str()),
                             row3
                         ]
                         .padding(5)
@@ -404,7 +402,7 @@ impl BBImager {
     fn destination_selection_view(&self) -> Element<BBImagerMessage> {
         let items = self
             .selected_board
-            .clone()
+            .as_ref()
             .expect("No Board Selected")
             .flasher
             .destinations()
@@ -415,7 +413,7 @@ impl BBImager {
                 iced::widget::button(
                     iced::widget::row![
                         iced::widget::svg("icons/usb.svg").width(40),
-                        iced::widget::text(x.clone()),
+                        iced::widget::text(x.as_str()),
                     ]
                     .align_items(iced::Alignment::Center)
                     .spacing(10),
