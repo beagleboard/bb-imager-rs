@@ -30,7 +30,7 @@ pub struct Device {
     pub flasher: Flasher,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct OsList {
     pub name: String,
     pub description: String,
@@ -39,12 +39,13 @@ pub struct OsList {
     #[serde(with = "const_hex")]
     pub icon_sha256: Vec<u8>,
     pub icon_local: Option<PathBuf>,
-    url: Url,
+    pub url: Url,
     pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
-    download_sha256: Vec<u8>,
+    pub download_sha256: Vec<u8>,
+    pub extract_path: String,
     #[serde(with = "const_hex")]
-    extracted_sha256: Vec<u8>,
+    pub extracted_sha256: Vec<u8>,
     pub devices: HashSet<String>,
     pub tags: HashSet<String>,
 }
@@ -86,7 +87,7 @@ impl Flasher {
         &self,
         img: std::path::PathBuf,
         port: String,
-    ) -> impl Stream<Item = Result<crate::Status, crate::bcf::BeagleConnectFreedomError>> {
+    ) -> impl Stream<Item = Result<crate::FlashingStatus, crate::bcf::BeagleConnectFreedomError>> {
         match self {
             Flasher::SdCard => todo!(),
             Flasher::BeagleConnectFreedom => crate::bcf::flash(img, port),
@@ -122,7 +123,8 @@ mod tests {
             "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
             "release_date": "2024-07-01",
             "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "extracted_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
+            "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
+            "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
             "devices": [
                 "BeagleConnect Freedom"
             ],

@@ -21,7 +21,8 @@
             "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
             "release_date": "2024-07-01",
             "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "extracted_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
+            "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
+            "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
             "devices": [
                 "BeagleConnect Freedom"
             ],

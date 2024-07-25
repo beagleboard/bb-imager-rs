@@ -1,15 +1,6 @@
-use std::{
-    future::Future,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
-use iced::{
-    advanced::graphics::futures::MaybeSend,
-    executor,
-    futures::{SinkExt, StreamExt},
-    Application, Command, Element, Settings,
-};
+use iced::{executor, Application, Command, Element, Settings};
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
@@ -33,21 +24,38 @@ struct BBImager {
     config: bb_imager::config::Config,
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
-    selected_image: Option<PathBuf>,
+    selected_image: Option<OsImage>,
     selected_dst: Option<String>,
-    flashing_status: Option<Result<bb_imager::Status, String>>,
+    download_status: Option<Result<bb_imager::DownloadStatus, String>>,
+    flashing_status: Option<Result<bb_imager::FlashingStatus, String>>,
     search_bar: String,
+}
+
+#[derive(Debug, Clone)]
+enum OsImage {
+    Local(PathBuf),
+    Remote(bb_imager::config::OsList),
+}
+
+impl std::fmt::Display for OsImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OsImage::Local(p) => write!(f, "{}", p.file_name().unwrap().to_string_lossy()),
+            OsImage::Remote(r) => write!(f, "{}", r.name),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
     BoardSelected(bb_imager::config::Device),
-    SelectImage,
+    SelectImage(Option<bb_imager::config::OsList>),
     SelectPort(String),
-    FlashImage,
+    StartFlashing,
+    FlashImage(PathBuf),
 
-    FlashingStatus(bb_imager::Status),
-    FlashingFail(String),
+    DownloadStatus(Result<bb_imager::DownloadStatus, String>),
+    FlashingStatus(Result<bb_imager::FlashingStatus, String>),
     Reset,
 
     BoardSectionPage,
@@ -90,10 +98,14 @@ impl Application for BBImager {
                 self.back_home();
                 Command::none()
             }
-            BBImagerMessage::SelectImage => {
-                self.selected_image = rfd::FileDialog::new()
-                    .add_filter("firmware", &["bin"])
-                    .pick_file();
+            BBImagerMessage::SelectImage(x) => {
+                self.selected_image = match x {
+                    Some(y) => Some(OsImage::Remote(y)),
+                    None => rfd::FileDialog::new()
+                        .add_filter("firmware", &["bin"])
+                        .pick_file()
+                        .map(OsImage::Local),
+                };
                 self.back_home();
                 Command::none()
             }
@@ -102,22 +114,16 @@ impl Application for BBImager {
                 self.back_home();
                 Command::none()
             }
-            BBImagerMessage::FlashImage => {
+            BBImagerMessage::FlashImage(img) => {
                 let board = self.selected_board.clone().expect("No board selected");
-                let img = self.selected_image.clone().expect("No image selected");
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
-                Command::run(board.flasher.flash(img, dst), |x| match x {
-                    Ok(y) => BBImagerMessage::FlashingStatus(y),
-                    Err(y) => BBImagerMessage::FlashingFail(y.to_string()),
+                Command::run(board.flasher.flash(img, dst), |x| {
+                    BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
                 })
             }
             BBImagerMessage::FlashingStatus(x) => {
-                self.flashing_status = Some(Ok(x));
-                Command::none()
-            }
-            BBImagerMessage::FlashingFail(x) => {
-                self.flashing_status = Some(Err(x));
+                self.flashing_status = Some(x);
                 Command::none()
             }
             BBImagerMessage::Reset => {
@@ -206,6 +212,29 @@ impl Application for BBImager {
                 );
                 Command::none()
             }
+            BBImagerMessage::StartFlashing => match self.selected_image.clone().unwrap() {
+                OsImage::Local(p) => {
+                    Command::perform(std::future::ready(p), BBImagerMessage::FlashImage)
+                }
+                OsImage::Remote(r) => Command::run(
+                    bb_imager::download::download(
+                        r.url,
+                        r.download_sha256,
+                        r.extract_path,
+                        r.extracted_sha256,
+                    ),
+                    BBImagerMessage::DownloadStatus,
+                ),
+            },
+            BBImagerMessage::DownloadStatus(s) => {
+                if let Ok(bb_imager::DownloadStatus::Finished(p)) = s {
+                    self.download_status.take();
+                    Command::perform(std::future::ready(p), BBImagerMessage::FlashImage)
+                } else {
+                    self.download_status = Some(s);
+                    Command::none()
+                }
+            }
         }
     }
 
@@ -248,7 +277,7 @@ impl BBImager {
             self.selected_image
                 .as_ref()
                 .map_or(iced::widget::text("CHOOSE IMAGE"), |x| {
-                    iced::widget::text(x.file_name().unwrap().to_string_lossy())
+                    iced::widget::text(x)
                 }),
         )
         .on_press_maybe(
@@ -277,7 +306,7 @@ impl BBImager {
             && self.selected_image.is_some()
             && self.selected_dst.is_some()
         {
-            iced::widget::button("WRITE").on_press(BBImagerMessage::FlashImage)
+            iced::widget::button("WRITE").on_press(BBImagerMessage::StartFlashing)
         } else {
             iced::widget::button("WRITE")
         }
@@ -300,46 +329,7 @@ impl BBImager {
                 .height(iced::Length::Fill)
                 .align_items(iced::Alignment::Center);
 
-        let (progress_label, progress_bar) = match &self.flashing_status {
-            Some(x) => match x {
-                Ok(y) => match y {
-                    bb_imager::Status::Preparing => (
-                        iced::widget::text("Preparing..."),
-                        iced::widget::progress_bar((0.0)..=1.0, 0.0),
-                    ),
-                    bb_imager::Status::Flashing => (
-                        iced::widget::text("Flashing Image..."),
-                        iced::widget::progress_bar((0.0)..=1.0, 0.0),
-                    ),
-                    bb_imager::Status::FlashingProgress(p) => (
-                        iced::widget::text("Flashing Image..."),
-                        iced::widget::progress_bar((0.0)..=1.0, *p),
-                    ),
-                    bb_imager::Status::Verifying => (
-                        iced::widget::text("Verifying Image..."),
-                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
-                    ),
-                    bb_imager::Status::VerifyingProgress(p) => (
-                        iced::widget::text("Verifying Image..."),
-                        iced::widget::progress_bar((0.0)..=1.0, *p),
-                    ),
-                    bb_imager::Status::Finished => (
-                        iced::widget::text(format!("Flashing Success!!")),
-                        iced::widget::progress_bar((0.0)..=1.0, 1.0)
-                            .style(iced::widget::theme::ProgressBar::Success),
-                    ),
-                },
-                Err(e) => (
-                    iced::widget::text(format!("Flashing Failed: {e}")),
-                    iced::widget::progress_bar((0.0)..=1.0, 1.0)
-                        .style(iced::widget::theme::ProgressBar::Danger),
-                ),
-            },
-            None => (
-                iced::widget::text(""),
-                iced::widget::progress_bar((0.0)..=1.0, 0.0),
-            ),
-        };
+        let (progress_label, progress_bar) = self.progress();
 
         iced::widget::column![
             logo,
@@ -447,7 +437,7 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectImage)
+                .on_press(BBImagerMessage::SelectImage(Some(x.clone())))
                 .style(iced::widget::theme::Button::Secondary)
             })
             .chain(std::iter::once(
@@ -459,7 +449,7 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectImage)
+                .on_press(BBImagerMessage::SelectImage(None))
                 .style(iced::widget::theme::Button::Secondary),
             ))
             .map(Into::into);
@@ -519,6 +509,73 @@ impl BBImager {
         .spacing(10)
         .into()
     }
+
+    fn progress(&self) -> (iced::widget::Text, iced::widget::ProgressBar) {
+        if let Some(s) = &self.download_status {
+            match s {
+                Ok(x) => match x {
+                    bb_imager::DownloadStatus::Downloading => (
+                        iced::widget::text("Downloading..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
+                    ),
+                    bb_imager::DownloadStatus::DownloadingProgress(p) => (
+                        iced::widget::text("Downloading..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
+                    ),
+                    bb_imager::DownloadStatus::Finished(_) => (
+                        iced::widget::text("Downloading Successful..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                            .style(iced::widget::theme::ProgressBar::Success),
+                    ),
+                },
+                Err(e) => (
+                    iced::widget::text(format!("Downloading Image Failed: {e}")),
+                    iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                        .style(iced::widget::theme::ProgressBar::Danger),
+                ),
+            }
+        } else if let Some(s) = &self.flashing_status {
+            match s {
+                Ok(x) => match x {
+                    bb_imager::FlashingStatus::Preparing => (
+                        iced::widget::text("Preparing..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
+                    ),
+                    bb_imager::FlashingStatus::Flashing => (
+                        iced::widget::text("Flashing..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
+                    ),
+                    bb_imager::FlashingStatus::FlashingProgress(p) => (
+                        iced::widget::text("Flashing..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
+                    ),
+                    bb_imager::FlashingStatus::Verifying => (
+                        iced::widget::text("Verifying..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
+                    ),
+                    bb_imager::FlashingStatus::VerifyingProgress(p) => (
+                        iced::widget::text("Verifying..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
+                    ),
+                    bb_imager::FlashingStatus::Finished => (
+                        iced::widget::text("Flashing Successful..."),
+                        iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                            .style(iced::widget::theme::ProgressBar::Success),
+                    ),
+                },
+                Err(e) => (
+                    iced::widget::text(format!("Flashing Failed: {e}")),
+                    iced::widget::progress_bar((0.0)..=1.0, 1.0)
+                        .style(iced::widget::theme::ProgressBar::Danger),
+                ),
+            }
+        } else {
+            (
+                iced::widget::text(""),
+                iced::widget::progress_bar((0.0)..=1.0, 0.0),
+            )
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -546,50 +603,4 @@ async fn image_resolver(icon: String, sha256: Vec<u8>) -> Result<PathBuf, data_d
     })
     .await
     .unwrap()
-}
-
-mod remote_image {
-    use super::BBImagerMessage;
-
-    pub struct RemoteImage {
-        url: String,
-        sha256: Vec<u8>,
-    }
-
-    impl RemoteImage {
-        pub fn new(url: String, sha256: Vec<u8>) -> Self {
-            Self { url, sha256 }
-        }
-    }
-
-    impl iced::widget::Component<BBImagerMessage> for RemoteImage {
-        type State = bool;
-
-        type Event = ();
-
-        fn update(
-            &mut self,
-            state: &mut Self::State,
-            _event: Self::Event,
-        ) -> Option<BBImagerMessage> {
-            None
-        }
-
-        fn view(
-            &self,
-            _state: &Self::State,
-        ) -> iced::Element<'_, Self::Event, iced::Theme, iced::Renderer> {
-            let img = data_downloader::DownloadRequest {
-                url: &self.url,
-                sha256_hash: &self.sha256,
-            };
-
-            match data_downloader::get_cached(&img) {
-                Ok(x) => iced::widget::image(iced::widget::image::Handle::from_memory(x))
-                    .width(40)
-                    .into(),
-                Err(_) => iced::widget::svg("icons/downloading.svg").width(40).into(),
-            }
-        }
-    }
 }

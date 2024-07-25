@@ -292,9 +292,9 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Status>> {
+pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
-        yield crate::Status::Preparing;
+        yield crate::FlashingStatus::Preparing;
 
         let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
         let mut img =
@@ -308,11 +308,11 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Sta
         let mut bcf = BeagleConnectFreedom::new(&port)?;
         info!("BeagleConnectFreedom Connected");
 
-        yield crate::Status::FlashingProgress(0.0);
+        yield crate::FlashingStatus::FlashingProgress(0.0);
 
         if bcf.verify(img_crc32)? {
             warn!("Skipping flashing same image");
-            yield crate::Status::Finished;
+            yield crate::FlashingStatus::Finished;
         }
 
         info!("Erase Flash");
@@ -335,13 +335,13 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Sta
             }
 
             image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-            yield crate::Status::FlashingProgress(progress(image_offset));
+            yield crate::FlashingStatus::FlashingProgress(progress(image_offset));
         }
 
-        yield crate::Status::Verifying;
+        yield crate::FlashingStatus::Verifying;
         if bcf.verify(img_crc32)? {
             info!("Flashing Successful");
-            yield crate::Status::Finished;
+            yield crate::FlashingStatus::Finished;
         } else {
             error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
             Err(BeagleConnectFreedomError::InvalidImage)?;
