@@ -1,6 +1,6 @@
 //! Configuration for bb-imager to use.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use futures_core::Stream;
 use semver::Version;
@@ -9,14 +9,14 @@ use url::Url;
 
 #[derive(Deserialize, Debug, Default)]
 pub struct Config {
-    imager: Imager,
-    os_list: Vec<OsList>,
+    pub imager: Imager,
+    pub os_list: Vec<OsList>,
 }
 
 #[derive(Deserialize, Debug, Default)]
-struct Imager {
+pub struct Imager {
     latest_version: Option<Version>,
-    devices: Vec<Device>,
+    pub devices: Vec<Device>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -24,6 +24,9 @@ pub struct Device {
     pub name: String,
     pub description: String,
     pub icon: Url,
+    #[serde(with = "const_hex")]
+    pub icon_sha256: Vec<u8>,
+    pub icon_local: Option<PathBuf>,
     pub flasher: Flasher,
 }
 
@@ -33,11 +36,16 @@ pub struct OsList {
     pub description: String,
     pub version: Version,
     pub icon: Url,
+    #[serde(with = "const_hex")]
+    pub icon_sha256: Vec<u8>,
+    pub icon_local: Option<PathBuf>,
     url: Url,
     pub release_date: chrono::NaiveDate,
-    download_sha256: String,
-    image_sha256: String,
-    devices: HashSet<String>,
+    #[serde(with = "const_hex")]
+    download_sha256: Vec<u8>,
+    #[serde(with = "const_hex")]
+    extracted_sha256: Vec<u8>,
+    pub devices: HashSet<String>,
     pub tags: HashSet<String>,
 }
 
@@ -56,8 +64,13 @@ impl Config {
         &self.imager.devices
     }
 
-    pub fn images_by_device<'a>(&'a self, device: &'a Device) -> impl Iterator<Item = &OsList> + 'a {
-        self.os_list.iter().filter(|x| x.devices.contains(&device.name))
+    pub fn images_by_device<'a>(
+        &'a self,
+        device: &'a Device,
+    ) -> impl Iterator<Item = &OsList> + 'a {
+        self.os_list
+            .iter()
+            .filter(|x| x.devices.contains(&device.name))
     }
 }
 
@@ -93,7 +106,8 @@ mod tests {
             {
                 "name": "BeagleConnect Freedom",
                 "description": "BeagleConnect Freedom based on Ti CC1352P7",
-                "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTwA7tuf_2QUzXgjGiPx1zsCrWg03xtfn-O9Q&s",
+                "icon": "https://www.mouser.in/images/marketingid/2023/img/188989252.png",
+                "icon_sha256": "6b9aa96b41b90c039349572cdafcc48d648ab01fbf1f095375e9e8eac612c1db",
                 "flasher": "BeagleConnectFreedom"
             }
         ]
@@ -104,10 +118,11 @@ mod tests {
             "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
             "version": "0.0.2",
             "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+            "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
             "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
             "release_date": "2024-07-01",
             "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "image_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
+            "extracted_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
             "devices": [
                 "BeagleConnect Freedom"
             ],

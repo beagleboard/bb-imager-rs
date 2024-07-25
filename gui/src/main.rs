@@ -1,6 +1,11 @@
-use std::path::PathBuf;
+use std::{
+    future::Future,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use iced::{
+    advanced::graphics::futures::MaybeSend,
     executor,
     futures::{SinkExt, StreamExt},
     Application, Command, Element, Settings,
@@ -51,6 +56,11 @@ enum BBImagerMessage {
     HomePage,
 
     Search(String),
+    BoardImageDownloaded { index: usize, path: PathBuf },
+    BoardImageDownloadFailed { index: usize, error: String },
+
+    OsListImageDownloaded { index: usize, path: PathBuf },
+    OsListDownloadFailed { index: usize, error: String },
 }
 
 impl Application for BBImager {
@@ -97,19 +107,9 @@ impl Application for BBImager {
                 let img = self.selected_image.clone().expect("No image selected");
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
-                iced::command::channel(10, move |mut tx| async move {
-                    let stream = board.flasher.flash(img, dst);
-
-                    tokio::pin!(stream);
-
-                    while let Some(x) = stream.next().await {
-                        let temp = match x {
-                            Ok(y) => BBImagerMessage::FlashingStatus(y),
-                            Err(y) => BBImagerMessage::FlashingFail(y.to_string()),
-                        };
-
-                        let _ = tx.send(temp).await;
-                    }
+                Command::run(board.flasher.flash(img, dst), |x| match x {
+                    Ok(y) => BBImagerMessage::FlashingStatus(y),
+                    Err(y) => BBImagerMessage::FlashingFail(y.to_string()),
                 })
             }
             BBImagerMessage::FlashingStatus(x) => {
@@ -133,11 +133,45 @@ impl Application for BBImager {
             }
             BBImagerMessage::BoardSectionPage => {
                 self.screen = Screen::BoardSelection;
-                Command::none()
+                tracing::info!("Start Image Download");
+                Command::batch(self.config.devices().iter().enumerate().map(|(index, v)| {
+                    Command::perform(
+                        image_resolver(v.icon.to_string(), v.icon_sha256.clone()),
+                        move |p| match p {
+                            Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
+                            Err(e) => BBImagerMessage::BoardImageDownloadFailed {
+                                index,
+                                error: e.to_string(),
+                            },
+                        },
+                    )
+                }))
             }
             BBImagerMessage::ImageSelectionPage => {
                 self.screen = Screen::ImageSelection;
-                Command::none()
+                let board = self.selected_board.as_ref().unwrap().name.clone();
+
+                Command::batch(
+                    self.config
+                        .os_list
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, v)| v.devices.contains(&board))
+                        .map(|(index, v)| {
+                            Command::perform(
+                                image_resolver(v.icon.to_string(), v.icon_sha256.clone()),
+                                move |p| match p {
+                                    Ok(path) => {
+                                        BBImagerMessage::OsListImageDownloaded { index, path }
+                                    }
+                                    Err(e) => BBImagerMessage::OsListDownloadFailed {
+                                        index,
+                                        error: e.to_string(),
+                                    },
+                                },
+                            )
+                        }),
+                )
             }
             BBImagerMessage::DestinationSelectionPage => {
                 self.screen = Screen::DestinationSelection;
@@ -146,6 +180,30 @@ impl Application for BBImager {
 
             BBImagerMessage::Search(x) => {
                 self.search_bar = x;
+                Command::none()
+            }
+            BBImagerMessage::BoardImageDownloaded { index, path } => {
+                tracing::info!("Successfully downloaded to {:?}", path);
+                self.config.imager.devices[index].icon_local = Some(path);
+                Command::none()
+            }
+            BBImagerMessage::BoardImageDownloadFailed { index, error } => {
+                tracing::warn!(
+                    "Failed to fetch icon for {:?}, Error: {error}",
+                    self.config.imager.devices[index]
+                );
+                Command::none()
+            }
+            BBImagerMessage::OsListImageDownloaded { index, path } => {
+                tracing::info!("Successfully downloaded to {:?}", path);
+                self.config.os_list[index].icon_local = Some(path);
+                Command::none()
+            }
+            BBImagerMessage::OsListDownloadFailed { index, error } => {
+                tracing::warn!(
+                    "Failed to fetch icon for {:?}, Error: {error}",
+                    self.config.imager.devices[index]
+                );
                 Command::none()
             }
         }
@@ -309,9 +367,19 @@ impl BBImager {
                     .contains(&self.search_bar.to_lowercase())
             })
             .map(|x| {
+                let image: Element<BBImagerMessage> = match &x.icon_local {
+                    Some(y) => iced::widget::image(iced::widget::image::Handle::from_memory(
+                        std::fs::read(y).unwrap(),
+                    ))
+                    .width(100)
+                    .height(100)
+                    .into(),
+                    None => iced::widget::svg("icons/downloading.svg").width(40).into(),
+                };
+
                 iced::widget::button(
                     iced::widget::row![
-                        iced::widget::image(x.icon.to_string()).width(100),
+                        image,
                         iced::widget::column![
                             iced::widget::text(x.name.as_str()).size(18),
                             iced::widget::horizontal_space(),
@@ -319,6 +387,7 @@ impl BBImager {
                         ]
                         .padding(5)
                     ]
+                    .align_items(iced::Alignment::Center)
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
@@ -361,7 +430,12 @@ impl BBImager {
 
                 iced::widget::button(
                     iced::widget::row![
-                        iced::widget::image(x.icon.to_string()).width(100),
+                        iced::widget::svg(
+                            x.icon_local
+                                .clone()
+                                .unwrap_or(PathBuf::from("icons/downloading.svg"))
+                        )
+                        .width(100),
                         iced::widget::column![
                             iced::widget::text(x.name.as_str()).size(18),
                             iced::widget::text(x.description.as_str()),
@@ -369,6 +443,7 @@ impl BBImager {
                         ]
                         .padding(5)
                     ]
+                    .align_items(iced::Alignment::Center)
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
@@ -453,4 +528,68 @@ enum Screen {
     BoardSelection,
     ImageSelection,
     DestinationSelection,
+}
+
+async fn image_resolver(icon: String, sha256: Vec<u8>) -> Result<PathBuf, data_downloader::Error> {
+    tokio::task::spawn_blocking(move || {
+        let downloader = data_downloader::DownloadRequest {
+            url: icon.as_str(),
+            sha256_hash: sha256.as_slice(),
+        };
+
+        data_downloader::DownloaderBuilder::new()
+            .retry_attempts(0)
+            .timeout(Some(Duration::from_secs(10)))
+            .build()
+            .unwrap()
+            .get_path(&downloader)
+    })
+    .await
+    .unwrap()
+}
+
+mod remote_image {
+    use super::BBImagerMessage;
+
+    pub struct RemoteImage {
+        url: String,
+        sha256: Vec<u8>,
+    }
+
+    impl RemoteImage {
+        pub fn new(url: String, sha256: Vec<u8>) -> Self {
+            Self { url, sha256 }
+        }
+    }
+
+    impl iced::widget::Component<BBImagerMessage> for RemoteImage {
+        type State = bool;
+
+        type Event = ();
+
+        fn update(
+            &mut self,
+            state: &mut Self::State,
+            _event: Self::Event,
+        ) -> Option<BBImagerMessage> {
+            None
+        }
+
+        fn view(
+            &self,
+            _state: &Self::State,
+        ) -> iced::Element<'_, Self::Event, iced::Theme, iced::Renderer> {
+            let img = data_downloader::DownloadRequest {
+                url: &self.url,
+                sha256_hash: &self.sha256,
+            };
+
+            match data_downloader::get_cached(&img) {
+                Ok(x) => iced::widget::image(iced::widget::image::Handle::from_memory(x))
+                    .width(40)
+                    .into(),
+                Err(_) => iced::widget::svg("icons/downloading.svg").width(40).into(),
+            }
+        }
+    }
 }
