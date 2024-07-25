@@ -2,7 +2,7 @@
 
 use std::{collections::HashSet, path::PathBuf};
 
-use futures_core::Stream;
+use futures_util::{Stream, TryStreamExt};
 use semver::Version;
 use serde::Deserialize;
 use url::Url;
@@ -76,10 +76,10 @@ impl Config {
 }
 
 impl Flasher {
-    pub fn destinations(&self) -> Result<Vec<String>, crate::bcf::BeagleConnectFreedomError> {
+    pub fn destinations(&self) -> crate::error::Result<Vec<String>> {
         match self {
             Flasher::SdCard => todo!(),
-            Flasher::BeagleConnectFreedom => crate::bcf::possible_devices(),
+            Flasher::BeagleConnectFreedom => crate::bcf::possible_devices().map_err(Into::into),
         }
     }
 
@@ -87,10 +87,10 @@ impl Flasher {
         &self,
         img: std::path::PathBuf,
         port: String,
-    ) -> impl Stream<Item = Result<crate::FlashingStatus, crate::bcf::BeagleConnectFreedomError>> {
+    ) -> impl Stream<Item = crate::error::Result<crate::FlashingStatus>> {
         match self {
             Flasher::SdCard => todo!(),
-            Flasher::BeagleConnectFreedom => crate::bcf::flash(img, port),
+            Flasher::BeagleConnectFreedom => crate::bcf::flash(img, port).map_err(Into::into),
         }
     }
 }

@@ -4,6 +4,7 @@ pub mod bcf;
 pub mod config;
 pub mod sd;
 pub mod download;
+pub mod error;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FlashingStatus {

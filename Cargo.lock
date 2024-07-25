@@ -458,7 +458,7 @@ dependencies = [
  "crc32fast",
  "data_downloader",
  "fatfs",
- "futures-core",
+ "futures-util",
  "semver",
  "serde",
  "serde_json",

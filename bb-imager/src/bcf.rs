@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use futures_core::Stream;
+use futures_util::Stream;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
@@ -25,10 +25,10 @@ const COMMAND_MAX_SIZE: u8 = u8::MAX - 3;
 
 const FIRMWARE_SIZE: u32 = 704 * 1024;
 
-type Result<T, E = BeagleConnectFreedomError> = std::result::Result<T, E>;
+type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Error, Debug)]
-pub enum BeagleConnectFreedomError {
+#[derive(Error, Debug, Clone, Copy)]
+pub enum Error {
     #[error("Status for unknown Command")]
     UnknownCmd,
     #[error("Status for invalid Command (in other words, incorrect packet size)")]
@@ -55,7 +55,7 @@ pub enum BeagleConnectFreedomError {
     InvalidImage,
 }
 
-impl From<u8> for BeagleConnectFreedomError {
+impl From<u8> for Error {
     fn from(value: u8) -> Self {
         match value {
             0x41 => Self::UnknownCmd,
@@ -76,12 +76,12 @@ impl BeagleConnectFreedom {
         let port = serialport::new(port, 500000)
             .timeout(Duration::from_millis(500))
             .open()
-            .map_err(|_| BeagleConnectFreedomError::FailedToOpenPort)?;
+            .map_err(|_| Error::FailedToOpenPort)?;
 
         let mut bcf = BeagleConnectFreedom { port };
 
         bcf.invoke_bootloader()
-            .map_err(|_| BeagleConnectFreedomError::FailedToStartBootloader)?;
+            .map_err(|_| Error::FailedToStartBootloader)?;
         bcf.send_sync()?;
 
         Ok(bcf)
@@ -93,13 +93,13 @@ impl BeagleConnectFreedom {
         while buf[0] == 0x00 {
             self.port
                 .read_exact(&mut buf)
-                .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+                .map_err(|_| Error::FailedToRead)?;
         }
 
         match buf[0] {
             ACK => Ok(()),
-            NACK => Err(BeagleConnectFreedomError::Nack),
-            _ => Err(BeagleConnectFreedomError::UnknownResponse),
+            NACK => Err(Error::Nack),
+            _ => Err(Error::UnknownResponse),
         }
     }
 
@@ -121,7 +121,7 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(PKT)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()
     }
@@ -140,29 +140,29 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[15, checksum, COMMAND_CRC32])
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&addr)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&size)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&read_repeat)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
 
         self.port
             .read_exact(&mut cmd)
-            .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+            .map_err(|_| Error::FailedToRead)?;
         assert_eq!(cmd[0], 6);
 
         let checksum = cmd[1];
 
         self.port
             .read_exact(&mut cmd_data)
-            .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+            .map_err(|_| Error::FailedToRead)?;
         assert_eq!(
             checksum,
             cmd_data.iter().fold(0u8, |acc, x| acc.wrapping_add(*x))
@@ -177,7 +177,7 @@ impl BeagleConnectFreedom {
         const PKT: &[u8] = &[0x00, ACK];
         self.port
             .write_all(PKT)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)
+            .map_err(|_| Error::FailedToSend)
     }
 
     fn send_bank_erase(&mut self) -> Result<()> {
@@ -185,7 +185,7 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(CMD)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
         self.get_status()
@@ -197,28 +197,28 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(CMD)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
 
         while resp[0] == 0x00 {
             self.port
                 .read(&mut resp)
-                .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+                .map_err(|_| Error::FailedToRead)?;
         }
 
         self.port
             .read(&mut resp)
-            .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+            .map_err(|_| Error::FailedToRead)?;
         self.port
             .read(&mut resp)
-            .map_err(|_| BeagleConnectFreedomError::FailedToRead)?;
+            .map_err(|_| Error::FailedToRead)?;
 
         self.send_ack()?;
 
         match resp[0] {
             0x40 => Ok(()),
-            _ => Err(BeagleConnectFreedomError::from(resp[0])),
+            _ => Err(Error::from(resp[0])),
         }
     }
 
@@ -234,13 +234,13 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[11, checksum, COMMAND_DOWNLOAD])
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&addr)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&size)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
         self.get_status()
@@ -256,10 +256,10 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[(bytes_to_write + 3) as u8, checksum, COMMAND_SEND_DATA])
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&data[..bytes_to_write])
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
         self.get_status()?;
@@ -272,7 +272,7 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(CMD)
-            .map_err(|_| BeagleConnectFreedomError::FailedToSend)?;
+            .map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()
     }
@@ -298,9 +298,9 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Fla
 
         let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
         let mut img =
-            std::fs::File::open(img).map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
+            std::fs::File::open(img).map_err(|_| Error::FailedToOpenImage)?;
         img.read_to_end(&mut firmware)
-            .map_err(|_| BeagleConnectFreedomError::FailedToOpenImage)?;
+            .map_err(|_| Error::FailedToOpenImage)?;
 
         assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
         let img_crc32 = crc32fast::hash(firmware.as_slice());
@@ -344,14 +344,14 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Fla
             yield crate::FlashingStatus::Finished;
         } else {
             error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-            Err(BeagleConnectFreedomError::InvalidImage)?;
+            Err(Error::InvalidImage)?;
         }
     }
 }
 
 pub fn possible_devices() -> Result<Vec<String>> {
     Ok(serialport::available_ports()
-        .map_err(|_| BeagleConnectFreedomError::FailedToOpenPort)?
+        .map_err(|_| Error::FailedToOpenPort)?
         .into_iter()
         .map(|x| x.port_name)
         .collect())

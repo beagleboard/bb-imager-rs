@@ -26,8 +26,8 @@ struct BBImager {
     selected_board: Option<bb_imager::config::Device>,
     selected_image: Option<OsImage>,
     selected_dst: Option<String>,
-    download_status: Option<Result<bb_imager::DownloadStatus, String>>,
-    flashing_status: Option<Result<bb_imager::FlashingStatus, String>>,
+    download_status: Option<bb_imager::error::Result<bb_imager::DownloadStatus>>,
+    flashing_status: Option<bb_imager::error::Result<bb_imager::FlashingStatus>>,
     search_bar: String,
 }
 
@@ -54,8 +54,8 @@ enum BBImagerMessage {
     StartFlashing,
     FlashImage(PathBuf),
 
-    DownloadStatus(Result<bb_imager::DownloadStatus, String>),
-    FlashingStatus(Result<bb_imager::FlashingStatus, String>),
+    DownloadStatus(bb_imager::error::Result<bb_imager::DownloadStatus>),
+    FlashingStatus(bb_imager::error::Result<bb_imager::FlashingStatus>),
     Reset,
 
     BoardSectionPage,
@@ -119,7 +119,7 @@ impl Application for BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
                 Command::run(board.flasher.flash(img, dst), |x| {
-                    BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
+                    BBImagerMessage::FlashingStatus(x)
                 })
             }
             BBImagerMessage::FlashingStatus(x) => {

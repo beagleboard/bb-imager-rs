@@ -1,14 +1,21 @@
 //! Module for downloading remote images for flashing
 
-use futures_core::Stream;
+use futures_util::Stream;
 use std::time::Duration;
+use thiserror::Error;
+
+#[derive(Error, Debug, Clone, Copy)]
+pub enum Error {
+    #[error("UnknownError")]
+    UnknownError,
+}
 
 pub fn download(
     remote_zip: url::Url,
     zip_sha256: Vec<u8>,
     path_in_zip: String,
     img_sha256: Vec<u8>,
-) -> impl Stream<Item = Result<crate::DownloadStatus, String>> {
+) -> impl Stream<Item = crate::error::Result<crate::DownloadStatus>> {
     async_stream::try_stream! {
         yield crate::DownloadStatus::Downloading;
 
@@ -28,7 +35,7 @@ pub fn download(
                 .build()
                 .unwrap()
                 .get_path(img)
-        }).await.unwrap().map_err(|e| e.to_string())?;
+        }).await.unwrap().map_err(|_| Error::UnknownError)?;
 
         yield crate::DownloadStatus::Finished(res);
     }
