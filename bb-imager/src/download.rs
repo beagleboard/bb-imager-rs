@@ -15,6 +15,7 @@ use tokio_util::io::StreamReader;
 use crate::{error::Result, DownloadStatus};
 
 const BUF_SIZE: usize = 8 * 1024;
+const FILE_NAME_TRIES: usize = 10;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -53,14 +54,32 @@ impl Downloader {
 
         let dirs = ProjectDirs::from("org", "beagleboard", "bb-imager").unwrap();
 
+        if let Err(e) = std::fs::create_dir(dirs.cache_dir()) {
+            if e.kind() != io::ErrorKind::AlreadyExists {
+                panic!("{}", e)
+            }
+        }
+
         Self { client, dirs }
+    }
+
+    pub async fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
+        let file_name = const_hex::encode(sha256);
+        let file_path = self.dirs.cache_dir().join(file_name);
+
+        if file_path.exists() {
+            let x = sha256_file(&file_path).await.ok()?;
+            if x == sha256 {
+                return Some(file_path);
+            }
+        }
+
+        None
     }
 
     pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
         let file_name = const_hex::encode(sha256);
-        let file_path = self.dirs.cache_dir().with_file_name(file_name);
-
-        tracing::info!("Trying to download {:?}", file_path);
+        let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
             let x = sha256_file(&file_path).await?;
@@ -81,12 +100,12 @@ impl Downloader {
 
         tokio::io::copy_buf(&mut response_reader, &mut file).await?;
 
-        let x = sha256_file(&tmp_file_path).await?;
+        let x = sha256_file(tmp_file_path.path()).await?;
         if x != sha256 {
             return Err(Error::Sha256Error.into());
         }
 
-        tokio::fs::rename(tmp_file_path, &file_path).await?;
+        tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
 
         Ok(file_path)
     }
@@ -145,7 +164,7 @@ impl Downloader {
 
             yield DownloadStatus::VerifyingProgress(0.0);
 
-            let sha_stream = sha256_file_progress(tmp_file_path.clone());
+            let sha_stream = sha256_file_progress(tmp_file_path.path().to_path_buf());
 
             for await v in sha_stream {
                 let val = v?;
@@ -159,7 +178,7 @@ impl Downloader {
                 }
             }
 
-            tokio::fs::rename(tmp_file_path, &file_path).await?;
+            tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
 
             yield DownloadStatus::Finished(file_path);
         }
@@ -218,11 +237,11 @@ async fn sha256_file(path: &Path) -> Result<[u8; 32]> {
         .expect("SHA-256 is 32 bytes"))
 }
 
-async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, PathBuf)> {
-    for i in 0..10 {
+async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {
+    for i in 0..FILE_NAME_TRIES {
         let p = path.with_extension(format!("tmp.{}", i));
         if let Ok(f) = tokio::fs::File::create_new(&p).await {
-            return Ok((f, p));
+            return Ok((f, TempFile::new(p)));
         }
     }
 
@@ -235,4 +254,25 @@ async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, PathBuf)> {
 enum Sha256State {
     Progress(f32),
     Finish([u8; 32]),
+}
+
+#[derive(Clone)]
+struct TempFile {
+    path: PathBuf,
+}
+
+impl TempFile {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
 }

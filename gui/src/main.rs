@@ -70,6 +70,7 @@ enum BBImagerMessage {
 
     OsListImageDownloaded { index: usize, path: PathBuf },
     OsListDownloadFailed { index: usize, error: String },
+    Null,
 }
 
 impl Application for BBImager {
@@ -79,12 +80,39 @@ impl Application for BBImager {
     type Theme = iced::theme::Theme;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        let downloader = bb_imager::download::Downloader::default();
+
+        let board_image_from_cache = flags.devices().iter().enumerate().map(|(index, v)| {
+            Command::perform(
+                downloader
+                    .clone()
+                    .check_cache(v.icon.clone(), v.icon_sha256),
+                move |p| match p {
+                    Some(path) => BBImagerMessage::BoardImageDownloaded { index, path },
+                    None => BBImagerMessage::Null,
+                },
+            )
+        });
+
+        let os_image_from_cache = flags.os_list.iter().enumerate().map(|(index, v)| {
+            Command::perform(
+                downloader
+                    .clone()
+                    .check_cache(v.icon.clone(), v.icon_sha256),
+                move |p| match p {
+                    Some(path) => BBImagerMessage::OsListImageDownloaded { index, path },
+                    None => BBImagerMessage::Null,
+                },
+            )
+        });
+
         (
             Self {
-                config: flags,
+                config: flags.clone(),
+                downloader: downloader.clone(),
                 ..Default::default()
             },
-            Command::none(),
+            Command::batch(board_image_from_cache.chain(os_image_from_cache)),
         )
     }
 
@@ -140,49 +168,54 @@ impl Application for BBImager {
             }
             BBImagerMessage::BoardSectionPage => {
                 self.screen = Screen::BoardSelection;
-                tracing::info!("Start Image Download");
-                Command::batch(self.config.devices().iter().enumerate().map(|(index, v)| {
-                    Command::perform(
-                        self.downloader
-                            .clone()
-                            .download(v.icon.clone(), v.icon_sha256),
-                        move |p| match p {
-                            Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
-                            Err(e) => BBImagerMessage::BoardImageDownloadFailed {
-                                index,
-                                error: e.to_string(),
+                let jobs = self
+                    .config
+                    .devices()
+                    .iter()
+                    .filter(|x| x.icon_local.is_none())
+                    .enumerate()
+                    .map(|(index, v)| {
+                        Command::perform(
+                            self.downloader
+                                .clone()
+                                .download(v.icon.clone(), v.icon_sha256),
+                            move |p| match p {
+                                Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
+                                Err(e) => BBImagerMessage::BoardImageDownloadFailed {
+                                    index,
+                                    error: e.to_string(),
+                                },
                             },
-                        },
-                    )
-                }))
+                        )
+                    });
+                Command::batch(jobs)
             }
             BBImagerMessage::ImageSelectionPage => {
                 self.screen = Screen::ImageSelection;
                 let board = self.selected_board.as_ref().unwrap().name.clone();
-
-                Command::batch(
-                    self.config
-                        .os_list
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, v)| v.devices.contains(&board))
-                        .map(|(index, v)| {
-                            Command::perform(
-                                self.downloader
-                                    .clone()
-                                    .download(v.icon.clone(), v.icon_sha256),
-                                move |p| match p {
-                                    Ok(path) => {
-                                        BBImagerMessage::OsListImageDownloaded { index, path }
-                                    }
-                                    Err(e) => BBImagerMessage::OsListDownloadFailed {
-                                        index,
-                                        error: e.to_string(),
-                                    },
+                let jobs = self
+                    .config
+                    .os_list
+                    .iter()
+                    .filter(|x| x.icon_local.is_none())
+                    .enumerate()
+                    .filter(|(_, v)| v.devices.contains(&board))
+                    .map(|(index, v)| {
+                        Command::perform(
+                            self.downloader
+                                .clone()
+                                .download(v.icon.clone(), v.icon_sha256),
+                            move |p| match p {
+                                Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
+                                Err(e) => BBImagerMessage::OsListDownloadFailed {
+                                    index,
+                                    error: e.to_string(),
                                 },
-                            )
-                        }),
-                )
+                            },
+                        )
+                    });
+
+                Command::batch(jobs)
             }
             BBImagerMessage::DestinationSelectionPage => {
                 self.screen = Screen::DestinationSelection;
@@ -232,6 +265,7 @@ impl Application for BBImager {
                     Command::none()
                 }
             }
+            BBImagerMessage::Null => Command::none(),
         }
     }
 

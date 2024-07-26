@@ -7,13 +7,13 @@ use semver::Version;
 use serde::Deserialize;
 use url::Url;
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
     pub imager: Imager,
     pub os_list: Vec<OsList>,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct Imager {
     latest_version: Option<Version>,
     pub devices: Vec<Device>,
