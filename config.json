@@ -1,34 +1,59 @@
 {
-    "imager": {
-        "latest_version": "2.0.0",
-        "devices": [
-            {
-                "name": "BeagleConnect Freedom",
-                "description": "BeagleConnect Freedom based on Ti CC1352P7",
-                "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
-                "icon_sha256": "790c74aa8e4bcfe59dca18907e2c775b1874daacac7f399ddb130a572e79cd6d",
-                "flasher": "BeagleConnectFreedom"
-            }
-        ]
-    },
-    "os_list": [
-        {
-            "name": "MicroBlocks",
-            "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-            "version": "0.0.2",
-            "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-            "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
-            "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
-            "release_date": "2024-07-01",
-            "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
-            "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
-            "devices": [
-                "BeagleConnect Freedom"
-            ],
-            "tags": [
-                "zephyr"
-            ]
-        }
+  "imager": {
+    "latest_version": "2.0.0",
+    "devices": [
+      {
+        "name": "BeagleConnect Freedom",
+        "description": "BeagleConnect Freedom based on Ti CC1352P7",
+        "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
+        "icon_sha256": "790c74aa8e4bcfe59dca18907e2c775b1874daacac7f399ddb130a572e79cd6d",
+        "flasher": "BeagleConnectFreedom"
+      },
+      {
+        "name": "BeaglePlay",
+        "description": "BeaglePlay and other boards based on Ti AM62",
+        "icon": "https://www.beagleboard.org/app/uploads/2023/03/45front.webp",
+        "icon_sha256": "a78111eb3eeb319582d376f3a8981fb3cf3c47ab669159bfeb35c0671233990e",
+        "flasher": "SdCard"
+      }
     ]
+  },
+  "os_list": [
+    {
+      "name": "MicroBlocks",
+      "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
+      "version": "0.0.2",
+      "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+      "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
+      "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
+      "release_date": "2024-07-01",
+      "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
+      "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
+      "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
+      "devices": [
+        "BeagleConnect Freedom"
+      ],
+      "tags": [
+        "zephyr"
+      ]
+    },
+    {
+      "name": "Debian 12.6 2024-07-04 XFCE Flasher",
+      "description": "Debian eMMC Flasher graphical user interface (Xfce) image for BeaglePlay based on TI AM62 processor",
+      "version": "0.0.1",
+      "icon": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Debian-OpenLogo.svg",
+      "icon_sha256": "a759c381560e82e8d719e0038d0d95209b85c00b0d0f6b92c5fc510b959226b7",
+      "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/beagleplay-emmc-flasher-debian-12.6-xfce-arm64-2024-07-04-12gb.img.xz",
+      "release_date": "2024-07-04",
+      "download_sha256": "a7d0e4b70ef9780a69d457e60d69684eb2cd0e8f1ef465be742de854165a5942",
+      "extracted_sha256": "29b8a53f0e0954ee814d7bc5ccb6220d342fd13c5710a1d5b40fc6c0e4b2ff7f",
+      "devices": [
+        "BeaglePlay"
+      ],
+      "tags": [
+        "linux",
+        "debian"
+      ]
+    }
+  ]
 }

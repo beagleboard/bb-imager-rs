@@ -25,7 +25,7 @@ pub struct Device {
     pub description: String,
     pub icon: Url,
     #[serde(with = "const_hex")]
-    pub icon_sha256: Vec<u8>,
+    pub icon_sha256: [u8; 32],
     pub icon_local: Option<PathBuf>,
     pub flasher: Flasher,
 }
@@ -37,15 +37,15 @@ pub struct OsList {
     pub version: Version,
     pub icon: Url,
     #[serde(with = "const_hex")]
-    pub icon_sha256: Vec<u8>,
+    pub icon_sha256: [u8; 32],
     pub icon_local: Option<PathBuf>,
     pub url: Url,
     pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
-    pub download_sha256: Vec<u8>,
-    pub extract_path: String,
+    pub download_sha256: [u8; 32],
+    pub extract_path: Option<String>,
     #[serde(with = "const_hex")]
-    pub extracted_sha256: Vec<u8>,
+    pub extracted_sha256: [u8; 32],
     pub devices: HashSet<String>,
     pub tags: HashSet<String>,
 }

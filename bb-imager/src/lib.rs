@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 pub mod bcf;
 pub mod config;
-pub mod sd;
 pub mod download;
 pub mod error;
+pub mod sd;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FlashingStatus {
@@ -18,7 +18,7 @@ pub enum FlashingStatus {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DownloadStatus {
-    Downloading,
     DownloadingProgress(f32),
+    VerifyingProgress(f32),
     Finished(PathBuf),
 }

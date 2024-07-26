@@ -10,7 +10,5 @@ bb-imager = { path = "../bb-imager" }
 tokio = { version = "1.39.1" }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
-iced_aw = "0.9.3"
-data_downloader = { version = "0.2.0", features = ["zip"] }
+iced_aw = { version = "0.9.3", default-features = false, features = ["badge"] }
 url = "2.5.2"
-hex-literal = "0.4.1"

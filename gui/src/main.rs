@@ -22,12 +22,13 @@ fn main() -> iced::Result {
 #[derive(Default, Debug)]
 struct BBImager {
     config: bb_imager::config::Config,
+    downloader: bb_imager::download::Downloader,
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
     selected_image: Option<OsImage>,
     selected_dst: Option<String>,
-    download_status: Option<bb_imager::error::Result<bb_imager::DownloadStatus>>,
-    flashing_status: Option<bb_imager::error::Result<bb_imager::FlashingStatus>>,
+    download_status: Option<Result<bb_imager::DownloadStatus, String>>,
+    flashing_status: Option<Result<bb_imager::FlashingStatus, String>>,
     search_bar: String,
 }
 
@@ -54,8 +55,8 @@ enum BBImagerMessage {
     StartFlashing,
     FlashImage(PathBuf),
 
-    DownloadStatus(bb_imager::error::Result<bb_imager::DownloadStatus>),
-    FlashingStatus(bb_imager::error::Result<bb_imager::FlashingStatus>),
+    DownloadStatus(Result<bb_imager::DownloadStatus, String>),
+    FlashingStatus(Result<bb_imager::FlashingStatus, String>),
     Reset,
 
     BoardSectionPage,
@@ -119,11 +120,11 @@ impl Application for BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
                 Command::run(board.flasher.flash(img, dst), |x| {
-                    BBImagerMessage::FlashingStatus(x)
+                    BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
                 })
             }
             BBImagerMessage::FlashingStatus(x) => {
-                self.flashing_status = Some(x);
+                self.flashing_status = Some(x.map_err(|e| e.to_string()));
                 Command::none()
             }
             BBImagerMessage::Reset => {
@@ -142,7 +143,9 @@ impl Application for BBImager {
                 tracing::info!("Start Image Download");
                 Command::batch(self.config.devices().iter().enumerate().map(|(index, v)| {
                     Command::perform(
-                        image_resolver(v.icon.to_string(), v.icon_sha256.clone()),
+                        self.downloader
+                            .clone()
+                            .download(v.icon.clone(), v.icon_sha256),
                         move |p| match p {
                             Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
                             Err(e) => BBImagerMessage::BoardImageDownloadFailed {
@@ -165,7 +168,9 @@ impl Application for BBImager {
                         .filter(|(_, v)| v.devices.contains(&board))
                         .map(|(index, v)| {
                             Command::perform(
-                                image_resolver(v.icon.to_string(), v.icon_sha256.clone()),
+                                self.downloader
+                                    .clone()
+                                    .download(v.icon.clone(), v.icon_sha256),
                                 move |p| match p {
                                     Ok(path) => {
                                         BBImagerMessage::OsListImageDownloaded { index, path }
@@ -216,15 +221,7 @@ impl Application for BBImager {
                 OsImage::Local(p) => {
                     Command::perform(std::future::ready(p), BBImagerMessage::FlashImage)
                 }
-                OsImage::Remote(r) => Command::run(
-                    bb_imager::download::download(
-                        r.url,
-                        r.download_sha256,
-                        r.extract_path,
-                        r.extracted_sha256,
-                    ),
-                    BBImagerMessage::DownloadStatus,
-                ),
+                OsImage::Remote(r) => todo!(),
             },
             BBImagerMessage::DownloadStatus(s) => {
                 if let Ok(bb_imager::DownloadStatus::Finished(p)) = s {
@@ -514,10 +511,6 @@ impl BBImager {
         if let Some(s) = &self.download_status {
             match s {
                 Ok(x) => match x {
-                    bb_imager::DownloadStatus::Downloading => (
-                        iced::widget::text("Downloading..."),
-                        iced::widget::progress_bar((0.0)..=1.0, 0.5),
-                    ),
                     bb_imager::DownloadStatus::DownloadingProgress(p) => (
                         iced::widget::text("Downloading..."),
                         iced::widget::progress_bar((0.0)..=1.0, *p),
@@ -526,6 +519,10 @@ impl BBImager {
                         iced::widget::text("Downloading Successful..."),
                         iced::widget::progress_bar((0.0)..=1.0, 1.0)
                             .style(iced::widget::theme::ProgressBar::Success),
+                    ),
+                    bb_imager::DownloadStatus::VerifyingProgress(p) => (
+                        iced::widget::text("Verifying..."),
+                        iced::widget::progress_bar((0.0)..=1.0, *p),
                     ),
                 },
                 Err(e) => (
@@ -585,22 +582,4 @@ enum Screen {
     BoardSelection,
     ImageSelection,
     DestinationSelection,
-}
-
-async fn image_resolver(icon: String, sha256: Vec<u8>) -> Result<PathBuf, data_downloader::Error> {
-    tokio::task::spawn_blocking(move || {
-        let downloader = data_downloader::DownloadRequest {
-            url: icon.as_str(),
-            sha256_hash: sha256.as_slice(),
-        };
-
-        data_downloader::DownloaderBuilder::new()
-            .retry_attempts(0)
-            .timeout(Some(Duration::from_secs(10)))
-            .build()
-            .unwrap()
-            .get_path(&downloader)
-    })
-    .await
-    .unwrap()
 }
