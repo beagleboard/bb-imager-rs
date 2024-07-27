@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use iced::{executor, Application, Command, Element, Settings};
 
@@ -53,7 +53,11 @@ enum BBImagerMessage {
     SelectImage(Option<bb_imager::config::OsList>),
     SelectPort(String),
     StartFlashing,
-    FlashImage(PathBuf),
+    FlashImage {
+        path: PathBuf,
+        inner_path: Option<String>,
+        sha256: Option<[u8; 32]>,
+    },
 
     DownloadStatus(Result<bb_imager::DownloadStatus, String>),
     FlashingStatus(Result<bb_imager::FlashingStatus, String>),
@@ -65,11 +69,23 @@ enum BBImagerMessage {
     HomePage,
 
     Search(String),
-    BoardImageDownloaded { index: usize, path: PathBuf },
-    BoardImageDownloadFailed { index: usize, error: String },
+    BoardImageDownloaded {
+        index: usize,
+        path: PathBuf,
+    },
+    BoardImageDownloadFailed {
+        index: usize,
+        error: String,
+    },
 
-    OsListImageDownloaded { index: usize, path: PathBuf },
-    OsListDownloadFailed { index: usize, error: String },
+    OsListImageDownloaded {
+        index: usize,
+        path: PathBuf,
+    },
+    OsListDownloadFailed {
+        index: usize,
+        error: String,
+    },
     Null,
 }
 
@@ -143,13 +159,23 @@ impl Application for BBImager {
                 self.back_home();
                 Command::none()
             }
-            BBImagerMessage::FlashImage(img) => {
+            BBImagerMessage::FlashImage {
+                path,
+                inner_path,
+                sha256,
+            } => {
                 let board = self.selected_board.clone().expect("No board selected");
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
-                Command::run(board.flasher.flash(img, dst), |x| {
-                    BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
-                })
+                if let Ok(img) =
+                    bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)
+                {
+                    Command::run(board.flasher.flash(img, dst), |x| {
+                        BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
+                    })
+                } else {
+                    Command::none()
+                }
             }
             BBImagerMessage::FlashingStatus(x) => {
                 self.flashing_status = Some(x.map_err(|e| e.to_string()));
@@ -252,14 +278,35 @@ impl Application for BBImager {
             }
             BBImagerMessage::StartFlashing => match self.selected_image.clone().unwrap() {
                 OsImage::Local(p) => {
-                    Command::perform(std::future::ready(p), BBImagerMessage::FlashImage)
+                    Command::perform(std::future::ready((p, None)), |(path, inner_path)| {
+                        BBImagerMessage::FlashImage {
+                            path,
+                            inner_path,
+                            sha256: None,
+                        }
+                    })
                 }
-                OsImage::Remote(r) => todo!(),
+                OsImage::Remote(r) => Command::run(
+                    self.downloader.download_progress(r.url, r.download_sha256),
+                    |x| BBImagerMessage::DownloadStatus(x.map_err(|y| y.to_string())),
+                ),
             },
             BBImagerMessage::DownloadStatus(s) => {
                 if let Ok(bb_imager::DownloadStatus::Finished(p)) = s {
                     self.download_status.take();
-                    Command::perform(std::future::ready(p), BBImagerMessage::FlashImage)
+                    if let Some(OsImage::Remote(x)) = &self.selected_image {
+                        let sha256 = x.extracted_sha256;
+                        Command::perform(
+                            std::future::ready((p, x.extract_path.clone())),
+                            move |(path, inner_path)| BBImagerMessage::FlashImage {
+                                path,
+                                inner_path,
+                                sha256: Some(sha256),
+                            },
+                        )
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     self.download_status = Some(s);
                     Command::none()

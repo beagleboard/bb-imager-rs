@@ -11,5 +11,7 @@ pub enum Error {
     #[error("Download Error: {0}")]
     DownloadError(#[from] crate::download::Error),
     #[error("Io Error: {0}")]
-    IoError(#[from] std::io::Error)
+    IoError(#[from] std::io::Error),
+    #[error("Image Error: {0}")]
+    ImageError(#[from] crate::img::Error),
 }

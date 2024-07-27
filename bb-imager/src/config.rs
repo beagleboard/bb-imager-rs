@@ -85,7 +85,7 @@ impl Flasher {
 
     pub fn flash(
         &self,
-        img: std::path::PathBuf,
+        img: crate::img::OsImage,
         port: String,
     ) -> impl Stream<Item = crate::error::Result<crate::FlashingStatus>> {
         match self {

@@ -2,11 +2,11 @@
 
 use std::{
     io::{self, Read},
-    path::PathBuf,
     thread::sleep,
     time::Duration,
 };
 
+use crate::error::Result;
 use futures_util::Stream;
 use thiserror::Error;
 use tracing::{error, info, warn};
@@ -24,8 +24,6 @@ const COMMAND_BANK_ERASE: u8 = 0x2c;
 const COMMAND_MAX_SIZE: u8 = u8::MAX - 3;
 
 const FIRMWARE_SIZE: u32 = 704 * 1024;
-
-type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug, Clone, Copy)]
 pub enum Error {
@@ -87,7 +85,7 @@ impl BeagleConnectFreedom {
         Ok(bcf)
     }
 
-    fn wait_for_ack(&mut self) -> Result<()> {
+    fn wait_for_ack(&mut self) -> Result<(), Error> {
         let mut buf = [0u8; 1];
 
         while buf[0] == 0x00 {
@@ -116,12 +114,10 @@ impl BeagleConnectFreedom {
         Ok(())
     }
 
-    fn send_sync(&mut self) -> Result<()> {
+    fn send_sync(&mut self) -> Result<(), Error> {
         const PKT: &[u8] = &[0x55, 0x55];
 
-        self.port
-            .write_all(PKT)
-            .map_err(|_| Error::FailedToSend)?;
+        self.port.write_all(PKT).map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()
     }
@@ -173,46 +169,34 @@ impl BeagleConnectFreedom {
         Ok(u32::from_be_bytes(cmd_data))
     }
 
-    fn send_ack(&mut self) -> Result<()> {
+    fn send_ack(&mut self) -> Result<(), Error> {
         const PKT: &[u8] = &[0x00, ACK];
-        self.port
-            .write_all(PKT)
-            .map_err(|_| Error::FailedToSend)
+        self.port.write_all(PKT).map_err(|_| Error::FailedToSend)
     }
 
-    fn send_bank_erase(&mut self) -> Result<()> {
+    fn send_bank_erase(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_BANK_ERASE, COMMAND_BANK_ERASE];
 
-        self.port
-            .write_all(CMD)
-            .map_err(|_| Error::FailedToSend)?;
+        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
         self.get_status()
     }
 
-    fn get_status(&mut self) -> Result<()> {
+    fn get_status(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_GET_STATUS, COMMAND_GET_STATUS];
         let mut resp = [0u8; 1];
 
-        self.port
-            .write_all(CMD)
-            .map_err(|_| Error::FailedToSend)?;
+        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()?;
 
         while resp[0] == 0x00 {
-            self.port
-                .read(&mut resp)
-                .map_err(|_| Error::FailedToRead)?;
+            self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
         }
 
-        self.port
-            .read(&mut resp)
-            .map_err(|_| Error::FailedToRead)?;
-        self.port
-            .read(&mut resp)
-            .map_err(|_| Error::FailedToRead)?;
+        self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
+        self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
 
         self.send_ack()?;
 
@@ -222,7 +206,7 @@ impl BeagleConnectFreedom {
         }
     }
 
-    fn send_download(&mut self, addr: u32, size: u32) -> Result<()> {
+    fn send_download(&mut self, addr: u32, size: u32) -> Result<(), Error> {
         let addr = addr.to_be_bytes();
         let size = size.to_be_bytes();
 
@@ -267,12 +251,10 @@ impl BeagleConnectFreedom {
         Ok(bytes_to_write)
     }
 
-    fn send_reset(&mut self) -> Result<()> {
+    fn send_reset(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_RESET, COMMAND_RESET];
 
-        self.port
-            .write_all(CMD)
-            .map_err(|_| Error::FailedToSend)?;
+        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
 
         self.wait_for_ack()
     }
@@ -292,13 +274,14 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::FlashingStatus>> {
+pub fn flash(
+    mut img: crate::img::OsImage,
+    port: String,
+) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
         yield crate::FlashingStatus::Preparing;
 
         let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
-        let mut img =
-            std::fs::File::open(img).map_err(|_| Error::FailedToOpenImage)?;
         img.read_to_end(&mut firmware)
             .map_err(|_| Error::FailedToOpenImage)?;
 
@@ -313,6 +296,7 @@ pub fn flash(img: PathBuf, port: String) -> impl Stream<Item = Result<crate::Fla
         if bcf.verify(img_crc32)? {
             warn!("Skipping flashing same image");
             yield crate::FlashingStatus::Finished;
+            return;
         }
 
         info!("Erase Flash");

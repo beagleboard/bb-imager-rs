@@ -1,7 +1,7 @@
 //! Module for downloading remote images for flashing
 
 use directories::ProjectDirs;
-use futures_util::{Stream, StreamExt, TryStream};
+use futures_util::{Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
     io,
@@ -114,7 +114,7 @@ impl Downloader {
         &self,
         url: url::Url,
         sha256: [u8; 32],
-    ) -> impl TryStream<Ok = DownloadStatus, Error = crate::error::Error> {
+    ) -> impl Stream<Item = Result<DownloadStatus>> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().with_file_name(file_name);
         let client = self.client.clone();
