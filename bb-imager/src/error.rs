@@ -14,4 +14,6 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("Image Error: {0}")]
     ImageError(#[from] crate::img::Error),
+    #[error("Sd Card Error: {0}")]
+    SdCardError(#[from] crate::sd::Error)
 }

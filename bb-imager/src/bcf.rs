@@ -7,8 +7,10 @@ use std::{
 };
 
 use crate::error::Result;
-use futures_util::Stream;
+use crate::FlashingStatus;
+use futures_util::{Stream, StreamExt};
 use thiserror::Error;
+use tokio::io::AsyncReadExt;
 use tracing::{error, info, warn};
 
 const ACK: u8 = 0xcc;
@@ -279,11 +281,11 @@ pub fn flash(
     port: String,
 ) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
-        yield crate::FlashingStatus::Preparing;
+        yield FlashingStatus::Preparing;
 
-        let mut firmware = Vec::<u8>::with_capacity(FIRMWARE_SIZE as usize);
-        img.read_to_end(&mut firmware)
-            .map_err(|_| Error::FailedToOpenImage)?;
+        let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
+        img.read_to_end(&mut firmware).await?;
+        drop(img);
 
         assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
         let img_crc32 = crc32fast::hash(firmware.as_slice());
@@ -291,11 +293,11 @@ pub fn flash(
         let mut bcf = BeagleConnectFreedom::new(&port)?;
         info!("BeagleConnectFreedom Connected");
 
-        yield crate::FlashingStatus::FlashingProgress(0.0);
+        yield FlashingStatus::FlashingProgress(0.0);
 
         if bcf.verify(img_crc32)? {
             warn!("Skipping flashing same image");
-            yield crate::FlashingStatus::Finished;
+            yield FlashingStatus::Finished;
             return;
         }
 
@@ -319,13 +321,13 @@ pub fn flash(
             }
 
             image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-            yield crate::FlashingStatus::FlashingProgress(progress(image_offset));
+            yield FlashingStatus::FlashingProgress(progress(image_offset));
         }
 
-        yield crate::FlashingStatus::Verifying;
+        yield FlashingStatus::Verifying;
         if bcf.verify(img_crc32)? {
             info!("Flashing Successful");
-            yield crate::FlashingStatus::Finished;
+            yield FlashingStatus::Finished;
         } else {
             error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
             Err(Error::InvalidImage)?;

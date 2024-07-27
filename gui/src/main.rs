@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use iced::{executor, Application, Command, Element, Settings};
+use bb_imager::FlashingStatus;
+use futures_util::{StreamExt, TryStreamExt};
+use iced::{executor, futures::Stream, Application, Command, Element, Settings};
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
@@ -167,15 +169,18 @@ impl Application for BBImager {
                 let board = self.selected_board.clone().expect("No board selected");
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
-                if let Ok(img) =
-                    bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)
-                {
-                    Command::run(board.flasher.flash(img, dst), |x| {
+                tracing::info!("Start flashing image {:?}", path);
+                let stream =
+                    Command::run(flash_helper(path, inner_path, sha256, board, dst), |x| {
                         BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
-                    })
-                } else {
-                    Command::none()
-                }
+                    });
+
+                Command::batch([
+                    Command::perform(std::future::ready(FlashingStatus::Preparing), |x| {
+                        BBImagerMessage::FlashingStatus(Ok(x))
+                    }),
+                    stream,
+                ])
             }
             BBImagerMessage::FlashingStatus(x) => {
                 self.flashing_status = Some(x.map_err(|e| e.to_string()));
@@ -198,8 +203,8 @@ impl Application for BBImager {
                     .config
                     .devices()
                     .iter()
-                    .filter(|x| x.icon_local.is_none())
                     .enumerate()
+                    .filter(|(_, x)| x.icon_local.is_none())
                     .map(|(index, v)| {
                         Command::perform(
                             self.downloader
@@ -223,8 +228,8 @@ impl Application for BBImager {
                     .config
                     .os_list
                     .iter()
-                    .filter(|x| x.icon_local.is_none())
                     .enumerate()
+                    .filter(|(_, x)| x.icon_local.is_none())
                     .filter(|(_, v)| v.devices.contains(&board))
                     .map(|(index, v)| {
                         Command::perform(
@@ -265,7 +270,11 @@ impl Application for BBImager {
                 Command::none()
             }
             BBImagerMessage::OsListImageDownloaded { index, path } => {
-                tracing::info!("Successfully downloaded to {:?}", path);
+                tracing::info!(
+                    "Successfully downloaded os icon for {:?} to {:?}",
+                    self.config.os_list[index],
+                    path
+                );
                 self.config.os_list[index].icon_local = Some(path);
                 Command::none()
             }
@@ -286,13 +295,17 @@ impl Application for BBImager {
                         }
                     })
                 }
-                OsImage::Remote(r) => Command::run(
-                    self.downloader.download_progress(r.url, r.download_sha256),
-                    |x| BBImagerMessage::DownloadStatus(x.map_err(|y| y.to_string())),
-                ),
+                OsImage::Remote(r) => {
+                    tracing::info!("Downloading Remote Os");
+                    Command::run(
+                        self.downloader.download_progress(r.url, r.download_sha256),
+                        |x| BBImagerMessage::DownloadStatus(x.map_err(|y| y.to_string())),
+                    )
+                }
             },
             BBImagerMessage::DownloadStatus(s) => {
                 if let Ok(bb_imager::DownloadStatus::Finished(p)) = s {
+                    tracing::info!("Os download finished");
                     self.download_status.take();
                     if let Some(OsImage::Remote(x)) = &self.selected_image {
                         let sha256 = x.extracted_sha256;
@@ -308,6 +321,7 @@ impl Application for BBImager {
                         unreachable!()
                     }
                 } else {
+                    tracing::debug!("Os download progress: {:?}", s);
                     self.download_status = Some(s);
                     Command::none()
                 }
@@ -663,4 +677,20 @@ enum Screen {
     BoardSelection,
     ImageSelection,
     DestinationSelection,
+}
+
+fn flash_helper(
+    path: std::path::PathBuf,
+    inner_path: Option<String>,
+    sha256: Option<[u8; 32]>,
+    board: bb_imager::config::Device,
+    dst: String,
+) -> impl Stream<Item = Result<bb_imager::FlashingStatus, String>> {
+    futures_util::stream::once(async move {
+        bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)
+            .await
+            .map(|x| board.flasher.flash(x, dst))
+    })
+    .try_flatten()
+    .map_err(|x| x.to_string())
 }

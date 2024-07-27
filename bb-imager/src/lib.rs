@@ -6,6 +6,7 @@ pub mod download;
 pub mod error;
 pub mod sd;
 pub mod img;
+pub(crate) mod util;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FlashingStatus {

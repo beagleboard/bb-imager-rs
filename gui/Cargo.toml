@@ -12,3 +12,4 @@ tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 iced_aw = { version = "0.9.3", default-features = false, features = ["badge"] }
 url = "2.5.2"
+futures-util = "0.3.30"

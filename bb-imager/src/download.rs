@@ -12,7 +12,11 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::io::StreamReader;
 
-use crate::{error::Result, DownloadStatus};
+use crate::{
+    error::Result,
+    util::{sha256_file_progress, Sha256State},
+    DownloadStatus,
+};
 
 const BUF_SIZE: usize = 8 * 1024;
 const FILE_NAME_TRIES: usize = 10;
@@ -116,7 +120,7 @@ impl Downloader {
         sha256: [u8; 32],
     ) -> impl Stream<Item = Result<DownloadStatus>> {
         let file_name = const_hex::encode(sha256);
-        let file_path = self.dirs.cache_dir().with_file_name(file_name);
+        let file_path = self.dirs.cache_dir().join(file_name);
         let client = self.client.clone();
 
         async_stream::try_stream! {
@@ -157,9 +161,10 @@ impl Downloader {
 
             for await data in response_stream {
                 let mut data = data.map_err(Error::from)?;
-                file.write_all_buf(&mut data).await?;
                 cur_pos += data.len();
-                yield DownloadStatus::DownloadingProgress(cur_pos as f32 / response_size as f32);
+                file.write_all_buf(&mut data).await?;
+
+                yield DownloadStatus::DownloadingProgress((cur_pos as f32) / (response_size as f32));
             }
 
             yield DownloadStatus::VerifyingProgress(0.0);
@@ -172,7 +177,8 @@ impl Downloader {
                     Sha256State::Progress(x) => yield DownloadStatus::VerifyingProgress(x),
                     Sha256State::Finish(x) => {
                         if x != sha256 {
-                            Err(Error::Sha256Error)?
+                            Err(Error::Sha256Error)?;
+                            return;
                         }
                     }
                 }
@@ -182,36 +188,6 @@ impl Downloader {
 
             yield DownloadStatus::Finished(file_path);
         }
-    }
-}
-
-fn sha256_file_progress(path: PathBuf) -> impl Stream<Item = Result<Sha256State>> {
-    async_stream::try_stream! {
-        let file = tokio::fs::OpenOptions::new().read(true).open(path).await?;
-        let file_len = file.metadata().await?.len() as f32;
-        let mut reader = tokio::io::BufReader::new(file);
-
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; BUF_SIZE];
-        let mut pos = 0;
-
-        loop {
-            let count = reader.read(&mut buffer).await?;
-            pos += count;
-            yield Sha256State::Progress(pos as f32 / file_len);
-            if count == 0 {
-                break;
-            }
-            hasher.update(&buffer[..count]);
-        }
-
-        let hash = hasher
-            .finalize()
-            .as_slice()
-            .try_into()
-            .expect("SHA-256 is 32 bytes");
-
-        yield Sha256State::Finish(hash);
     }
 }
 
@@ -249,11 +225,6 @@ async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {
         io::ErrorKind::Other,
         "Failed to create tmp file",
     )))
-}
-
-enum Sha256State {
-    Progress(f32),
-    Finish([u8; 32]),
 }
 
 #[derive(Clone)]
