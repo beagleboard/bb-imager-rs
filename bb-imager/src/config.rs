@@ -34,7 +34,6 @@ pub struct Device {
 pub struct OsList {
     pub name: String,
     pub description: String,
-    pub version: Version,
     pub icon: Url,
     #[serde(with = "const_hex")]
     pub icon_sha256: [u8; 32],
@@ -119,7 +118,6 @@ mod tests {
         {
             "name": "MicroBlocks",
             "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-            "version": "0.0.2",
             "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
             "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
             "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",

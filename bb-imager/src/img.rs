@@ -1,14 +1,11 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
 use crate::error::Result;
-use futures_util::{StreamExt, TryStreamExt};
 use sha2::{Digest, Sha256};
 use std::{io::Read, os::unix::fs::MetadataExt, path::Path};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::bytes::BufMut;
-
-const BUFFER_LEN: usize = 8 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -22,7 +19,7 @@ pub enum Error {
 
 pub struct OsImage {
     sha256: Option<[u8; 32]>,
-    size: usize,
+    size: u64,
     img: OsImageReader,
 }
 
@@ -55,7 +52,7 @@ impl OsImage {
 
                 Ok(Self {
                     sha256,
-                    size: buf.len(),
+                    size: buf.len() as u64,
                     img: OsImageReader::Memory(std::io::Cursor::new(buf)),
                 })
             }
@@ -65,7 +62,7 @@ impl OsImage {
                 );
 
                 // TODO: Find something more efficient
-                let size = tokio::io::copy(&mut img, &mut tokio::io::empty()).await? as usize;
+                let size = tokio::io::copy(&mut img, &mut tokio::io::empty()).await?;
                 drop(img);
 
                 file.seek(std::io::SeekFrom::Start(0)).await?;
@@ -80,7 +77,7 @@ impl OsImage {
                 })
             }
             _ => {
-                let size = file.metadata().await?.size() as usize;
+                let size = file.metadata().await?.size();
 
                 Ok(Self {
                     sha256,
@@ -125,7 +122,7 @@ impl OsImage {
         self.sha256
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u64 {
         self.size
     }
 }

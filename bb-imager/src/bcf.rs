@@ -8,7 +8,7 @@ use std::{
 
 use crate::error::Result;
 use crate::FlashingStatus;
-use futures_util::{Stream, StreamExt};
+use futures_util::Stream;
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
 use tracing::{error, info, warn};

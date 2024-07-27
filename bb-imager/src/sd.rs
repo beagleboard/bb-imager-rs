@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::FlashingStatus;
 use futures_util::Stream;
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 const BUF_SIZE: usize = 8 * 1024;
 
@@ -25,8 +25,7 @@ pub fn flash(
 
         let size = img.size();
 
-        let port = tokio::fs::OpenOptions::new().read(true).write(true).open(&port_path).await?;
-        let mut port = tokio::io::BufWriter::new(port);
+        let mut port = tokio::fs::OpenOptions::new().read(true).write(true).open(&port_path).await?;
         let mut buf = [0u8; BUF_SIZE];
         let mut pos = 0;
 
@@ -45,12 +44,11 @@ pub fn flash(
             port.write_all(&buf[..count]).await?;
         }
 
-        drop(port);
-
         if let Some(sha256) = img.sha256() {
             yield FlashingStatus::VerifyingProgress(0.0);
 
-            let verify_stream = crate::util::sha256_file_progress(port_path);
+            port.seek(std::io::SeekFrom::Start(0)).await?;
+            let verify_stream = crate::util::sha256_file_fixed_progress(port, size);
 
             for await v in verify_stream {
                 match v? {

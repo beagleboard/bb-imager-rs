@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use bb_imager::FlashingStatus;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::TryStreamExt;
 use iced::{executor, futures::Stream, Application, Command, Element, Settings};
 
 fn main() -> iced::Result {
@@ -498,7 +498,7 @@ impl BBImager {
             })
             .map(|x| {
                 let mut row3 = iced::widget::row![
-                    iced::widget::text(x.version.clone()),
+                    iced::widget::text(x.release_date),
                     iced::widget::horizontal_space(),
                 ]
                 .width(iced::Length::Fill);
@@ -507,9 +507,6 @@ impl BBImager {
                     acc.push(iced_aw::Badge::new(iced::widget::text(t)))
                 });
 
-                row3 = row3.push(iced::widget::horizontal_space());
-                row3 = row3.push(iced::widget::text(x.release_date));
-
                 iced::widget::button(
                     iced::widget::row![
                         iced::widget::svg(
@@ -517,7 +514,7 @@ impl BBImager {
                                 .clone()
                                 .unwrap_or(PathBuf::from("icons/downloading.svg"))
                         )
-                        .width(100),
+                        .width(80),
                         iced::widget::column![
                             iced::widget::text(x.name.as_str()).size(18),
                             iced::widget::text(x.description.as_str()),
@@ -607,7 +604,10 @@ impl BBImager {
             match s {
                 Ok(x) => match x {
                     bb_imager::DownloadStatus::DownloadingProgress(p) => (
-                        iced::widget::text("Downloading..."),
+                        iced::widget::text(format!(
+                            "Downloading... {}%",
+                            (*p * 100.0).round() as usize
+                        )),
                         iced::widget::progress_bar((0.0)..=1.0, *p),
                     ),
                     bb_imager::DownloadStatus::Finished(_) => (
@@ -616,7 +616,10 @@ impl BBImager {
                             .style(iced::widget::theme::ProgressBar::Success),
                     ),
                     bb_imager::DownloadStatus::VerifyingProgress(p) => (
-                        iced::widget::text("Verifying..."),
+                        iced::widget::text(format!(
+                            "Verifying... {}%",
+                            (*p * 100.0).round() as usize
+                        )),
                         iced::widget::progress_bar((0.0)..=1.0, *p),
                     ),
                 },
@@ -638,7 +641,10 @@ impl BBImager {
                         iced::widget::progress_bar((0.0)..=1.0, 0.5),
                     ),
                     bb_imager::FlashingStatus::FlashingProgress(p) => (
-                        iced::widget::text("Flashing..."),
+                        iced::widget::text(format!(
+                            "Flashing... {}%",
+                            (*p * 100.0).round() as usize
+                        )),
                         iced::widget::progress_bar((0.0)..=1.0, *p),
                     ),
                     bb_imager::FlashingStatus::Verifying => (
@@ -646,7 +652,10 @@ impl BBImager {
                         iced::widget::progress_bar((0.0)..=1.0, 0.5),
                     ),
                     bb_imager::FlashingStatus::VerifyingProgress(p) => (
-                        iced::widget::text("Verifying..."),
+                        iced::widget::text(format!(
+                            "Verifying... {}%",
+                            (*p * 100.0).round() as usize
+                        )),
                         iced::widget::progress_bar((0.0)..=1.0, *p),
                     ),
                     bb_imager::FlashingStatus::Finished => (
