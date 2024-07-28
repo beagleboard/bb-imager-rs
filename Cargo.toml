@@ -5,3 +5,6 @@ members = [
 	"bb-imager",
 	"cli", "gui",
 ]
+
+[profile.release]
+strip = true

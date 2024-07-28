@@ -197,12 +197,19 @@ impl Application for BBImager {
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
                     Some(y) => Some(OsImage::Remote(y)),
-                    None => rfd::FileDialog::new()
-                        .add_filter("firmware", &["bin"])
-                        .pick_file()
-                        .map(OsImage::Local),
+                    None => {
+                        let (name, extensions) =
+                            self.selected_board.as_ref().unwrap().flasher.file_filter();
+                        rfd::FileDialog::new()
+                            .add_filter(name, extensions)
+                            .pick_file()
+                            .map(OsImage::Local)
+                    }
                 };
-                self.back_home();
+
+                if self.selected_image.is_some() {
+                    self.back_home();
+                }
             }
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
