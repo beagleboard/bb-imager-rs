@@ -336,14 +336,23 @@ pub fn flash(
 }
 
 pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
-    Ok(serialport::available_ports()
+    let ports = serialport::available_ports()
         .map_err(|_| Error::FailedToOpenPort)?
         .into_iter()
+        .filter(|x| match &x.port_type {
+            serialport::SerialPortType::UsbPort(y) => {
+                y.manufacturer.as_deref() == Some("BeagleBoard.org")
+                    && y.product.as_deref() == Some("BeagleConnect")
+            }
+            _ => false,
+        })
         .map(|x| x.port_name)
         .map(|x| crate::Destination {
             name: x,
             size: None,
             block: None,
         })
-        .collect())
+        .collect();
+
+    Ok(ports)
 }

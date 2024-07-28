@@ -19,6 +19,7 @@ const ARROW_BACK_ICON: &[u8] = include_bytes!("../../icons/arrow-back.svg");
 const DOWNLOADING_ICON: &[u8] = include_bytes!("../../icons/downloading.svg");
 const FILE_ADD_ICON: &[u8] = include_bytes!("../../icons/file-add.svg");
 const USB_ICON: &[u8] = include_bytes!("../../icons/usb.svg");
+const REFRESH_ICON: &[u8] = include_bytes!("../../icons/refresh.svg");
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
@@ -119,6 +120,7 @@ enum BBImagerMessage {
     },
 
     Destinations(Result<HashSet<bb_imager::Destination>, String>),
+    RefreshDestinations,
     InitState(bb_imager::State),
 
     UnrecoverableError(String),
@@ -187,12 +189,7 @@ impl Application for BBImager {
                 self.selected_board = Some(x);
                 self.back_home();
 
-                let flasher = self.selected_board.clone().unwrap().flasher;
-                let state = self.state.clone().unwrap();
-
-                return Command::perform(async move { flasher.destinations(state).await }, |x| {
-                    BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
-                });
+                return self.refresh_destinations();
             }
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
@@ -395,6 +392,9 @@ impl Application for BBImager {
             BBImagerMessage::UnrecoverableError(e) => {
                 self.unrecoverable_error = Some(e);
             }
+            BBImagerMessage::RefreshDestinations => {
+                return self.refresh_destinations();
+            }
 
             BBImagerMessage::Null => {}
         };
@@ -420,6 +420,15 @@ impl BBImager {
     fn back_home(&mut self) {
         self.search_bar.clear();
         self.screen = Screen::Home;
+    }
+
+    fn refresh_destinations(&self) -> Command<BBImagerMessage> {
+        let flasher = self.selected_board.clone().unwrap().flasher;
+        let state = self.state.clone().unwrap();
+
+        Command::perform(async move { flasher.destinations(state).await }, |x| {
+            BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
+        })
     }
 
     fn home_view(&self) -> Element<BBImagerMessage> {
@@ -549,7 +558,7 @@ impl BBImager {
 
         let items = widget::scrollable(widget::column(items).spacing(10));
 
-        widget::column![self.search_bar(), widget::horizontal_rule(2), items]
+        widget::column![self.search_bar(None), widget::horizontal_rule(2), items]
             .spacing(10)
             .padding(10)
             .into()
@@ -611,7 +620,7 @@ impl BBImager {
             .map(Into::into);
 
         widget::column![
-            self.search_bar(),
+            self.search_bar(None),
             widget::horizontal_rule(2),
             widget::scrollable(widget::column(items).spacing(10))
         ]
@@ -652,7 +661,7 @@ impl BBImager {
             .map(Into::into);
 
         widget::column![
-            self.search_bar(),
+            self.search_bar(Some(BBImagerMessage::RefreshDestinations)),
             widget::horizontal_rule(2),
             widget::scrollable(widget::column(items).spacing(10))
         ]
@@ -661,15 +670,24 @@ impl BBImager {
         .into()
     }
 
-    fn search_bar(&self) -> Element<BBImagerMessage> {
-        widget::row![
-            button(widget::svg(widget::svg::Handle::from_memory(ARROW_BACK_ICON)).width(22))
-                .on_press(BBImagerMessage::HomePage)
-                .style(theme::Button::Secondary),
-            widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search)
-        ]
-        .spacing(10)
-        .into()
+    fn search_bar(&self, refresh: Option<BBImagerMessage>) -> Element<BBImagerMessage> {
+        let mut row = widget::row![button(
+            widget::svg(widget::svg::Handle::from_memory(ARROW_BACK_ICON)).width(22)
+        )
+        .on_press(BBImagerMessage::HomePage)
+        .style(theme::Button::Secondary)]
+        .spacing(10);
+
+        if let Some(r) = refresh {
+            row = row.push(
+                button(widget::svg(widget::svg::Handle::from_memory(REFRESH_ICON)).width(22))
+                    .on_press(r)
+                    .style(theme::Button::Secondary),
+            );
+        }
+
+        row.push(widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search))
+            .into()
     }
 
     fn progress(&self) -> (widget::Text, widget::ProgressBar) {
