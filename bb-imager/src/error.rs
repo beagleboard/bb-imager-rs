@@ -19,4 +19,6 @@ pub enum Error {
     #[error("Zbus Error: {0}")]
     #[cfg(target_os = "linux")]
     DbusClientError(#[from] udisks2::zbus::Error),
+    #[error("{0}")]
+    CommanError(#[from] crate::common::Error),
 }

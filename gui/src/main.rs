@@ -13,7 +13,7 @@ use iced::{
 // TODO: Load Config from network
 const CONFIG: &[u8] = include_bytes!("../../config.json");
 
-const WINDOW_ICON: &[u8] = include_bytes!("../../icons/bb-imager.ico");
+const WINDOW_ICON: &[u8] = include_bytes!("../icon.png");
 const BB_BANNER: &[u8] = include_bytes!("../../icons/bb-banner.png");
 const ARROW_BACK_ICON: &[u8] = include_bytes!("../../icons/arrow-back.svg");
 const DOWNLOADING_ICON: &[u8] = include_bytes!("../../icons/downloading.svg");
@@ -27,13 +27,15 @@ fn main() -> iced::Result {
 
     assert!(icon.is_some());
 
+    let config = bb_imager::config::Config::from_json(CONFIG).expect("Failed to parse config");
+
     let settings = Settings {
         window: iced::window::Settings {
             size: iced::Size::new(800.0, 500.0),
             icon,
             ..Default::default()
         },
-        flags: bb_imager::config::Config::from_json(CONFIG).expect("Failed to parse config"),
+        flags: Flags { config },
         ..Default::default()
     };
 
@@ -43,6 +45,7 @@ fn main() -> iced::Result {
 #[derive(Default, Debug)]
 struct BBImager {
     config: bb_imager::config::Config,
+    state: Option<bb_imager::State>,
     downloader: bb_imager::download::Downloader,
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
@@ -52,6 +55,12 @@ struct BBImager {
     flashing_status: Option<Result<FlashingStatus, String>>,
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
+    unrecoverable_error: Option<String>,
+}
+
+#[derive(Default, Debug)]
+struct Flags {
+    config: bb_imager::config::Config,
 }
 
 #[derive(Debug, Clone)]
@@ -110,20 +119,22 @@ enum BBImagerMessage {
     },
 
     Destinations(Result<HashSet<bb_imager::Destination>, String>),
+    InitState(bb_imager::State),
 
+    UnrecoverableError(String),
     Null,
 }
 
 impl Application for BBImager {
     type Message = BBImagerMessage;
     type Executor = executor::Default;
-    type Flags = bb_imager::config::Config;
+    type Flags = Flags;
     type Theme = theme::Theme;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let downloader = bb_imager::download::Downloader::default();
 
-        let board_image_from_cache = flags.devices().iter().enumerate().map(|(index, v)| {
+        let board_image_from_cache = flags.config.devices().iter().enumerate().map(|(index, v)| {
             Command::perform(
                 downloader
                     .clone()
@@ -135,7 +146,7 @@ impl Application for BBImager {
             )
         });
 
-        let os_image_from_cache = flags.os_list.iter().enumerate().map(|(index, v)| {
+        let os_image_from_cache = flags.config.os_list.iter().enumerate().map(|(index, v)| {
             Command::perform(
                 downloader
                     .clone()
@@ -147,13 +158,22 @@ impl Application for BBImager {
             )
         });
 
+        let state_cmd = Command::perform(bb_imager::State::new(), |x| match x {
+            Ok(x) => BBImagerMessage::InitState(x),
+            Err(e) => BBImagerMessage::UnrecoverableError(e.to_string()),
+        });
+
         (
             Self {
-                config: flags.clone(),
+                config: flags.config.clone(),
                 downloader: downloader.clone(),
                 ..Default::default()
             },
-            Command::batch(board_image_from_cache.chain(os_image_from_cache)),
+            Command::batch(
+                board_image_from_cache
+                    .chain(os_image_from_cache)
+                    .chain([state_cmd]),
+            ),
         )
     }
 
@@ -166,6 +186,13 @@ impl Application for BBImager {
             BBImagerMessage::BoardSelected(x) => {
                 self.selected_board = Some(x);
                 self.back_home();
+
+                let flasher = self.selected_board.clone().unwrap().flasher;
+                let state = self.state.clone().unwrap();
+
+                return Command::perform(async move { flasher.destinations(state).await }, |x| {
+                    BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
+                });
             }
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
@@ -190,10 +217,17 @@ impl Application for BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
                 tracing::info!("Start flashing image {:?}", path);
-                let stream =
-                    Command::run(flash_helper(path, inner_path, sha256, board, dst), |x| {
-                        BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
-                    });
+                let stream = Command::run(
+                    flash_helper(
+                        path,
+                        inner_path,
+                        sha256,
+                        board,
+                        dst,
+                        self.state.clone().unwrap(),
+                    ),
+                    |x| BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string())),
+                );
 
                 return Command::batch([
                     Command::perform(std::future::ready(FlashingStatus::Preparing), |x| {
@@ -206,9 +240,10 @@ impl Application for BBImager {
                 self.flashing_status = Some(x.map_err(|e| e.to_string()));
             }
             BBImagerMessage::Reset => {
-                self.selected_dst = None;
-                self.selected_image = None;
-                self.selected_board = None;
+                self.selected_dst.take();
+                self.selected_image.take();
+                self.selected_board.take();
+                self.unrecoverable_error.take();
                 self.search_bar.clear();
                 self.download_status.take();
                 self.flashing_status.take();
@@ -271,11 +306,6 @@ impl Application for BBImager {
             }
             BBImagerMessage::DestinationSelectionPage => {
                 self.screen = Screen::DestinationSelection;
-                let flasher = self.selected_board.clone().unwrap().flasher;
-
-                return Command::perform(async move { flasher.destinations().await }, |x| {
-                    BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
-                });
             }
 
             BBImagerMessage::Search(x) => {
@@ -352,6 +382,13 @@ impl Application for BBImager {
                     tracing::error!("Error retriving destinations {e}")
                 }
             },
+            BBImagerMessage::InitState(s) => {
+                self.state = Some(s);
+            }
+            BBImagerMessage::UnrecoverableError(e) => {
+                self.unrecoverable_error = Some(e);
+            }
+
             BBImagerMessage::Null => {}
         };
 
@@ -590,7 +627,7 @@ impl BBImager {
 
                 if let Some(size) = x.size {
                     let s = (size as f32) / (1024.0 * 1024.0 * 1024.0);
-                    row2 = row2.push(text(format!("{s} GB")));
+                    row2 = row2.push(text(format!("{:.2} GB", s)));
                 }
 
                 button(
@@ -635,7 +672,12 @@ impl BBImager {
 
         const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
 
-        if let Some(s) = &self.download_status {
+        if let Some(e) = &self.unrecoverable_error {
+            (
+                text(format!("Unrecoverable Error: {e}")),
+                progress_bar(RANGE, 1.0).style(ProgressBar::Danger),
+            )
+        } else if let Some(s) = &self.download_status {
             match s {
                 Ok(x) => match x {
                     DownloadStatus::DownloadingProgress(p) => (
@@ -701,11 +743,12 @@ fn flash_helper(
     sha256: Option<[u8; 32]>,
     board: bb_imager::config::Device,
     dst: bb_imager::Destination,
+    state: bb_imager::State,
 ) -> impl Stream<Item = Result<FlashingStatus, String>> {
     futures_util::stream::once(async move {
         bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)
             .await
-            .map(|x| board.flasher.flash(x, dst))
+            .map(|x| board.flasher.flash(x, dst, state))
     })
     .try_flatten()
     .map_err(|x| x.to_string())

@@ -1,6 +1,13 @@
 //! Stuff common to all the flashers
 
 use std::path::PathBuf;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to Open Destination")]
+    FailedToOpenDestination(String),
+}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FlashingStatus {
@@ -29,24 +36,23 @@ pub struct Destination {
 
 impl Destination {
     #[cfg(target_os = "linux")]
-    pub async fn open(&self) -> crate::error::Result<tokio::fs::File> {
+    pub async fn open(&self, state: &State) -> crate::error::Result<tokio::fs::File> {
         use std::os::fd::{FromRawFd, IntoRawFd};
 
-        let dbus_client = udisks2::Client::new().await?;
-        let obj = dbus_client
-            .object(self.block.clone().unwrap())
+        let obj = state
+            .dbus_client
+            .object(
+                self.block
+                    .clone()
+                    .ok_or(Error::FailedToOpenDestination(self.name.clone()))?,
+            )
             .unwrap()
             .block()
-            .await
-            .unwrap();
+            .await?;
 
-        let fd = obj.open_device("rw", Default::default()).await.unwrap();
+        let fd = obj.open_device("rw", Default::default()).await?;
 
-        unsafe {
-            Ok(tokio::fs::File::from_raw_fd(
-                std::os::fd::OwnedFd::from(fd).into_raw_fd(),
-            ))
-        }
+        Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
     }
 }
 
@@ -57,6 +63,7 @@ pub struct State {
 }
 
 impl State {
+    #[cfg(target_os = "linux")]
     pub async fn new() -> crate::error::Result<Self> {
         let dbus_client = udisks2::Client::new().await?;
 

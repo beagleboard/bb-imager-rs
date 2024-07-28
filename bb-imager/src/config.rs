@@ -77,9 +77,12 @@ impl Config {
 }
 
 impl Flasher {
-    pub async fn destinations(&self) -> crate::error::Result<HashSet<Destination>> {
+    pub async fn destinations(
+        &self,
+        state: crate::State,
+    ) -> crate::error::Result<HashSet<Destination>> {
         match self {
-            Flasher::SdCard => crate::sd::destinations().await,
+            Flasher::SdCard => crate::sd::destinations(&state).await,
             Flasher::BeagleConnectFreedom => crate::bcf::possible_devices().await,
         }
     }
@@ -88,9 +91,10 @@ impl Flasher {
         &self,
         img: crate::img::OsImage,
         port: Destination,
+        state: crate::State,
     ) -> impl Stream<Item = crate::error::Result<crate::FlashingStatus>> {
         match self {
-            Flasher::SdCard => crate::sd::flash(img, port).boxed(),
+            Flasher::SdCard => crate::sd::flash(img, port, state).boxed(),
             Flasher::BeagleConnectFreedom => {
                 crate::bcf::flash(img, port).map_err(Into::into).boxed()
             }

@@ -19,13 +19,14 @@ pub enum Error {
 pub fn flash(
     mut img: crate::img::OsImage,
     sd: crate::Destination,
+    state: crate::State,
 ) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
         yield FlashingStatus::Preparing;
 
         let size = img.size();
 
-        let mut port = sd.open().await?;
+        let mut port = sd.open(&state).await?;
         tracing::info!("Opened File");
         let mut buf = [0u8; BUF_SIZE];
         let mut pos = 0;
@@ -77,26 +78,28 @@ pub fn flash(
 // }
 
 #[cfg(target_os = "linux")]
-pub async fn destinations() -> Result<std::collections::HashSet<crate::Destination>> {
+pub async fn destinations(
+    state: &crate::State,
+) -> Result<std::collections::HashSet<crate::Destination>> {
     use std::collections::HashSet;
 
-    let dbus = udisks2::Client::new().await?;
-
-    let block_devs = dbus
+    let block_devs = state
+        .dbus_client
         .manager()
         .get_block_devices(Default::default())
         .await?
         .into_iter()
-        .map(|x| dbus.object(x).unwrap())
+        .map(|x| state.dbus_client.object(x).unwrap())
         .collect::<Vec<_>>();
 
     let mut ans = HashSet::new();
 
     for obj in block_devs {
         if let Ok(block) = obj.block().await {
-            if let Ok(drive) = dbus.drive_for_block(&block).await {
+            if let Ok(drive) = state.dbus_client.drive_for_block(&block).await {
                 if drive.removable().await.unwrap() && drive.media_removable().await.unwrap() {
-                    let block = dbus
+                    let block = state
+                        .dbus_client
                         .block_for_drive(&drive, true)
                         .await
                         .unwrap()
