@@ -1,0 +1,10 @@
+image: "rust:latest"
+
+default:
+  before_script:
+    - apt-get update -y -qq && apt-get install libudev-dev -y -qq
+
+test:cargo:
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo test --workspace --verbose
