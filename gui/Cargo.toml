@@ -14,3 +14,10 @@ iced_aw = { version = "0.9.3", default-features = false, features = ["badge"] }
 url = "2.5.2"
 futures-util = "0.3.30"
 image = "0.25.2"
+
+[package.metadata.appimage]
+auto_link = true
+auto_link_exclude_list = [
+	"libc.so*",
+	"libm.so*",
+]

@@ -4,7 +4,23 @@ default:
   before_script:
     - apt-get update -y -qq && apt-get install libudev-dev -y -qq
 
-test:cargo:
+test:
+  stage: test
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --verbose
+
+appimage:
+  stage: deploy
+  before_script:
+    - cargo install cargo-appimage
+    - apt-get update && apt-get install -y --no-install-recommends file wget libudev-dev
+    - wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
+    - chmod +x /usr/local/bin/appimagetool
+    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
+  script:
+    - cd gui
+    - APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage
+  artifacts:
+    paths:
+      - target/appimage/gui.AppImage
