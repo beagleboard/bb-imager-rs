@@ -18,14 +18,15 @@ pub enum Error {
 
 pub fn flash(
     mut img: crate::img::OsImage,
-    port_path: String,
+    sd: crate::Destination,
 ) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
         yield FlashingStatus::Preparing;
 
         let size = img.size();
 
-        let mut port = tokio::fs::OpenOptions::new().read(true).write(true).open(&port_path).await?;
+        let mut port = sd.open().await?;
+        tracing::info!("Opened File");
         let mut buf = [0u8; BUF_SIZE];
         let mut pos = 0;
 
@@ -75,13 +76,42 @@ pub fn flash(
 //     fatfs::format_volume(disk, fatfs::FormatVolumeOptions::new())
 // }
 
-pub fn destinations() -> Result<Vec<String>> {
-    let ans = drives::get_devices()
-        .unwrap()
+#[cfg(target_os = "linux")]
+pub async fn destinations() -> Result<std::collections::HashSet<crate::Destination>> {
+    use std::collections::HashSet;
+
+    let dbus = udisks2::Client::new().await?;
+
+    let block_devs = dbus
+        .manager()
+        .get_block_devices(Default::default())
+        .await?
         .into_iter()
-        .filter(|x| x.is_removable)
-        .map(|x| format!("/dev/{}", x.name))
+        .map(|x| dbus.object(x).unwrap())
         .collect::<Vec<_>>();
+
+    let mut ans = HashSet::new();
+
+    for obj in block_devs {
+        if let Ok(block) = obj.block().await {
+            if let Ok(drive) = dbus.drive_for_block(&block).await {
+                if drive.removable().await.unwrap() && drive.media_removable().await.unwrap() {
+                    let block = dbus
+                        .block_for_drive(&drive, true)
+                        .await
+                        .unwrap()
+                        .into_inner()
+                        .path()
+                        .to_owned();
+                    ans.insert(crate::Destination {
+                        name: drive.id().await?,
+                        size: Some(drive.size().await?),
+                        block: Some(block.into()),
+                    });
+                }
+            }
+        }
+    }
 
     Ok(ans)
 }

@@ -10,7 +10,7 @@ chrono = { version = "0.4.38", features = ["serde"] }
 const-hex = { version = "1.12.0", features = ["serde"] }
 crc32fast = "1.4.2"
 directories = "5.0.1"
-drives = "0.6.0"
+# drives = "0.6.0"
 # fatfs = "0.3.6"
 futures-util = { version = "0.3.30", features = ["io"] }
 reqwest = { version = "0.12.5", features = ["stream"] }
@@ -24,5 +24,7 @@ tokio = { version = "1.39.1", features = ["fs"] }
 tokio-util = { version = "0.7.11", features = ["io"] }
 tracing = "0.1.40"
 url = { version = "2.5.2", features = ["serde"] }
-xz2 = { version = "0.1.7", features = ["tokio"] }
 zip = "2.1.5"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+udisks2 = { git = "https://github.com/FineFindus/udisks-rs.git" }

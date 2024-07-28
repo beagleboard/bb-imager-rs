@@ -278,7 +278,7 @@ fn progress(off: u32) -> f32 {
 
 pub fn flash(
     mut img: crate::img::OsImage,
-    port: String,
+    port: crate::Destination,
 ) -> impl Stream<Item = Result<crate::FlashingStatus>> {
     async_stream::try_stream! {
         yield FlashingStatus::Preparing;
@@ -290,7 +290,7 @@ pub fn flash(
         assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
         let img_crc32 = crc32fast::hash(firmware.as_slice());
 
-        let mut bcf = BeagleConnectFreedom::new(&port)?;
+        let mut bcf = BeagleConnectFreedom::new(&port.name)?;
         info!("BeagleConnectFreedom Connected");
 
         yield FlashingStatus::FlashingProgress(0.0);
@@ -335,10 +335,15 @@ pub fn flash(
     }
 }
 
-pub fn possible_devices() -> Result<Vec<String>> {
+pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
     Ok(serialport::available_ports()
         .map_err(|_| Error::FailedToOpenPort)?
         .into_iter()
         .map(|x| x.port_name)
+        .map(|x| crate::Destination {
+            name: x,
+            size: None,
+            block: None,
+        })
         .collect())
 }

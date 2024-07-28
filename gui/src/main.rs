@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use bb_imager::{DownloadStatus, FlashingStatus};
 use futures_util::TryStreamExt;
@@ -47,9 +47,10 @@ struct BBImager {
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
     selected_image: Option<OsImage>,
-    selected_dst: Option<String>,
+    selected_dst: Option<bb_imager::Destination>,
     download_status: Option<Result<DownloadStatus, String>>,
     flashing_status: Option<Result<FlashingStatus, String>>,
+    destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
 }
 
@@ -72,7 +73,7 @@ impl std::fmt::Display for OsImage {
 enum BBImagerMessage {
     BoardSelected(bb_imager::config::Device),
     SelectImage(Option<bb_imager::config::OsList>),
-    SelectPort(String),
+    SelectPort(bb_imager::Destination),
     StartFlashing,
     FlashImage {
         path: PathBuf,
@@ -107,6 +108,9 @@ enum BBImagerMessage {
         index: usize,
         error: String,
     },
+
+    Destinations(Result<HashSet<bb_imager::Destination>, String>),
+
     Null,
 }
 
@@ -162,7 +166,6 @@ impl Application for BBImager {
             BBImagerMessage::BoardSelected(x) => {
                 self.selected_board = Some(x);
                 self.back_home();
-                Command::none()
             }
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
@@ -173,12 +176,10 @@ impl Application for BBImager {
                         .map(OsImage::Local),
                 };
                 self.back_home();
-                Command::none()
             }
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
                 self.back_home();
-                Command::none()
             }
             BBImagerMessage::FlashImage {
                 path,
@@ -194,16 +195,15 @@ impl Application for BBImager {
                         BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string()))
                     });
 
-                Command::batch([
+                return Command::batch([
                     Command::perform(std::future::ready(FlashingStatus::Preparing), |x| {
                         BBImagerMessage::FlashingStatus(Ok(x))
                     }),
                     stream,
-                ])
+                ]);
             }
             BBImagerMessage::FlashingStatus(x) => {
                 self.flashing_status = Some(x.map_err(|e| e.to_string()));
-                Command::none()
             }
             BBImagerMessage::Reset => {
                 self.selected_dst = None;
@@ -212,11 +212,10 @@ impl Application for BBImager {
                 self.search_bar.clear();
                 self.download_status.take();
                 self.flashing_status.take();
-                Command::none()
+                self.destinations.clear();
             }
             BBImagerMessage::HomePage => {
                 self.back_home();
-                Command::none()
             }
             BBImagerMessage::BoardSectionPage => {
                 self.screen = Screen::BoardSelection;
@@ -240,7 +239,8 @@ impl Application for BBImager {
                             },
                         )
                     });
-                Command::batch(jobs)
+
+                return Command::batch(jobs);
             }
             BBImagerMessage::ImageSelectionPage => {
                 self.screen = Screen::ImageSelection;
@@ -267,28 +267,29 @@ impl Application for BBImager {
                         )
                     });
 
-                Command::batch(jobs)
+                return Command::batch(jobs);
             }
             BBImagerMessage::DestinationSelectionPage => {
                 self.screen = Screen::DestinationSelection;
-                Command::none()
+                let flasher = self.selected_board.clone().unwrap().flasher;
+
+                return Command::perform(async move { flasher.destinations().await }, |x| {
+                    BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
+                });
             }
 
             BBImagerMessage::Search(x) => {
                 self.search_bar = x;
-                Command::none()
             }
             BBImagerMessage::BoardImageDownloaded { index, path } => {
                 tracing::info!("Successfully downloaded to {:?}", path);
                 self.config.imager.devices[index].icon_local = Some(path);
-                Command::none()
             }
             BBImagerMessage::BoardImageDownloadFailed { index, error } => {
                 tracing::warn!(
                     "Failed to fetch icon for {:?}, Error: {error}",
                     self.config.imager.devices[index]
                 );
-                Command::none()
             }
             BBImagerMessage::OsListImageDownloaded { index, path } => {
                 tracing::info!(
@@ -297,31 +298,30 @@ impl Application for BBImager {
                     path
                 );
                 self.config.os_list[index].icon_local = Some(path);
-                Command::none()
             }
             BBImagerMessage::OsListDownloadFailed { index, error } => {
                 tracing::warn!(
                     "Failed to fetch icon for {:?}, Error: {error}",
                     self.config.imager.devices[index]
                 );
-                Command::none()
             }
             BBImagerMessage::StartFlashing => match self.selected_image.clone().unwrap() {
                 OsImage::Local(p) => {
-                    Command::perform(std::future::ready((p, None)), |(path, inner_path)| {
-                        BBImagerMessage::FlashImage {
+                    return Command::perform(
+                        std::future::ready((p, None)),
+                        |(path, inner_path)| BBImagerMessage::FlashImage {
                             path,
                             inner_path,
                             sha256: None,
-                        }
-                    })
+                        },
+                    );
                 }
                 OsImage::Remote(r) => {
                     tracing::info!("Downloading Remote Os");
-                    Command::run(
+                    return Command::run(
                         self.downloader.download_progress(r.url, r.download_sha256),
                         |x| BBImagerMessage::DownloadStatus(x.map_err(|y| y.to_string())),
-                    )
+                    );
                 }
             },
             BBImagerMessage::DownloadStatus(s) => {
@@ -330,25 +330,32 @@ impl Application for BBImager {
                     self.download_status.take();
                     if let Some(OsImage::Remote(x)) = &self.selected_image {
                         let sha256 = x.extracted_sha256;
-                        Command::perform(
+                        return Command::perform(
                             std::future::ready((p, x.extract_path.clone())),
                             move |(path, inner_path)| BBImagerMessage::FlashImage {
                                 path,
                                 inner_path,
                                 sha256: Some(sha256),
                             },
-                        )
+                        );
                     } else {
                         unreachable!()
                     }
                 } else {
                     tracing::debug!("Os download progress: {:?}", s);
                     self.download_status = Some(s);
-                    Command::none()
                 }
             }
-            BBImagerMessage::Null => Command::none(),
-        }
+            BBImagerMessage::Destinations(x) => match x {
+                Ok(y) => self.destinations = y,
+                Err(e) => {
+                    tracing::error!("Error retriving destinations {e}")
+                }
+            },
+            BBImagerMessage::Null => {}
+        };
+
+        Command::none()
     }
 
     fn view(&self) -> Element<Self::Message> {
@@ -401,7 +408,7 @@ impl BBImager {
         });
 
         let choose_dst_btn = match &self.selected_dst {
-            Some(x) => button(x.as_str()),
+            Some(x) => button(x.name.as_str()),
             None => button("CHOOSE DESTINATION"),
         }
         .padding(HOME_BTN_PADDING)
@@ -571,25 +578,31 @@ impl BBImager {
 
     fn destination_selection_view(&self) -> Element<BBImagerMessage> {
         let items = self
-            .selected_board
-            .as_ref()
-            .expect("No Board Selected")
-            .flasher
-            .destinations()
-            .unwrap()
-            .into_iter()
-            .filter(|x| x.to_lowercase().contains(&self.search_bar.to_lowercase()))
+            .destinations
+            .iter()
+            .filter(|x| {
+                x.name
+                    .to_lowercase()
+                    .contains(&self.search_bar.to_lowercase())
+            })
             .map(|x| {
+                let mut row2 = widget::column![text(x.name.as_str()),];
+
+                if let Some(size) = x.size {
+                    let s = (size as f32) / (1024.0 * 1024.0 * 1024.0);
+                    row2 = row2.push(text(format!("{s} GB")));
+                }
+
                 button(
                     widget::row![
                         widget::svg(widget::svg::Handle::from_memory(USB_ICON)).width(40),
-                        text(x.as_str()),
+                        row2
                     ]
                     .align_items(iced::Alignment::Center)
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectPort(x))
+                .on_press(BBImagerMessage::SelectPort(x.clone()))
                 .style(theme::Button::Secondary)
             })
             .map(Into::into);
@@ -687,7 +700,7 @@ fn flash_helper(
     inner_path: Option<String>,
     sha256: Option<[u8; 32]>,
     board: bb_imager::config::Device,
-    dst: String,
+    dst: bb_imager::Destination,
 ) -> impl Stream<Item = Result<FlashingStatus, String>> {
     futures_util::stream::once(async move {
         bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)

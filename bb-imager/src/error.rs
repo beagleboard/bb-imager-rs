@@ -15,5 +15,8 @@ pub enum Error {
     #[error("Image Error: {0}")]
     ImageError(#[from] crate::img::Error),
     #[error("Sd Card Error: {0}")]
-    SdCardError(#[from] crate::sd::Error)
+    SdCardError(#[from] crate::sd::Error),
+    #[error("Zbus Error: {0}")]
+    #[cfg(target_os = "linux")]
+    DbusClientError(#[from] udisks2::zbus::Error),
 }

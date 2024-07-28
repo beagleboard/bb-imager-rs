@@ -7,6 +7,8 @@ use semver::Version;
 use serde::Deserialize;
 use url::Url;
 
+use crate::Destination;
+
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
     pub imager: Imager,
@@ -75,17 +77,17 @@ impl Config {
 }
 
 impl Flasher {
-    pub fn destinations(&self) -> crate::error::Result<Vec<String>> {
+    pub async fn destinations(&self) -> crate::error::Result<HashSet<Destination>> {
         match self {
-            Flasher::SdCard => crate::sd::destinations(),
-            Flasher::BeagleConnectFreedom => crate::bcf::possible_devices(),
+            Flasher::SdCard => crate::sd::destinations().await,
+            Flasher::BeagleConnectFreedom => crate::bcf::possible_devices().await,
         }
     }
 
     pub fn flash(
         &self,
         img: crate::img::OsImage,
-        port: String,
+        port: Destination,
     ) -> impl Stream<Item = crate::error::Result<crate::FlashingStatus>> {
         match self {
             Flasher::SdCard => crate::sd::flash(img, port).boxed(),
