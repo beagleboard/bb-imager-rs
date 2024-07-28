@@ -100,42 +100,7 @@ impl Flasher {
 mod tests {
     #[test]
     fn basic() {
-        let data = r#"
-{
-    "imager": {
-        "latest_version": "2.0.0",
-        "devices": [
-            {
-                "name": "BeagleConnect Freedom",
-                "description": "BeagleConnect Freedom based on Ti CC1352P7",
-                "icon": "https://www.mouser.in/images/marketingid/2023/img/188989252.png",
-                "icon_sha256": "6b9aa96b41b90c039349572cdafcc48d648ab01fbf1f095375e9e8eac612c1db",
-                "flasher": "BeagleConnectFreedom"
-            }
-        ]
-    },
-    "os_list": [
-        {
-            "name": "MicroBlocks",
-            "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-            "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-            "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
-            "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
-            "release_date": "2024-07-01",
-            "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
-            "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
-            "devices": [
-                "BeagleConnect Freedom"
-            ],
-            "tags": [
-                "zephyr"
-            ]
-        }
-    ]
-}
-            "#;
-
-        let parsed: super::Config = serde_json::from_str(data).unwrap();
+        let data = include_bytes!("../../config.json");
+        super::Config::from_json(data).unwrap();
     }
 }
