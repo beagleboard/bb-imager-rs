@@ -1,10 +1,12 @@
 //! Provide functionality to flash images to sd card
 
+use std::io::Read;
+
 use crate::error::Result;
 use crate::FlashingStatus;
 use futures_util::Stream;
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 const BUF_SIZE: usize = 8 * 1024;
 
@@ -34,7 +36,7 @@ pub fn flash(
         yield FlashingStatus::FlashingProgress(0.0);
 
         loop {
-            let count = img.read(&mut buf).await?;
+            let count = img.read(&mut buf)?;
             pos += count;
 
             yield FlashingStatus::FlashingProgress(pos as f32 / size as f32);

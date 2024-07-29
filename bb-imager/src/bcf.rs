@@ -10,7 +10,6 @@ use crate::error::Result;
 use crate::FlashingStatus;
 use futures_util::Stream;
 use thiserror::Error;
-use tokio::io::AsyncReadExt;
 use tracing::{error, info, warn};
 
 const ACK: u8 = 0xcc;
@@ -284,7 +283,7 @@ pub fn flash(
         yield FlashingStatus::Preparing;
 
         let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
-        img.read_to_end(&mut firmware).await?;
+        img.read_to_end(&mut firmware)?;
         drop(img);
 
         assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);

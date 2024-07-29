@@ -2,10 +2,12 @@
 
 use crate::error::Result;
 use sha2::{Digest, Sha256};
-use std::{io::Read, path::Path};
+use std::{
+    io::{Read, Seek},
+    path::Path,
+};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
-use tokio_util::bytes::BufMut;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -24,8 +26,8 @@ pub struct OsImage {
 }
 
 pub enum OsImageReader {
-    Xz(async_compression::tokio::bufread::XzDecoder<tokio::io::BufReader<tokio::fs::File>>),
-    Uncompressed(tokio::fs::File),
+    Xz(liblzma::read::XzDecoder<std::fs::File>),
+    Uncompressed(std::io::BufReader<std::fs::File>),
     Memory(std::io::Cursor<Vec<u8>>),
 }
 
@@ -57,18 +59,12 @@ impl OsImage {
                 })
             }
             [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => {
-                let mut img = async_compression::tokio::bufread::XzDecoder::new(
-                    tokio::io::BufReader::new(&mut file),
-                );
+                let mut file = file.into_std().await;
 
-                // TODO: Find something more efficient
-                let size = tokio::io::copy(&mut img, &mut tokio::io::empty()).await?;
-                drop(img);
+                let size = liblzma::uncompressed_size(&mut file)?;
 
-                file.seek(std::io::SeekFrom::Start(0)).await?;
-                let img = async_compression::tokio::bufread::XzDecoder::new(
-                    tokio::io::BufReader::new(file),
-                );
+                file.seek(std::io::SeekFrom::Start(0))?;
+                let img = liblzma::read::XzDecoder::new(file);
 
                 Ok(Self {
                     sha256,
@@ -82,7 +78,9 @@ impl OsImage {
                 Ok(Self {
                     sha256,
                     size,
-                    img: OsImageReader::Uncompressed(file),
+                    img: OsImageReader::Uncompressed(std::io::BufReader::new(
+                        file.into_std().await,
+                    )),
                 })
             }
         }
@@ -127,22 +125,32 @@ impl OsImage {
     }
 }
 
-impl tokio::io::AsyncRead for OsImage {
-    fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
+impl std::io::Read for OsImage {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match &mut self.img {
-            OsImageReader::Xz(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
-            OsImageReader::Uncompressed(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
-            OsImageReader::Memory(x) => {
-                buf.put(x);
-                std::task::Poll::Ready(Ok(()))
-            }
+            OsImageReader::Xz(x) => x.read(buf),
+            OsImageReader::Uncompressed(x) => x.read(buf),
+            OsImageReader::Memory(x) => std::io::Read::read(x, buf),
         }
     }
 }
+
+// impl tokio::io::AsyncRead for OsImage {
+//     fn poll_read(
+//         mut self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//         buf: &mut tokio::io::ReadBuf<'_>,
+//     ) -> std::task::Poll<std::io::Result<()>> {
+//         match &mut self.img {
+//             OsImageReader::Xz(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
+//             OsImageReader::Uncompressed(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
+//             OsImageReader::Memory(x) => {
+//                 buf.put(x);
+//                 std::task::Poll::Ready(Ok(()))
+//             }
+//         }
+//     }
+// }
 
 fn size(file: &std::fs::Metadata) -> u64 {
     cfg_if::cfg_if! {

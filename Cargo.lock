@@ -273,19 +273,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-compression"
-version = "0.4.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fec134f64e2bc57411226dfc4e52dec859ddfc7e711fc5e07b612584f000e4aa"
-dependencies = [
- "futures-core",
- "memchr",
- "pin-project-lite",
- "tokio",
- "xz2",
-]
-
-[[package]]
 name = "async-executor"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -493,7 +480,6 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 name = "bb-imager"
 version = "0.1.0"
 dependencies = [
- "async-compression",
  "async-stream",
  "cfg-if",
  "chrono",
@@ -501,6 +487,7 @@ dependencies = [
  "crc32fast",
  "directories",
  "futures-util",
+ "liblzma",
  "reqwest",
  "semver",
  "serde",
@@ -2545,6 +2532,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "liblzma"
+version = "0.3.2"
+source = "git+https://github.com/Ayush1325/xz2-rs.git?branch=uncompressed-size#3f47a34d6b48d90e9b7017cff80209d35147e6bf"
+dependencies = [
+ "liblzma-sys",
+]
+
+[[package]]
+name = "liblzma-sys"
+version = "0.3.5"
+source = "git+https://github.com/Ayush1325/xz2-rs.git?branch=uncompressed-size#3f47a34d6b48d90e9b7017cff80209d35147e6bf"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2651,17 +2656,6 @@ checksum = "297e814c836ae64db86b36cf2a557ba54368d03f6afcd7d947c266692f71115e"
 dependencies = [
  "byteorder",
  "crc",
-]
-
-[[package]]
-name = "lzma-sys"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fda04ab3764e6cde78b9974eec4f779acaba7c4e84b36eca3cf77c581b85d27"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
 ]
 
 [[package]]
@@ -5970,15 +5964,6 @@ name = "xxhash-rust"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63658493314859b4dfdf3fb8c1defd61587839def09582db50b8a4e93afca6bb"
-
-[[package]]
-name = "xz2"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
-dependencies = [
- "lzma-sys",
-]
 
 [[package]]
 name = "yazi"
