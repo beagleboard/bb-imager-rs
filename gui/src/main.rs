@@ -95,10 +95,7 @@ enum BBImagerMessage {
     FlashingStatus(Result<FlashingStatus, String>),
     Reset,
 
-    BoardSectionPage,
-    ImageSelectionPage,
-    DestinationSelectionPage,
-    HomePage,
+    SwitchScreen(Screen),
 
     Search(String),
     BoardImageDownloaded {
@@ -253,65 +250,68 @@ impl Application for BBImager {
                 self.flashing_status.take();
                 self.destinations.clear();
             }
-            BBImagerMessage::HomePage => {
-                self.back_home();
-            }
-            BBImagerMessage::BoardSectionPage => {
-                self.screen = Screen::BoardSelection;
-                let jobs = self
-                    .config
-                    .devices()
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, x)| x.icon_local.is_none())
-                    .map(|(index, v)| {
-                        Command::perform(
-                            self.downloader
-                                .clone()
-                                .download(v.icon.clone(), v.icon_sha256),
-                            move |p| match p {
-                                Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
-                                Err(e) => BBImagerMessage::BoardImageDownloadFailed {
-                                    index,
-                                    error: e.to_string(),
-                                },
-                            },
-                        )
-                    });
+            BBImagerMessage::SwitchScreen(x) => {
+                self.screen = x;
+                match x {
+                    Screen::Home => self.back_home(),
+                    Screen::BoardSelection => {
+                        let jobs = self
+                            .config
+                            .devices()
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, x)| x.icon_local.is_none())
+                            .map(|(index, v)| {
+                                Command::perform(
+                                    self.downloader
+                                        .clone()
+                                        .download(v.icon.clone(), v.icon_sha256),
+                                    move |p| match p {
+                                        Ok(path) => {
+                                            BBImagerMessage::BoardImageDownloaded { index, path }
+                                        }
+                                        Err(e) => BBImagerMessage::BoardImageDownloadFailed {
+                                            index,
+                                            error: e.to_string(),
+                                        },
+                                    },
+                                )
+                            });
+                        return Command::batch(jobs);
+                    }
+                    Screen::ImageSelection => {
+                        let board = self.selected_board.as_ref().unwrap().name.clone();
+                        let jobs = self
+                            .config
+                            .os_list
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, x)| x.icon_local.is_none())
+                            .filter(|(_, v)| v.devices.contains(&board))
+                            .map(|(index, v)| {
+                                Command::perform(
+                                    self.downloader
+                                        .clone()
+                                        .download(v.icon.clone(), v.icon_sha256),
+                                    move |p| match p {
+                                        Ok(path) => {
+                                            BBImagerMessage::OsListImageDownloaded { index, path }
+                                        }
+                                        Err(e) => BBImagerMessage::OsListDownloadFailed {
+                                            index,
+                                            error: e.to_string(),
+                                        },
+                                    },
+                                )
+                            });
 
-                return Command::batch(jobs);
+                        return Command::batch(jobs);
+                    }
+                    Screen::DestinationSelection => {
+                        return self.refresh_destinations();
+                    }
+                }
             }
-            BBImagerMessage::ImageSelectionPage => {
-                self.screen = Screen::ImageSelection;
-                let board = self.selected_board.as_ref().unwrap().name.clone();
-                let jobs = self
-                    .config
-                    .os_list
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, x)| x.icon_local.is_none())
-                    .filter(|(_, v)| v.devices.contains(&board))
-                    .map(|(index, v)| {
-                        Command::perform(
-                            self.downloader
-                                .clone()
-                                .download(v.icon.clone(), v.icon_sha256),
-                            move |p| match p {
-                                Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
-                                Err(e) => BBImagerMessage::OsListDownloadFailed {
-                                    index,
-                                    error: e.to_string(),
-                                },
-                            },
-                        )
-                    });
-
-                return Command::batch(jobs);
-            }
-            BBImagerMessage::DestinationSelectionPage => {
-                self.screen = Screen::DestinationSelection;
-            }
-
             BBImagerMessage::Search(x) => {
                 self.search_bar = x;
             }
@@ -446,7 +446,7 @@ impl BBImager {
         .on_press_maybe(if btn_disable {
             None
         } else {
-            Some(BBImagerMessage::BoardSectionPage)
+            Some(BBImagerMessage::SwitchScreen(Screen::BoardSelection))
         });
 
         let choose_image_btn = match &self.selected_image {
@@ -457,7 +457,7 @@ impl BBImager {
         .on_press_maybe(if btn_disable || self.selected_board.is_none() {
             None
         } else {
-            Some(BBImagerMessage::ImageSelectionPage)
+            Some(BBImagerMessage::SwitchScreen(Screen::ImageSelection))
         });
 
         let choose_dst_btn = match &self.selected_dst {
@@ -468,7 +468,7 @@ impl BBImager {
         .on_press_maybe(if btn_disable || self.selected_image.is_none() {
             None
         } else {
-            Some(BBImagerMessage::DestinationSelectionPage)
+            Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
         });
 
         let reset_btn = button("RESET")
@@ -674,7 +674,7 @@ impl BBImager {
         let mut row = widget::row![button(
             widget::svg(widget::svg::Handle::from_memory(ARROW_BACK_ICON)).width(22)
         )
-        .on_press(BBImagerMessage::HomePage)
+        .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
         .style(theme::Button::Secondary)]
         .spacing(10);
 
@@ -753,7 +753,7 @@ impl BBImager {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 enum Screen {
     #[default]
     Home,
