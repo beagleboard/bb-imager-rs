@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use sha2::{Digest, Sha256};
-use std::{io::Read, os::unix::fs::MetadataExt, path::Path};
+use std::{io::Read, path::Path};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::bytes::BufMut;
@@ -77,7 +77,7 @@ impl OsImage {
                 })
             }
             _ => {
-                let size = file.metadata().await?.size();
+                let size = size(&file.metadata().await?);
 
                 Ok(Self {
                     sha256,
@@ -140,6 +140,22 @@ impl tokio::io::AsyncRead for OsImage {
                 buf.put(x);
                 std::task::Poll::Ready(Ok(()))
             }
+        }
+    }
+}
+
+fn size(file: &std::fs::Metadata) -> u64 {
+    cfg_if::cfg_if! {
+        if #[cfg(unix)] {
+            use std::os::unix::fs::MetadataExt;
+
+            file.size()
+        } else if #[cfg(windows)] {
+            use std::os::windows::fs::MetadataExt;
+
+            file.file_size()
+        } else {
+            panic!("Unsupported Platform")
         }
     }
 }

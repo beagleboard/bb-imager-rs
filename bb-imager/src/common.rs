@@ -54,6 +54,11 @@ impl Destination {
 
         Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
     }
+
+    #[cfg(windows)]
+    pub async fn open(&self, state: &State) -> crate::error::Result<tokio::fs::File> {
+        todo!()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -68,5 +73,10 @@ impl State {
         let dbus_client = udisks2::Client::new().await?;
 
         Ok(Self { dbus_client })
+    }
+
+    #[cfg(windows)]
+    pub async fn new() -> crate::error::Result<Self> {
+        Ok(Self {})
     }
 }

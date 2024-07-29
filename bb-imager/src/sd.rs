@@ -118,3 +118,12 @@ pub async fn destinations(
 
     Ok(ans)
 }
+
+#[cfg(windows)]
+pub async fn destinations(
+    state: &crate::State,
+) -> Result<std::collections::HashSet<crate::Destination>> {
+    use std::collections::HashSet;
+
+    Ok(HashSet::new())
+}

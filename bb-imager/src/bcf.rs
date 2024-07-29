@@ -349,8 +349,7 @@ pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Desti
         .map(|x| x.port_name)
         .map(|x| crate::Destination {
             name: x,
-            size: None,
-            block: None,
+            ..Default::default()
         })
         .collect();
 

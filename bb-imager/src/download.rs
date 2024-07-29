@@ -58,9 +58,12 @@ impl Downloader {
 
         let dirs = ProjectDirs::from("org", "beagleboard", "bb-imager").unwrap();
 
-        if let Err(e) = std::fs::create_dir(dirs.cache_dir()) {
+        if let Err(e) = std::fs::create_dir_all(dirs.cache_dir()) {
             if e.kind() != io::ErrorKind::AlreadyExists {
-                panic!("{}", e)
+                panic!(
+                    "Failed to create cache dir: {:?} due to error {e}",
+                    dirs.cache_dir()
+                )
             }
         }
 
