@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use bb_imager::{DownloadStatus, FlashingStatus};
 use futures_util::TryStreamExt;
@@ -52,11 +52,11 @@ struct BBImager {
     selected_board: Option<bb_imager::config::Device>,
     selected_image: Option<OsImage>,
     selected_dst: Option<bb_imager::Destination>,
-    download_status: Option<Result<DownloadStatus, String>>,
-    flashing_status: Option<Result<FlashingStatus, String>>,
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
     unrecoverable_error: Option<String>,
+    progress_bar: ProgressBarState,
+    flashing: bool,
 }
 
 #[derive(Default, Debug)]
@@ -85,14 +85,15 @@ enum BBImagerMessage {
     SelectImage(Option<bb_imager::config::OsList>),
     SelectPort(bb_imager::Destination),
     StartFlashing,
+    StopFlashing(ProgressBarState),
     FlashImage {
         path: PathBuf,
         inner_path: Option<String>,
         sha256: Option<[u8; 32]>,
     },
 
-    DownloadStatus(Result<DownloadStatus, String>),
-    FlashingStatus(Result<FlashingStatus, String>),
+    ProgressBar(ProgressBarState),
+
     Reset,
 
     SwitchScreen(Screen),
@@ -122,6 +123,44 @@ enum BBImagerMessage {
 
     UnrecoverableError(String),
     Null,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ProgressBarState {
+    label: Cow<'static, str>,
+    progress: f32,
+    state: ProgressBarStatus,
+}
+
+impl ProgressBarState {
+    fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
+        Self {
+            label: label.into(),
+            progress,
+            state,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum ProgressBarStatus {
+    #[default]
+    Normal,
+    Success,
+    Fail,
+    Loading,
+}
+
+impl From<ProgressBarStatus> for widget::theme::ProgressBar {
+    fn from(value: ProgressBarStatus) -> Self {
+        match value {
+            ProgressBarStatus::Normal => widget::theme::ProgressBar::Primary,
+            ProgressBarStatus::Success => widget::theme::ProgressBar::Success,
+            ProgressBarStatus::Fail => widget::theme::ProgressBar::Danger,
+            // TODO: Add better loading theme
+            ProgressBarStatus::Loading => widget::theme::ProgressBar::Primary,
+        }
+    }
 }
 
 impl Application for BBImager {
@@ -188,6 +227,7 @@ impl Application for BBImager {
 
                 return self.refresh_destinations();
             }
+            BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
                     Some(y) => Some(OsImage::Remote(y)),
@@ -218,7 +258,11 @@ impl Application for BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
 
                 tracing::info!("Start flashing image {:?}", path);
-                let stream = Command::run(
+
+                self.progress_bar =
+                    ProgressBarState::new("Preparing...", 0.5, ProgressBarStatus::Loading);
+
+                return Command::run(
                     flash_helper(
                         path,
                         inner_path,
@@ -227,18 +271,58 @@ impl Application for BBImager {
                         dst,
                         self.state.clone().unwrap(),
                     ),
-                    |x| BBImagerMessage::FlashingStatus(x.map_err(|e| e.to_string())),
+                    |x| match x {
+                        Ok(s) => match s {
+                            FlashingStatus::Preparing => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Preparing...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            FlashingStatus::Flashing => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Flashing...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            FlashingStatus::FlashingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Flashing... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            FlashingStatus::Verifying => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Verifying...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            FlashingStatus::VerifyingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Verifying... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            FlashingStatus::Finished => {
+                                BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                    "Flashing Successful...",
+                                    1.0,
+                                    ProgressBarStatus::Success,
+                                ))
+                            }
+                        },
+                        Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::new(
+                            format!("Flashing Failed: {e}"),
+                            1.0,
+                            ProgressBarStatus::Fail,
+                        )),
+                    },
                 );
-
-                return Command::batch([
-                    Command::perform(std::future::ready(FlashingStatus::Preparing), |x| {
-                        BBImagerMessage::FlashingStatus(Ok(x))
-                    }),
-                    stream,
-                ]);
-            }
-            BBImagerMessage::FlashingStatus(x) => {
-                self.flashing_status = Some(x.map_err(|e| e.to_string()));
             }
             BBImagerMessage::Reset => {
                 self.selected_dst.take();
@@ -246,8 +330,6 @@ impl Application for BBImager {
                 self.selected_board.take();
                 self.unrecoverable_error.take();
                 self.search_bar.clear();
-                self.download_status.take();
-                self.flashing_status.take();
                 self.destinations.clear();
             }
             BBImagerMessage::SwitchScreen(x) => {
@@ -339,46 +421,72 @@ impl Application for BBImager {
                     self.config.imager.devices[index]
                 );
             }
-            BBImagerMessage::StartFlashing => match self.selected_image.clone().unwrap() {
-                OsImage::Local(p) => {
-                    return Command::perform(
-                        std::future::ready((p, None)),
-                        |(path, inner_path)| BBImagerMessage::FlashImage {
-                            path,
-                            inner_path,
-                            sha256: None,
-                        },
-                    );
-                }
-                OsImage::Remote(r) => {
-                    tracing::info!("Downloading Remote Os");
-                    return Command::run(
-                        self.downloader.download_progress(r.url, r.download_sha256),
-                        |x| BBImagerMessage::DownloadStatus(x.map_err(|y| y.to_string())),
-                    );
-                }
-            },
-            BBImagerMessage::DownloadStatus(s) => {
-                if let Ok(DownloadStatus::Finished(p)) = s {
-                    tracing::info!("Os download finished");
-                    self.download_status.take();
-                    if let Some(OsImage::Remote(x)) = &self.selected_image {
-                        let sha256 = x.extracted_sha256;
+            BBImagerMessage::StartFlashing => {
+                self.flashing = true;
+
+                match self.selected_image.clone().unwrap() {
+                    OsImage::Local(p) => {
                         return Command::perform(
-                            std::future::ready((p, x.extract_path.clone())),
-                            move |(path, inner_path)| BBImagerMessage::FlashImage {
+                            std::future::ready((p, None)),
+                            |(path, inner_path)| BBImagerMessage::FlashImage {
                                 path,
                                 inner_path,
-                                sha256: Some(sha256),
+                                sha256: None,
                             },
                         );
-                    } else {
-                        unreachable!()
                     }
-                } else {
-                    tracing::debug!("Os download progress: {:?}", s);
-                    self.download_status = Some(s);
+                    OsImage::Remote(r) => {
+                        tracing::info!("Downloading Remote Os");
+                        let img = self.selected_image.clone();
+                        return Command::run(
+                            self.downloader.download_progress(r.url, r.download_sha256),
+                            move |x| match x {
+                                Ok(s) => match s {
+                                    DownloadStatus::DownloadingProgress(p) => {
+                                        BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                            format!(
+                                                "Downloading... {}%",
+                                                (p * 100.0).round() as usize
+                                            ),
+                                            p,
+                                            ProgressBarStatus::Normal,
+                                        ))
+                                    }
+                                    DownloadStatus::VerifyingProgress(p) => {
+                                        BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                            format!(
+                                                "Verifying Download... {}%",
+                                                (p * 100.0).round() as usize
+                                            ),
+                                            p,
+                                            ProgressBarStatus::Normal,
+                                        ))
+                                    }
+                                    DownloadStatus::Finished(path) => {
+                                        if let Some(OsImage::Remote(r)) = &img {
+                                            BBImagerMessage::FlashImage {
+                                                path,
+                                                inner_path: r.extract_path.clone(),
+                                                sha256: Some(r.extracted_sha256),
+                                            }
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                },
+                                Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                    format!("Downloading Failed: {e}"),
+                                    1.0,
+                                    ProgressBarStatus::Fail,
+                                )),
+                            },
+                        );
+                    }
                 }
+            }
+            BBImagerMessage::StopFlashing(x) => {
+                self.flashing = false;
+                self.progress_bar = x;
             }
             BBImagerMessage::Destinations(x) => match x {
                 Ok(y) => self.destinations = y,
@@ -390,7 +498,7 @@ impl Application for BBImager {
                 self.state = Some(s);
             }
             BBImagerMessage::UnrecoverableError(e) => {
-                self.unrecoverable_error = Some(e);
+                panic!("Encounterd unrecoverable error {e}");
             }
             BBImagerMessage::RefreshDestinations => {
                 return self.refresh_destinations();
@@ -436,14 +544,12 @@ impl BBImager {
 
         let logo = widget::image(widget::image::Handle::from_memory(BB_BANNER)).width(500);
 
-        let btn_disable = self.flashing_status.is_some() || self.download_status.is_some();
-
         let choose_device_btn = match &self.selected_board {
             Some(x) => button(x.name.as_str()),
             None => button("CHOOSE DEVICE"),
         }
         .padding(HOME_BTN_PADDING)
-        .on_press_maybe(if btn_disable {
+        .on_press_maybe(if self.flashing {
             None
         } else {
             Some(BBImagerMessage::SwitchScreen(Screen::BoardSelection))
@@ -454,7 +560,7 @@ impl BBImager {
             None => button("CHOOSE IMAGE"),
         }
         .padding(HOME_BTN_PADDING)
-        .on_press_maybe(if btn_disable || self.selected_board.is_none() {
+        .on_press_maybe(if self.flashing || self.selected_board.is_none() {
             None
         } else {
             Some(BBImagerMessage::SwitchScreen(Screen::ImageSelection))
@@ -465,7 +571,7 @@ impl BBImager {
             None => button("CHOOSE DESTINATION"),
         }
         .padding(HOME_BTN_PADDING)
-        .on_press_maybe(if btn_disable || self.selected_image.is_none() {
+        .on_press_maybe(if self.flashing || self.selected_image.is_none() {
             None
         } else {
             Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
@@ -697,59 +803,11 @@ impl BBImager {
 
         const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
 
-        if let Some(e) = &self.unrecoverable_error {
-            (
-                text(format!("Unrecoverable Error: {e}")),
-                progress_bar(RANGE, 1.0).style(ProgressBar::Danger),
-            )
-        } else if let Some(s) = &self.download_status {
-            match s {
-                Ok(x) => match x {
-                    DownloadStatus::DownloadingProgress(p) => (
-                        text(format!("Downloading... {}%", (*p * 100.0).round() as usize)),
-                        progress_bar(RANGE, *p),
-                    ),
-                    DownloadStatus::Finished(_) => (
-                        text("Downloading Successful..."),
-                        progress_bar(RANGE, 1.0).style(ProgressBar::Success),
-                    ),
-                    DownloadStatus::VerifyingProgress(p) => (
-                        text(format!("Verifying... {}%", (*p * 100.0).round() as usize)),
-                        progress_bar(RANGE, *p),
-                    ),
-                },
-                Err(e) => (
-                    text(format!("Downloading Image Failed: {e}")),
-                    progress_bar(RANGE, 1.0).style(ProgressBar::Danger),
-                ),
-            }
-        } else if let Some(s) = &self.flashing_status {
-            match s {
-                Ok(x) => match x {
-                    FlashingStatus::Preparing => (text("Preparing..."), progress_bar(RANGE, 0.5)),
-                    FlashingStatus::Flashing => (text("Flashing..."), progress_bar(RANGE, 0.5)),
-                    FlashingStatus::FlashingProgress(p) => (
-                        text(format!("Flashing... {}%", (*p * 100.0).round() as usize)),
-                        progress_bar(RANGE, *p),
-                    ),
-                    FlashingStatus::Verifying => (text("Verifying..."), progress_bar(RANGE, 0.5)),
-                    FlashingStatus::VerifyingProgress(p) => (
-                        text(format!("Verifying... {}%", (*p * 100.0).round() as usize)),
-                        progress_bar(RANGE, *p),
-                    ),
-                    FlashingStatus::Finished => (
-                        text("Flashing Successful..."),
-                        progress_bar(RANGE, 1.0).style(ProgressBar::Success),
-                    ),
-                },
-                Err(e) => (
-                    text(format!("Flashing Failed: {e}")),
-                    progress_bar(RANGE, 1.0).style(ProgressBar::Danger),
-                ),
-            }
-        } else {
-            (text(""), widget::progress_bar((0.0)..=1.0, 0.0))
-        }
+        (
+            text(self.progress_bar.label.clone()),
+            progress_bar(RANGE, self.progress_bar.progress)
+                .style(ProgressBar::from(self.progress_bar.state)),
+        )
     }
 }
 
