@@ -54,7 +54,6 @@ struct BBImager {
     selected_dst: Option<bb_imager::Destination>,
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
-    unrecoverable_error: Option<String>,
     progress_bar: ProgressBarState,
     flashing: bool,
 }
@@ -328,7 +327,6 @@ impl Application for BBImager {
                 self.selected_dst.take();
                 self.selected_image.take();
                 self.selected_board.take();
-                self.unrecoverable_error.take();
                 self.search_bar.clear();
                 self.destinations.clear();
             }
@@ -577,9 +575,14 @@ impl BBImager {
             Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
         });
 
-        let reset_btn = button("RESET")
-            .padding(HOME_BTN_PADDING)
-            .on_press(BBImagerMessage::Reset);
+        let reset_btn =
+            button("RESET")
+                .padding(HOME_BTN_PADDING)
+                .on_press_maybe(if self.flashing {
+                    None
+                } else {
+                    Some(BBImagerMessage::Reset)
+                });
 
         let write_btn = button("WRITE").padding(HOME_BTN_PADDING).on_press_maybe(
             if self.selected_board.is_none()
