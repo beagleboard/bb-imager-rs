@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
+pub(crate) const BUF_SIZE: usize = 64 * 1024;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to Open Destination")]

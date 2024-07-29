@@ -1,13 +1,11 @@
 //! Helper functions
 
-use crate::error::Result;
+use crate::{error::Result, BUF_SIZE};
 use std::path::PathBuf;
 
 use futures_util::Stream;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
-
-const BUF_SIZE: usize = 8 * 1024;
 
 pub(crate) enum Sha256State {
     Progress(f32),

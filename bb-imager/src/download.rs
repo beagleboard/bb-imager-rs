@@ -15,10 +15,9 @@ use tokio_util::io::StreamReader;
 use crate::{
     error::Result,
     util::{sha256_file_progress, Sha256State},
-    DownloadStatus,
+    DownloadStatus, BUF_SIZE,
 };
 
-const BUF_SIZE: usize = 8 * 1024;
 const FILE_NAME_TRIES: usize = 10;
 
 #[derive(Error, Debug, Clone)]

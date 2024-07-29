@@ -2537,6 +2537,7 @@ version = "0.3.2"
 source = "git+https://github.com/Ayush1325/xz2-rs.git?branch=uncompressed-size#3f47a34d6b48d90e9b7017cff80209d35147e6bf"
 dependencies = [
  "liblzma-sys",
+ "num_cpus",
 ]
 
 [[package]]

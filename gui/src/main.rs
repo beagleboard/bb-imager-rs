@@ -102,18 +102,9 @@ enum BBImagerMessage {
         index: usize,
         path: PathBuf,
     },
-    BoardImageDownloadFailed {
-        index: usize,
-        error: String,
-    },
-
     OsListImageDownloaded {
         index: usize,
         path: PathBuf,
-    },
-    OsListDownloadFailed {
-        index: usize,
-        error: String,
     },
 
     Destinations(Result<HashSet<bb_imager::Destination>, String>),
@@ -350,10 +341,12 @@ impl Application for BBImager {
                                         Ok(path) => {
                                             BBImagerMessage::BoardImageDownloaded { index, path }
                                         }
-                                        Err(e) => BBImagerMessage::BoardImageDownloadFailed {
-                                            index,
-                                            error: e.to_string(),
-                                        },
+                                        Err(_) => {
+                                            tracing::warn!(
+                                                "Failed to download image for board {index}"
+                                            );
+                                            BBImagerMessage::Null
+                                        }
                                     },
                                 )
                             });
@@ -377,10 +370,12 @@ impl Application for BBImager {
                                         Ok(path) => {
                                             BBImagerMessage::OsListImageDownloaded { index, path }
                                         }
-                                        Err(e) => BBImagerMessage::OsListDownloadFailed {
-                                            index,
-                                            error: e.to_string(),
-                                        },
+                                        Err(_) => {
+                                            tracing::warn!(
+                                                "Failed to download image for os {index}"
+                                            );
+                                            BBImagerMessage::Null
+                                        }
                                     },
                                 )
                             });
@@ -399,12 +394,6 @@ impl Application for BBImager {
                 tracing::info!("Successfully downloaded to {:?}", path);
                 self.config.imager.devices[index].icon_local = Some(path);
             }
-            BBImagerMessage::BoardImageDownloadFailed { index, error } => {
-                tracing::warn!(
-                    "Failed to fetch icon for {:?}, Error: {error}",
-                    self.config.imager.devices[index]
-                );
-            }
             BBImagerMessage::OsListImageDownloaded { index, path } => {
                 tracing::info!(
                     "Successfully downloaded os icon for {:?} to {:?}",
@@ -412,12 +401,6 @@ impl Application for BBImager {
                     path
                 );
                 self.config.os_list[index].icon_local = Some(path);
-            }
-            BBImagerMessage::OsListDownloadFailed { index, error } => {
-                tracing::warn!(
-                    "Failed to fetch icon for {:?}, Error: {error}",
-                    self.config.imager.devices[index]
-                );
             }
             BBImagerMessage::StartFlashing => {
                 self.flashing = true;
