@@ -80,9 +80,17 @@ impl std::fmt::Display for OsImage {
 
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
+    InitState(bb_imager::State),
     BoardSelected(bb_imager::config::Device),
     SelectImage(Option<bb_imager::config::OsList>),
     SelectPort(bb_imager::Destination),
+    ProgressBar(ProgressBarState),
+    SwitchScreen(Screen),
+    Search(String),
+    Destinations(Result<HashSet<bb_imager::Destination>, String>),
+    RefreshDestinations,
+    Reset,
+
     StartFlashing,
     StopFlashing(ProgressBarState),
     FlashImage {
@@ -91,13 +99,6 @@ enum BBImagerMessage {
         sha256: Option<[u8; 32]>,
     },
 
-    ProgressBar(ProgressBarState),
-
-    Reset,
-
-    SwitchScreen(Screen),
-
-    Search(String),
     BoardImageDownloaded {
         index: usize,
         path: PathBuf,
@@ -106,10 +107,6 @@ enum BBImagerMessage {
         index: usize,
         path: PathBuf,
     },
-
-    Destinations(Result<HashSet<bb_imager::Destination>, String>),
-    RefreshDestinations,
-    InitState(bb_imager::State),
 
     UnrecoverableError(String),
     Null,
@@ -162,14 +159,16 @@ impl Application for BBImager {
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let downloader = bb_imager::download::Downloader::default();
 
-        let board_image_from_cache = flags.config.devices().iter().enumerate().map(|(index, v)| {
+        // Fetch all board images
+        let board_image = flags.config.devices().iter().enumerate().map(|(index, v)| {
             Command::perform(
-                downloader
-                    .clone()
-                    .check_cache(v.icon.clone(), v.icon_sha256),
+                downloader.clone().download(v.icon.clone(), v.icon_sha256),
                 move |p| match p {
-                    Some(path) => BBImagerMessage::BoardImageDownloaded { index, path },
-                    None => BBImagerMessage::Null,
+                    Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
+                    Err(_) => {
+                        tracing::warn!("Failed to fetch image for board {index}");
+                        BBImagerMessage::Null
+                    }
                 },
             )
         });
@@ -197,11 +196,7 @@ impl Application for BBImager {
                 downloader: downloader.clone(),
                 ..Default::default()
             },
-            Command::batch(
-                board_image_from_cache
-                    .chain(os_image_from_cache)
-                    .chain([state_cmd]),
-            ),
+            Command::batch(board_image.chain(os_image_from_cache).chain([state_cmd])),
         )
     }
 
@@ -212,10 +207,37 @@ impl Application for BBImager {
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             BBImagerMessage::BoardSelected(x) => {
-                self.selected_board = Some(x);
+                // Reset any previously selected values
+                self.selected_dst.take();
+                self.selected_image.take();
+                self.destinations.clear();
+
+                self.selected_board = Some(x.clone());
                 self.back_home();
 
-                return self.refresh_destinations();
+                let jobs = self
+                    .config
+                    .os_list
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, x)| x.icon_local.is_none())
+                    .filter(|(_, v)| v.devices.contains(&x.name))
+                    .map(|(index, v)| {
+                        Command::perform(
+                            self.downloader
+                                .clone()
+                                .download(v.icon.clone(), v.icon_sha256),
+                            move |p| match p {
+                                Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
+                                Err(_) => {
+                                    tracing::warn!("Failed to download image for os {index}");
+                                    BBImagerMessage::Null
+                                }
+                            },
+                        )
+                    });
+
+                return Command::batch(jobs.chain([self.refresh_destinations()]));
             }
             BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
@@ -230,7 +252,6 @@ impl Application for BBImager {
                             .map(OsImage::Local)
                     }
                 };
-
                 if self.selected_image.is_some() {
                     self.back_home();
                 }
@@ -244,10 +265,9 @@ impl Application for BBImager {
                 inner_path,
                 sha256,
             } => {
+                tracing::info!("Start flashing image {:?}", path);
                 let board = self.selected_board.clone().expect("No board selected");
                 let dst = self.selected_dst.clone().expect("No destination selected");
-
-                tracing::info!("Start flashing image {:?}", path);
 
                 self.progress_bar =
                     ProgressBarState::new("Preparing...", 0.5, ProgressBarStatus::Loading);
@@ -325,63 +345,8 @@ impl Application for BBImager {
                 self.screen = x;
                 match x {
                     Screen::Home => self.back_home(),
-                    Screen::BoardSelection => {
-                        let jobs = self
-                            .config
-                            .devices()
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, x)| x.icon_local.is_none())
-                            .map(|(index, v)| {
-                                Command::perform(
-                                    self.downloader
-                                        .clone()
-                                        .download(v.icon.clone(), v.icon_sha256),
-                                    move |p| match p {
-                                        Ok(path) => {
-                                            BBImagerMessage::BoardImageDownloaded { index, path }
-                                        }
-                                        Err(_) => {
-                                            tracing::warn!(
-                                                "Failed to download image for board {index}"
-                                            );
-                                            BBImagerMessage::Null
-                                        }
-                                    },
-                                )
-                            });
-                        return Command::batch(jobs);
-                    }
-                    Screen::ImageSelection => {
-                        let board = self.selected_board.as_ref().unwrap().name.clone();
-                        let jobs = self
-                            .config
-                            .os_list
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, x)| x.icon_local.is_none())
-                            .filter(|(_, v)| v.devices.contains(&board))
-                            .map(|(index, v)| {
-                                Command::perform(
-                                    self.downloader
-                                        .clone()
-                                        .download(v.icon.clone(), v.icon_sha256),
-                                    move |p| match p {
-                                        Ok(path) => {
-                                            BBImagerMessage::OsListImageDownloaded { index, path }
-                                        }
-                                        Err(_) => {
-                                            tracing::warn!(
-                                                "Failed to download image for os {index}"
-                                            );
-                                            BBImagerMessage::Null
-                                        }
-                                    },
-                                )
-                            });
-
-                        return Command::batch(jobs);
-                    }
+                    Screen::BoardSelection => {}
+                    Screen::ImageSelection => {}
                     Screen::DestinationSelection => {
                         return self.refresh_destinations();
                     }
@@ -391,15 +356,9 @@ impl Application for BBImager {
                 self.search_bar = x;
             }
             BBImagerMessage::BoardImageDownloaded { index, path } => {
-                tracing::info!("Successfully downloaded to {:?}", path);
                 self.config.imager.devices[index].icon_local = Some(path);
             }
             BBImagerMessage::OsListImageDownloaded { index, path } => {
-                tracing::info!(
-                    "Successfully downloaded os icon for {:?} to {:?}",
-                    self.config.os_list[index],
-                    path
-                );
                 self.config.os_list[index].icon_local = Some(path);
             }
             BBImagerMessage::StartFlashing => {
