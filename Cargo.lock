@@ -376,28 +376,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-stream"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd56dd203fef61ac097dd65721a419ddccb106b2d2b70ba60a6b529f03961a51"
-dependencies = [
- "async-stream-impl",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.70",
-]
-
-[[package]]
 name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -480,13 +458,12 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 name = "bb-imager"
 version = "0.1.0"
 dependencies = [
- "async-stream",
  "cfg-if",
  "chrono",
  "const-hex",
  "crc32fast",
  "directories",
- "futures",
+ "futures-util",
  "liblzma",
  "reqwest",
  "semver",
@@ -1791,7 +1768,7 @@ name = "gui"
 version = "0.1.0"
 dependencies = [
  "bb-imager",
- "futures",
+ "futures-util",
  "iced",
  "iced_aw",
  "image 0.25.2",

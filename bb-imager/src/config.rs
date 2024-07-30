@@ -82,7 +82,9 @@ impl Flasher {
     ) -> crate::error::Result<HashSet<Destination>> {
         match self {
             Flasher::SdCard => crate::sd::destinations(&state).await,
-            Flasher::BeagleConnectFreedom => crate::bcf::possible_devices().await,
+            Flasher::BeagleConnectFreedom => {
+                tokio::task::block_in_place(|| crate::bcf::possible_devices())
+            }
         }
     }
 

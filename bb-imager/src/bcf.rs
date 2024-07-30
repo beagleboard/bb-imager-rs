@@ -323,7 +323,7 @@ pub fn flash(
     }
 }
 
-pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
+pub fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
     let ports = serialport::available_ports()
         .unwrap()
         .into_iter()

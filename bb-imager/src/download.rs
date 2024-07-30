@@ -1,7 +1,7 @@
 //! Module for downloading remote images for flashing
 
 use directories::ProjectDirs;
-use futures::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
     io::{self, Read},
@@ -147,9 +147,12 @@ impl Downloader {
             None => response_stream.size_hint().0,
         };
 
+        let mut hasher = Sha256::new();
+
         while let Some(x) = response_stream.next().await {
             let mut data = x.map_err(Error::from)?;
             cur_pos += data.len();
+            hasher.update(&data);
             file.write_all_buf(&mut data).await?;
 
             let _ = chan.send(DownloadFlashingStatus::DownloadingProgress(
@@ -157,11 +160,16 @@ impl Downloader {
             ));
         }
 
-        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
+        let hash: [u8; 32] = hasher
+            .finalize()
+            .as_slice()
+            .try_into()
+            .expect("SHA-256 is 32 bytes");
 
-        let hash =
-            tokio::task::block_in_place(|| sha256_file_progress(tmp_file_path.path(), chan))?;
+        let _ = chan.send(DownloadFlashingStatus::Verifying);
+
         if hash != sha256 {
+            tracing::warn!("{hash:?} != {sha256:?}");
             return Err(Error::Sha256Error.into());
         }
 

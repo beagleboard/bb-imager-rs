@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
-use futures::SinkExt;
+use futures_util::SinkExt;
 use iced::{
     executor, theme,
     widget::{self, button, text},
@@ -63,8 +63,8 @@ struct Flags {
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
     InitState(bb_imager::State),
-    BoardSelected(bb_imager::config::Device),
-    SelectImage(Option<bb_imager::config::OsList>),
+    BoardSelected(Box<bb_imager::config::Device>),
+    SelectImage(Option<Box<bb_imager::config::OsList>>),
     SelectPort(bb_imager::Destination),
     ProgressBar(ProgressBarState),
     SwitchScreen(Screen),
@@ -189,7 +189,7 @@ impl Application for BBImager {
                 self.selected_image.take();
                 self.destinations.clear();
 
-                self.selected_board = Some(x.clone());
+                self.selected_board = Some(*x.clone());
                 self.back_home();
 
                 let jobs = self
@@ -219,7 +219,7 @@ impl Application for BBImager {
             BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
-                    Some(y) => Some(bb_imager::common::SelectedImage::Remote(y)),
+                    Some(y) => Some(bb_imager::common::SelectedImage::Remote(*y)),
                     None => {
                         let (name, extensions) =
                             self.selected_board.as_ref().unwrap().flasher.file_filter();
@@ -545,7 +545,7 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::BoardSelected(x.clone()))
+                .on_press(BBImagerMessage::BoardSelected(Box::new(x.clone())))
                 .style(theme::Button::Secondary)
             })
             .map(Into::into);
@@ -596,7 +596,7 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectImage(Some(x.clone())))
+                .on_press(BBImagerMessage::SelectImage(Some(Box::new(x.clone()))))
                 .style(theme::Button::Secondary)
             })
             .chain(std::iter::once(
