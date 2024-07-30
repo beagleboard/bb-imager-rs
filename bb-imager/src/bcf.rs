@@ -303,7 +303,7 @@ pub fn flash(
         }
 
         if reset_download {
-            bcf.send_download(image_offset as u32, (FIRMWARE_SIZE - image_offset) as u32)?;
+            bcf.send_download(image_offset, FIRMWARE_SIZE - image_offset)?;
             reset_download = false;
         }
 
@@ -335,7 +335,7 @@ pub fn possible_devices() -> Result<std::collections::HashSet<crate::Destination
             _ => false,
         })
         .map(|x| x.port_name)
-        .map(|x| crate::Destination::port(x))
+        .map(crate::Destination::port)
         .collect();
 
     Ok(ports)

@@ -219,14 +219,20 @@ impl Application for BBImager {
             BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
-                    Some(y) => Some(bb_imager::common::SelectedImage::Remote(*y)),
+                    Some(y) => Some(bb_imager::common::SelectedImage::remote(
+                        y.name,
+                        y.url,
+                        y.download_sha256,
+                        y.extracted_sha256,
+                        y.extract_path,
+                    )),
                     None => {
                         let (name, extensions) =
                             self.selected_board.as_ref().unwrap().flasher.file_filter();
                         rfd::FileDialog::new()
                             .add_filter(name, extensions)
                             .pick_file()
-                            .map(bb_imager::common::SelectedImage::Local)
+                            .map(bb_imager::common::SelectedImage::local)
                     }
                 };
                 if self.selected_image.is_some() {
@@ -562,7 +568,7 @@ impl BBImager {
         let board = self.selected_board.as_ref().unwrap();
         let items = self
             .config
-            .images_by_device(&board)
+            .images_by_device(board)
             .filter(|x| {
                 x.name
                     .to_lowercase()

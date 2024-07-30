@@ -40,12 +40,18 @@ impl OsImage {
             crate::SelectedImage::Local(x) => {
                 tokio::task::block_in_place(move || Self::from_path(&x, None, None))
             }
-            crate::SelectedImage::Remote(x) => {
+            crate::SelectedImage::Remote {
+                url,
+                download_sha256,
+                extracted_sha256,
+                extract_path,
+                ..
+            } => {
                 let p = downloader
-                    .download_progress(x.url, x.download_sha256, chan)
+                    .download_progress(url, download_sha256, chan)
                     .await?;
                 tokio::task::block_in_place(move || {
-                    Self::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
+                    Self::from_path(&p, extract_path.as_deref(), Some(extracted_sha256))
                 })
             }
         }
@@ -120,7 +126,7 @@ impl OsImage {
                 .expect("SHA-256 is 32 bytes");
 
             if hash != x {
-                return Err(Error::ZipSha256Error).map_err(Into::into);
+                return Err(Error::ZipSha256Error.into());
             }
         }
 

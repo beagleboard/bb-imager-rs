@@ -110,14 +110,42 @@ impl State {
 #[derive(Debug, Clone)]
 pub enum SelectedImage {
     Local(PathBuf),
-    Remote(crate::config::OsList),
+    Remote {
+        name: String,
+        url: url::Url,
+        download_sha256: [u8; 32],
+        extracted_sha256: [u8; 32],
+        extract_path: Option<String>,
+    },
+}
+
+impl SelectedImage {
+    pub const fn local(name: PathBuf) -> Self {
+        Self::Local(name)
+    }
+
+    pub const fn remote(
+        name: String,
+        url: url::Url,
+        download_sha256: [u8; 32],
+        extracted_sha256: [u8; 32],
+        extract_path: Option<String>,
+    ) -> Self {
+        Self::Remote {
+            name,
+            url,
+            download_sha256,
+            extracted_sha256,
+            extract_path,
+        }
+    }
 }
 
 impl std::fmt::Display for SelectedImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SelectedImage::Local(p) => write!(f, "{}", p.file_name().unwrap().to_string_lossy()),
-            SelectedImage::Remote(r) => write!(f, "{}", r.name),
+            SelectedImage::Remote { name, .. } => write!(f, "{}", name),
         }
     }
 }

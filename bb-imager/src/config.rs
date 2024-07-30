@@ -83,7 +83,7 @@ impl Flasher {
         match self {
             Flasher::SdCard => crate::sd::destinations(&state).await,
             Flasher::BeagleConnectFreedom => {
-                tokio::task::block_in_place(|| crate::bcf::possible_devices())
+                tokio::task::block_in_place(crate::bcf::possible_devices)
             }
         }
     }
