@@ -2,11 +2,9 @@
 
 use std::io::{Read, Seek, Write};
 
+use crate::DownloadFlashingStatus;
 use crate::{error::Result, BUF_SIZE};
-use crate::{DownloadFlashingStatus, SelectedImage};
-use futures::SinkExt;
 use thiserror::Error;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 #[derive(Error, Debug)]
 pub enum Error {

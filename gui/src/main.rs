@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use iced::{
     executor, theme,
     widget::{self, button, text},
@@ -145,10 +145,16 @@ impl Application for BBImager {
         });
 
         let os_image_from_cache = flags.config.os_list.iter().enumerate().map(|(index, v)| {
+            let downloader_clone = downloader.clone();
+            let icon = v.icon.clone();
+            let sha = v.icon_sha256;
+
             Command::perform(
-                downloader
-                    .clone()
-                    .check_cache(v.icon.clone(), v.icon_sha256),
+                async move {
+                    tokio::task::spawn_blocking(move || downloader_clone.check_cache(icon, sha))
+                        .await
+                        .unwrap()
+                },
                 move |p| match p {
                     Some(path) => BBImagerMessage::OsListImageDownloaded { index, path },
                     None => BBImagerMessage::Null,

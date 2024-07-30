@@ -4,7 +4,6 @@ use crate::{error::Result, BUF_SIZE};
 use std::{io::Read, path::Path};
 
 use sha2::{Digest, Sha256};
-use tokio::io::AsyncReadExt;
 
 pub(crate) fn sha256_file_progress(
     path: &Path,

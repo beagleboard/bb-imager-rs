@@ -1,6 +1,5 @@
 //! Stuff common to all the flashers
 
-use futures::SinkExt;
 use std::{path::PathBuf, time::Duration};
 use thiserror::Error;
 
@@ -83,7 +82,7 @@ impl Destination {
     }
 
     #[cfg(windows)]
-    pub async fn open(&self, state: &State) -> crate::error::Result<tokio::fs::File> {
+    pub async fn open(&self, state: &State) -> crate::error::Result<std::fs::File> {
         todo!()
     }
 }

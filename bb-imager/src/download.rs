@@ -1,15 +1,15 @@
 //! Module for downloading remote images for flashing
 
 use directories::ProjectDirs;
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
-    io,
+    io::{self, Read},
     path::{Path, PathBuf},
     time::Duration,
 };
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 
 use crate::{error::Result, util::sha256_file_progress, DownloadFlashingStatus, BUF_SIZE};
@@ -65,12 +65,12 @@ impl Downloader {
         Self { client, dirs }
     }
 
-    pub async fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let x = sha256_file(&file_path).await.ok()?;
+            let x = sha256_file(&file_path).ok()?;
             if x == sha256 {
                 return Some(file_path);
             }
@@ -84,7 +84,7 @@ impl Downloader {
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let x = sha256_file(&file_path).await?;
+            let x = tokio::task::block_in_place(|| sha256_file(&file_path))?;
             if x == sha256 {
                 return Ok(file_path);
             }
@@ -102,7 +102,7 @@ impl Downloader {
 
         tokio::io::copy_buf(&mut response_reader, &mut file).await?;
 
-        let x = sha256_file(tmp_file_path.path()).await?;
+        let x = tokio::task::block_in_place(|| sha256_file(tmp_file_path.path()))?;
         if x != sha256 {
             return Err(Error::Sha256Error.into());
         }
@@ -171,15 +171,13 @@ impl Downloader {
     }
 }
 
-async fn sha256_file(path: &Path) -> Result<[u8; 32]> {
-    let file = tokio::fs::OpenOptions::new().read(true).open(path).await?;
-    let mut reader = tokio::io::BufReader::new(file);
-
+fn sha256_file(path: &Path) -> Result<[u8; 32]> {
+    let mut file = std::fs::File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0; BUF_SIZE];
 
     loop {
-        let count = reader.read(&mut buffer).await?;
+        let count = file.read(&mut buffer)?;
         if count == 0 {
             break;
         }

@@ -7,7 +7,6 @@ use std::{
     path::Path,
 };
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 #[derive(Error, Debug)]
 pub enum Error {

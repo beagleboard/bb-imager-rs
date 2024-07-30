@@ -6,8 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{error::Result, SelectedImage};
-use futures::SinkExt;
+use crate::error::Result;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
