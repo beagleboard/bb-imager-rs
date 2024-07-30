@@ -2,9 +2,9 @@
 
 use std::io::Read;
 
-use crate::FlashingStatus;
 use crate::{error::Result, BUF_SIZE};
-use futures_util::Stream;
+use crate::{DownloadFlashingStatus, SelectedImage};
+use futures::SinkExt;
 use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
@@ -16,57 +16,66 @@ pub enum Error {
     DriveFetchError,
 }
 
-pub fn flash(
-    mut img: crate::img::OsImage,
-    sd: crate::Destination,
-    state: crate::State,
-) -> impl Stream<Item = Result<crate::FlashingStatus>> {
-    async_stream::try_stream! {
-        yield FlashingStatus::Preparing;
+pub(crate) async fn flash(
+    img: SelectedImage,
+    downloader: &crate::download::Downloader,
+    dst: &crate::Destination,
+    state: &crate::State,
+    chan: &mut futures::channel::mpsc::UnboundedSender<DownloadFlashingStatus>,
+) -> Result<()> {
+    let mut sd = dst.open_file(state).await?;
 
-        let size = img.size();
+    let mut img = match img {
+        SelectedImage::Local(x) => crate::img::OsImage::from_path(&x, None, None).await,
+        SelectedImage::Remote(x) => {
+            let p = downloader
+                .download_progress(x.url, x.download_sha256, chan)
+                .await?;
+            crate::img::OsImage::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
+                .await
+        }
+    }?;
 
-        let mut port = sd.open(&state).await?;
-        tracing::info!("Opened File");
-        let mut buf = [0u8; BUF_SIZE];
-        let mut pos = 0;
+    let size = img.size();
 
-        yield FlashingStatus::FlashingProgress(0.0);
+    let mut buf = [0u8; BUF_SIZE];
+    let mut pos = 0;
 
-        loop {
-            let count = img.read(&mut buf)?;
-            pos += count;
+    let _ = chan
+        .send(DownloadFlashingStatus::FlashingProgress(0.0))
+        .await;
 
-            yield FlashingStatus::FlashingProgress(pos as f32 / size as f32);
+    loop {
+        let count = img.read(&mut buf)?;
+        pos += count;
 
-            if count == 0 {
-                break;
-            }
+        let _ = chan
+            .send(DownloadFlashingStatus::FlashingProgress(
+                pos as f32 / size as f32,
+            ))
+            .await;
 
-            port.write_all(&buf[..count]).await?;
+        if count == 0 {
+            break;
         }
 
-        if let Some(sha256) = img.sha256() {
-            yield FlashingStatus::VerifyingProgress(0.0);
-
-            port.seek(std::io::SeekFrom::Start(0)).await?;
-            let verify_stream = crate::util::sha256_file_fixed_progress(port, size);
-
-            for await v in verify_stream {
-                match v? {
-                    crate::util::Sha256State::Progress(x) => yield FlashingStatus::VerifyingProgress(x),
-                    crate::util::Sha256State::Finish(x) => {
-                        if x != sha256 {
-                            Err(Error::Sha256VerificationError)?;
-                            return;
-                        }
-                    },
-                }
-            }
-        }
-
-        yield FlashingStatus::Finished
+        sd.write_all(&buf[..count]).await?;
     }
+
+    if let Some(sha256) = img.sha256() {
+        let _ = chan
+            .send(DownloadFlashingStatus::VerifyingProgress(0.0))
+            .await;
+
+        sd.seek(std::io::SeekFrom::Start(0)).await?;
+        let hash = crate::util::sha256_file_fixed_progress(sd, size, chan).await?;
+
+        if hash != sha256 {
+            return Err(Error::Sha256VerificationError.into());
+        }
+    }
+
+    Ok(())
 }
 
 // pub fn format(dev: &Path) -> io::Result<()> {
@@ -106,11 +115,11 @@ pub async fn destinations(
                         .into_inner()
                         .path()
                         .to_owned();
-                    ans.insert(crate::Destination {
-                        name: drive.id().await?,
-                        size: Some(drive.size().await?),
-                        block: Some(block.into()),
-                    });
+                    ans.insert(crate::Destination::sd_card(
+                        drive.id().await?,
+                        drive.size().await?,
+                        block.into(),
+                    ));
                 }
             }
         }

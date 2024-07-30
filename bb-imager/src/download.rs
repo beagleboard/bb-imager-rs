@@ -1,7 +1,7 @@
 //! Module for downloading remote images for flashing
 
 use directories::ProjectDirs;
-use futures_util::{Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
     io,
@@ -12,11 +12,7 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::io::StreamReader;
 
-use crate::{
-    error::Result,
-    util::{sha256_file_progress, Sha256State},
-    DownloadStatus, BUF_SIZE,
-};
+use crate::{error::Result, util::sha256_file_progress, DownloadFlashingStatus, BUF_SIZE};
 
 const FILE_NAME_TRIES: usize = 10;
 
@@ -116,80 +112,69 @@ impl Downloader {
         Ok(file_path)
     }
 
-    pub fn download_progress(
+    pub async fn download_progress(
         &self,
         url: url::Url,
         sha256: [u8; 32],
-    ) -> impl Stream<Item = Result<DownloadStatus>> {
+        chan: &mut futures::channel::mpsc::UnboundedSender<DownloadFlashingStatus>,
+    ) -> Result<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
-        let client = self.client.clone();
 
-        async_stream::try_stream! {
-            if file_path.exists() {
-                yield DownloadStatus::VerifyingProgress(0.0);
+        if file_path.exists() {
+            let _ = chan
+                .send(DownloadFlashingStatus::VerifyingProgress(0.0))
+                .await;
 
-                let sha_stream = sha256_file_progress(file_path.clone());
-
-                for await v in sha_stream {
-                    match v? {
-                        Sha256State::Progress(x) => yield DownloadStatus::VerifyingProgress(x),
-                        Sha256State::Finish(x) => {
-                            if x == sha256 {
-                                yield DownloadStatus::Finished(file_path.clone());
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // Delete old file
-                let _ = tokio::fs::remove_file(&file_path).await;
-            }
-            yield DownloadStatus::DownloadingProgress(0.0);
-
-            let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
-            let response = client.get(url).send().await.map_err(Error::from)?;
-
-            let mut cur_pos = 0;
-            let response_size = response.content_length();
-
-            let response_stream = response.bytes_stream();
-
-            let response_size = match response_size {
-                Some(x) => x as usize,
-                None => response_stream.size_hint().0
-            };
-
-            for await data in response_stream {
-                let mut data = data.map_err(Error::from)?;
-                cur_pos += data.len();
-                file.write_all_buf(&mut data).await?;
-
-                yield DownloadStatus::DownloadingProgress((cur_pos as f32) / (response_size as f32));
+            let hash = sha256_file_progress(&file_path, chan).await?;
+            if hash == sha256 {
+                return Ok(file_path);
             }
 
-            yield DownloadStatus::VerifyingProgress(0.0);
-
-            let sha_stream = sha256_file_progress(tmp_file_path.path().to_path_buf());
-
-            for await v in sha_stream {
-                let val = v?;
-                match val {
-                    Sha256State::Progress(x) => yield DownloadStatus::VerifyingProgress(x),
-                    Sha256State::Finish(x) => {
-                        if x != sha256 {
-                            Err(Error::Sha256Error)?;
-                            return;
-                        }
-                    }
-                }
-            }
-
-            tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
-
-            yield DownloadStatus::Finished(file_path);
+            // Delete old file
+            let _ = tokio::fs::remove_file(&file_path).await;
         }
+        let _ = chan
+            .send(DownloadFlashingStatus::DownloadingProgress(0.0))
+            .await;
+
+        let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
+        let response = self.client.get(url).send().await.map_err(Error::from)?;
+
+        let mut cur_pos = 0;
+        let response_size = response.content_length();
+
+        let mut response_stream = response.bytes_stream();
+
+        let response_size = match response_size {
+            Some(x) => x as usize,
+            None => response_stream.size_hint().0,
+        };
+
+        while let Some(x) = response_stream.next().await {
+            let mut data = x.map_err(Error::from)?;
+            cur_pos += data.len();
+            file.write_all_buf(&mut data).await?;
+
+            let _ = chan
+                .send(DownloadFlashingStatus::DownloadingProgress(
+                    (cur_pos as f32) / (response_size as f32),
+                ))
+                .await;
+        }
+
+        let _ = chan
+            .send(DownloadFlashingStatus::VerifyingProgress(0.0))
+            .await;
+
+        let hash = sha256_file_progress(tmp_file_path.path(), chan).await?;
+        if hash != sha256 {
+            return Err(Error::Sha256Error.into());
+        }
+
+        tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
+
+        Ok(file_path)
     }
 }
 

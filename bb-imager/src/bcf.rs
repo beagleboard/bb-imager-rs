@@ -6,9 +6,8 @@ use std::{
     time::Duration,
 };
 
-use crate::error::Result;
-use crate::FlashingStatus;
-use futures_util::Stream;
+use crate::{error::Result, SelectedImage};
+use futures::SinkExt;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
@@ -44,8 +43,6 @@ pub enum Error {
     FailedToRead,
     #[error("Bootloader Responded with Nack")]
     Nack,
-    #[error("Failed to open supplied Port")]
-    FailedToOpenPort,
     #[error("Failed to start Bootloader")]
     FailedToStartBootloader,
     #[error("Failed to open firmware image")]
@@ -71,12 +68,7 @@ struct BeagleConnectFreedom {
 }
 
 impl BeagleConnectFreedom {
-    fn new(port: &str) -> Result<Self> {
-        let port = serialport::new(port, 500000)
-            .timeout(Duration::from_millis(500))
-            .open()
-            .map_err(|_| Error::FailedToOpenPort)?;
-
+    fn new(port: Box<dyn serialport::SerialPort>) -> Result<Self> {
         let mut bcf = BeagleConnectFreedom { port };
 
         bcf.invoke_bootloader()
@@ -275,68 +267,82 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-pub fn flash(
-    mut img: crate::img::OsImage,
-    port: crate::Destination,
-) -> impl Stream<Item = Result<crate::FlashingStatus>> {
-    async_stream::try_stream! {
-        yield FlashingStatus::Preparing;
+pub async fn flash(
+    img: SelectedImage,
+    downloader: &crate::download::Downloader,
+    port: &crate::Destination,
+    chan: &mut futures::channel::mpsc::UnboundedSender<crate::DownloadFlashingStatus>,
+) -> Result<()> {
+    let mut bcf = BeagleConnectFreedom::new(port.open_port()?)?;
+    info!("BeagleConnectFreedom Connected");
 
-        let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
-        img.read_to_end(&mut firmware)?;
-        drop(img);
+    let mut img = match img {
+        SelectedImage::Local(x) => crate::img::OsImage::from_path(&x, None, None).await,
+        SelectedImage::Remote(x) => {
+            let p = downloader
+                .download_progress(x.url, x.download_sha256, chan)
+                .await?;
+            crate::img::OsImage::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
+                .await
+        }
+    }?;
 
-        assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
-        let img_crc32 = crc32fast::hash(firmware.as_slice());
+    let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
+    img.read_to_end(&mut firmware)?;
+    drop(img);
 
-        let mut bcf = BeagleConnectFreedom::new(&port.name)?;
-        info!("BeagleConnectFreedom Connected");
+    assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
+    let img_crc32 = crc32fast::hash(firmware.as_slice());
 
-        yield FlashingStatus::FlashingProgress(0.0);
+    let _ = chan
+        .send(crate::DownloadFlashingStatus::FlashingProgress(0.0))
+        .await;
 
-        if bcf.verify(img_crc32)? {
-            warn!("Skipping flashing same image");
-            yield FlashingStatus::Finished;
-            return;
+    if bcf.verify(img_crc32)? {
+        warn!("Skipping flashing same image");
+        return Ok(());
+    }
+
+    info!("Erase Flash");
+    bcf.send_bank_erase()?;
+
+    info!("Start Flashing");
+
+    let mut image_offset = 0;
+    let mut reset_download = true;
+
+    while image_offset < FIRMWARE_SIZE {
+        while firmware[image_offset as usize] == 0xff {
+            image_offset += 1;
+            reset_download = true;
         }
 
-        info!("Erase Flash");
-        bcf.send_bank_erase()?;
-
-        info!("Start Flashing");
-
-        let mut image_offset = 0;
-        let mut reset_download = true;
-
-        while image_offset < FIRMWARE_SIZE {
-            while firmware[image_offset as usize] == 0xff {
-                image_offset += 1;
-                reset_download = true;
-            }
-
-            if reset_download {
-                bcf.send_download(image_offset as u32, (FIRMWARE_SIZE - image_offset) as u32)?;
-                reset_download = false;
-            }
-
-            image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-            yield FlashingStatus::FlashingProgress(progress(image_offset));
+        if reset_download {
+            bcf.send_download(image_offset as u32, (FIRMWARE_SIZE - image_offset) as u32)?;
+            reset_download = false;
         }
 
-        yield FlashingStatus::Verifying;
-        if bcf.verify(img_crc32)? {
-            info!("Flashing Successful");
-            yield FlashingStatus::Finished;
-        } else {
-            error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-            Err(Error::InvalidImage)?;
-        }
+        image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
+        let _ = chan
+            .send(crate::DownloadFlashingStatus::FlashingProgress(progress(
+                image_offset,
+            )))
+            .await;
+    }
+
+    let _ = chan.send(crate::DownloadFlashingStatus::Verifying).await;
+    if bcf.verify(img_crc32)? {
+        info!("Flashing Successful");
+        Ok(())
+    } else {
+        error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
+        Err(Error::InvalidImage.into())
     }
 }
 
 pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
     let ports = serialport::available_ports()
-        .map_err(|_| Error::FailedToOpenPort)?
+        .unwrap()
         .into_iter()
         .filter(|x| match &x.port_type {
             serialport::SerialPortType::UsbPort(y) => {
@@ -346,10 +352,7 @@ pub async fn possible_devices() -> Result<std::collections::HashSet<crate::Desti
             _ => false,
         })
         .map(|x| x.port_name)
-        .map(|x| crate::Destination {
-            name: x,
-            ..Default::default()
-        })
+        .map(|x| crate::Destination::port(x))
         .collect();
 
     Ok(ports)

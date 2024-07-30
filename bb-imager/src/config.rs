@@ -2,7 +2,6 @@
 
 use std::{collections::HashSet, path::PathBuf};
 
-use futures_util::{Stream, StreamExt, TryStreamExt};
 use semver::Version;
 use serde::Deserialize;
 use url::Url;
@@ -84,20 +83,6 @@ impl Flasher {
         match self {
             Flasher::SdCard => crate::sd::destinations(&state).await,
             Flasher::BeagleConnectFreedom => crate::bcf::possible_devices().await,
-        }
-    }
-
-    pub fn flash(
-        &self,
-        img: crate::img::OsImage,
-        port: Destination,
-        state: crate::State,
-    ) -> impl Stream<Item = crate::error::Result<crate::FlashingStatus>> {
-        match self {
-            Flasher::SdCard => crate::sd::flash(img, port, state).boxed(),
-            Flasher::BeagleConnectFreedom => {
-                crate::bcf::flash(img, port).map_err(Into::into).boxed()
-            }
         }
     }
 

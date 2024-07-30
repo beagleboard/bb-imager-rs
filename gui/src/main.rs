@@ -1,11 +1,8 @@
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
-use bb_imager::{DownloadStatus, FlashingStatus};
-use futures_util::TryStreamExt;
+use futures::{SinkExt, StreamExt};
 use iced::{
-    executor,
-    futures::Stream,
-    theme,
+    executor, theme,
     widget::{self, button, text},
     Application, Command, Element, Settings,
 };
@@ -50,7 +47,7 @@ struct BBImager {
     downloader: bb_imager::download::Downloader,
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
-    selected_image: Option<OsImage>,
+    selected_image: Option<bb_imager::common::SelectedImage>,
     selected_dst: Option<bb_imager::Destination>,
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
@@ -61,21 +58,6 @@ struct BBImager {
 #[derive(Default, Debug)]
 struct Flags {
     config: bb_imager::config::Config,
-}
-
-#[derive(Debug, Clone)]
-enum OsImage {
-    Local(PathBuf),
-    Remote(bb_imager::config::OsList),
-}
-
-impl std::fmt::Display for OsImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OsImage::Local(p) => write!(f, "{}", p.file_name().unwrap().to_string_lossy()),
-            OsImage::Remote(r) => write!(f, "{}", r.name),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -93,20 +75,9 @@ enum BBImagerMessage {
 
     StartFlashing,
     StopFlashing(ProgressBarState),
-    FlashImage {
-        path: PathBuf,
-        inner_path: Option<String>,
-        sha256: Option<[u8; 32]>,
-    },
 
-    BoardImageDownloaded {
-        index: usize,
-        path: PathBuf,
-    },
-    OsListImageDownloaded {
-        index: usize,
-        path: PathBuf,
-    },
+    BoardImageDownloaded { index: usize, path: PathBuf },
+    OsListImageDownloaded { index: usize, path: PathBuf },
 
     UnrecoverableError(String),
     Null,
@@ -242,14 +213,14 @@ impl Application for BBImager {
             BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
                 self.selected_image = match x {
-                    Some(y) => Some(OsImage::Remote(y)),
+                    Some(y) => Some(bb_imager::common::SelectedImage::Remote(y)),
                     None => {
                         let (name, extensions) =
                             self.selected_board.as_ref().unwrap().flasher.file_filter();
                         rfd::FileDialog::new()
                             .add_filter(name, extensions)
                             .pick_file()
-                            .map(OsImage::Local)
+                            .map(bb_imager::common::SelectedImage::Local)
                     }
                 };
                 if self.selected_image.is_some() {
@@ -259,80 +230,6 @@ impl Application for BBImager {
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
                 self.back_home();
-            }
-            BBImagerMessage::FlashImage {
-                path,
-                inner_path,
-                sha256,
-            } => {
-                tracing::info!("Start flashing image {:?}", path);
-                let board = self.selected_board.clone().expect("No board selected");
-                let dst = self.selected_dst.clone().expect("No destination selected");
-
-                self.progress_bar =
-                    ProgressBarState::new("Preparing...", 0.5, ProgressBarStatus::Loading);
-
-                return Command::run(
-                    flash_helper(
-                        path,
-                        inner_path,
-                        sha256,
-                        board,
-                        dst,
-                        self.state.clone().unwrap(),
-                    ),
-                    |x| match x {
-                        Ok(s) => match s {
-                            FlashingStatus::Preparing => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    "Preparing...",
-                                    0.5,
-                                    ProgressBarStatus::Loading,
-                                ))
-                            }
-                            FlashingStatus::Flashing => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    "Flashing...",
-                                    0.5,
-                                    ProgressBarStatus::Loading,
-                                ))
-                            }
-                            FlashingStatus::FlashingProgress(p) => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    format!("Flashing... {}%", (p * 100.0).round() as usize),
-                                    p,
-                                    ProgressBarStatus::Normal,
-                                ))
-                            }
-                            FlashingStatus::Verifying => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    "Verifying...",
-                                    0.5,
-                                    ProgressBarStatus::Loading,
-                                ))
-                            }
-                            FlashingStatus::VerifyingProgress(p) => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    format!("Verifying... {}%", (p * 100.0).round() as usize),
-                                    p,
-                                    ProgressBarStatus::Normal,
-                                ))
-                            }
-                            FlashingStatus::Finished => {
-                                BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                    "Flashing Successful...",
-                                    1.0,
-                                    ProgressBarStatus::Success,
-                                ))
-                            }
-                        },
-                        Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::new(
-                            format!("Flashing Failed: {e}"),
-                            1.0,
-                            ProgressBarStatus::Fail,
-                        )),
-                    },
-                );
             }
             BBImagerMessage::Reset => {
                 self.selected_dst.take();
@@ -364,65 +261,102 @@ impl Application for BBImager {
             BBImagerMessage::StartFlashing => {
                 self.flashing = true;
 
-                match self.selected_image.clone().unwrap() {
-                    OsImage::Local(p) => {
-                        return Command::perform(
-                            std::future::ready((p, None)),
-                            |(path, inner_path)| BBImagerMessage::FlashImage {
-                                path,
-                                inner_path,
-                                sha256: None,
-                            },
-                        );
-                    }
-                    OsImage::Remote(r) => {
-                        tracing::info!("Downloading Remote Os");
-                        let img = self.selected_image.clone();
-                        return Command::run(
-                            self.downloader.download_progress(r.url, r.download_sha256),
-                            move |x| match x {
-                                Ok(s) => match s {
-                                    DownloadStatus::DownloadingProgress(p) => {
-                                        BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                            format!(
-                                                "Downloading... {}%",
-                                                (p * 100.0).round() as usize
-                                            ),
-                                            p,
-                                            ProgressBarStatus::Normal,
-                                        ))
-                                    }
-                                    DownloadStatus::VerifyingProgress(p) => {
-                                        BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                            format!(
-                                                "Verifying Download... {}%",
-                                                (p * 100.0).round() as usize
-                                            ),
-                                            p,
-                                            ProgressBarStatus::Normal,
-                                        ))
-                                    }
-                                    DownloadStatus::Finished(path) => {
-                                        if let Some(OsImage::Remote(r)) = &img {
-                                            BBImagerMessage::FlashImage {
-                                                path,
-                                                inner_path: r.extract_path.clone(),
-                                                sha256: Some(r.extracted_sha256),
-                                            }
-                                        } else {
-                                            unreachable!()
-                                        }
-                                    }
-                                },
-                                Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                    format!("Downloading Failed: {e}"),
+                let flasher = self
+                    .selected_board
+                    .clone()
+                    .expect("No board selected")
+                    .flasher;
+                let dst = self.selected_dst.clone().expect("No destination selected");
+                let img = self.selected_image.clone().unwrap();
+                let state = self.state.clone().unwrap();
+                let downloader = self.downloader.clone();
+
+                return iced::command::channel(20, move |mut chan| async move {
+                    let _ = chan
+                        .send(BBImagerMessage::ProgressBar(ProgressBarState::new(
+                            "Preparing...",
+                            0.5,
+                            ProgressBarStatus::Loading,
+                        )))
+                        .await;
+
+                    let (tx, mut rx) = futures::channel::mpsc::unbounded();
+
+                    let task = tokio::spawn(async move {
+                        bb_imager::common::download_and_flash(
+                            img, dst, flasher, state, downloader, tx,
+                        )
+                        .await
+                    });
+
+                    while let Some(progress) = rx.next().await {
+                        let message = match progress {
+                            bb_imager::DownloadFlashingStatus::Preparing => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Preparing...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!(
+                                        "Downloading Image... {}%",
+                                        (p * 100.0).round() as usize
+                                    ),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Flashing... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::Verifying => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Verifying...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Verifying... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::Finished => {
+                                BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                    "Flashing Successful...",
                                     1.0,
-                                    ProgressBarStatus::Fail,
-                                )),
-                            },
-                        );
+                                    ProgressBarStatus::Success,
+                                ))
+                            }
+                        };
+
+                        let _ = chan.send(message).await;
                     }
-                }
+
+                    let res = task.await.unwrap();
+
+                    let _ = match res {
+                        Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
+                            "Flashing Successful...",
+                            1.0,
+                            ProgressBarStatus::Success,
+                        ))),
+                        Err(e) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
+                            format!("Flashing Failed... {e}"),
+                            1.0,
+                            ProgressBarStatus::Fail,
+                        ))),
+                    }
+                    .await;
+                });
             }
             BBImagerMessage::StopFlashing(x) => {
                 self.flashing = false;
@@ -763,23 +697,6 @@ enum Screen {
     BoardSelection,
     ImageSelection,
     DestinationSelection,
-}
-
-fn flash_helper(
-    path: std::path::PathBuf,
-    inner_path: Option<String>,
-    sha256: Option<[u8; 32]>,
-    board: bb_imager::config::Device,
-    dst: bb_imager::Destination,
-    state: bb_imager::State,
-) -> impl Stream<Item = Result<FlashingStatus, String>> {
-    futures_util::stream::once(async move {
-        bb_imager::img::OsImage::from_path(&path, inner_path.as_deref(), sha256)
-            .await
-            .map(|x| board.flasher.flash(x, dst, state))
-    })
-    .try_flatten()
-    .map_err(|x| x.to_string())
 }
 
 fn img_or_svg(path: &std::path::Path, width: u16) -> Element<BBImagerMessage> {
