@@ -1,33 +1,29 @@
 //! Helper functions
 
 use crate::{error::Result, BUF_SIZE};
-use std::path::Path;
+use std::{io::Read, path::Path};
 
-use futures::SinkExt;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 
-pub(crate) async fn sha256_file_progress(
+pub(crate) fn sha256_file_progress(
     path: &Path,
-    chan: &mut futures::channel::mpsc::UnboundedSender<crate::DownloadFlashingStatus>,
+    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<[u8; 32]> {
-    let file = tokio::fs::File::open(path).await?;
-    let file_len = file.metadata().await?.len() as f32;
-    let mut reader = tokio::io::BufReader::new(file);
+    let mut file = std::fs::File::open(path)?;
+    let file_len = file.metadata()?.len() as f32;
 
     let mut hasher = Sha256::new();
     let mut buffer = [0; BUF_SIZE];
     let mut pos = 0;
 
     loop {
-        let count = reader.read(&mut buffer).await?;
+        let count = file.read(&mut buffer)?;
         pos += count;
 
-        let _ = chan
-            .send(crate::DownloadFlashingStatus::VerifyingProgress(
-                pos as f32 / file_len,
-            ))
-            .await;
+        let _ = chan.send(crate::DownloadFlashingStatus::VerifyingProgress(
+            pos as f32 / file_len,
+        ));
 
         if count == 0 {
             break;
@@ -44,27 +40,25 @@ pub(crate) async fn sha256_file_progress(
     Ok(hash)
 }
 
-pub(crate) async fn sha256_file_fixed_progress(
-    file: tokio::fs::File,
+pub(crate) fn sha256_file_fixed_progress(
+    file: std::fs::File,
     size: u64,
-    chan: &mut futures::channel::mpsc::UnboundedSender<crate::DownloadFlashingStatus>,
+    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<[u8; 32]> {
-    let mut reader = tokio::io::BufReader::new(file);
+    let mut reader = std::io::BufReader::new(file);
 
     let mut hasher = Sha256::new();
     let mut buffer = [0; BUF_SIZE];
     let mut pos = 0;
 
     while pos < size as usize {
-        let count = reader.read(&mut buffer).await?;
+        let count = reader.read(&mut buffer)?;
         let count = std::cmp::min(size as usize - pos, count);
 
         pos += count;
-        let _ = chan
-            .send(crate::DownloadFlashingStatus::VerifyingProgress(
-                pos as f32 / size as f32,
-            ))
-            .await;
+        let _ = chan.send(crate::DownloadFlashingStatus::VerifyingProgress(
+            pos as f32 / size as f32,
+        ));
 
         if count == 0 {
             break;

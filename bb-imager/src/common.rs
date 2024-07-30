@@ -1,7 +1,7 @@
 //! Stuff common to all the flashers
 
-use std::{path::PathBuf, time::Duration};
 use futures::SinkExt;
+use std::{path::PathBuf, time::Duration};
 use thiserror::Error;
 
 pub(crate) const BUF_SIZE: usize = 64 * 1024;
@@ -63,7 +63,7 @@ impl Destination {
     }
 
     #[cfg(target_os = "linux")]
-    pub async fn open_file(&self, state: &State) -> crate::error::Result<tokio::fs::File> {
+    pub async fn open_file(&self, state: &State) -> crate::error::Result<std::fs::File> {
         use std::os::fd::{FromRawFd, IntoRawFd};
 
         let obj = state
@@ -79,7 +79,7 @@ impl Destination {
 
         let fd = obj.open_device("rw", Default::default()).await?;
 
-        Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
+        Ok(unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
     }
 
     #[cfg(windows)]
@@ -129,16 +129,23 @@ pub async fn download_and_flash(
     flasher: crate::config::Flasher,
     state: State,
     downloader: crate::download::Downloader,
-    mut chan: futures::channel::mpsc::UnboundedSender<DownloadFlashingStatus>,
+    chan: std::sync::mpsc::Sender<DownloadFlashingStatus>,
 ) -> crate::error::Result<()> {
-    let _ = chan.send(DownloadFlashingStatus::Preparing).await;
+    tracing::info!("Preparing...");
+    let _ = chan.send(DownloadFlashingStatus::Preparing);
 
     match flasher {
         crate::config::Flasher::SdCard => {
-            crate::sd::flash(img, &downloader, &dst, &state, &mut chan).await
+            let port = dst.open_file(&state).await?;
+            let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+
+            tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan))
         }
         crate::config::Flasher::BeagleConnectFreedom => {
-            crate::bcf::flash(img, &downloader, &dst, &mut chan).await
+            let port = dst.open_port()?;
+            let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+
+            tokio::task::block_in_place(move || crate::bcf::flash(img, port, &chan))
         }
     }
 }

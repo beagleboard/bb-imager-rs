@@ -1,6 +1,6 @@
 //! Provide functionality to flash images to sd card
 
-use std::io::Read;
+use std::io::{Read, Seek, Write};
 
 use crate::{error::Result, BUF_SIZE};
 use crate::{DownloadFlashingStatus, SelectedImage};
@@ -16,59 +16,38 @@ pub enum Error {
     DriveFetchError,
 }
 
-pub(crate) async fn flash(
-    img: SelectedImage,
-    downloader: &crate::download::Downloader,
-    dst: &crate::Destination,
-    state: &crate::State,
-    chan: &mut futures::channel::mpsc::UnboundedSender<DownloadFlashingStatus>,
+pub(crate) fn flash(
+    mut img: crate::img::OsImage,
+    mut sd: std::fs::File,
+    chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
 ) -> Result<()> {
-    let mut sd = dst.open_file(state).await?;
-
-    let mut img = match img {
-        SelectedImage::Local(x) => crate::img::OsImage::from_path(&x, None, None).await,
-        SelectedImage::Remote(x) => {
-            let p = downloader
-                .download_progress(x.url, x.download_sha256, chan)
-                .await?;
-            crate::img::OsImage::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
-                .await
-        }
-    }?;
-
     let size = img.size();
 
     let mut buf = [0u8; BUF_SIZE];
     let mut pos = 0;
 
-    let _ = chan
-        .send(DownloadFlashingStatus::FlashingProgress(0.0))
-        .await;
+    let _ = chan.send(DownloadFlashingStatus::FlashingProgress(0.0));
 
     loop {
         let count = img.read(&mut buf)?;
         pos += count;
 
-        let _ = chan
-            .send(DownloadFlashingStatus::FlashingProgress(
-                pos as f32 / size as f32,
-            ))
-            .await;
+        let _ = chan.send(DownloadFlashingStatus::FlashingProgress(
+            pos as f32 / size as f32,
+        ));
 
         if count == 0 {
             break;
         }
 
-        sd.write_all(&buf[..count]).await?;
+        sd.write_all(&buf[..count])?;
     }
 
     if let Some(sha256) = img.sha256() {
-        let _ = chan
-            .send(DownloadFlashingStatus::VerifyingProgress(0.0))
-            .await;
+        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-        sd.seek(std::io::SeekFrom::Start(0)).await?;
-        let hash = crate::util::sha256_file_fixed_progress(sd, size, chan).await?;
+        sd.seek(std::io::SeekFrom::Start(0))?;
+        let hash = crate::util::sha256_file_fixed_progress(sd, size, chan)?;
 
         if hash != sha256 {
             return Err(Error::Sha256VerificationError.into());

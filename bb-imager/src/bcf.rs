@@ -267,25 +267,13 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-pub async fn flash(
-    img: SelectedImage,
-    downloader: &crate::download::Downloader,
-    port: &crate::Destination,
-    chan: &mut futures::channel::mpsc::UnboundedSender<crate::DownloadFlashingStatus>,
+pub fn flash(
+    mut img: crate::img::OsImage,
+    port: Box<dyn serialport::SerialPort>,
+    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<()> {
-    let mut bcf = BeagleConnectFreedom::new(port.open_port()?)?;
+    let mut bcf = BeagleConnectFreedom::new(port)?;
     info!("BeagleConnectFreedom Connected");
-
-    let mut img = match img {
-        SelectedImage::Local(x) => crate::img::OsImage::from_path(&x, None, None).await,
-        SelectedImage::Remote(x) => {
-            let p = downloader
-                .download_progress(x.url, x.download_sha256, chan)
-                .await?;
-            crate::img::OsImage::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
-                .await
-        }
-    }?;
 
     let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
     img.read_to_end(&mut firmware)?;
@@ -294,9 +282,7 @@ pub async fn flash(
     assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
     let img_crc32 = crc32fast::hash(firmware.as_slice());
 
-    let _ = chan
-        .send(crate::DownloadFlashingStatus::FlashingProgress(0.0))
-        .await;
+    let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(0.0));
 
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
@@ -323,14 +309,12 @@ pub async fn flash(
         }
 
         image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-        let _ = chan
-            .send(crate::DownloadFlashingStatus::FlashingProgress(progress(
-                image_offset,
-            )))
-            .await;
+        let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(progress(
+            image_offset,
+        )));
     }
 
-    let _ = chan.send(crate::DownloadFlashingStatus::Verifying).await;
+    let _ = chan.send(crate::DownloadFlashingStatus::Verifying);
     if bcf.verify(img_crc32)? {
         info!("Flashing Successful");
         Ok(())

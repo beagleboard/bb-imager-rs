@@ -32,25 +32,41 @@ pub enum OsImageReader {
 }
 
 impl OsImage {
-    pub async fn from_path(
+    pub async fn from_selected_image(
+        img: crate::SelectedImage,
+        downloader: &crate::download::Downloader,
+        chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    ) -> Result<Self> {
+        match img {
+            crate::SelectedImage::Local(x) => {
+                tokio::task::block_in_place(move || Self::from_path(&x, None, None))
+            }
+            crate::SelectedImage::Remote(x) => {
+                let p = downloader
+                    .download_progress(x.url, x.download_sha256, chan)
+                    .await?;
+                tokio::task::block_in_place(move || {
+                    Self::from_path(&p, x.extract_path.as_deref(), Some(x.extracted_sha256))
+                })
+            }
+        }
+    }
+
+    pub fn from_path(
         path: &Path,
         inner_path: Option<&str>,
         sha256: Option<[u8; 32]>,
     ) -> Result<Self> {
-        let mut file = tokio::fs::File::open(path).await?;
+        let mut file = std::fs::File::open(path)?;
 
         let mut magic = [0u8; 6];
-        file.read_exact(&mut magic).await?;
+        file.read_exact(&mut magic)?;
 
-        file.seek(std::io::SeekFrom::Start(0)).await?;
+        file.seek(std::io::SeekFrom::Start(0))?;
 
         match magic {
             [0x50, 0x4b, 0x03, 0x04, _, _] => {
-                let buf = Self::from_zip(
-                    file.into_std().await,
-                    inner_path.ok_or(Error::ZipPathError)?,
-                    sha256,
-                )?;
+                let buf = Self::from_zip(file, inner_path.ok_or(Error::ZipPathError)?, sha256)?;
 
                 Ok(Self {
                     sha256,
@@ -59,8 +75,6 @@ impl OsImage {
                 })
             }
             [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => {
-                let mut file = file.into_std().await;
-
                 let size = liblzma::uncompressed_size(&mut file)?;
 
                 file.seek(std::io::SeekFrom::Start(0))?;
@@ -73,14 +87,12 @@ impl OsImage {
                 })
             }
             _ => {
-                let size = size(&file.metadata().await?);
+                let size = size(&file.metadata()?);
 
                 Ok(Self {
                     sha256,
                     size,
-                    img: OsImageReader::Uncompressed(std::io::BufReader::new(
-                        file.into_std().await,
-                    )),
+                    img: OsImageReader::Uncompressed(std::io::BufReader::new(file)),
                 })
             }
         }
@@ -134,23 +146,6 @@ impl std::io::Read for OsImage {
         }
     }
 }
-
-// impl tokio::io::AsyncRead for OsImage {
-//     fn poll_read(
-//         mut self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//         buf: &mut tokio::io::ReadBuf<'_>,
-//     ) -> std::task::Poll<std::io::Result<()>> {
-//         match &mut self.img {
-//             OsImageReader::Xz(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
-//             OsImageReader::Uncompressed(ref mut x) => std::pin::Pin::new(x).poll_read(cx, buf),
-//             OsImageReader::Memory(x) => {
-//                 buf.put(x);
-//                 std::task::Poll::Ready(Ok(()))
-//             }
-//         }
-//     }
-// }
 
 fn size(file: &std::fs::Metadata) -> u64 {
     cfg_if::cfg_if! {

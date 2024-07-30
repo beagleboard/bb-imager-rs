@@ -116,17 +116,15 @@ impl Downloader {
         &self,
         url: url::Url,
         sha256: [u8; 32],
-        chan: &mut futures::channel::mpsc::UnboundedSender<DownloadFlashingStatus>,
+        chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
     ) -> Result<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let _ = chan
-                .send(DownloadFlashingStatus::VerifyingProgress(0.0))
-                .await;
+            let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-            let hash = sha256_file_progress(&file_path, chan).await?;
+            let hash = tokio::task::block_in_place(|| sha256_file_progress(&file_path, chan))?;
             if hash == sha256 {
                 return Ok(file_path);
             }
@@ -134,9 +132,7 @@ impl Downloader {
             // Delete old file
             let _ = tokio::fs::remove_file(&file_path).await;
         }
-        let _ = chan
-            .send(DownloadFlashingStatus::DownloadingProgress(0.0))
-            .await;
+        let _ = chan.send(DownloadFlashingStatus::DownloadingProgress(0.0));
 
         let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
         let response = self.client.get(url).send().await.map_err(Error::from)?;
@@ -156,18 +152,15 @@ impl Downloader {
             cur_pos += data.len();
             file.write_all_buf(&mut data).await?;
 
-            let _ = chan
-                .send(DownloadFlashingStatus::DownloadingProgress(
-                    (cur_pos as f32) / (response_size as f32),
-                ))
-                .await;
+            let _ = chan.send(DownloadFlashingStatus::DownloadingProgress(
+                (cur_pos as f32) / (response_size as f32),
+            ));
         }
 
-        let _ = chan
-            .send(DownloadFlashingStatus::VerifyingProgress(0.0))
-            .await;
+        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-        let hash = sha256_file_progress(tmp_file_path.path(), chan).await?;
+        let hash =
+            tokio::task::block_in_place(|| sha256_file_progress(tmp_file_path.path(), chan))?;
         if hash != sha256 {
             return Err(Error::Sha256Error.into());
         }
