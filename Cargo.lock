@@ -473,7 +473,6 @@ dependencies = [
  "sha2",
  "thiserror",
  "tokio",
- "tokio-util",
  "tracing",
  "udisks2",
  "url",
@@ -2511,8 +2510,9 @@ dependencies = [
 
 [[package]]
 name = "liblzma"
-version = "0.3.2"
-source = "git+https://github.com/Ayush1325/xz2-rs.git?branch=uncompressed-size#3f47a34d6b48d90e9b7017cff80209d35147e6bf"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3139da5a723df5ecc87bea4f09c5622b0f6e40a1448c839aefa56727834491d"
 dependencies = [
  "liblzma-sys",
  "num_cpus",
@@ -2520,8 +2520,9 @@ dependencies = [
 
 [[package]]
 name = "liblzma-sys"
-version = "0.3.5"
-source = "git+https://github.com/Ayush1325/xz2-rs.git?branch=uncompressed-size#3f47a34d6b48d90e9b7017cff80209d35147e6bf"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2e80e6c899a9fcbcfddb3e6d3e95c91303d416870fa812c49dc1689efaa94f1"
 dependencies = [
  "cc",
  "libc",

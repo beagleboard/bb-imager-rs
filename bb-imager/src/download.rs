@@ -4,15 +4,14 @@ use directories::ProjectDirs;
 use futures_util::{Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
-    io::{self, Read},
+    io,
     path::{Path, PathBuf},
     time::Duration,
 };
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
-use tokio_util::io::StreamReader;
 
-use crate::{error::Result, util::sha256_file_progress, DownloadFlashingStatus, BUF_SIZE};
+use crate::{error::Result, util::sha256_file_progress, DownloadFlashingStatus};
 
 const FILE_NAME_TRIES: usize = 10;
 
@@ -80,36 +79,9 @@ impl Downloader {
     }
 
     pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
-        let file_name = const_hex::encode(sha256);
-        let file_path = self.dirs.cache_dir().join(file_name);
+        let (tx, _) = std::sync::mpsc::channel();
 
-        if file_path.exists() {
-            let x = tokio::task::block_in_place(|| sha256_file(&file_path))?;
-            if x == sha256 {
-                return Ok(file_path);
-            }
-
-            // Delete old file
-            let _ = tokio::fs::remove_file(&file_path).await;
-        }
-
-        let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
-        let response = self.client.get(url).send().await.map_err(Error::from)?;
-        let response_stream = response.bytes_stream();
-        let mut response_reader = StreamReader::new(
-            response_stream.map(|x| x.map_err(|e| io::Error::new(io::ErrorKind::Other, e))),
-        );
-
-        tokio::io::copy_buf(&mut response_reader, &mut file).await?;
-
-        let x = tokio::task::block_in_place(|| sha256_file(tmp_file_path.path()))?;
-        if x != sha256 {
-            return Err(Error::Sha256Error.into());
-        }
-
-        tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
-
-        Ok(file_path)
+        self.download_progress(url, sha256, &tx).await
     }
 
     pub async fn download_progress(
@@ -180,23 +152,9 @@ impl Downloader {
 }
 
 fn sha256_file(path: &Path) -> Result<[u8; 32]> {
-    let mut file = std::fs::File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0; BUF_SIZE];
+    let (tx, _) = std::sync::mpsc::channel();
 
-    loop {
-        let count = file.read(&mut buffer)?;
-        if count == 0 {
-            break;
-        }
-        hasher.update(&buffer[..count]);
-    }
-
-    Ok(hasher
-        .finalize()
-        .as_slice()
-        .try_into()
-        .expect("SHA-256 is 32 bytes"))
+    sha256_file_progress(path, &tx)
 }
 
 async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {

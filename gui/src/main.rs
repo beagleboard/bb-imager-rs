@@ -206,8 +206,8 @@ impl Application for BBImager {
                                 .download(v.icon.clone(), v.icon_sha256),
                             move |p| match p {
                                 Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
-                                Err(_) => {
-                                    tracing::warn!("Failed to download image for os {index}");
+                                Err(e) => {
+                                    tracing::warn!("Failed to download image for os {index} with error {e}");
                                     BBImagerMessage::Null
                                 }
                             },
