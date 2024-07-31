@@ -488,11 +488,17 @@ impl BBImager {
         );
 
         let choice_btn_row = widget::row![
-            choose_device_btn,
+            widget::column![text("Board"), choose_device_btn]
+                .spacing(5)
+                .align_items(iced::Alignment::Center),
             widget::horizontal_space(),
-            choose_image_btn,
+            widget::column![text("Image"), choose_image_btn]
+                .spacing(5)
+                .align_items(iced::Alignment::Center),
             widget::horizontal_space(),
-            choose_dst_btn
+            widget::column![text("Destination"), choose_dst_btn]
+                .spacing(5)
+                .align_items(iced::Alignment::Center)
         ]
         .width(iced::Length::Fill)
         .height(iced::Length::Fill)
