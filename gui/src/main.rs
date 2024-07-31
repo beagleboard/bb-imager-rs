@@ -207,7 +207,9 @@ impl Application for BBImager {
                             move |p| match p {
                                 Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
                                 Err(e) => {
-                                    tracing::warn!("Failed to download image for os {index} with error {e}");
+                                    tracing::warn!(
+                                        "Failed to download image for os {index} with error {e}"
+                                    );
                                     BBImagerMessage::Null
                                 }
                             },
@@ -222,8 +224,7 @@ impl Application for BBImager {
                     Some(y) => Some(bb_imager::common::SelectedImage::remote(
                         y.name,
                         y.url,
-                        y.download_sha256,
-                        y.extracted_sha256,
+                        y.extract_sha256,
                         y.extract_path,
                     )),
                     None => {

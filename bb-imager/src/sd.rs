@@ -41,15 +41,14 @@ pub(crate) fn flash(
         sd.write_all(&buf[..count])?;
     }
 
-    if let Some(sha256) = img.sha256() {
-        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
+    let sha256 = img.sha256();
+    let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-        sd.seek(std::io::SeekFrom::Start(0))?;
-        let hash = crate::util::sha256_file_fixed_progress(sd, size, chan)?;
+    sd.seek(std::io::SeekFrom::Start(0))?;
+    let hash = crate::util::sha256_file_fixed_progress(sd, size, chan)?;
 
-        if hash != sha256 {
-            return Err(Error::Sha256VerificationError.into());
-        }
+    if hash != sha256 {
+        return Err(Error::Sha256VerificationError.into());
     }
 
     Ok(())

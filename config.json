@@ -26,9 +26,8 @@
       "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
       "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
       "release_date": "2024-07-01",
-      "download_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
+      "extract_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
       "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
-      "extracted_sha256": "d6123b4159dfa4bd90e2af590a8b88782901272ff7be6e08cfd89d3099618cad",
       "devices": [
         "BeagleConnect Freedom"
       ],
@@ -43,8 +42,7 @@
       "icon_sha256": "a759c381560e82e8d719e0038d0d95209b85c00b0d0f6b92c5fc510b959226b7",
       "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/beagleplay-emmc-flasher-debian-12.6-xfce-arm64-2024-07-04-12gb.img.xz",
       "release_date": "2024-07-04",
-      "download_sha256": "a7d0e4b70ef9780a69d457e60d69684eb2cd0e8f1ef465be742de854165a5942",
-      "extracted_sha256": "29b8a53f0e0954ee814d7bc5ccb6220d342fd13c5710a1d5b40fc6c0e4b2ff7f",
+      "extract_sha256": "a7d0e4b70ef9780a69d457e60d69684eb2cd0e8f1ef465be742de854165a5942",
       "devices": [
         "BeaglePlay"
       ],
@@ -60,8 +58,7 @@
       "icon_sha256": "a759c381560e82e8d719e0038d0d95209b85c00b0d0f6b92c5fc510b959226b7",
       "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/beagleplay-emmc-flasher-debian-12.6-minimal-arm64-2024-07-04-8gb.img.xz",
       "release_date": "2024-07-04",
-      "download_sha256": "dabdd08a23068dc4027b49c72a7fcc6486949620369bbe54e53507ab8efa98df",
-      "extracted_sha256": "e008f50a0127bd103c7352e8946712b7a62715aa22fdb37c0a1748f81ea04246",
+      "extract_sha256": "dabdd08a23068dc4027b49c72a7fcc6486949620369bbe54e53507ab8efa98df",
       "devices": [
         "BeaglePlay"
       ],

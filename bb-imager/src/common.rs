@@ -113,8 +113,7 @@ pub enum SelectedImage {
     Remote {
         name: String,
         url: url::Url,
-        download_sha256: [u8; 32],
-        extracted_sha256: [u8; 32],
+        extract_sha256: [u8; 32],
         extract_path: Option<String>,
     },
 }
@@ -128,14 +127,12 @@ impl SelectedImage {
         name: String,
         url: url::Url,
         download_sha256: [u8; 32],
-        extracted_sha256: [u8; 32],
         extract_path: Option<String>,
     ) -> Self {
         Self::Remote {
             name,
             url,
-            download_sha256,
-            extracted_sha256,
+            extract_sha256: download_sha256,
             extract_path,
         }
     }

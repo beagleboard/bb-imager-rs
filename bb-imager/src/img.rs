@@ -19,8 +19,8 @@ pub enum Error {
 }
 
 pub struct OsImage {
-    sha256: Option<[u8; 32]>,
     size: u64,
+    hasher: Sha256,
     img: OsImageReader,
 }
 
@@ -38,30 +38,23 @@ impl OsImage {
     ) -> Result<Self> {
         match img {
             crate::SelectedImage::Local(x) => {
-                tokio::task::block_in_place(move || Self::from_path(&x, None, None))
+                tokio::task::block_in_place(move || Self::from_path(&x, None))
             }
             crate::SelectedImage::Remote {
                 url,
-                download_sha256,
-                extracted_sha256,
+                extract_sha256,
                 extract_path,
                 ..
             } => {
                 let p = downloader
-                    .download_progress(url, download_sha256, chan)
+                    .download_progress(url, extract_sha256, chan)
                     .await?;
-                tokio::task::block_in_place(move || {
-                    Self::from_path(&p, extract_path.as_deref(), Some(extracted_sha256))
-                })
+                tokio::task::block_in_place(move || Self::from_path(&p, extract_path.as_deref()))
             }
         }
     }
 
-    pub fn from_path(
-        path: &Path,
-        inner_path: Option<&str>,
-        sha256: Option<[u8; 32]>,
-    ) -> Result<Self> {
+    pub fn from_path(path: &Path, inner_path: Option<&str>) -> Result<Self> {
         let mut file = std::fs::File::open(path)?;
 
         let mut magic = [0u8; 6];
@@ -71,31 +64,27 @@ impl OsImage {
 
         match magic {
             [0x50, 0x4b, 0x03, 0x04, _, _] => {
-                let buf = Self::from_zip(file, inner_path.ok_or(Error::ZipPathError)?, sha256)?;
-
-                Ok(Self {
-                    sha256,
-                    size: buf.len() as u64,
-                    img: OsImageReader::Memory(std::io::Cursor::new(buf)),
-                })
+                Self::from_zip(file, inner_path.ok_or(Error::ZipPathError)?)
             }
             [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => {
                 let size = liblzma::uncompressed_size(&mut file)?;
 
                 file.seek(std::io::SeekFrom::Start(0))?;
                 let img = liblzma::read::XzDecoder::new_parallel(file);
+                let hasher = Sha256::new();
 
                 Ok(Self {
-                    sha256,
+                    hasher,
                     size,
                     img: OsImageReader::Xz(img),
                 })
             }
             _ => {
                 let size = size(&file.metadata()?);
+                let hasher = Sha256::new();
 
                 Ok(Self {
-                    sha256,
+                    hasher,
                     size,
                     img: OsImageReader::Uncompressed(std::io::BufReader::new(file)),
                 })
@@ -104,11 +93,7 @@ impl OsImage {
     }
 
     /// TODO: Find way to extract Zipfile with Send
-    pub fn from_zip(
-        file: std::fs::File,
-        inner_path: &str,
-        sha256: Option<[u8; 32]>,
-    ) -> Result<Vec<u8>> {
+    pub fn from_zip(file: std::fs::File, inner_path: &str) -> Result<Self> {
         let mut res = Vec::new();
         zip::ZipArchive::new(file)
             .map_err(Error::from)?
@@ -116,25 +101,22 @@ impl OsImage {
             .map_err(Error::from)?
             .read_to_end(&mut res)?;
 
-        if let Some(x) = sha256 {
-            let mut hasher = Sha256::new();
-            hasher.update(&res);
-            let hash: [u8; 32] = hasher
-                .finalize()
-                .as_slice()
-                .try_into()
-                .expect("SHA-256 is 32 bytes");
+        let hasher = Sha256::new();
 
-            if hash != x {
-                return Err(Error::ZipSha256Error.into());
-            }
-        }
-
-        Ok(res)
+        Ok(Self {
+            hasher,
+            size: res.len() as u64,
+            img: OsImageReader::Memory(std::io::Cursor::new(res)),
+        })
     }
 
-    pub fn sha256(&self) -> Option<[u8; 32]> {
-        self.sha256
+    pub fn sha256(&self) -> [u8; 32] {
+        self.hasher
+            .clone()
+            .finalize()
+            .as_slice()
+            .try_into()
+            .expect("SHA-256 is 32 bytes")
     }
 
     pub fn size(&self) -> u64 {
@@ -144,11 +126,14 @@ impl OsImage {
 
 impl std::io::Read for OsImage {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match &mut self.img {
+        let count = match &mut self.img {
             OsImageReader::Xz(x) => x.read(buf),
             OsImageReader::Uncompressed(x) => x.read(buf),
             OsImageReader::Memory(x) => std::io::Read::read(x, buf),
-        }
+        }?;
+
+        self.hasher.update(&buf[..count]);
+        Ok(count)
     }
 }
 
