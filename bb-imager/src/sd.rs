@@ -45,7 +45,7 @@ pub(crate) fn flash(
     let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
     sd.seek(std::io::SeekFrom::Start(0))?;
-    let hash = crate::util::sha256_file_fixed_progress(sd, size, chan)?;
+    let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan)?;
 
     if hash != sha256 {
         return Err(Error::Sha256VerificationError.into());
