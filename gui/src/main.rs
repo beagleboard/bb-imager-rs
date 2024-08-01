@@ -707,6 +707,7 @@ impl BBImager {
         (
             text(self.progress_bar.label.clone()),
             progress_bar(RANGE, self.progress_bar.progress)
+                .height(10)
                 .style(ProgressBar::from(self.progress_bar.state)),
         )
     }

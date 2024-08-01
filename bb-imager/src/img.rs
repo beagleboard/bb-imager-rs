@@ -137,18 +137,14 @@ impl std::io::Read for OsImage {
     }
 }
 
+#[cfg(unix)]
 fn size(file: &std::fs::Metadata) -> u64 {
-    cfg_if::cfg_if! {
-        if #[cfg(unix)] {
-            use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::MetadataExt;
+    file.size()
+}
 
-            file.size()
-        } else if #[cfg(windows)] {
-            use std::os::windows::fs::MetadataExt;
-
-            file.file_size()
-        } else {
-            panic!("Unsupported Platform")
-        }
-    }
+#[cfg(windows)]
+fn size(file: &std::fs::Metadata) -> u64 {
+    use std::os::windows::fs::MetadataExt;
+    file.file_size()
 }
