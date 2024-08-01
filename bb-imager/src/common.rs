@@ -30,7 +30,7 @@ pub struct Destination {
 }
 
 impl Destination {
-    pub(crate) const fn port(name: String) -> Self {
+    pub const fn port(name: String) -> Self {
         Self {
             name,
             size: None,
@@ -49,6 +49,27 @@ impl Destination {
             size: Some(size),
             block: Some(block),
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub async fn from_path(path: &str, state: &State) -> crate::error::Result<Self> {
+        use std::collections::HashMap;
+
+        let devs = state
+            .dbus_client
+            .manager()
+            .resolve_device(HashMap::from([("path", path.into())]), HashMap::new())
+            .await?;
+
+        let dev = devs
+            .first()
+            .ok_or(Error::FailedToOpenDestination("Not Found".to_owned()))?;
+
+        Ok(Self {
+            name: path.to_owned(),
+            size: None,
+            block: Some(dev.to_owned()),
+        })
     }
 
     pub fn open_port(&self) -> crate::error::Result<Box<dyn serialport::SerialPort>> {
