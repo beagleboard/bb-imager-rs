@@ -66,7 +66,7 @@ pub(crate) fn flash(
 pub async fn destinations(
     state: &crate::State,
 ) -> Result<std::collections::HashSet<crate::Destination>> {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf};
 
     let block_devs = state
         .dbus_client
@@ -88,13 +88,16 @@ pub async fn destinations(
                         .block_for_drive(&drive, true)
                         .await
                         .unwrap()
-                        .into_inner()
-                        .path()
-                        .to_owned();
+                        .device()
+                        .await
+                        .unwrap();
+
+                    let path = PathBuf::from(OsString::from_vec(block[..block.len() - 1].to_vec()));
+
                     ans.insert(crate::Destination::sd_card(
                         drive.id().await?,
                         drive.size().await?,
-                        block.into(),
+                        path,
                     ));
                 }
             }

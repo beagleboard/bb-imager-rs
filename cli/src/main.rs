@@ -20,6 +20,9 @@ enum Commands {
         dst: String,
         target: FlashTarget,
     },
+    ListDestinations {
+        target: FlashTarget,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]
@@ -41,120 +44,137 @@ impl From<FlashTarget> for bb_imager::config::Flasher {
 async fn main() {
     let opt = Opt::parse();
 
+    let state = bb_imager::State::new().await.unwrap();
+
     match opt.command {
-        Commands::Flash { img, dst, target } => {
-            let state = bb_imager::State::new().await.unwrap();
-            let downloader = bb_imager::download::Downloader::new();
-            let (tx, rx) = std::sync::mpsc::channel();
-            let dst = match target {
-                FlashTarget::Bcf => bb_imager::Destination::port(dst),
-                FlashTarget::Sd => bb_imager::Destination::from_path(&dst, &state)
-                    .await
-                    .unwrap(),
-            };
+        Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite, state).await,
+        Commands::ListDestinations { target } => {
+            let dsts = bb_imager::config::Flasher::from(target)
+                .destinations(state)
+                .await
+                .unwrap();
 
-            if !opt.quite {
-                tokio::task::spawn_blocking(move || {
-                    let bars = indicatif::MultiProgress::new();
-                    static FLASHING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
-                    static VERIFYING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
-
-                    while let Ok(progress) = rx.recv() {
-                        match progress {
-                            DownloadFlashingStatus::Preparing => {
-                                static PREPARING: Once = Once::new();
-
-                                PREPARING.call_once(|| {
-                                    println!("[1/3] Preparing");
-                                });
-                            }
-                            DownloadFlashingStatus::DownloadingProgress(_) => {
-                                panic!("Not Supported");
-                            }
-                            DownloadFlashingStatus::FlashingProgress(p) => {
-                                let bar = FLASHING.get_or_init(|| {
-                                    let bar = bars.add(indicatif::ProgressBar::new(100));
-                                    bar.set_style(
-                                        indicatif::ProgressStyle::with_template(
-                                            "[2/3] {msg}  [{wide_bar}] [{percent} %]",
-                                        )
-                                        .unwrap(),
-                                    );
-                                    bar.set_message("Flashing");
-                                    bar
-                                });
-
-                                bar.set_position((p * 100.0) as u64);
-                            }
-                            DownloadFlashingStatus::Verifying => {
-                                static VERIFYING: Once = Once::new();
-
-                                if let Some(x) = FLASHING.get() {
-                                    if !x.is_finished() {
-                                        x.finish()
-                                    }
-                                }
-
-                                VERIFYING.call_once(|| println!("[3/3] Verifying"));
-                            }
-                            DownloadFlashingStatus::VerifyingProgress(p) => {
-                                if let Some(x) = FLASHING.get() {
-                                    if !x.is_finished() {
-                                        x.finish()
-                                    }
-                                }
-
-                                let bar = VERIFYING.get_or_init(|| {
-                                    let bar = bars.add(indicatif::ProgressBar::new(100));
-                                    bar.set_style(
-                                        indicatif::ProgressStyle::with_template(
-                                            "[3/3] {msg} [{wide_bar}] [{percent} %]",
-                                        )
-                                        .unwrap(),
-                                    );
-                                    bar.set_message("Verifying");
-                                    bar
-                                });
-
-                                bar.set_position((p * 100.0) as u64);
-                            }
-                            DownloadFlashingStatus::Finished => {
-                                if let Some(x) = VERIFYING.get() {
-                                    if !x.is_finished() {
-                                        x.finish()
-                                    }
-                                }
-                            }
-                        };
+            match target {
+                FlashTarget::Sd => {
+                    println!("| {: <12} | {: <12} |", "Sd Card", "Size");
+                    println!("|--------------|--------------|");
+                    for d in dsts {
+                        println!(
+                            "| {: <12} | {: <12} |",
+                            d.path.to_string_lossy(),
+                            d.size.unwrap()
+                        )
                     }
-                });
+                }
+                FlashTarget::Bcf => {
+                    for d in dsts {
+                        println!("{}", d.name)
+                    }
+                }
             }
-
-            bb_imager::download_and_flash(
-                bb_imager::SelectedImage::local(img),
-                dst,
-                target.into(),
-                state,
-                downloader,
-                tx,
-            )
-            .await
-            .unwrap();
         }
     }
+}
 
-    // bb_imager::bcf::flash(&opt.img, opt.dst).unwrap();
+async fn flash(
+    img: PathBuf,
+    dst: String,
+    target: FlashTarget,
+    quite: bool,
+    state: bb_imager::State,
+) {
+    let downloader = bb_imager::download::Downloader::new();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let dst = match target {
+        FlashTarget::Bcf => bb_imager::Destination::port(dst),
+        FlashTarget::Sd => bb_imager::Destination::from_path(PathBuf::from(dst)),
+    };
 
-    // if !opt.img.exists() {
-    //     eprintln!("Provided Image does not exist {:?}", opt.img);
-    //     return;
-    // }
+    if !quite {
+        tokio::task::spawn_blocking(move || {
+            let bars = indicatif::MultiProgress::new();
+            static FLASHING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
+            static VERIFYING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
 
-    // if !opt.dst.exists() {
-    //     eprintln!("Provided destination does not exist {:?}", opt.dst);
-    //     return;
-    // }
+            while let Ok(progress) = rx.recv() {
+                match progress {
+                    DownloadFlashingStatus::Preparing => {
+                        static PREPARING: Once = Once::new();
 
-    // bb_imager::format(&opt.dst).expect("Failed to format disk");
-    // flash(&opt.img, &opt.dst).expect("Failed to flash");
+                        PREPARING.call_once(|| {
+                            println!("[1/3] Preparing");
+                        });
+                    }
+                    DownloadFlashingStatus::DownloadingProgress(_) => {
+                        panic!("Not Supported");
+                    }
+                    DownloadFlashingStatus::FlashingProgress(p) => {
+                        let bar = FLASHING.get_or_init(|| {
+                            let bar = bars.add(indicatif::ProgressBar::new(100));
+                            bar.set_style(
+                                indicatif::ProgressStyle::with_template(
+                                    "[2/3] {msg}  [{wide_bar}] [{percent} %]",
+                                )
+                                .unwrap(),
+                            );
+                            bar.set_message("Flashing");
+                            bar
+                        });
+
+                        bar.set_position((p * 100.0) as u64);
+                    }
+                    DownloadFlashingStatus::Verifying => {
+                        static VERIFYING: Once = Once::new();
+
+                        if let Some(x) = FLASHING.get() {
+                            if !x.is_finished() {
+                                x.finish()
+                            }
+                        }
+
+                        VERIFYING.call_once(|| println!("[3/3] Verifying"));
+                    }
+                    DownloadFlashingStatus::VerifyingProgress(p) => {
+                        if let Some(x) = FLASHING.get() {
+                            if !x.is_finished() {
+                                x.finish()
+                            }
+                        }
+
+                        let bar = VERIFYING.get_or_init(|| {
+                            let bar = bars.add(indicatif::ProgressBar::new(100));
+                            bar.set_style(
+                                indicatif::ProgressStyle::with_template(
+                                    "[3/3] {msg} [{wide_bar}] [{percent} %]",
+                                )
+                                .unwrap(),
+                            );
+                            bar.set_message("Verifying");
+                            bar
+                        });
+
+                        bar.set_position((p * 100.0) as u64);
+                    }
+                    DownloadFlashingStatus::Finished => {
+                        if let Some(x) = VERIFYING.get() {
+                            if !x.is_finished() {
+                                x.finish()
+                            }
+                        }
+                    }
+                };
+            }
+        });
+    }
+
+    bb_imager::download_and_flash(
+        bb_imager::SelectedImage::local(img),
+        dst,
+        target.into(),
+        state,
+        downloader,
+        tx,
+    )
+    .await
+    .unwrap();
 }

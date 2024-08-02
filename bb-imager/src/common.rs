@@ -24,52 +24,34 @@ pub enum DownloadFlashingStatus {
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Destination {
     pub name: String,
+    pub path: PathBuf,
     pub size: Option<u64>,
-    #[cfg(target_os = "linux")]
-    block: Option<udisks2::zbus::zvariant::OwnedObjectPath>,
 }
 
 impl Destination {
-    pub const fn port(name: String) -> Self {
+    pub fn port(name: String) -> Self {
         Self {
-            name,
+            name: name.clone(),
+            path: PathBuf::from(name),
             size: None,
-            block: None,
         }
     }
 
     #[cfg(target_os = "linux")]
-    pub(crate) const fn sd_card(
-        name: String,
-        size: u64,
-        block: udisks2::zbus::zvariant::OwnedObjectPath,
-    ) -> Self {
+    pub(crate) const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
         Self {
             name,
+            path,
             size: Some(size),
-            block: Some(block),
         }
     }
 
-    #[cfg(target_os = "linux")]
-    pub async fn from_path(path: &str, state: &State) -> crate::error::Result<Self> {
-        use std::collections::HashMap;
-
-        let devs = state
-            .dbus_client
-            .manager()
-            .resolve_device(HashMap::from([("path", path.into())]), HashMap::new())
-            .await?;
-
-        let dev = devs
-            .first()
-            .ok_or(Error::FailedToOpenDestination("Not Found".to_owned()))?;
-
-        Ok(Self {
-            name: path.to_owned(),
+    pub fn from_path(path: PathBuf) -> Self {
+        Self {
+            name: path.to_string_lossy().to_string(),
+            path,
             size: None,
-            block: Some(dev.to_owned()),
-        })
+        }
     }
 
     pub fn open_port(&self) -> crate::error::Result<Box<dyn serialport::SerialPort>> {
@@ -84,18 +66,26 @@ impl Destination {
 
     #[cfg(target_os = "linux")]
     pub async fn open_file(&self, state: &State) -> crate::error::Result<std::fs::File> {
-        use std::os::fd::{FromRawFd, IntoRawFd};
+        use std::{
+            collections::HashMap,
+            os::fd::{FromRawFd, IntoRawFd},
+        };
 
-        let obj = state
+        let devs = state
             .dbus_client
-            .object(
-                self.block
-                    .clone()
-                    .ok_or(Error::FailedToOpenDestination(self.name.clone()))?,
+            .manager()
+            .resolve_device(
+                HashMap::from([("path", self.path.to_str().unwrap().into())]),
+                HashMap::new(),
             )
-            .unwrap()
-            .block()
             .await?;
+
+        let block = devs
+            .first()
+            .ok_or(Error::FailedToOpenDestination("Not Found".to_owned()))?
+            .to_owned();
+
+        let obj = state.dbus_client.object(block).unwrap().block().await?;
 
         let fd = obj.open_device("rw", Default::default()).await?;
 
