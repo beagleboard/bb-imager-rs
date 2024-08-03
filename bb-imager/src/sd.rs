@@ -112,6 +112,42 @@ pub async fn destinations(
     state: &crate::State,
 ) -> Result<std::collections::HashSet<crate::Destination>> {
     use std::collections::HashSet;
+    use std::mem::MaybeUninit;
+    use std::path::PathBuf;
 
-    Ok(HashSet::new())
+    let mut res = HashSet::new();
+
+    let removable_devs = windows::Storage::KnownFolders::RemovableDevices()?
+        .GetFoldersAsync(
+            windows::Storage::Search::CommonFolderQuery::DefaultQuery,
+            0,
+            10,
+        )?
+        .get()?;
+
+    for i in 0..(removable_devs.Size().unwrap() as usize) {
+        let dev = removable_devs.GetAt(i as u32).unwrap();
+
+        let size = unsafe {
+            let mut size = MaybeUninit::<u64>::uninit();
+            windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(
+                &dev.Path()?,
+                None,
+                Some(size.as_mut_ptr()),
+                None,
+            )?;
+            size.assume_init()
+        };
+
+        let path = dev.Path()?.to_os_string();
+        let path = PathBuf::from(path);
+
+        res.insert(crate::Destination::sd_card(
+            dev.DisplayName()?.to_string_lossy(),
+            size,
+            path,
+        ));
+    }
+
+    Ok(res)
 }

@@ -37,7 +37,6 @@ impl Destination {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub(crate) const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
         Self {
             name,
@@ -93,7 +92,7 @@ impl Destination {
     }
 
     #[cfg(windows)]
-    pub async fn open(&self, state: &State) -> crate::error::Result<std::fs::File> {
+    pub async fn open_file(&self, state: &State) -> crate::error::Result<std::fs::File> {
         todo!()
     }
 }
