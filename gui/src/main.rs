@@ -297,7 +297,7 @@ impl Application for BBImager {
 
                     let task = tokio::spawn(async move {
                         bb_imager::common::download_and_flash(
-                            img, dst, flasher, state, downloader, tx,
+                            img, dst, flasher, state, downloader, tx, true
                         )
                         .await
                     });

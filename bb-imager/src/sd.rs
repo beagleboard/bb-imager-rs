@@ -14,10 +14,37 @@ pub enum Error {
     DriveFetchError,
 }
 
+fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> {
+    let mut pos = 0;
+
+    loop {
+        let count = img.read(&mut buf[pos..])?;
+
+        if count == 0 {
+            break;
+        }
+
+        pos += count;
+
+        if pos % 512 == 0 {
+            break;
+        }
+    }
+
+    if pos == 0 || pos % 512 == 0 {
+        Ok(pos)
+    } else {
+        let rem = pos % 512;
+        buf[pos..rem].fill(0);
+        Ok(pos + rem)
+    }
+}
+
 pub(crate) fn flash(
     mut img: crate::img::OsImage,
     mut sd: std::fs::File,
     chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
+    verify: bool,
 ) -> Result<()> {
     let size = img.size();
 
@@ -27,28 +54,31 @@ pub(crate) fn flash(
     let _ = chan.send(DownloadFlashingStatus::FlashingProgress(0.0));
 
     loop {
-        let count = img.read(&mut buf)?;
+        let count = read_aligned(&mut img, &mut buf)?;
+        if count == 0 {
+            break;
+        }
+
         pos += count;
 
         let _ = chan.send(DownloadFlashingStatus::FlashingProgress(
             pos as f32 / size as f32,
         ));
 
-        if count == 0 {
-            break;
-        }
-
+        tracing::debug!("Writing: {count} bytes");
         sd.write_all(&buf[..count])?;
     }
 
-    let sha256 = img.sha256();
-    let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
+    if verify {
+        let sha256 = img.sha256();
+        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-    sd.seek(std::io::SeekFrom::Start(0))?;
-    let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan)?;
+        sd.seek(std::io::SeekFrom::Start(0))?;
+        let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan)?;
 
-    if hash != sha256 {
-        return Err(Error::Sha256VerificationError.into());
+        if hash != sha256 {
+            return Err(Error::Sha256VerificationError.into());
+        }
     }
 
     Ok(())
@@ -139,8 +169,7 @@ pub async fn destinations(
             size.assume_init()
         };
 
-        let path = dev.Path()?.to_os_string();
-        let path = PathBuf::from(path);
+        let path = PathBuf::from(format!("\\\\.\\{}", dev.Path()?).trim_end_matches('\\'));
 
         res.insert(crate::Destination::sd_card(
             dev.DisplayName()?.to_string_lossy(),

@@ -19,6 +19,8 @@ enum Commands {
         img: PathBuf,
         dst: String,
         target: FlashTarget,
+        #[arg(long)]
+        no_verify: bool,
     },
     ListDestinations {
         target: FlashTarget,
@@ -47,7 +49,12 @@ async fn main() {
     let state = bb_imager::State::new().await.unwrap();
 
     match opt.command {
-        Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite, state).await,
+        Commands::Flash {
+            img,
+            dst,
+            target,
+            no_verify,
+        } => flash(img, dst, target, opt.quite, state, !no_verify).await,
         Commands::ListDestinations { target } => {
             let dsts = bb_imager::config::Flasher::from(target)
                 .destinations(state)
@@ -82,6 +89,7 @@ async fn flash(
     target: FlashTarget,
     quite: bool,
     state: bb_imager::State,
+    verify: bool,
 ) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, rx) = std::sync::mpsc::channel();
@@ -174,6 +182,7 @@ async fn flash(
         state,
         downloader,
         tx,
+        verify,
     )
     .await
     .unwrap();

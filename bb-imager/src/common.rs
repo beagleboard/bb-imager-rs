@@ -3,7 +3,7 @@
 use std::{path::PathBuf, time::Duration};
 use thiserror::Error;
 
-pub(crate) const BUF_SIZE: usize = 64 * 1024;
+pub(crate) const BUF_SIZE: usize = 32 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -92,8 +92,45 @@ impl Destination {
     }
 
     #[cfg(windows)]
-    pub async fn open_file(&self, state: &State) -> crate::error::Result<std::fs::File> {
-        todo!()
+    pub async fn open_file(&self, _state: &State) -> crate::error::Result<std::fs::File> {
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::os::windows::io::AsRawHandle;
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::Ioctl::{FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME};
+        use windows::Win32::System::IO::DeviceIoControl;
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(0x20000000)
+            .open(&self.path)?;
+
+        unsafe {
+            // Lock drive
+            DeviceIoControl(
+                HANDLE(file.as_raw_handle()),
+                FSCTL_ALLOW_EXTENDED_DASD_IO,
+                None,
+                0,
+                None,
+                0,
+                None,
+                None,
+            )?;
+
+            DeviceIoControl(
+                HANDLE(file.as_raw_handle()),
+                FSCTL_LOCK_VOLUME,
+                None,
+                0,
+                None,
+                0,
+                None,
+                None,
+            )?;
+        }
+
+        Ok(file)
     }
 }
 
@@ -164,16 +201,17 @@ pub async fn download_and_flash(
     state: State,
     downloader: crate::download::Downloader,
     chan: std::sync::mpsc::Sender<DownloadFlashingStatus>,
+    verify: bool,
 ) -> crate::error::Result<()> {
     tracing::info!("Preparing...");
     let _ = chan.send(DownloadFlashingStatus::Preparing);
 
     match flasher {
         crate::config::Flasher::SdCard => {
-            let port = dst.open_file(&state).await?;
+            let port = dst.open_file(&state).await.unwrap();
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-            tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan))
+            tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan, verify))
         }
         crate::config::Flasher::BeagleConnectFreedom => {
             let port = dst.open_port()?;
