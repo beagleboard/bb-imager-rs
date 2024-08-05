@@ -1,17 +1,20 @@
 image: "rust:latest"
 
-default:
-  before_script:
-    - apt-get update -y -qq && apt-get install libudev-dev -y -qq
+stages:
+  - test
+  - build
+  - deploy
 
 test:
   stage: test
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends libudev-dev
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --verbose
 
 appimage:
-  stage: deploy
+  stage: build
   before_script:
     - cargo install cargo-appimage
     - apt-get update && apt-get install -y --no-install-recommends file wget libudev-dev
@@ -24,3 +27,16 @@ appimage:
   artifacts:
     paths:
       - target/appimage/gui.AppImage
+
+
+windows:
+  stage: build
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends gcc-mingw-w64
+    - rustup target add x86_64-pc-windows-gnu
+  script:
+    - cargo build --package gui --target x86_64-pc-windows-gnu --release
+    - cargo build --package cli --target x86_64-pc-windows-gnu --release
+  artifacts:
+    paths:
+      - target/x86_64-pc-windows-gnu/release/*.exe
