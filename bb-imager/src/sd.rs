@@ -141,42 +141,12 @@ pub async fn destinations(
 pub async fn destinations(
     state: &crate::State,
 ) -> Result<std::collections::HashSet<crate::Destination>> {
-    use std::collections::HashSet;
-    use std::mem::MaybeUninit;
     use std::path::PathBuf;
 
-    let mut res = HashSet::new();
-
-    let removable_devs = windows::Storage::KnownFolders::RemovableDevices()?
-        .GetFoldersAsync(
-            windows::Storage::Search::CommonFolderQuery::DefaultQuery,
-            0,
-            10,
-        )?
-        .get()?;
-
-    for i in 0..(removable_devs.Size().unwrap() as usize) {
-        let dev = removable_devs.GetAt(i as u32).unwrap();
-
-        let size = unsafe {
-            let mut size = MaybeUninit::<u64>::uninit();
-            windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(
-                &dev.Path()?,
-                None,
-                Some(size.as_mut_ptr()),
-                None,
-            )?;
-            size.assume_init()
-        };
-
-        let path = PathBuf::from(format!("\\\\.\\{}", dev.Path()?).trim_end_matches('\\'));
-
-        res.insert(crate::Destination::sd_card(
-            dev.DisplayName()?.to_string_lossy(),
-            size,
-            path,
-        ));
-    }
-
-    Ok(res)
+    Ok(rs_drivelist::drive_list()
+        .map_err(|_| Error::DriveFetchError)?
+        .into_iter()
+        .filter(|x| x.isRemovable)
+        .map(|x| crate::Destination::sd_card(x.description, x.size, PathBuf::from(x.device)))
+        .collect())
 }
