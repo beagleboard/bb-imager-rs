@@ -45,7 +45,6 @@ fn main() -> iced::Result {
 #[derive(Default, Debug)]
 struct BBImager {
     config: bb_imager::config::Config,
-    state: Option<bb_imager::State>,
     downloader: bb_imager::download::Downloader,
     screen: Screen,
     selected_board: Option<bb_imager::config::Device>,
@@ -64,7 +63,6 @@ struct Flags {
 
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
-    InitState(bb_imager::State),
     BoardSelected(Box<bb_imager::config::Device>),
     SelectImage(Option<Box<bb_imager::config::OsList>>),
     SelectPort(bb_imager::Destination),
@@ -81,7 +79,6 @@ enum BBImagerMessage {
     BoardImageDownloaded { index: usize, path: PathBuf },
     OsListImageDownloaded { index: usize, path: PathBuf },
 
-    UnrecoverableError(String),
     Null,
 }
 
@@ -164,18 +161,13 @@ impl Application for BBImager {
             )
         });
 
-        let state_cmd = Command::perform(bb_imager::State::new(), |x| match x {
-            Ok(x) => BBImagerMessage::InitState(x),
-            Err(e) => BBImagerMessage::UnrecoverableError(e.to_string()),
-        });
-
         (
             Self {
                 config: flags.config.clone(),
                 downloader: downloader.clone(),
                 ..Default::default()
             },
-            Command::batch(board_image.chain(os_image_from_cache).chain([state_cmd])),
+            Command::batch(board_image.chain(os_image_from_cache)),
         )
     }
 
@@ -283,7 +275,6 @@ impl Application for BBImager {
                     .flasher;
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().unwrap();
-                let state = self.state.clone().unwrap();
                 let downloader = self.downloader.clone();
 
                 return iced::command::channel(20, move |mut chan| async move {
@@ -299,7 +290,7 @@ impl Application for BBImager {
 
                     let task = tokio::spawn(async move {
                         bb_imager::common::download_and_flash(
-                            img, dst, flasher, state, downloader, tx, true,
+                            img, dst, flasher, downloader, tx, true,
                         )
                         .await
                     });
@@ -382,12 +373,6 @@ impl Application for BBImager {
             }
             BBImagerMessage::Destinations(x) => {
                 self.destinations = x;
-            }
-            BBImagerMessage::InitState(s) => {
-                self.state = Some(s);
-            }
-            BBImagerMessage::UnrecoverableError(e) => {
-                panic!("Encounterd unrecoverable error {e}");
             }
             BBImagerMessage::RefreshDestinations => {
                 return self.refresh_destinations();

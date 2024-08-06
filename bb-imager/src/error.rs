@@ -16,12 +16,12 @@ pub enum Error {
     ImageError(#[from] crate::img::Error),
     #[error("Sd Card Error: {0}")]
     SdCardError(#[from] crate::sd::Error),
-    #[error("Zbus Error: {0}")]
-    #[cfg(target_os = "linux")]
-    DbusClientError(#[from] udisks2::zbus::Error),
     #[error("{0}")]
     CommanError(#[from] crate::common::Error),
     #[cfg(windows)]
-    #[error("Windows Error: {0}")]
+    #[error("{0}")]
     WindowsError(#[from] crate::pal::windows::Error),
+    #[cfg(target_os = "linux")]
+    #[error("{0}")]
+    LinuxError(#[from] crate::pal::linux::Error),
 }

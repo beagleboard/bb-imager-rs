@@ -62,49 +62,6 @@ impl Destination {
             })
             .map_err(Into::into)
     }
-
-    #[cfg(target_os = "linux")]
-    pub async fn open(&self, state: &State) -> crate::error::Result<std::fs::File> {
-        use std::{
-            collections::HashMap,
-            os::fd::{FromRawFd, IntoRawFd},
-        };
-
-        let devs = state
-            .dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", self.path.as_str().into())]),
-                HashMap::new(),
-            )
-            .await?;
-
-        let block = devs
-            .first()
-            .ok_or(Error::FailedToOpenDestination("Not Found".to_owned()))?
-            .to_owned();
-
-        let obj = state.dbus_client.object(block).unwrap().block().await?;
-
-        let fd = obj.open_device("rw", Default::default()).await?;
-
-        Ok(unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct State {
-    #[cfg(target_os = "linux")]
-    pub dbus_client: udisks2::Client,
-}
-
-impl State {
-    #[cfg(target_os = "linux")]
-    pub async fn new() -> crate::error::Result<Self> {
-        let dbus_client = udisks2::Client::new().await?;
-
-        Ok(Self { dbus_client })
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -151,7 +108,6 @@ pub async fn download_and_flash(
     img: SelectedImage,
     dst: Destination,
     flasher: crate::config::Flasher,
-    state: State,
     downloader: crate::download::Downloader,
     chan: std::sync::mpsc::Sender<DownloadFlashingStatus>,
     verify: bool,
@@ -161,7 +117,7 @@ pub async fn download_and_flash(
 
     match flasher {
         crate::config::Flasher::SdCard => {
-            let port = dst.open(&state).await?;
+            let port = dst.open().await?;
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
             tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan, verify))

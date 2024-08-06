@@ -64,14 +64,8 @@ impl Drop for WinDrive {
     }
 }
 
-impl crate::common::State {
-    pub async fn new() -> crate::error::Result<Self> {
-        Ok(Self {})
-    }
-}
-
 impl crate::common::Destination {
-    pub(crate) async fn open(&self, _state: &crate::State) -> crate::error::Result<WinDrive> {
+    pub(crate) async fn open(&self) -> crate::error::Result<WinDrive> {
         WinDrive::open(&self.path).await
     }
 }

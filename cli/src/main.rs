@@ -46,15 +46,13 @@ impl From<FlashTarget> for bb_imager::config::Flasher {
 async fn main() {
     let opt = Opt::parse();
 
-    let state = bb_imager::State::new().await.unwrap();
-
     match opt.command {
         Commands::Flash {
             img,
             dst,
             target,
             no_verify,
-        } => flash(img, dst, target, opt.quite, state, !no_verify).await,
+        } => flash(img, dst, target, opt.quite, !no_verify).await,
         Commands::ListDestinations { target } => {
             let dsts = bb_imager::config::Flasher::from(target)
                 .destinations()
@@ -78,14 +76,7 @@ async fn main() {
     }
 }
 
-async fn flash(
-    img: PathBuf,
-    dst: String,
-    target: FlashTarget,
-    quite: bool,
-    state: bb_imager::State,
-    verify: bool,
-) {
+async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, verify: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, rx) = std::sync::mpsc::channel();
     let dst = match target {
@@ -174,7 +165,6 @@ async fn flash(
         bb_imager::SelectedImage::local(img),
         dst,
         target.into(),
-        state,
         downloader,
         tx,
         verify,
