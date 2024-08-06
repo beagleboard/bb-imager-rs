@@ -6,5 +6,6 @@ pub mod sd;
 pub mod img;
 pub(crate) mod util;
 pub mod common;
+pub(crate) mod pal;
 
 pub use common::*;

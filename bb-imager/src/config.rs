@@ -74,12 +74,9 @@ impl Config {
 }
 
 impl Flasher {
-    pub async fn destinations(
-        &self,
-        state: crate::State,
-    ) -> crate::error::Result<HashSet<Destination>> {
+    pub async fn destinations(&self) -> HashSet<Destination> {
         match self {
-            Flasher::SdCard => crate::sd::destinations(&state).await,
+            Flasher::SdCard => tokio::task::block_in_place(crate::sd::destinations),
             Flasher::BeagleConnectFreedom => {
                 tokio::task::block_in_place(crate::bcf::possible_devices)
             }

@@ -40,9 +40,9 @@ fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> 
     }
 }
 
-pub(crate) fn flash(
+pub(crate) fn flash<W: Write + Seek + Read>(
     mut img: crate::img::OsImage,
-    mut sd: std::fs::File,
+    mut sd: W,
     chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
     verify: bool,
 ) -> Result<()> {
@@ -65,7 +65,6 @@ pub(crate) fn flash(
             pos as f32 / size as f32,
         ));
 
-        tracing::debug!("Writing: {count} bytes");
         sd.write_all(&buf[..count])?;
     }
 
@@ -92,61 +91,12 @@ pub(crate) fn flash(
 //     fatfs::format_volume(disk, fatfs::FormatVolumeOptions::new())
 // }
 
-#[cfg(target_os = "linux")]
-pub async fn destinations(
-    state: &crate::State,
-) -> Result<std::collections::HashSet<crate::Destination>> {
-    use std::{collections::HashSet, ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf};
-
-    let block_devs = state
-        .dbus_client
-        .manager()
-        .get_block_devices(Default::default())
-        .await?
-        .into_iter()
-        .map(|x| state.dbus_client.object(x).unwrap())
-        .collect::<Vec<_>>();
-
-    let mut ans = HashSet::new();
-
-    for obj in block_devs {
-        if let Ok(block) = obj.block().await {
-            if let Ok(drive) = state.dbus_client.drive_for_block(&block).await {
-                if drive.removable().await.unwrap() && drive.media_removable().await.unwrap() {
-                    let block = state
-                        .dbus_client
-                        .block_for_drive(&drive, true)
-                        .await
-                        .unwrap()
-                        .device()
-                        .await
-                        .unwrap();
-
-                    let path = PathBuf::from(OsString::from_vec(block[..block.len() - 1].to_vec()));
-
-                    ans.insert(crate::Destination::sd_card(
-                        drive.id().await?,
-                        drive.size().await?,
-                        path,
-                    ));
-                }
-            }
-        }
-    }
-
-    Ok(ans)
-}
-
-#[cfg(windows)]
-pub async fn destinations(
-    state: &crate::State,
-) -> Result<std::collections::HashSet<crate::Destination>> {
-    use std::path::PathBuf;
-
-    Ok(rs_drivelist::drive_list()
-        .map_err(|_| Error::DriveFetchError)?
+pub fn destinations() -> std::collections::HashSet<crate::Destination> {
+    rs_drivelist::drive_list()
+        .unwrap()
         .into_iter()
         .filter(|x| x.isRemovable)
-        .map(|x| crate::Destination::sd_card(x.description, x.size, PathBuf::from(x.device)))
-        .collect())
+        .filter(|x| !x.isVirtual)
+        .map(|x| crate::Destination::sd_card(x.description, x.size, x.device))
+        .collect()
 }

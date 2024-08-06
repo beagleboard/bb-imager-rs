@@ -69,7 +69,7 @@ enum BBImagerMessage {
     ProgressBar(ProgressBarState),
     SwitchScreen(Screen),
     Search(String),
-    Destinations(Result<HashSet<bb_imager::Destination>, String>),
+    Destinations(HashSet<bb_imager::Destination>),
     RefreshDestinations,
     Reset,
 
@@ -297,7 +297,7 @@ impl Application for BBImager {
 
                     let task = tokio::spawn(async move {
                         bb_imager::common::download_and_flash(
-                            img, dst, flasher, state, downloader, tx, true
+                            img, dst, flasher, state, downloader, tx, true,
                         )
                         .await
                     });
@@ -378,12 +378,9 @@ impl Application for BBImager {
                 self.flashing = false;
                 self.progress_bar = x;
             }
-            BBImagerMessage::Destinations(x) => match x {
-                Ok(y) => self.destinations = y,
-                Err(e) => {
-                    tracing::error!("Error retriving destinations {e}")
-                }
-            },
+            BBImagerMessage::Destinations(x) => {
+                self.destinations = x;
+            }
             BBImagerMessage::InitState(s) => {
                 self.state = Some(s);
             }
@@ -422,10 +419,9 @@ impl BBImager {
 
     fn refresh_destinations(&self) -> Command<BBImagerMessage> {
         let flasher = self.selected_board.clone().unwrap().flasher;
-        let state = self.state.clone().unwrap();
 
-        Command::perform(async move { flasher.destinations(state).await }, |x| {
-            BBImagerMessage::Destinations(x.map_err(|y| y.to_string()))
+        Command::perform(async move { flasher.destinations().await }, |x| {
+            BBImagerMessage::Destinations(x)
         })
     }
 

@@ -24,7 +24,7 @@ pub enum DownloadFlashingStatus {
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Destination {
     pub name: String,
-    pub path: PathBuf,
+    pub path: String,
     pub size: Option<u64>,
 }
 
@@ -32,12 +32,12 @@ impl Destination {
     pub fn port(name: String) -> Self {
         Self {
             name: name.clone(),
-            path: PathBuf::from(name),
+            path: name,
             size: None,
         }
     }
 
-    pub(crate) const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
+    pub(crate) const fn sd_card(name: String, size: u64, path: String) -> Self {
         Self {
             name,
             path,
@@ -45,9 +45,9 @@ impl Destination {
         }
     }
 
-    pub fn from_path(path: PathBuf) -> Self {
+    pub fn from_path(path: String) -> Self {
         Self {
-            name: path.to_string_lossy().to_string(),
+            name: path.clone(),
             path,
             size: None,
         }
@@ -64,7 +64,7 @@ impl Destination {
     }
 
     #[cfg(target_os = "linux")]
-    pub async fn open_file(&self, state: &State) -> crate::error::Result<std::fs::File> {
+    pub async fn open(&self, state: &State) -> crate::error::Result<std::fs::File> {
         use std::{
             collections::HashMap,
             os::fd::{FromRawFd, IntoRawFd},
@@ -74,7 +74,7 @@ impl Destination {
             .dbus_client
             .manager()
             .resolve_device(
-                HashMap::from([("path", self.path.to_str().unwrap().into())]),
+                HashMap::from([("path", self.path.as_str().into())]),
                 HashMap::new(),
             )
             .await?;
@@ -90,48 +90,6 @@ impl Destination {
 
         Ok(unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
     }
-
-    #[cfg(windows)]
-    pub async fn open_file(&self, _state: &State) -> crate::error::Result<std::fs::File> {
-        use std::os::windows::fs::OpenOptionsExt;
-        use std::os::windows::io::AsRawHandle;
-        use windows::Win32::Foundation::HANDLE;
-        use windows::Win32::System::Ioctl::{FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME};
-        use windows::Win32::System::IO::DeviceIoControl;
-
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .custom_flags(0x20000000)
-            .open(&self.path)?;
-
-        unsafe {
-            // Lock drive
-            DeviceIoControl(
-                HANDLE(file.as_raw_handle()),
-                FSCTL_ALLOW_EXTENDED_DASD_IO,
-                None,
-                0,
-                None,
-                0,
-                None,
-                None,
-            )?;
-
-            DeviceIoControl(
-                HANDLE(file.as_raw_handle()),
-                FSCTL_LOCK_VOLUME,
-                None,
-                0,
-                None,
-                0,
-                None,
-                None,
-            )?;
-        }
-
-        Ok(file)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -146,11 +104,6 @@ impl State {
         let dbus_client = udisks2::Client::new().await?;
 
         Ok(Self { dbus_client })
-    }
-
-    #[cfg(windows)]
-    pub async fn new() -> crate::error::Result<Self> {
-        Ok(Self {})
     }
 }
 
@@ -208,7 +161,7 @@ pub async fn download_and_flash(
 
     match flasher {
         crate::config::Flasher::SdCard => {
-            let port = dst.open_file(&state).await.unwrap();
+            let port = dst.open(&state).await?;
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
             tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan, verify))

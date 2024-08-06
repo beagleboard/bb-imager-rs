@@ -57,20 +57,15 @@ async fn main() {
         } => flash(img, dst, target, opt.quite, state, !no_verify).await,
         Commands::ListDestinations { target } => {
             let dsts = bb_imager::config::Flasher::from(target)
-                .destinations(state)
-                .await
-                .unwrap();
+                .destinations()
+                .await;
 
             match target {
                 FlashTarget::Sd => {
                     println!("| {: <12} | {: <12} |", "Sd Card", "Size");
                     println!("|--------------|--------------|");
                     for d in dsts {
-                        println!(
-                            "| {: <12} | {: <12} |",
-                            d.path.to_string_lossy(),
-                            d.size.unwrap()
-                        )
+                        println!("| {: <12} | {: <12} |", d.path, d.size.unwrap())
                     }
                 }
                 FlashTarget::Bcf => {
@@ -95,7 +90,7 @@ async fn flash(
     let (tx, rx) = std::sync::mpsc::channel();
     let dst = match target {
         FlashTarget::Bcf => bb_imager::Destination::port(dst),
-        FlashTarget::Sd => bb_imager::Destination::from_path(PathBuf::from(dst)),
+        FlashTarget::Sd => bb_imager::Destination::from_path(dst),
     };
 
     if !quite {

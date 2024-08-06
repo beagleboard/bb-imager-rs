@@ -323,8 +323,8 @@ pub fn flash(
     }
 }
 
-pub fn possible_devices() -> Result<std::collections::HashSet<crate::Destination>> {
-    let ports = serialport::available_ports()
+pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+    serialport::available_ports()
         .unwrap()
         .into_iter()
         .filter(|x| match &x.port_type {
@@ -336,7 +336,5 @@ pub fn possible_devices() -> Result<std::collections::HashSet<crate::Destination
         })
         .map(|x| x.port_name)
         .map(crate::Destination::port)
-        .collect();
-
-    Ok(ports)
+        .collect()
 }
