@@ -133,7 +133,7 @@ async fn diskpart_clean(path: &str) -> crate::error::Result<()> {
     let mut cmd = Command::new("diskpart")
         .stderr(Stdio::null())
         .stdin(Stdio::piped())
-        // .stdout(Stdio::null())
+        .stdout(Stdio::null())
         .spawn()?;
 
     let mut stdin = cmd.stdin.take().unwrap();
