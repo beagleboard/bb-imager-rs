@@ -23,3 +23,6 @@ auto_link_exclude_list = [
 		"ld-linux*",
 		"libm.so*"
 ]
+
+[build-dependencies]
+embed-resource = "2.4"

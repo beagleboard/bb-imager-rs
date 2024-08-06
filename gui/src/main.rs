@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use futures_util::SinkExt;
