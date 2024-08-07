@@ -2,6 +2,7 @@
 
 use std::{path::PathBuf, time::Duration};
 use thiserror::Error;
+use tokio_serial::SerialPortBuilderExt;
 
 pub(crate) const BUF_SIZE: usize = 32 * 1024;
 
@@ -53,10 +54,10 @@ impl Destination {
         }
     }
 
-    pub fn open_port(&self) -> crate::error::Result<Box<dyn serialport::SerialPort>> {
-        serialport::new(&self.name, 500000)
+    pub fn open_port(&self) -> crate::error::Result<tokio_serial::SerialStream> {
+        tokio_serial::new(&self.name, 500000)
             .timeout(Duration::from_millis(500))
-            .open()
+            .open_native_async()
             .map_err(|_| {
                 Error::FailedToOpenDestination(format!("Failed to open serial port {}", self.name))
             })
@@ -124,9 +125,11 @@ pub async fn download_and_flash(
         }
         crate::config::Flasher::BeagleConnectFreedom => {
             let port = dst.open_port()?;
+            tracing::info!("Port opened");
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+            tracing::info!("Image opened");
 
-            tokio::task::block_in_place(move || crate::bcf::flash(img, port, &chan))
+            crate::bcf::flash(img, port, &chan).await
         }
     }
 }

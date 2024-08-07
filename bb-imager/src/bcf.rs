@@ -2,12 +2,13 @@
 
 use std::{
     io::{self, Read},
-    thread::sleep,
     time::Duration,
 };
 
 use crate::error::Result;
 use thiserror::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_serial::SerialPort;
 use tracing::{error, info, warn};
 
 const ACK: u8 = 0xcc;
@@ -63,26 +64,27 @@ impl From<u8> for Error {
 }
 
 struct BeagleConnectFreedom {
-    port: Box<dyn serialport::SerialPort>,
+    port: tokio_serial::SerialStream,
 }
 
 impl BeagleConnectFreedom {
-    fn new(port: Box<dyn serialport::SerialPort>) -> Result<Self> {
+    async fn new(port: tokio_serial::SerialStream) -> Result<Self> {
         let mut bcf = BeagleConnectFreedom { port };
 
         bcf.invoke_bootloader()
+            .await
             .map_err(|_| Error::FailedToStartBootloader)?;
-        bcf.send_sync()?;
+        bcf.send_sync().await?;
 
         Ok(bcf)
     }
 
-    fn wait_for_ack(&mut self) -> Result<(), Error> {
+    async fn wait_for_ack(&mut self) -> Result<(), Error> {
         let mut buf = [0u8; 1];
 
         while buf[0] == 0x00 {
-            self.port
-                .read_exact(&mut buf)
+            AsyncReadExt::read_exact(&mut self.port, &mut buf)
+                .await
                 .map_err(|_| Error::FailedToRead)?;
         }
 
@@ -93,28 +95,30 @@ impl BeagleConnectFreedom {
         }
     }
 
-    fn invoke_bootloader(&mut self) -> io::Result<()> {
-        let mut buf = [0u8; 100];
+    async fn invoke_bootloader(&mut self) -> io::Result<()> {
+        info!("Invoke Bootloader");
 
         let _ = self.port.set_break();
-        sleep(Duration::from_millis(250));
+        let _ = tokio::time::sleep(Duration::from_millis(250)).await;
         let _ = self.port.clear_break();
 
-        let _ = self.port.read(&mut buf);
-
-        sleep(Duration::from_millis(100));
+        let _ = tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(())
     }
 
-    fn send_sync(&mut self) -> Result<(), Error> {
+    async fn send_sync(&mut self) -> Result<(), Error> {
+        info!("Send Sync");
         const PKT: &[u8] = &[0x55, 0x55];
 
-        self.port.write_all(PKT).map_err(|_| Error::FailedToSend)?;
+        self.port
+            .write_all(PKT)
+            .await
+            .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()
+        self.wait_for_ack().await
     }
 
-    fn crc32(&mut self) -> Result<u32> {
+    async fn crc32(&mut self) -> Result<u32> {
         let addr = 0u32.to_be_bytes();
         let size = FIRMWARE_SIZE.to_be_bytes();
         let read_repeat = 0u32.to_be_bytes();
@@ -128,69 +132,88 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[15, checksum, COMMAND_CRC32])
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&addr)
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&size)
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&read_repeat)
+            .await
             .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()?;
+        self.wait_for_ack().await?;
 
-        self.port
-            .read_exact(&mut cmd)
+        AsyncReadExt::read_exact(&mut self.port, &mut cmd)
+            .await
             .map_err(|_| Error::FailedToRead)?;
         assert_eq!(cmd[0], 6);
 
         let checksum = cmd[1];
 
-        self.port
-            .read_exact(&mut cmd_data)
+        AsyncReadExt::read_exact(&mut self.port, &mut cmd_data)
+            .await
             .map_err(|_| Error::FailedToRead)?;
         assert_eq!(
             checksum,
             cmd_data.iter().fold(0u8, |acc, x| acc.wrapping_add(*x))
         );
 
-        self.send_ack()?;
+        self.send_ack().await?;
 
         Ok(u32::from_be_bytes(cmd_data))
     }
 
-    fn send_ack(&mut self) -> Result<(), Error> {
+    async fn send_ack(&mut self) -> Result<(), Error> {
         const PKT: &[u8] = &[0x00, ACK];
-        self.port.write_all(PKT).map_err(|_| Error::FailedToSend)
+        self.port
+            .write_all(PKT)
+            .await
+            .map_err(|_| Error::FailedToSend)
     }
 
-    fn send_bank_erase(&mut self) -> Result<(), Error> {
+    async fn send_bank_erase(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_BANK_ERASE, COMMAND_BANK_ERASE];
 
-        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
+        self.port
+            .write_all(CMD)
+            .await
+            .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()?;
-        self.get_status()
+        self.wait_for_ack().await?;
+        self.get_status().await
     }
 
-    fn get_status(&mut self) -> Result<(), Error> {
+    async fn get_status(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_GET_STATUS, COMMAND_GET_STATUS];
         let mut resp = [0u8; 1];
 
-        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
+        self.port
+            .write_all(CMD)
+            .await
+            .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()?;
+        self.wait_for_ack().await?;
 
         while resp[0] == 0x00 {
-            self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
+            AsyncReadExt::read(&mut self.port, &mut resp)
+                .await
+                .map_err(|_| Error::FailedToRead)?;
         }
 
-        self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
-        self.port.read(&mut resp).map_err(|_| Error::FailedToRead)?;
+        AsyncReadExt::read(&mut self.port, &mut resp)
+            .await
+            .map_err(|_| Error::FailedToRead)?;
+        AsyncReadExt::read(&mut self.port, &mut resp)
+            .await
+            .map_err(|_| Error::FailedToRead)?;
 
-        self.send_ack()?;
+        self.send_ack().await?;
 
         match resp[0] {
             0x40 => Ok(()),
@@ -198,7 +221,7 @@ impl BeagleConnectFreedom {
         }
     }
 
-    fn send_download(&mut self, addr: u32, size: u32) -> Result<(), Error> {
+    async fn send_download(&mut self, addr: u32, size: u32) -> Result<(), Error> {
         let addr = addr.to_be_bytes();
         let size = size.to_be_bytes();
 
@@ -210,19 +233,22 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[11, checksum, COMMAND_DOWNLOAD])
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&addr)
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&size)
+            .await
             .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()?;
-        self.get_status()
+        self.wait_for_ack().await?;
+        self.get_status().await
     }
 
-    fn send_data(&mut self, data: &[u8]) -> Result<usize> {
+    async fn send_data(&mut self, data: &[u8]) -> Result<usize> {
         let bytes_to_write = std::cmp::min(data.len(), usize::from(COMMAND_MAX_SIZE));
 
         let checksum = data[..bytes_to_write]
@@ -232,27 +258,32 @@ impl BeagleConnectFreedom {
 
         self.port
             .write_all(&[(bytes_to_write + 3) as u8, checksum, COMMAND_SEND_DATA])
+            .await
             .map_err(|_| Error::FailedToSend)?;
         self.port
             .write_all(&data[..bytes_to_write])
+            .await
             .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()?;
-        self.get_status()?;
+        self.wait_for_ack().await?;
+        self.get_status().await?;
 
         Ok(bytes_to_write)
     }
 
-    fn send_reset(&mut self) -> Result<(), Error> {
+    async fn send_reset(&mut self) -> Result<(), Error> {
         const CMD: &[u8] = &[3, COMMAND_RESET, COMMAND_RESET];
 
-        self.port.write_all(CMD).map_err(|_| Error::FailedToSend)?;
+        self.port
+            .write_all(CMD)
+            .await
+            .map_err(|_| Error::FailedToSend)?;
 
-        self.wait_for_ack()
+        self.wait_for_ack().await
     }
 
-    fn verify(&mut self, crc32: u32) -> Result<bool> {
-        self.crc32().map(|x| x == crc32)
+    async fn verify(&mut self, crc32: u32) -> Result<bool> {
+        self.crc32().await.map(|x| x == crc32)
     }
 }
 
@@ -266,12 +297,12 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-pub fn flash(
+pub async fn flash(
     mut img: crate::img::OsImage,
-    port: Box<dyn serialport::SerialPort>,
+    port: tokio_serial::SerialStream,
     chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<()> {
-    let mut bcf = BeagleConnectFreedom::new(port)?;
+    let mut bcf = BeagleConnectFreedom::new(port).await?;
     info!("BeagleConnectFreedom Connected");
 
     let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
@@ -283,13 +314,13 @@ pub fn flash(
 
     let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(0.0));
 
-    if bcf.verify(img_crc32)? {
+    if bcf.verify(img_crc32).await? {
         warn!("Skipping flashing same image");
         return Ok(());
     }
 
     info!("Erase Flash");
-    bcf.send_bank_erase()?;
+    bcf.send_bank_erase().await?;
 
     info!("Start Flashing");
 
@@ -303,18 +334,19 @@ pub fn flash(
         }
 
         if reset_download {
-            bcf.send_download(image_offset, FIRMWARE_SIZE - image_offset)?;
+            bcf.send_download(image_offset, FIRMWARE_SIZE - image_offset)
+                .await?;
             reset_download = false;
         }
 
-        image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
+        image_offset += bcf.send_data(&firmware[(image_offset as usize)..]).await? as u32;
         let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(progress(
             image_offset,
         )));
     }
 
     let _ = chan.send(crate::DownloadFlashingStatus::Verifying);
-    if bcf.verify(img_crc32)? {
+    if bcf.verify(img_crc32).await? {
         info!("Flashing Successful");
         Ok(())
     } else {
@@ -324,11 +356,11 @@ pub fn flash(
 }
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
-    serialport::available_ports()
+    tokio_serial::available_ports()
         .unwrap()
         .into_iter()
         .filter(|x| match &x.port_type {
-            serialport::SerialPortType::UsbPort(y) => {
+            tokio_serial::SerialPortType::UsbPort(y) => {
                 y.manufacturer.as_deref() == Some("BeagleBoard.org")
                     && y.product.as_deref() == Some("BeagleConnect")
             }
