@@ -54,6 +54,7 @@ struct BBImager {
     search_bar: String,
     progress_bar: ProgressBarState,
     flashing: bool,
+    cancel_flashing: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 #[derive(Default, Debug)]
@@ -74,6 +75,7 @@ enum BBImagerMessage {
     Reset,
 
     StartFlashing,
+    CancelFlashing,
     StopFlashing(ProgressBarState),
 
     BoardImageDownloaded { index: usize, path: PathBuf },
@@ -258,6 +260,11 @@ impl Application for BBImager {
             BBImagerMessage::OsListImageDownloaded { index, path } => {
                 self.config.os_list[index].icon_local = Some(path);
             }
+            BBImagerMessage::CancelFlashing => {
+                if let Some(tx) = self.cancel_flashing.take() {
+                    let _ = tx.send(());
+                }
+            }
             BBImagerMessage::StartFlashing => {
                 self.flashing = true;
 
@@ -269,6 +276,9 @@ impl Application for BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().unwrap();
                 let downloader = self.downloader.clone();
+                let (tx, cancel_rx) = tokio::sync::oneshot::channel();
+
+                self.cancel_flashing = Some(tx);
 
                 return iced::command::channel(20, move |mut chan| async move {
                     let _ = chan
@@ -281,79 +291,91 @@ impl Application for BBImager {
 
                     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
-                    let task = tokio::spawn(async move {
-                        bb_imager::common::download_and_flash(
-                            img, dst, flasher, downloader, tx, true,
-                        )
-                        .await
+                    let flash_task = tokio::spawn(bb_imager::common::download_and_flash(
+                        img, dst, flasher, downloader, tx, true,
+                    ));
+
+                    let mut chan_clone = chan.clone();
+                    let chan_task = tokio::spawn(async move {
+                        while let Some(progress) = rx.recv().await {
+                            let message = match progress {
+                                bb_imager::DownloadFlashingStatus::Preparing => {
+                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                        "Preparing...",
+                                        0.5,
+                                        ProgressBarStatus::Loading,
+                                    ))
+                                }
+                                bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
+                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                        format!(
+                                            "Downloading Image... {}%",
+                                            (p * 100.0).round() as usize
+                                        ),
+                                        p,
+                                        ProgressBarStatus::Normal,
+                                    ))
+                                }
+                                bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
+                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                        format!("Flashing... {}%", (p * 100.0).round() as usize),
+                                        p,
+                                        ProgressBarStatus::Normal,
+                                    ))
+                                }
+                                bb_imager::DownloadFlashingStatus::Verifying => {
+                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                        "Verifying...",
+                                        0.5,
+                                        ProgressBarStatus::Loading,
+                                    ))
+                                }
+                                bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
+                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                        format!("Verifying... {}%", (p * 100.0).round() as usize),
+                                        p,
+                                        ProgressBarStatus::Normal,
+                                    ))
+                                }
+                                bb_imager::DownloadFlashingStatus::Finished => {
+                                    BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                        "Flashing Successful...",
+                                        1.0,
+                                        ProgressBarStatus::Success,
+                                    ))
+                                }
+                            };
+
+                            let _ = chan_clone.try_send(message);
+                        }
                     });
 
-                    while let Some(progress) = rx.recv().await {
-                        let message = match progress {
-                            bb_imager::DownloadFlashingStatus::Preparing => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    "Preparing...",
-                                    0.5,
-                                    ProgressBarStatus::Loading,
-                                ))
-                            }
-                            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    format!(
-                                        "Downloading Image... {}%",
-                                        (p * 100.0).round() as usize
-                                    ),
-                                    p,
-                                    ProgressBarStatus::Normal,
-                                ))
-                            }
-                            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    format!("Flashing... {}%", (p * 100.0).round() as usize),
-                                    p,
-                                    ProgressBarStatus::Normal,
-                                ))
-                            }
-                            bb_imager::DownloadFlashingStatus::Verifying => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    "Verifying...",
-                                    0.5,
-                                    ProgressBarStatus::Loading,
-                                ))
-                            }
-                            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
-                                BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                    format!("Verifying... {}%", (p * 100.0).round() as usize),
-                                    p,
-                                    ProgressBarStatus::Normal,
-                                ))
-                            }
-                            bb_imager::DownloadFlashingStatus::Finished => {
-                                BBImagerMessage::StopFlashing(ProgressBarState::new(
+                    tokio::select! {
+                        _ = cancel_rx => {
+                            flash_task.abort();
+                            let _ = chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                "Flashing Cancelled by User",
+                                1.0,
+                                ProgressBarStatus::Fail,
+                            ))).await;
+                        },
+                        _ = chan_task => {
+                            let res = flash_task.await.unwrap();
+                            let _ = match res {
+                                Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
                                     "Flashing Successful...",
                                     1.0,
                                     ProgressBarStatus::Success,
-                                ))
+                                ))),
+                                Err(e) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                    format!("Flashing Failed... {e}"),
+                                    1.0,
+                                    ProgressBarStatus::Fail,
+                                ))),
                             }
-                        };
-
-                        let _ = chan.try_send(message);
-                    }
-
-                    let res = task.await.unwrap();
-                    let _ = match res {
-                        Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
-                            "Flashing Successful...",
-                            1.0,
-                            ProgressBarStatus::Success,
-                        ))),
-                        Err(e) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
-                            format!("Flashing Failed... {e}"),
-                            1.0,
-                            ProgressBarStatus::Fail,
-                        ))),
-                    }
-                    .await;
+                            .await;
+                        }
+                    };
                 });
             }
             BBImagerMessage::StopFlashing(x) => {
@@ -448,16 +470,20 @@ impl BBImager {
                     Some(BBImagerMessage::Reset)
                 });
 
-        let write_btn = button("WRITE").padding(HOME_BTN_PADDING).on_press_maybe(
-            if self.selected_board.is_none()
-                || self.selected_image.is_none()
-                || self.selected_dst.is_none()
-            {
-                None
-            } else {
-                Some(BBImagerMessage::StartFlashing)
-            },
-        );
+        let write_btn = button(if self.flashing { "CANCEL" } else { "WRITE" })
+            .padding(HOME_BTN_PADDING)
+            .on_press_maybe(
+                if self.selected_board.is_none()
+                    || self.selected_image.is_none()
+                    || self.selected_dst.is_none()
+                {
+                    None
+                } else if self.flashing {
+                    Some(BBImagerMessage::CancelFlashing)
+                } else {
+                    Some(BBImagerMessage::StartFlashing)
+                },
+            );
 
         let choice_btn_row = widget::row![
             widget::column![text("Board"), choose_device_btn]
