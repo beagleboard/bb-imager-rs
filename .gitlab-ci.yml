@@ -1,12 +1,13 @@
-image: "rust:latest"
-
 stages:
   - test
   - build
   - deploy
 
 test:
+  image: "rust:latest"
   stage: test
+  tags:
+    - docker-amd64
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends libudev-dev
   script:
@@ -14,6 +15,9 @@ test:
     - cargo test --workspace --verbose
 
 appimage:
+  image: "rust:latest"
+  tags:
+    - docker-amd64
   stage: build
   before_script:
     - cargo install cargo-appimage
@@ -30,6 +34,9 @@ appimage:
 
 
 windows:
+  image: "rust:latest"
+  tags:
+    - docker-amd64
   stage: build
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc-mingw-w64
@@ -40,3 +47,19 @@ windows:
   artifacts:
     paths:
       - target/x86_64-pc-windows-gnu/release/*.exe
+
+macos:
+  image: macos-14-xcode-15
+  stage: build
+  tags:
+    - macos
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  script:
+    - rustc --version
+    - cargo build --package gui --target aarch64-apple-darwin --release
+    - cargo build --package cli --target aarch64-apple-darwin --release
+  artifacts:
+    paths:
+      - target/aarch64-apple-darwin/release/gui
+      - target/aarch64-apple-darwin/release/cli
