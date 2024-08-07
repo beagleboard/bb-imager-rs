@@ -10,7 +10,7 @@ pub enum Error {
 }
 
 impl crate::common::Destination {
-    pub async fn open(&self) -> crate::error::Result<std::fs::File> {
+    pub async fn open(&self) -> crate::error::Result<tokio::fs::File> {
         use std::{
             collections::HashMap,
             os::fd::{FromRawFd, IntoRawFd},
@@ -44,6 +44,6 @@ impl crate::common::Destination {
             .await
             .map_err(Error::from)?;
 
-        Ok(unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
+        Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
     }
 }

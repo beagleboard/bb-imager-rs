@@ -1,10 +1,11 @@
 //! Provide functionality to flash images to sd card
 
-use std::io::{Read, Seek, Write};
+use std::io::Read;
 
 use crate::DownloadFlashingStatus;
 use crate::{error::Result, BUF_SIZE};
 use thiserror::Error;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -40,7 +41,7 @@ fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> 
     }
 }
 
-pub(crate) fn flash<W: Write + Seek + Read>(
+pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin>(
     mut img: crate::img::OsImage,
     mut sd: W,
     chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
@@ -65,15 +66,15 @@ pub(crate) fn flash<W: Write + Seek + Read>(
             pos as f32 / size as f32,
         ));
 
-        sd.write_all(&buf[..count])?;
+        sd.write_all(&buf[..count]).await?;
     }
 
     if verify {
         let sha256 = img.sha256();
         let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-        sd.seek(std::io::SeekFrom::Start(0))?;
-        let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan)?;
+        sd.seek(std::io::SeekFrom::Start(0)).await?;
+        let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan).await?;
 
         if hash != sha256 {
             return Err(Error::Sha256VerificationError.into());

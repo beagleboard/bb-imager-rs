@@ -64,12 +64,12 @@ impl Downloader {
         Self { client, dirs }
     }
 
-    pub fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub async fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let x = sha256_file(&file_path).ok()?;
+            let x = sha256_file(&file_path).await.ok()?;
             if x == sha256 {
                 return Some(file_path);
             }
@@ -96,7 +96,7 @@ impl Downloader {
         if file_path.exists() {
             let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
-            let hash = tokio::task::block_in_place(|| sha256_file_progress(&file_path, chan))?;
+            let hash = sha256_file_progress(&file_path, chan).await?;
             if hash == sha256 {
                 return Ok(file_path);
             }
@@ -151,10 +151,10 @@ impl Downloader {
     }
 }
 
-fn sha256_file(path: &Path) -> Result<[u8; 32]> {
+async fn sha256_file(path: &Path) -> Result<[u8; 32]> {
     let (tx, _) = std::sync::mpsc::channel();
 
-    sha256_file_progress(path, &tx)
+    sha256_file_progress(path, &tx).await
 }
 
 async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {

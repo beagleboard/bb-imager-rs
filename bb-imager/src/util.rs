@@ -1,21 +1,21 @@
 //! Helper functions
 
 use crate::{error::Result, BUF_SIZE};
-use std::{io::Read, path::Path};
+use std::path::Path;
 
 use sha2::{Digest, Sha256};
 
-pub(crate) fn sha256_file_progress(
+pub(crate) async fn sha256_file_progress(
     path: &Path,
     chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<[u8; 32]> {
-    let file = std::fs::File::open(path)?;
-    let file_len = file.metadata()?.len();
+    let file = tokio::fs::File::open(path).await?;
+    let file_len = file.metadata().await?.len();
 
-    sha256_reader_progress(file, file_len, chan)
+    sha256_reader_progress(file, file_len, chan).await
 }
 
-pub(crate) fn sha256_reader_progress<R: Read>(
+pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
     mut reader: R,
     size: u64,
     chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
@@ -25,7 +25,7 @@ pub(crate) fn sha256_reader_progress<R: Read>(
     let mut pos = 0;
 
     loop {
-        let count = reader.read(&mut buffer)?;
+        let count = reader.read(&mut buffer).await?;
         pos += count;
 
         let _ = chan.send(crate::DownloadFlashingStatus::VerifyingProgress(

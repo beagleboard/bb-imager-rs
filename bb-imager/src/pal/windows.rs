@@ -1,16 +1,21 @@
-use std::fs::{File, OpenOptions};
-use std::io::SeekFrom;
-use std::os::windows::fs::OpenOptionsExt;
-use std::os::windows::io::AsRawHandle;
-use std::process::Stdio;
-use thiserror::Error;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
-use windows::Win32::Foundation::HANDLE;
-use windows::Win32::System::Ioctl::{
-    FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME, FSCTL_UNLOCK_VOLUME,
+use std::{
+    io::SeekFrom,
+    os::windows::io::AsRawHandle,
+    pin::Pin,
+    process::Stdio,
+    task::{Context, Poll},
 };
-use windows::Win32::System::IO::DeviceIoControl;
+use thiserror::Error;
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{AsyncWriteExt, ReadBuf},
+    process::Command,
+};
+use windows::Win32::{
+    Foundation::HANDLE,
+    System::Ioctl::{FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME, FSCTL_UNLOCK_VOLUME},
+    System::IO::DeviceIoControl,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -31,17 +36,18 @@ impl WinDrive {
     pub(crate) async fn open(path: &str) -> crate::error::Result<Self> {
         let vol_path = physical_drive_to_volume(path)?;
         tracing::info!("Trying to open {vol_path}");
-        let volume = open_and_lock_volume(&vol_path)?;
+        let volume = open_and_lock_volume(&vol_path).await?;
 
         tracing::info!("Trying to clean {path}");
         diskpart_clean(path).await?;
 
         tracing::info!("Trying to open {path}");
-        let drive = std::fs::OpenOptions::new()
+        let drive = OpenOptions::new()
             .read(true)
             .write(true)
             .custom_flags(0x20000000)
-            .open(path)?;
+            .open(path)
+            .await?;
 
         Ok(Self { drive, volume })
     }
@@ -70,8 +76,8 @@ impl crate::common::Destination {
     }
 }
 
-fn open_and_lock_volume(path: &str) -> crate::error::Result<File> {
-    let volume = OpenOptions::new().read(true).write(true).open(path)?;
+async fn open_and_lock_volume(path: &str) -> crate::error::Result<File> {
+    let volume = OpenOptions::new().read(true).write(true).open(path).await?;
 
     unsafe {
         DeviceIoControl(
@@ -145,24 +151,62 @@ async fn diskpart_clean(path: &str) -> crate::error::Result<()> {
     Ok(())
 }
 
-impl std::io::Read for WinDrive {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.drive.read(buf)
+impl tokio::io::AsyncRead for WinDrive {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.drive).poll_read(cx, buf)
     }
 }
 
-impl std::io::Write for WinDrive {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.drive.write(buf)
+impl tokio::io::AsyncWrite for WinDrive {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        Pin::new(&mut self.drive).poll_write(cx, buf)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.drive.flush()
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.drive).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.drive).poll_shutdown(cx)
     }
 }
 
-impl std::io::Seek for WinDrive {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        self.drive.seek(pos)
+impl tokio::io::AsyncSeek for WinDrive {
+    fn start_seek(mut self: Pin<&mut Self>, position: SeekFrom) -> std::io::Result<()> {
+        Pin::new(&mut self.drive).start_seek(position)
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
+        Pin::new(&mut self.drive).poll_complete(cx)
     }
 }
+
+// impl std::io::Read for WinDrive {
+//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+//         self.drive.read(buf)
+//     }
+// }
+//
+// impl std::io::Write for WinDrive {
+//     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+//         self.drive.write(buf)
+//     }
+//
+//     fn flush(&mut self) -> std::io::Result<()> {
+//         self.drive.flush()
+//     }
+// }
+//
+// impl std::io::Seek for WinDrive {
+//     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+//         self.drive.seek(pos)
+//     }
+// }

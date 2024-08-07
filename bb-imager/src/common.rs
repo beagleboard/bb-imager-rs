@@ -121,7 +121,7 @@ pub async fn download_and_flash(
             let port = dst.open().await?;
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-            tokio::task::block_in_place(move || crate::sd::flash(img, port, &chan, verify))
+            crate::sd::flash(img, port, &chan, verify).await
         }
         crate::config::Flasher::BeagleConnectFreedom => {
             let port = dst.open_port()?;

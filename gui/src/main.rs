@@ -148,17 +148,10 @@ impl Application for BBImager {
             let icon = v.icon.clone();
             let sha = v.icon_sha256;
 
-            Command::perform(
-                async move {
-                    tokio::task::spawn_blocking(move || downloader_clone.check_cache(icon, sha))
-                        .await
-                        .unwrap()
-                },
-                move |p| match p {
-                    Some(path) => BBImagerMessage::OsListImageDownloaded { index, path },
-                    None => BBImagerMessage::Null,
-                },
-            )
+            Command::perform(downloader_clone.check_cache(icon, sha), move |p| match p {
+                Some(path) => BBImagerMessage::OsListImageDownloaded { index, path },
+                None => BBImagerMessage::Null,
+            })
         });
 
         (
