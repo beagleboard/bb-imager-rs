@@ -79,7 +79,7 @@ impl Downloader {
     }
 
     pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
-        let (tx, _) = std::sync::mpsc::channel();
+        let (tx, _) = tokio::sync::mpsc::channel(1);
 
         self.download_progress(url, sha256, &tx).await
     }
@@ -88,13 +88,13 @@ impl Downloader {
         &self,
         url: url::Url,
         sha256: [u8; 32],
-        chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
+        chan: &tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     ) -> Result<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
+            let _ = chan.try_send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
             let hash = sha256_file_progress(&file_path, chan).await?;
             if hash == sha256 {
@@ -104,7 +104,7 @@ impl Downloader {
             // Delete old file
             let _ = tokio::fs::remove_file(&file_path).await;
         }
-        let _ = chan.send(DownloadFlashingStatus::DownloadingProgress(0.0));
+        let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(0.0));
 
         let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
         let response = self.client.get(url).send().await.map_err(Error::from)?;
@@ -127,7 +127,7 @@ impl Downloader {
             hasher.update(&data);
             file.write_all_buf(&mut data).await?;
 
-            let _ = chan.send(DownloadFlashingStatus::DownloadingProgress(
+            let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(
                 (cur_pos as f32) / (response_size as f32),
             ));
         }
@@ -138,7 +138,7 @@ impl Downloader {
             .try_into()
             .expect("SHA-256 is 32 bytes");
 
-        let _ = chan.send(DownloadFlashingStatus::Verifying);
+        let _ = chan.try_send(DownloadFlashingStatus::Verifying);
 
         if hash != sha256 {
             tracing::warn!("{hash:?} != {sha256:?}");
@@ -152,7 +152,7 @@ impl Downloader {
 }
 
 async fn sha256_file(path: &Path) -> Result<[u8; 32]> {
-    let (tx, _) = std::sync::mpsc::channel();
+    let (tx, _) = tokio::sync::mpsc::channel(1);
 
     sha256_file_progress(path, &tx).await
 }

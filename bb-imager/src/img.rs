@@ -34,7 +34,7 @@ impl OsImage {
     pub async fn from_selected_image(
         img: crate::SelectedImage,
         downloader: &crate::download::Downloader,
-        chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+        chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
     ) -> Result<Self> {
         match img {
             crate::SelectedImage::Local(x) => {

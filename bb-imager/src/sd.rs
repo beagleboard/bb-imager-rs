@@ -44,7 +44,7 @@ fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> 
 pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin>(
     mut img: crate::img::OsImage,
     mut sd: W,
-    chan: &std::sync::mpsc::Sender<DownloadFlashingStatus>,
+    chan: &tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     verify: bool,
 ) -> Result<()> {
     let size = img.size();
@@ -52,7 +52,7 @@ pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin
     let mut buf = [0u8; BUF_SIZE];
     let mut pos = 0;
 
-    let _ = chan.send(DownloadFlashingStatus::FlashingProgress(0.0));
+    let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(0.0));
 
     loop {
         let count = read_aligned(&mut img, &mut buf)?;
@@ -62,7 +62,7 @@ pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin
 
         pos += count;
 
-        let _ = chan.send(DownloadFlashingStatus::FlashingProgress(
+        let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(
             pos as f32 / size as f32,
         ));
 
@@ -71,7 +71,7 @@ pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin
 
     if verify {
         let sha256 = img.sha256();
-        let _ = chan.send(DownloadFlashingStatus::VerifyingProgress(0.0));
+        let _ = chan.try_send(DownloadFlashingStatus::VerifyingProgress(0.0));
 
         sd.seek(std::io::SeekFrom::Start(0)).await?;
         let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan).await?;

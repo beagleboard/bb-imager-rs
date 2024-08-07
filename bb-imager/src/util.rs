@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 
 pub(crate) async fn sha256_file_progress(
     path: &Path,
-    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<[u8; 32]> {
     let file = tokio::fs::File::open(path).await?;
     let file_len = file.metadata().await?.len();
@@ -18,7 +18,7 @@ pub(crate) async fn sha256_file_progress(
 pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
     mut reader: R,
     size: u64,
-    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<[u8; 32]> {
     let mut hasher = Sha256::new();
     let mut buffer = [0; BUF_SIZE];
@@ -28,7 +28,7 @@ pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
         let count = reader.read(&mut buffer).await?;
         pos += count;
 
-        let _ = chan.send(crate::DownloadFlashingStatus::VerifyingProgress(
+        let _ = chan.try_send(crate::DownloadFlashingStatus::VerifyingProgress(
             pos as f32 / size as f32,
         ));
 

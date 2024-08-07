@@ -110,11 +110,11 @@ pub async fn download_and_flash(
     dst: Destination,
     flasher: crate::config::Flasher,
     downloader: crate::download::Downloader,
-    chan: std::sync::mpsc::Sender<DownloadFlashingStatus>,
+    chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     verify: bool,
 ) -> crate::error::Result<()> {
     tracing::info!("Preparing...");
-    let _ = chan.send(DownloadFlashingStatus::Preparing);
+    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
 
     match flasher {
         crate::config::Flasher::SdCard => {

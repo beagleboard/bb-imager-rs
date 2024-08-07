@@ -279,7 +279,7 @@ impl Application for BBImager {
                         )))
                         .await;
 
-                    let (tx, rx) = std::sync::mpsc::channel();
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
                     let task = tokio::spawn(async move {
                         bb_imager::common::download_and_flash(
@@ -288,63 +288,59 @@ impl Application for BBImager {
                         .await
                     });
 
-                    let mut chan_clone = chan.clone();
-                    tokio::task::spawn_blocking(move || {
-                        while let Ok(progress) = rx.recv() {
-                            let message = match progress {
-                                bb_imager::DownloadFlashingStatus::Preparing => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        "Preparing...",
-                                        0.5,
-                                        ProgressBarStatus::Loading,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!(
-                                            "Downloading Image... {}%",
-                                            (p * 100.0).round() as usize
-                                        ),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!("Flashing... {}%", (p * 100.0).round() as usize),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::Verifying => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        "Verifying...",
-                                        0.5,
-                                        ProgressBarStatus::Loading,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!("Verifying... {}%", (p * 100.0).round() as usize),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::Finished => {
-                                    BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                        "Flashing Successful...",
-                                        1.0,
-                                        ProgressBarStatus::Success,
-                                    ))
-                                }
-                            };
+                    while let Some(progress) = rx.recv().await {
+                        let message = match progress {
+                            bb_imager::DownloadFlashingStatus::Preparing => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Preparing...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!(
+                                        "Downloading Image... {}%",
+                                        (p * 100.0).round() as usize
+                                    ),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Flashing... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::Verifying => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    "Verifying...",
+                                    0.5,
+                                    ProgressBarStatus::Loading,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
+                                BBImagerMessage::ProgressBar(ProgressBarState::new(
+                                    format!("Verifying... {}%", (p * 100.0).round() as usize),
+                                    p,
+                                    ProgressBarStatus::Normal,
+                                ))
+                            }
+                            bb_imager::DownloadFlashingStatus::Finished => {
+                                BBImagerMessage::StopFlashing(ProgressBarState::new(
+                                    "Flashing Successful...",
+                                    1.0,
+                                    ProgressBarStatus::Success,
+                                ))
+                            }
+                        };
 
-                            let _ = chan_clone.try_send(message);
-                        }
-                    });
+                        let _ = chan.try_send(message);
+                    }
 
                     let res = task.await.unwrap();
-
                     let _ = match res {
                         Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
                             "Flashing Successful...",

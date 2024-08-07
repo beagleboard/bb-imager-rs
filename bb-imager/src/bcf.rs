@@ -300,7 +300,7 @@ fn progress(off: u32) -> f32 {
 pub async fn flash(
     mut img: crate::img::OsImage,
     port: tokio_serial::SerialStream,
-    chan: &std::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<()> {
     let mut bcf = BeagleConnectFreedom::new(port).await?;
     info!("BeagleConnectFreedom Connected");
@@ -312,7 +312,7 @@ pub async fn flash(
     assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
     let img_crc32 = crc32fast::hash(firmware.as_slice());
 
-    let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(0.0));
+    let _ = chan.try_send(crate::DownloadFlashingStatus::FlashingProgress(0.0));
 
     if bcf.verify(img_crc32).await? {
         warn!("Skipping flashing same image");
@@ -340,12 +340,12 @@ pub async fn flash(
         }
 
         image_offset += bcf.send_data(&firmware[(image_offset as usize)..]).await? as u32;
-        let _ = chan.send(crate::DownloadFlashingStatus::FlashingProgress(progress(
+        let _ = chan.try_send(crate::DownloadFlashingStatus::FlashingProgress(progress(
             image_offset,
         )));
     }
 
-    let _ = chan.send(crate::DownloadFlashingStatus::Verifying);
+    let _ = chan.try_send(crate::DownloadFlashingStatus::Verifying);
     if bcf.verify(img_crc32).await? {
         info!("Flashing Successful");
         Ok(())

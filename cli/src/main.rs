@@ -78,19 +78,19 @@ async fn main() {
 
 async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, verify: bool) {
     let downloader = bb_imager::download::Downloader::new();
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(20);
     let dst = match target {
         FlashTarget::Bcf => bb_imager::Destination::port(dst),
         FlashTarget::Sd => bb_imager::Destination::from_path(dst),
     };
 
     if !quite {
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn(async move {
             let bars = indicatif::MultiProgress::new();
             static FLASHING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
             static VERIFYING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
 
-            while let Ok(progress) = rx.recv() {
+            while let Some(progress) = rx.recv().await {
                 match progress {
                     DownloadFlashingStatus::Preparing => {
                         static PREPARING: Once = Once::new();
