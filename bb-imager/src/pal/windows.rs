@@ -188,25 +188,3 @@ impl tokio::io::AsyncSeek for WinDrive {
         Pin::new(&mut self.drive).poll_complete(cx)
     }
 }
-
-// impl std::io::Read for WinDrive {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         self.drive.read(buf)
-//     }
-// }
-//
-// impl std::io::Write for WinDrive {
-//     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-//         self.drive.write(buf)
-//     }
-//
-//     fn flush(&mut self) -> std::io::Result<()> {
-//         self.drive.flush()
-//     }
-// }
-//
-// impl std::io::Seek for WinDrive {
-//     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-//         self.drive.seek(pos)
-//     }
-// }
