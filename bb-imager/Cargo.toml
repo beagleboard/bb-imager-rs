@@ -22,7 +22,7 @@ tracing = "0.1.40"
 url = { version = "2.5.2", features = ["serde"] }
 zip = "2.1.5"
 futures-util = "0.3.30"
-rs-drivelist = { git = "https://github.com/Ayush1325/rs-drivelist.git", branch = "macos" }
+rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { git = "https://github.com/FineFindus/udisks-rs.git" }

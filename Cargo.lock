@@ -4042,7 +4042,7 @@ checksum = "3cd14fd5e3b777a7422cca79358c57a8f6e3a703d9ac187448d0daf220c2407f"
 [[package]]
 name = "rs-drivelist"
 version = "0.9.4"
-source = "git+https://github.com/Ayush1325/rs-drivelist.git?branch=macos#5f84ceb67dd97315a6ed40365f19dd0bcf820474"
+source = "git+https://github.com/ir1keren/rs-drivelist.git#02a353f5f7caea88e9a13243aa95ec76bb5e59a8"
 dependencies = [
  "anyhow",
  "derivative",
