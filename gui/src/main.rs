@@ -25,7 +25,7 @@ fn main() -> iced::Result {
 
     let icon = iced::window::icon::from_file_data(WINDOW_ICON, None).ok();
 
-    assert!(icon.is_some());
+    // assert!(icon.is_some());
 
     let config = bb_imager::config::Config::from_json(CONFIG).expect("Failed to parse config");
 

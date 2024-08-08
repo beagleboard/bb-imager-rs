@@ -98,6 +98,6 @@ pub fn destinations() -> std::collections::HashSet<crate::Destination> {
         .into_iter()
         .filter(|x| x.isRemovable)
         .filter(|x| !x.isVirtual)
-        .map(|x| crate::Destination::sd_card(x.description, x.size, x.device))
+        .map(|x| crate::Destination::sd_card(x.description, x.size, x.raw))
         .collect()
 }

@@ -32,7 +32,6 @@ appimage:
     paths:
       - target/appimage/gui.AppImage
 
-
 windows:
   image: "rust:latest"
   tags:
@@ -55,6 +54,7 @@ macos:
     - macos
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source "$HOME/.cargo/env"
   script:
     - rustc --version
     - cargo build --package gui --target aarch64-apple-darwin --release
