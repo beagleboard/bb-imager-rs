@@ -6,7 +6,10 @@ use semver::Version;
 use serde::Deserialize;
 use url::Url;
 
-use crate::Destination;
+use crate::{
+    flasher::{bcf, sd},
+    Destination,
+};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
@@ -76,10 +79,8 @@ impl Config {
 impl Flasher {
     pub async fn destinations(&self) -> HashSet<Destination> {
         match self {
-            Flasher::SdCard => tokio::task::block_in_place(crate::sd::destinations),
-            Flasher::BeagleConnectFreedom => {
-                tokio::task::block_in_place(crate::bcf::possible_devices)
-            }
+            Flasher::SdCard => tokio::task::block_in_place(sd::destinations),
+            Flasher::BeagleConnectFreedom => tokio::task::block_in_place(bcf::possible_devices),
         }
     }
 

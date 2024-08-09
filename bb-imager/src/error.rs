@@ -2,12 +2,14 @@
 
 use thiserror::Error;
 
+use crate::flasher::{bcf, sd};
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("BeagleConnect Freedom Error: {0}")]
-    BeagleConnectFreedomError(#[from] crate::bcf::Error),
+    BeagleConnectFreedomError(#[from] bcf::Error),
     #[error("Download Error: {0}")]
     DownloadError(#[from] crate::download::Error),
     #[error("Io Error: {0}")]
@@ -15,7 +17,7 @@ pub enum Error {
     #[error("Image Error: {0}")]
     ImageError(#[from] crate::img::Error),
     #[error("Sd Card Error: {0}")]
-    SdCardError(#[from] crate::sd::Error),
+    SdCardError(#[from] sd::Error),
     #[error("{0}")]
     CommanError(#[from] crate::common::Error),
     #[cfg(windows)]

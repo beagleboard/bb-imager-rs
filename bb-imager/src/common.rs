@@ -4,6 +4,8 @@ use std::{path::PathBuf, time::Duration};
 use thiserror::Error;
 use tokio_serial::SerialPortBuilderExt;
 
+use crate::flasher::{bcf, sd};
+
 pub(crate) const BUF_SIZE: usize = 32 * 1024;
 
 #[derive(Error, Debug)]
@@ -121,7 +123,7 @@ pub async fn download_and_flash(
             let port = dst.open().await?;
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-            crate::sd::flash(img, port, &chan, verify).await
+            sd::flash(img, port, &chan, verify).await
         }
         crate::config::Flasher::BeagleConnectFreedom => {
             let port = dst.open_port()?;
@@ -129,7 +131,7 @@ pub async fn download_and_flash(
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
             tracing::info!("Image opened");
 
-            crate::bcf::flash(img, port, &chan).await
+            bcf::flash(img, port, &chan).await
         }
     }
 }
