@@ -161,13 +161,15 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
         });
     }
 
+    let config = bb_imager::FlashingConfig { verify };
+
     bb_imager::download_and_flash(
         bb_imager::SelectedImage::local(img),
         dst,
         target.into(),
         downloader,
         tx,
-        verify,
+        config,
     )
     .await
     .unwrap();
