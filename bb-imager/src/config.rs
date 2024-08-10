@@ -87,7 +87,7 @@ impl Flasher {
     pub fn file_filter(&self) -> (&'static str, &'static [&'static str]) {
         match self {
             Flasher::SdCard => ("image", &["img", "xz"]),
-            Flasher::BeagleConnectFreedom => ("firmware", &["bin", "zip"]),
+            Flasher::BeagleConnectFreedom => ("firmware", &["bin", "xz"]),
         }
     }
 }

@@ -107,6 +107,17 @@ impl std::fmt::Display for SelectedImage {
     }
 }
 
+impl From<&crate::config::OsList> for SelectedImage {
+    fn from(value: &crate::config::OsList) -> Self {
+        Self::remote(
+            value.name.clone(),
+            value.url.clone(),
+            value.extract_sha256,
+            value.extract_path.clone(),
+        )
+    }
+}
+
 pub async fn download_and_flash(
     img: SelectedImage,
     dst: Destination,

@@ -65,7 +65,8 @@ struct Flags {
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
     BoardSelected(Box<bb_imager::config::Device>),
-    SelectImage(Option<Box<bb_imager::config::OsList>>),
+    SelectImage(bb_imager::SelectedImage),
+    SelectLocalImage,
     SelectPort(bb_imager::Destination),
     ProgressBar(ProgressBarState),
     SwitchScreen(Screen),
@@ -209,25 +210,25 @@ impl Application for BBImager {
             }
             BBImagerMessage::ProgressBar(s) => self.progress_bar = s,
             BBImagerMessage::SelectImage(x) => {
-                self.selected_image = match x {
-                    Some(y) => Some(bb_imager::common::SelectedImage::remote(
-                        y.name,
-                        y.url,
-                        y.extract_sha256,
-                        y.extract_path,
-                    )),
-                    None => {
-                        let (name, extensions) =
-                            self.selected_board.as_ref().unwrap().flasher.file_filter();
-                        rfd::FileDialog::new()
+                self.selected_image = Some(x);
+                self.back_home();
+            }
+            BBImagerMessage::SelectLocalImage => {
+                let (name, extensions) =
+                    self.selected_board.as_ref().unwrap().flasher.file_filter();
+                return Command::perform(
+                    async move {
+                        rfd::AsyncFileDialog::new()
                             .add_filter(name, extensions)
                             .pick_file()
-                            .map(bb_imager::common::SelectedImage::local)
-                    }
-                };
-                if self.selected_image.is_some() {
-                    self.back_home();
-                }
+                            .await
+                            .map(|x| x.path().to_path_buf())
+                    },
+                    |x| match x {
+                        Some(y) => BBImagerMessage::SelectImage(bb_imager::SelectedImage::local(y)),
+                        None => BBImagerMessage::Null,
+                    },
+                );
             }
             BBImagerMessage::SelectPort(x) => {
                 self.selected_dst = Some(x);
@@ -607,7 +608,9 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectImage(Some(Box::new(x.clone()))))
+                .on_press(BBImagerMessage::SelectImage(
+                    bb_imager::SelectedImage::from(x),
+                ))
                 .style(theme::Button::Secondary)
             })
             .chain(std::iter::once(
@@ -619,7 +622,7 @@ impl BBImager {
                     .spacing(10),
                 )
                 .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectImage(None))
+                .on_press(BBImagerMessage::SelectLocalImage)
                 .style(theme::Button::Secondary),
             ))
             .map(Into::into);
