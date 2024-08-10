@@ -52,5 +52,6 @@ fn open_auth(path: String) -> crate::error::Result<File> {
     tracing::info!("Raw output: {output:#?}");
     tracing::info!("String output: {}", String::from_utf8_lossy(&output.stdout));
 
-    todo!()
+    let fd = i32::from_ne_bytes(output.stdout.try_into().unwrap());
+    Ok(unsafe { tokio::fs::File::from_raw_fd(fd) })
 }
