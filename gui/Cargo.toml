@@ -15,6 +15,7 @@ image = "0.25.2"
 futures-util = "0.3.30"
 tokio = { version = "1.39.2", default-features = false, features = ["macros"] }
 webbrowser = "1.0.1"
+notify-rust = "4.11.1"
 
 [package.metadata.appimage]
 auto_link = true

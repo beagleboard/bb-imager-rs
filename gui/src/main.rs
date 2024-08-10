@@ -289,7 +289,23 @@ impl Application for BBImager {
             }
             BBImagerMessage::StopFlashing(x) => {
                 self.flashing = false;
+                let content = x.label.to_string();
                 self.progress_bar = x;
+                return Command::perform(
+                    async move {
+                        let res = tokio::task::spawn_blocking(move || {
+                            notify_rust::Notification::new()
+                                .appname("BeagleBoard Imager")
+                                .body(&content)
+                                .finalize()
+                                .show()
+                        })
+                        .await
+                        .unwrap();
+                        tracing::debug!("Notification response {res:?}");
+                    },
+                    |_| BBImagerMessage::Null,
+                );
             }
             BBImagerMessage::Destinations(x) => {
                 self.destinations = x;
