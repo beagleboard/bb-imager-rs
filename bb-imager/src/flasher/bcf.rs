@@ -301,6 +301,7 @@ pub async fn flash(
     mut img: crate::img::OsImage,
     port: tokio_serial::SerialStream,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    verify: bool,
 ) -> Result<()> {
     let mut bcf = BeagleConnectFreedom::new(port).await?;
     info!("BeagleConnectFreedom Connected");
@@ -345,13 +346,17 @@ pub async fn flash(
         )));
     }
 
-    let _ = chan.try_send(crate::DownloadFlashingStatus::Verifying);
-    if bcf.verify(img_crc32).await? {
-        info!("Flashing Successful");
-        Ok(())
+    if verify {
+        let _ = chan.try_send(crate::DownloadFlashingStatus::Verifying);
+        if bcf.verify(img_crc32).await? {
+            info!("Flashing Successful");
+            Ok(())
+        } else {
+            error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
+            Err(Error::InvalidImage.into())
+        }
     } else {
-        error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-        Err(Error::InvalidImage.into())
+        Ok(())
     }
 }
 

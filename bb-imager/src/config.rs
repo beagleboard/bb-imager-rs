@@ -32,6 +32,7 @@ pub struct Device {
     pub icon_sha256: [u8; 32],
     pub icon_local: Option<PathBuf>,
     pub flasher: Flasher,
+    pub documentation: Url,
 }
 
 #[derive(Deserialize, Debug, Clone)]

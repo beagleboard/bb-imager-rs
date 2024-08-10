@@ -7,14 +7,16 @@
         "description": "BeagleConnect Freedom based on Ti CC1352P7",
         "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
         "icon_sha256": "790c74aa8e4bcfe59dca18907e2c775b1874daacac7f399ddb130a572e79cd6d",
-        "flasher": "BeagleConnectFreedom"
+        "flasher": "BeagleConnectFreedom",
+        "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
       },
       {
         "name": "BeaglePlay",
         "description": "BeaglePlay and other boards based on Ti AM62",
         "icon": "https://www.beagleboard.org/app/uploads/2023/03/45front.webp",
         "icon_sha256": "a78111eb3eeb319582d376f3a8981fb3cf3c47ab669159bfeb35c0671233990e",
-        "flasher": "SdCard"
+        "flasher": "SdCard",
+        "documentation": "https://docs.beagleboard.org/latest/boards/beagleplay/index.html"
       }
     ]
   },

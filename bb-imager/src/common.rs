@@ -124,7 +124,7 @@ pub async fn download_and_flash(
     flasher: crate::config::Flasher,
     downloader: crate::download::Downloader,
     chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
-    verify: bool,
+    config: FlashingConfig,
 ) -> crate::error::Result<()> {
     tracing::info!("Preparing...");
     let _ = chan.try_send(DownloadFlashingStatus::Preparing);
@@ -134,7 +134,7 @@ pub async fn download_and_flash(
             let port = dst.open().await?;
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-            sd::flash(img, port, &chan, verify).await
+            sd::flash(img, port, &chan, config.verify).await
         }
         crate::config::Flasher::BeagleConnectFreedom => {
             let port = dst.open_port()?;
@@ -142,7 +142,25 @@ pub async fn download_and_flash(
             let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
             tracing::info!("Image opened");
 
-            bcf::flash(img, port, &chan).await
+            bcf::flash(img, port, &chan, config.verify).await
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FlashingConfig {
+    pub verify: bool,
+}
+
+impl FlashingConfig {
+    pub fn update_verify(mut self, val: bool) -> Self {
+        self.verify = val;
+        self
+    }
+}
+
+impl Default for FlashingConfig {
+    fn default() -> Self {
+        Self { verify: true }
     }
 }
