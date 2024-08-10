@@ -85,44 +85,6 @@ enum BBImagerMessage {
     Null,
 }
 
-#[derive(Clone, Debug, Default)]
-struct ProgressBarState {
-    label: Cow<'static, str>,
-    progress: f32,
-    state: ProgressBarStatus,
-}
-
-impl ProgressBarState {
-    fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
-        Self {
-            label: label.into(),
-            progress,
-            state,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-enum ProgressBarStatus {
-    #[default]
-    Normal,
-    Success,
-    Fail,
-    Loading,
-}
-
-impl From<ProgressBarStatus> for widget::theme::ProgressBar {
-    fn from(value: ProgressBarStatus) -> Self {
-        match value {
-            ProgressBarStatus::Normal => widget::theme::ProgressBar::Primary,
-            ProgressBarStatus::Success => widget::theme::ProgressBar::Success,
-            ProgressBarStatus::Fail => widget::theme::ProgressBar::Danger,
-            // TODO: Add better loading theme
-            ProgressBarStatus::Loading => widget::theme::ProgressBar::Primary,
-        }
-    }
-}
-
 impl Application for BBImager {
     type Message = BBImagerMessage;
     type Executor = executor::Default;
@@ -283,11 +245,7 @@ impl Application for BBImager {
 
                 return iced::command::channel(20, move |mut chan| async move {
                     let _ = chan
-                        .send(BBImagerMessage::ProgressBar(ProgressBarState::new(
-                            "Preparing...",
-                            0.5,
-                            ProgressBarStatus::Loading,
-                        )))
+                        .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
                         .await;
 
                     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
@@ -299,79 +257,24 @@ impl Application for BBImager {
                     let mut chan_clone = chan.clone();
                     let chan_task = tokio::spawn(async move {
                         while let Some(progress) = rx.recv().await {
-                            let message = match progress {
-                                bb_imager::DownloadFlashingStatus::Preparing => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        "Preparing...",
-                                        0.5,
-                                        ProgressBarStatus::Loading,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!(
-                                            "Downloading Image... {}%",
-                                            (p * 100.0).round() as usize
-                                        ),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::FlashingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!("Flashing... {}%", (p * 100.0).round() as usize),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::Verifying => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        "Verifying...",
-                                        0.5,
-                                        ProgressBarStatus::Loading,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
-                                    BBImagerMessage::ProgressBar(ProgressBarState::new(
-                                        format!("Verifying... {}%", (p * 100.0).round() as usize),
-                                        p,
-                                        ProgressBarStatus::Normal,
-                                    ))
-                                }
-                                bb_imager::DownloadFlashingStatus::Finished => {
-                                    BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                        "Flashing Successful...",
-                                        1.0,
-                                        ProgressBarStatus::Success,
-                                    ))
-                                }
-                            };
-
-                            let _ = chan_clone.try_send(message);
+                            let _ =
+                                chan_clone.try_send(BBImagerMessage::ProgressBar(progress.into()));
                         }
                     });
 
                     tokio::select! {
                         _ = cancel_rx => {
                             flash_task.abort();
-                            let _ = chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
+                            let _ = chan.send(BBImagerMessage::StopFlashing(ProgressBarState::fail(
                                 "Flashing Cancelled by User",
-                                1.0,
-                                ProgressBarStatus::Fail,
                             ))).await;
                         },
                         _ = chan_task => {
                             let res = flash_task.await.unwrap();
                             let _ = match res {
-                                Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                    "Flashing Successful...",
-                                    1.0,
-                                    ProgressBarStatus::Success,
-                                ))),
-                                Err(e) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::new(
-                                    format!("Flashing Failed... {e}"),
-                                    1.0,
-                                    ProgressBarStatus::Fail,
+                                Ok(_) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS)),
+                                Err(e) => chan.send(BBImagerMessage::StopFlashing(ProgressBarState::fail(
+                                    format!("Flashing Failed {e}"),
                                 ))),
                             }
                             .await;
@@ -508,7 +411,7 @@ impl BBImager {
             .height(iced::Length::Fill)
             .align_items(iced::Alignment::Center);
 
-        let (progress_label, progress_bar) = self.progress();
+        let (progress_label, progress_bar) = self.progress_bar.bar();
 
         widget::column![
             logo,
@@ -697,21 +600,6 @@ impl BBImager {
         row.push(widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search))
             .into()
     }
-
-    fn progress(&self) -> (widget::Text, widget::ProgressBar) {
-        use std::ops::RangeInclusive;
-        use theme::ProgressBar;
-        use widget::progress_bar;
-
-        const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
-
-        (
-            text(self.progress_bar.label.clone()),
-            progress_bar(RANGE, self.progress_bar.progress)
-                .height(10)
-                .style(ProgressBar::from(self.progress_bar.state)),
-        )
-    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -736,5 +624,105 @@ fn img_or_svg(path: &std::path::Path, width: u16) -> Element<BBImagerMessage> {
             .width(width)
             .height(width)
             .into(),
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct ProgressBarState {
+    label: Cow<'static, str>,
+    progress: f32,
+    state: ProgressBarStatus,
+}
+
+impl ProgressBarState {
+    const FLASHING_SUCCESS: Self =
+        Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success);
+    const PREPARING: Self = Self::loading("Preparing...");
+    const VERIFYING: Self = Self::loading("Verifying...");
+
+    const fn const_new(label: &'static str, progress: f32, state: ProgressBarStatus) -> Self {
+        Self {
+            label: Cow::Borrowed(label),
+            progress,
+            state,
+        }
+    }
+
+    fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
+        Self {
+            label: label.into(),
+            progress,
+            state,
+        }
+    }
+
+    /// Progress should be between 0 to 1.0
+    fn progress(prefix: &'static str, progress: f32) -> Self {
+        Self::new(
+            format!("{prefix}... {}%", (progress * 100.0).round() as usize),
+            progress,
+            ProgressBarStatus::Normal,
+        )
+    }
+
+    const fn loading(label: &'static str) -> Self {
+        Self::const_new(label, 0.5, ProgressBarStatus::Loading)
+    }
+
+    fn fail(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(label, 1.0, ProgressBarStatus::Fail)
+    }
+
+    fn bar(&self) -> (widget::Text, widget::ProgressBar) {
+        use std::ops::RangeInclusive;
+        use theme::ProgressBar;
+        use widget::progress_bar;
+
+        const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
+
+        (
+            text(self.label.clone()),
+            progress_bar(RANGE, self.progress)
+                .height(10)
+                .style(ProgressBar::from(self.state)),
+        )
+    }
+}
+
+impl From<bb_imager::DownloadFlashingStatus> for ProgressBarState {
+    fn from(value: bb_imager::DownloadFlashingStatus) -> Self {
+        match value {
+            bb_imager::DownloadFlashingStatus::Preparing => Self::PREPARING,
+            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
+                Self::progress("Downloading Image", p)
+            }
+            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => Self::progress("Flashing", p),
+            bb_imager::DownloadFlashingStatus::Verifying => Self::VERIFYING,
+            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
+                Self::progress("Verifying", p)
+            }
+            bb_imager::DownloadFlashingStatus::Finished => Self::FLASHING_SUCCESS,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum ProgressBarStatus {
+    #[default]
+    Normal,
+    Success,
+    Fail,
+    Loading,
+}
+
+impl From<ProgressBarStatus> for widget::theme::ProgressBar {
+    fn from(value: ProgressBarStatus) -> Self {
+        match value {
+            ProgressBarStatus::Normal => widget::theme::ProgressBar::Primary,
+            ProgressBarStatus::Success => widget::theme::ProgressBar::Success,
+            ProgressBarStatus::Fail => widget::theme::ProgressBar::Danger,
+            // TODO: Add better loading theme
+            ProgressBarStatus::Loading => widget::theme::ProgressBar::Primary,
+        }
     }
 }
