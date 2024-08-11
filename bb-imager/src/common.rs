@@ -1,7 +1,12 @@
 //! Stuff common to all the flashers
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    io::{Seek, SeekFrom, Write},
+    path::PathBuf,
+    time::Duration,
+};
 use thiserror::Error;
+use tokio::io::AsyncSeekExt;
 use tokio_serial::SerialPortBuilderExt;
 
 use crate::flasher::{bcf, sd};
@@ -118,48 +123,154 @@ impl From<&crate::config::OsList> for SelectedImage {
     }
 }
 
-pub async fn download_and_flash(
+#[derive(Debug, Clone)]
+pub struct Flasher {
     img: SelectedImage,
-    dst: Destination,
-    flasher: crate::config::Flasher,
+    dst: crate::Destination,
     downloader: crate::download::Downloader,
     chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     config: FlashingConfig,
-) -> crate::error::Result<()> {
-    tracing::info!("Preparing...");
-    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+}
 
-    match flasher {
-        crate::config::Flasher::SdCard => {
-            let port = dst.open().await?;
-            let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
-
-            sd::flash(img, port, &chan, config.verify).await
+impl Flasher {
+    pub const fn new(
+        img: SelectedImage,
+        dst: crate::Destination,
+        downloader: crate::download::Downloader,
+        chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
+        config: FlashingConfig,
+    ) -> Self {
+        Self {
+            img,
+            dst,
+            downloader,
+            chan,
+            config,
         }
-        crate::config::Flasher::BeagleConnectFreedom => {
-            let port = dst.open_port()?;
-            tracing::info!("Port opened");
-            let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
-            tracing::info!("Image opened");
+    }
 
-            bcf::flash(img, port, &chan, config.verify).await
+    pub async fn download_flash_customize(self) -> crate::error::Result<()> {
+        match self.config {
+            FlashingConfig::LinuxSd(config) => {
+                let mut disk = self.dst.open().await?;
+                let img = crate::img::OsImage::from_selected_image(
+                    self.img,
+                    &self.downloader,
+                    &self.chan,
+                )
+                .await?;
+
+                sd::flash(img, &mut disk, &self.chan, config.verify).await?;
+                disk.seek(SeekFrom::Start(0)).await?;
+
+                let mut std_disk = disk.into_std().await;
+
+                tokio::task::spawn_blocking(move || config.customize(&mut std_disk))
+                    .await
+                    .unwrap()
+            }
+            FlashingConfig::Bcf(config) => {
+                let port = self.dst.open_port()?;
+                tracing::info!("Port opened");
+                let img = crate::img::OsImage::from_selected_image(
+                    self.img,
+                    &self.downloader,
+                    &self.chan,
+                )
+                .await?;
+                tracing::info!("Image opened");
+
+                bcf::flash(img, port, &self.chan, config.verify).await
+            }
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct FlashingConfig {
-    pub verify: bool,
+pub enum FlashingConfig {
+    LinuxSd(FlashingSdLinuxConfig),
+    Bcf(FlashingBcfConfig),
 }
 
-impl FlashingConfig {
-    pub fn update_verify(mut self, val: bool) -> Self {
-        self.verify = val;
+impl From<crate::config::Flasher> for FlashingConfig {
+    fn from(value: crate::config::Flasher) -> Self {
+        match value {
+            crate::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
+            crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FlashingSdLinuxConfig {
+    pub verify: bool,
+    pub hostname: Option<String>,
+}
+
+impl FlashingSdLinuxConfig {
+    pub fn customize<D: std::io::Write + std::io::Seek + std::io::Read>(
+        &self,
+        dst: &mut D,
+    ) -> crate::error::Result<()> {
+        let boot_partition = {
+            let mbr = mbrman::MBR::read_from(dst, 512).unwrap();
+
+            let boot_part = mbr.get(1).unwrap();
+            assert_eq!(boot_part.sys, 12);
+            let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
+            let end_offset: u64 =
+                start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
+            let slice = fscommon::StreamSlice::new(dst, start_offset, end_offset).unwrap();
+            let boot_stream = fscommon::BufStream::new(slice);
+            fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new()).unwrap()
+        };
+
+        let boot_root = boot_partition.root_dir();
+
+        if let Some(h) = &self.hostname {
+            let mut sysconf = boot_root.create_file("sysconf.txt").unwrap();
+            sysconf.seek(SeekFrom::End(0)).unwrap();
+            sysconf
+                .write_all(format!("hostname={h}\n").as_bytes())
+                .unwrap();
+        }
+
+        Ok(())
+    }
+
+    pub fn update_verify(mut self, verify: bool) -> Self {
+        self.verify = verify;
+        self
+    }
+
+    pub fn update_hostname(mut self, hostname: Option<String>) -> Self {
+        self.hostname = hostname;
         self
     }
 }
 
-impl Default for FlashingConfig {
+impl Default for FlashingSdLinuxConfig {
+    fn default() -> Self {
+        Self {
+            verify: true,
+            hostname: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FlashingBcfConfig {
+    pub verify: bool,
+}
+
+impl FlashingBcfConfig {
+    pub fn update_verify(mut self, verify: bool) -> Self {
+        self.verify = verify;
+        self
+    }
+}
+
+impl Default for FlashingBcfConfig {
     fn default() -> Self {
         Self { verify: true }
     }

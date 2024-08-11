@@ -9,7 +9,6 @@ chrono = { version = "0.4.38", features = ["serde"] }
 const-hex = { version = "1.12.0", features = ["serde"] }
 crc32fast = "1.4.2"
 directories = "5.0.1"
-# fatfs = "0.3.6"
 reqwest = { version = "0.12.5", features = ["stream"] }
 semver = { version = "1.0.23", features = ["serde"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -23,6 +22,9 @@ url = { version = "2.5.2", features = ["serde"] }
 zip = "2.1.5"
 futures-util = "0.3.30"
 rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
+fatfs = "0.3.6"
+fscommon = "0.1.1"
+mbrman = "0.5.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { git = "https://github.com/FineFindus/udisks-rs.git" }
