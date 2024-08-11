@@ -206,6 +206,7 @@ pub struct FlashingSdLinuxConfig {
     pub verify: bool,
     pub hostname: Option<String>,
     pub timezone: Option<String>,
+    pub keymap: Option<String>,
 }
 
 impl FlashingSdLinuxConfig {
@@ -228,7 +229,7 @@ impl FlashingSdLinuxConfig {
 
         let boot_root = boot_partition.root_dir();
 
-        if self.hostname.is_some() || self.timezone.is_some() {
+        if self.hostname.is_some() || self.timezone.is_some() || self.keymap.is_some() {
             let mut sysconf = boot_root.create_file("sysconf.txt").unwrap();
             sysconf.seek(SeekFrom::End(0)).unwrap();
 
@@ -241,6 +242,12 @@ impl FlashingSdLinuxConfig {
             if let Some(tz) = &self.timezone {
                 sysconf
                     .write_all(format!("timezone={tz}\n").as_bytes())
+                    .unwrap();
+            }
+
+            if let Some(k) = &self.keymap {
+                sysconf
+                    .write_all(format!("keymap={k}\n").as_bytes())
                     .unwrap();
             }
         }
@@ -262,6 +269,11 @@ impl FlashingSdLinuxConfig {
         self.timezone = timezone;
         self
     }
+
+    pub fn update_keymap(mut self, k: Option<String>) -> Self {
+        self.keymap = k;
+        self
+    }
 }
 
 impl Default for FlashingSdLinuxConfig {
@@ -270,6 +282,7 @@ impl Default for FlashingSdLinuxConfig {
             verify: true,
             hostname: Default::default(),
             timezone: Default::default(),
+            keymap: Default::default(),
         }
     }
 }
