@@ -27,7 +27,7 @@ fscommon = "0.1.1"
 mbrman = "0.5.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-udisks2 = { git = "https://github.com/FineFindus/udisks-rs.git" }
+udisks2 = "0.1.0"
 tokio-serial = { version = "5.4.4", features = ["libudev"] }
 
 [target.'cfg(windows)'.dependencies]
