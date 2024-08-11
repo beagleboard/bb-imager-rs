@@ -56,7 +56,9 @@ struct BBImager {
     flashing: bool,
     cancel_flashing: Option<tokio::sync::oneshot::Sender<()>>,
     flashing_config: Option<bb_imager::FlashingConfig>,
+
     timezones: Option<widget::combo_box::State<String>>,
+    keymaps: Option<widget::combo_box::State<String>>,
 }
 
 #[derive(Default, Debug)]
@@ -129,6 +131,7 @@ impl Application for BBImager {
                 config: flags.config.clone(),
                 downloader: downloader.clone(),
                 timezones: Some(timezone()),
+                keymaps: Some(keymap()),
                 ..Default::default()
             },
             Command::batch(board_image.chain(os_image_from_cache)),
@@ -631,6 +634,19 @@ impl BBImager {
                         ))
                     },
                 );
+
+                let xc = x.clone();
+                let keymap_box = widget::combo_box(
+                    self.keymaps.as_ref().unwrap(),
+                    "Keymap",
+                    x.keymap.as_ref(),
+                    move |t| {
+                        let tz = if t.is_empty() { None } else { Some(t) };
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            xc.clone().update_keymap(tz),
+                        ))
+                    },
+                );
                 widget::column![
                     widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
                         BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
@@ -653,6 +669,9 @@ impl BBImager {
                     .align_items(iced::Alignment::Center),
                     widget::row![text("Set Timezone"), timezone_box]
                         .spacing(10)
+                        .align_items(iced::Alignment::Center),
+                    widget::row![text("Set Keymap"), keymap_box]
+                        .spacing(10)
                         .align_items(iced::Alignment::Center)
                 ]
             }
@@ -669,13 +688,14 @@ impl BBImager {
         .spacing(15)
         .width(iced::Length::Fill);
 
-        let form = widget::scrollable(form);
+        let form = widget::scrollable(form)
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill);
 
         widget::column![
             text("Extra Configuration").size(28),
             widget::horizontal_rule(2),
             form,
-            widget::vertical_space(),
             action_btn_row
         ]
         .spacing(10)
@@ -873,6 +893,15 @@ impl From<ProgressBarStatus> for widget::theme::ProgressBar {
 
 fn timezone() -> widget::combo_box::State<String> {
     let temp = include_str!("../../assets/timezones.txt")
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect();
+
+    widget::combo_box::State::new(temp)
+}
+
+fn keymap() -> widget::combo_box::State<String> {
+    let temp = include_str!("../../assets/keymap-layouts.txt")
         .split_whitespace()
         .map(|x| x.to_string())
         .collect();
