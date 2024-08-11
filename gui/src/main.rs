@@ -650,7 +650,7 @@ impl BBImager {
                 widget::column![
                     widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
                         BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                            x.clone().update_verify(y),
+                            x.clone().update_verify(!y),
                         ))
                     }),
                     widget::row![
@@ -661,6 +661,34 @@ impl BBImager {
                                 BBImagerMessage::UpdateFlashConfig(
                                     bb_imager::FlashingConfig::LinuxSd(
                                         x.clone().update_hostname(h),
+                                    ),
+                                )
+                            })
+                    ]
+                    .spacing(10)
+                    .align_items(iced::Alignment::Center),
+                    widget::row![
+                        text("Set Username"),
+                        widget::text_input("debian", &x.username.clone().unwrap_or_default())
+                            .on_input(|inp| {
+                                let uname = if inp.is_empty() { None } else { Some(inp) };
+                                BBImagerMessage::UpdateFlashConfig(
+                                    bb_imager::FlashingConfig::LinuxSd(
+                                        x.clone().update_username(uname),
+                                    ),
+                                )
+                            })
+                    ]
+                    .spacing(10)
+                    .align_items(iced::Alignment::Center),
+                    widget::row![
+                        text("Set Password"),
+                        widget::text_input("temppwd", &x.password.clone().unwrap_or_default())
+                            .on_input(|inp| {
+                                let pass = if inp.is_empty() { None } else { Some(inp) };
+                                BBImagerMessage::UpdateFlashConfig(
+                                    bb_imager::FlashingConfig::LinuxSd(
+                                        x.clone().update_password(pass),
                                     ),
                                 )
                             })
@@ -688,9 +716,7 @@ impl BBImager {
         .spacing(15)
         .width(iced::Length::Fill);
 
-        let form = widget::scrollable(form)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill);
+        let form = widget::scrollable(form).width(iced::Length::Fill);
 
         widget::column![
             text("Extra Configuration").size(28),

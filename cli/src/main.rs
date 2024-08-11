@@ -179,6 +179,8 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                 hostname: None,
                 timezone: None,
                 keymap: None,
+                username: None,
+                password: None,
             }),
         ),
     };
