@@ -207,8 +207,7 @@ pub struct FlashingSdLinuxConfig {
     pub hostname: Option<String>,
     pub timezone: Option<String>,
     pub keymap: Option<String>,
-    pub username: Option<String>,
-    pub password: Option<String>,
+    pub user: Option<(String, String)>,
     pub wifi: Option<(String, String)>,
 }
 
@@ -235,8 +234,7 @@ impl FlashingSdLinuxConfig {
         if self.hostname.is_some()
             || self.timezone.is_some()
             || self.keymap.is_some()
-            || self.username.is_some()
-            || self.password.is_some()
+            || self.user.is_some()
             || self.wifi.is_some()
         {
             let mut sysconf = boot_root.create_file("sysconf.txt").unwrap();
@@ -260,13 +258,10 @@ impl FlashingSdLinuxConfig {
                     .unwrap();
             }
 
-            if let Some(u) = &self.username {
+            if let Some((u, p)) = &self.user {
                 sysconf
                     .write_all(format!("user_name={u}\n").as_bytes())
                     .unwrap();
-            }
-
-            if let Some(p) = &self.password {
                 sysconf
                     .write_all(format!("user_password={p}\n").as_bytes())
                     .unwrap();
@@ -315,13 +310,8 @@ impl FlashingSdLinuxConfig {
         self
     }
 
-    pub fn update_username(mut self, u: Option<String>) -> Self {
-        self.username = u;
-        self
-    }
-
-    pub fn update_password(mut self, p: Option<String>) -> Self {
-        self.password = p;
+    pub fn update_user(mut self, v: Option<(String, String)>) -> Self {
+        self.user = v;
         self
     }
 
@@ -338,8 +328,7 @@ impl Default for FlashingSdLinuxConfig {
             hostname: Default::default(),
             timezone: Default::default(),
             keymap: Default::default(),
-            username: Default::default(),
-            password: Default::default(),
+            user: Default::default(),
             wifi: Default::default(),
         }
     }
