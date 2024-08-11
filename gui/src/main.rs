@@ -56,6 +56,7 @@ struct BBImager {
     flashing: bool,
     cancel_flashing: Option<tokio::sync::oneshot::Sender<()>>,
     flashing_config: Option<bb_imager::FlashingConfig>,
+    timezones: Option<widget::combo_box::State<String>>,
 }
 
 #[derive(Default, Debug)]
@@ -127,6 +128,7 @@ impl Application for BBImager {
             Self {
                 config: flags.config.clone(),
                 downloader: downloader.clone(),
+                timezones: Some(timezone()),
                 ..Default::default()
             },
             Command::batch(board_image.chain(os_image_from_cache)),
@@ -616,25 +618,44 @@ impl BBImager {
             .align_items(iced::Alignment::Center);
 
         let form = match self.flashing_config.as_ref().unwrap() {
-            bb_imager::FlashingConfig::LinuxSd(x) => widget::column![
-                widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
-                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                        x.clone().update_verify(y),
-                    ))
-                }),
-                widget::row![
-                    text("Set Hostname"),
-                    widget::text_input("Default", &x.hostname.clone().unwrap_or_default())
-                        .on_input(|inp| {
-                            let h = if inp.is_empty() { None } else { Some(inp) };
-                            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                                x.clone().update_hostname(h),
-                            ))
-                        })
+            bb_imager::FlashingConfig::LinuxSd(x) => {
+                let xc = x.clone();
+                let timezone_box = widget::combo_box(
+                    self.timezones.as_ref().unwrap(),
+                    "Timezone",
+                    x.timezone.as_ref(),
+                    move |t| {
+                        let tz = if t.is_empty() { None } else { Some(t) };
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            xc.clone().update_timezone(tz),
+                        ))
+                    },
+                );
+                widget::column![
+                    widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            x.clone().update_verify(y),
+                        ))
+                    }),
+                    widget::row![
+                        text("Set Hostname"),
+                        widget::text_input("Default", &x.hostname.clone().unwrap_or_default())
+                            .on_input(|inp| {
+                                let h = if inp.is_empty() { None } else { Some(inp) };
+                                BBImagerMessage::UpdateFlashConfig(
+                                    bb_imager::FlashingConfig::LinuxSd(
+                                        x.clone().update_hostname(h),
+                                    ),
+                                )
+                            })
+                    ]
+                    .spacing(10)
+                    .align_items(iced::Alignment::Center),
+                    widget::row![text("Set Timezone"), timezone_box]
+                        .spacing(10)
+                        .align_items(iced::Alignment::Center)
                 ]
-                .spacing(10)
-                .align_items(iced::Alignment::Center)
-            ],
+            }
             bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(
                 Some("Skip Verification".to_string()),
                 !x.verify,
@@ -848,4 +869,13 @@ impl From<ProgressBarStatus> for widget::theme::ProgressBar {
             ProgressBarStatus::Loading => widget::theme::ProgressBar::Primary,
         }
     }
+}
+
+fn timezone() -> widget::combo_box::State<String> {
+    let temp = include_str!("../../assets/timezones.txt")
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect();
+
+    widget::combo_box::State::new(temp)
 }

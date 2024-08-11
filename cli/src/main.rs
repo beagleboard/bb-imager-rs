@@ -177,6 +177,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
             bb_imager::FlashingConfig::LinuxSd(bb_imager::FlashingSdLinuxConfig {
                 verify,
                 hostname: None,
+                timezone: None,
             }),
         ),
     };
