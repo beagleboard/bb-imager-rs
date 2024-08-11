@@ -209,6 +209,7 @@ pub struct FlashingSdLinuxConfig {
     pub keymap: Option<String>,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub wifi: Option<(String, String)>,
 }
 
 impl FlashingSdLinuxConfig {
@@ -236,6 +237,7 @@ impl FlashingSdLinuxConfig {
             || self.keymap.is_some()
             || self.username.is_some()
             || self.password.is_some()
+            || self.wifi.is_some()
         {
             let mut sysconf = boot_root.create_file("sysconf.txt").unwrap();
             sysconf.seek(SeekFrom::End(0)).unwrap();
@@ -269,6 +271,25 @@ impl FlashingSdLinuxConfig {
                     .write_all(format!("user_password={p}\n").as_bytes())
                     .unwrap();
             }
+
+            if let Some((ssid, _)) = &self.wifi {
+                sysconf
+                    .write_all(format!("iwd_psk_file={ssid}.psk\n").as_bytes())
+                    .unwrap();
+            }
+        }
+
+        if let Some((ssid, psk)) = &self.wifi {
+            let mut wifi_file = boot_root
+                .create_file(format!("services/{ssid}.psk").as_str())
+                .unwrap();
+
+            wifi_file
+                .write_all(
+                    format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
+                        .as_bytes(),
+                )
+                .unwrap();
         }
 
         Ok(())
@@ -303,6 +324,11 @@ impl FlashingSdLinuxConfig {
         self.password = p;
         self
     }
+
+    pub fn update_wifi(mut self, v: Option<(String, String)>) -> Self {
+        self.wifi = v;
+        self
+    }
 }
 
 impl Default for FlashingSdLinuxConfig {
@@ -314,6 +340,7 @@ impl Default for FlashingSdLinuxConfig {
             keymap: Default::default(),
             username: Default::default(),
             password: Default::default(),
+            wifi: Default::default(),
         }
     }
 }

@@ -621,88 +621,7 @@ impl BBImager {
             .align_items(iced::Alignment::Center);
 
         let form = match self.flashing_config.as_ref().unwrap() {
-            bb_imager::FlashingConfig::LinuxSd(x) => {
-                let xc = x.clone();
-                let timezone_box = widget::combo_box(
-                    self.timezones.as_ref().unwrap(),
-                    "Timezone",
-                    x.timezone.as_ref(),
-                    move |t| {
-                        let tz = if t.is_empty() { None } else { Some(t) };
-                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                            xc.clone().update_timezone(tz),
-                        ))
-                    },
-                );
-
-                let xc = x.clone();
-                let keymap_box = widget::combo_box(
-                    self.keymaps.as_ref().unwrap(),
-                    "Keymap",
-                    x.keymap.as_ref(),
-                    move |t| {
-                        let tz = if t.is_empty() { None } else { Some(t) };
-                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                            xc.clone().update_keymap(tz),
-                        ))
-                    },
-                );
-                widget::column![
-                    widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
-                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                            x.clone().update_verify(!y),
-                        ))
-                    }),
-                    widget::row![
-                        text("Set Hostname"),
-                        widget::text_input("Default", &x.hostname.clone().unwrap_or_default())
-                            .on_input(|inp| {
-                                let h = if inp.is_empty() { None } else { Some(inp) };
-                                BBImagerMessage::UpdateFlashConfig(
-                                    bb_imager::FlashingConfig::LinuxSd(
-                                        x.clone().update_hostname(h),
-                                    ),
-                                )
-                            })
-                    ]
-                    .spacing(10)
-                    .align_items(iced::Alignment::Center),
-                    widget::row![
-                        text("Set Username"),
-                        widget::text_input("debian", &x.username.clone().unwrap_or_default())
-                            .on_input(|inp| {
-                                let uname = if inp.is_empty() { None } else { Some(inp) };
-                                BBImagerMessage::UpdateFlashConfig(
-                                    bb_imager::FlashingConfig::LinuxSd(
-                                        x.clone().update_username(uname),
-                                    ),
-                                )
-                            })
-                    ]
-                    .spacing(10)
-                    .align_items(iced::Alignment::Center),
-                    widget::row![
-                        text("Set Password"),
-                        widget::text_input("temppwd", &x.password.clone().unwrap_or_default())
-                            .on_input(|inp| {
-                                let pass = if inp.is_empty() { None } else { Some(inp) };
-                                BBImagerMessage::UpdateFlashConfig(
-                                    bb_imager::FlashingConfig::LinuxSd(
-                                        x.clone().update_password(pass),
-                                    ),
-                                )
-                            })
-                    ]
-                    .spacing(10)
-                    .align_items(iced::Alignment::Center),
-                    widget::row![text("Set Timezone"), timezone_box]
-                        .spacing(10)
-                        .align_items(iced::Alignment::Center),
-                    widget::row![text("Set Keymap"), keymap_box]
-                        .spacing(10)
-                        .align_items(iced::Alignment::Center)
-                ]
-            }
+            bb_imager::FlashingConfig::LinuxSd(x) => self.linux_sd_form(x),
             bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(
                 Some("Skip Verification".to_string()),
                 !x.verify,
@@ -767,6 +686,132 @@ impl BBImager {
         .height(iced::Length::Fill)
         .align_items(iced::Alignment::Center)
         .into()
+    }
+
+    fn linux_sd_form<'a>(
+        &'a self,
+        config: &'a bb_imager::FlashingSdLinuxConfig,
+    ) -> widget::Column<BBImagerMessage> {
+        let xc = config.clone();
+        let timezone_box = widget::combo_box(
+            self.timezones.as_ref().unwrap(),
+            "Timezone",
+            config.timezone.as_ref(),
+            move |t| {
+                let tz = if t.is_empty() { None } else { Some(t) };
+                BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                    xc.clone().update_timezone(tz),
+                ))
+            },
+        );
+
+        let xc = config.clone();
+        let keymap_box = widget::combo_box(
+            self.keymaps.as_ref().unwrap(),
+            "Keymap",
+            config.keymap.as_ref(),
+            move |t| {
+                let tz = if t.is_empty() { None } else { Some(t) };
+                BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                    xc.clone().update_keymap(tz),
+                ))
+            },
+        );
+
+        let wifi_toggle = widget::toggler(
+            Some("Configure Wifi".to_string()),
+            config.wifi.is_some(),
+            |t| {
+                let c = if t {
+                    Some((String::new(), String::new()))
+                } else {
+                    None
+                };
+                BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                    config.clone().update_wifi(c),
+                ))
+            },
+        );
+
+        let mut form = widget::column![
+            widget::toggler(Some("Skip Verification".to_string()), !config.verify, |y| {
+                BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                    config.clone().update_verify(!y),
+                ))
+            }),
+            widget::row![
+                text("Set Hostname"),
+                widget::text_input("Default", &config.hostname.clone().unwrap_or_default())
+                    .on_input(|inp| {
+                        let h = if inp.is_empty() { None } else { Some(inp) };
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            config.clone().update_hostname(h),
+                        ))
+                    })
+            ]
+            .spacing(10)
+            .align_items(iced::Alignment::Center),
+            widget::row![
+                text("Set Username"),
+                widget::text_input("debian", &config.username.clone().unwrap_or_default())
+                    .on_input(|inp| {
+                        let uname = if inp.is_empty() { None } else { Some(inp) };
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            config.clone().update_username(uname),
+                        ))
+                    })
+            ]
+            .spacing(10)
+            .align_items(iced::Alignment::Center),
+            widget::row![
+                text("Set Password"),
+                widget::text_input("temppwd", &config.password.clone().unwrap_or_default())
+                    .on_input(|inp| {
+                        let pass = if inp.is_empty() { None } else { Some(inp) };
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            config.clone().update_password(pass),
+                        ))
+                    })
+            ]
+            .spacing(10)
+            .align_items(iced::Alignment::Center),
+            widget::row![text("Set Timezone"), timezone_box]
+                .spacing(10)
+                .align_items(iced::Alignment::Center),
+            widget::row![text("Set Keymap"), keymap_box]
+                .spacing(10)
+                .align_items(iced::Alignment::Center),
+            wifi_toggle
+        ];
+
+        if let Some((ssid, psk)) = &config.wifi {
+            form = form.push(
+                widget::row![
+                    text("SSID"),
+                    widget::text_input("SSID", ssid).on_input(|inp| {
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            config.clone().update_wifi(Some((inp, psk.clone()))),
+                        ))
+                    })
+                ]
+                .spacing(10)
+                .align_items(iced::Alignment::Center),
+            );
+            form = form.push(
+                widget::row![
+                    text("Password"),
+                    widget::text_input("PSK", psk).on_input(|inp| {
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                            config.clone().update_wifi(Some((ssid.clone(), inp))),
+                        ))
+                    })
+                ]
+                .spacing(10)
+                .align_items(iced::Alignment::Center),
+            );
+        }
+
+        form.into()
     }
 
     fn search_bar(&self, refresh: Option<BBImagerMessage>) -> Element<BBImagerMessage> {
