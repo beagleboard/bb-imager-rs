@@ -32,6 +32,11 @@ pub(crate) struct WinDrive {
     volume: File,
 }
 
+pub(crate) struct WinDriveStd {
+    drive: std::fs::File,
+    volume: File,
+}
+
 impl WinDrive {
     pub(crate) async fn open(path: &str) -> crate::error::Result<Self> {
         let vol_path = physical_drive_to_volume(path)?;
@@ -51,9 +56,16 @@ impl WinDrive {
 
         Ok(Self { drive, volume })
     }
+
+    pub(crate) async fn into_std(self) -> WinDriveStd {
+        WinDriveStd {
+            volume: self.volume,
+            drive: self.drive.into_std().await,
+        }
+    }
 }
 
-impl Drop for WinDrive {
+impl Drop for WinDriveStd {
     fn drop(&mut self) {
         let _ = unsafe {
             DeviceIoControl(
@@ -186,5 +198,27 @@ impl tokio::io::AsyncSeek for WinDrive {
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
         Pin::new(&mut self.drive).poll_complete(cx)
+    }
+}
+
+impl std::io::Read for WinDriveStd {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.drive.read(buf)
+    }
+}
+
+impl std::io::Write for WinDriveStd {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.drive.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.drive.flush()
+    }
+}
+
+impl std::io::Seek for WinDriveStd {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.drive.seek(pos)
     }
 }

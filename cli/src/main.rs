@@ -161,16 +161,25 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
         });
     }
 
-    let config = bb_imager::FlashingConfig { verify };
+    let flasher = match target {
+        FlashTarget::Bcf => bb_imager::Flasher::new(
+            bb_imager::SelectedImage::local(img),
+            dst,
+            downloader,
+            tx,
+            bb_imager::FlashingConfig::Bcf(bb_imager::FlashingBcfConfig { verify }),
+        ),
+        FlashTarget::Sd => bb_imager::Flasher::new(
+            bb_imager::SelectedImage::local(img),
+            dst,
+            downloader,
+            tx,
+            bb_imager::FlashingConfig::LinuxSd(bb_imager::FlashingSdLinuxConfig {
+                verify,
+                hostname: None,
+            }),
+        ),
+    };
 
-    bb_imager::download_and_flash(
-        bb_imager::SelectedImage::local(img),
-        dst,
-        target.into(),
-        downloader,
-        tx,
-        config,
-    )
-    .await
-    .unwrap();
+    flasher.download_flash_customize().await.unwrap();
 }

@@ -55,7 +55,7 @@ struct BBImager {
     progress_bar: ProgressBarState,
     flashing: bool,
     cancel_flashing: Option<tokio::sync::oneshot::Sender<()>>,
-    flashing_config: bb_imager::FlashingConfig,
+    flashing_config: Option<bb_imager::FlashingConfig>,
 }
 
 #[derive(Default, Debug)]
@@ -214,6 +214,10 @@ impl Application for BBImager {
                     Screen::DestinationSelection => {
                         return self.refresh_destinations();
                     }
+                    Screen::ExtraConfiguration => {
+                        self.flashing_config =
+                            Some(self.selected_board.as_ref().unwrap().flasher.into());
+                    }
                     _ => {}
                 }
             }
@@ -235,15 +239,10 @@ impl Application for BBImager {
                 self.screen = Screen::Flashing;
                 self.flashing = true;
 
-                let flasher = self
-                    .selected_board
-                    .clone()
-                    .expect("No board selected")
-                    .flasher;
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().unwrap();
                 let downloader = self.downloader.clone();
-                let config = self.flashing_config.clone();
+                let config = self.flashing_config.clone().unwrap();
                 let (tx, cancel_rx) = tokio::sync::oneshot::channel();
 
                 self.cancel_flashing = Some(tx);
@@ -255,9 +254,10 @@ impl Application for BBImager {
 
                     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
-                    let flash_task = tokio::spawn(bb_imager::common::download_and_flash(
-                        img, dst, flasher, downloader, tx, config,
-                    ));
+                    let flash_task = tokio::spawn(
+                        bb_imager::common::Flasher::new(img, dst, downloader, tx, config)
+                            .download_flash_customize(),
+                    );
 
                     let mut chan_clone = chan.clone();
                     let chan_task = tokio::spawn(async move {
@@ -313,7 +313,7 @@ impl Application for BBImager {
             BBImagerMessage::RefreshDestinations => {
                 return self.refresh_destinations();
             }
-            BBImagerMessage::UpdateFlashConfig(x) => self.flashing_config = x,
+            BBImagerMessage::UpdateFlashConfig(x) => self.flashing_config = Some(x),
             BBImagerMessage::OpenUrl(x) => {
                 return Command::perform(
                     async move {
@@ -615,18 +615,45 @@ impl BBImager {
             .height(iced::Length::Fill)
             .align_items(iced::Alignment::Center);
 
+        let form = match self.flashing_config.as_ref().unwrap() {
+            bb_imager::FlashingConfig::LinuxSd(x) => widget::column![
+                widget::toggler(Some("Skip Verification".to_string()), !x.verify, |y| {
+                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                        x.clone().update_verify(y),
+                    ))
+                }),
+                widget::row![
+                    text("Set Hostname"),
+                    widget::text_input("Default", &x.hostname.clone().unwrap_or_default())
+                        .on_input(|inp| {
+                            let h = if inp.is_empty() { None } else { Some(inp) };
+                            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                                x.clone().update_hostname(h),
+                            ))
+                        })
+                ]
+                .spacing(10)
+                .align_items(iced::Alignment::Center)
+            ],
+            bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(
+                Some("Skip Verification".to_string()),
+                !x.verify,
+                |y| {
+                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::Bcf(
+                        x.clone().update_verify(y),
+                    ))
+                }
+            )],
+        }
+        .spacing(15)
+        .width(iced::Length::Fill);
+
+        let form = widget::scrollable(form);
+
         widget::column![
             text("Extra Configuration").size(28),
             widget::horizontal_rule(2),
-            widget::toggler(
-                Some("Skip Verification".to_string()),
-                !self.flashing_config.verify,
-                |x| {
-                    BBImagerMessage::UpdateFlashConfig(
-                        self.flashing_config.clone().update_verify(!x),
-                    )
-                }
-            ),
+            form,
             widget::vertical_space(),
             action_btn_row
         ]
