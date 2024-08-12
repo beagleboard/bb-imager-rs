@@ -364,12 +364,18 @@ pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     tokio_serial::available_ports()
         .unwrap()
         .into_iter()
-        .filter(|x| match &x.port_type {
-            tokio_serial::SerialPortType::UsbPort(y) => {
-                y.manufacturer.as_deref() == Some("BeagleBoard.org")
-                    && y.product.as_deref() == Some("BeagleConnect")
+        .filter(|x| {
+            if cfg!(target_os = "linux") {
+                match &x.port_type {
+                    tokio_serial::SerialPortType::UsbPort(y) => {
+                        y.manufacturer.as_deref() == Some("BeagleBoard.org")
+                            && y.product.as_deref() == Some("BeagleConnect")
+                    }
+                    _ => false,
+                }
+            } else {
+                true
             }
-            _ => false,
         })
         .map(|x| x.port_name)
         .map(crate::Destination::port)
