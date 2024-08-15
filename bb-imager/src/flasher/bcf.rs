@@ -74,6 +74,7 @@ impl BeagleConnectFreedom {
         bcf.invoke_bootloader()
             .await
             .map_err(|_| Error::FailedToStartBootloader)?;
+
         bcf.send_sync().await?;
 
         Ok(bcf)
@@ -99,10 +100,10 @@ impl BeagleConnectFreedom {
         info!("Invoke Bootloader");
 
         let _ = self.port.set_break();
-        let _ = tokio::time::sleep(Duration::from_millis(250)).await;
+        let _ = tokio::time::sleep(Duration::from_millis(500)).await;
         let _ = self.port.clear_break();
 
-        let _ = tokio::time::sleep(Duration::from_millis(100)).await;
+        let _ = tokio::time::sleep(Duration::from_millis(500)).await;
         Ok(())
     }
 
