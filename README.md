@@ -5,7 +5,7 @@ A Rust rewrite of [bb-imager](https://openbeagle.org/beagleboard/bb-imager) with
 # Goals
 - [ ] Cross Platform
     - [x] Linux
-    - [ ] Windows
+    - [x] Windows
     - [ ] Macos
     - [ ] Web
 - [ ] Supported Flashers
