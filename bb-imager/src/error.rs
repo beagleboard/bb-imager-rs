@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::flasher::{bcf, sd};
+use crate::flasher::{bcf, msp430, sd};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -10,6 +10,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("BeagleConnect Freedom Error: {0}")]
     BeagleConnectFreedomError(#[from] bcf::Error),
+    #[error("MSP430 Error: {0}")]
+    MSP430Error(#[from] msp430::Error),
     #[error("Download Error: {0}")]
     DownloadError(#[from] crate::download::Error),
     #[error("Io Error: {0}")]

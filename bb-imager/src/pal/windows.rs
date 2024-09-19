@@ -84,7 +84,11 @@ impl Drop for WinDriveStd {
 
 impl crate::common::Destination {
     pub(crate) async fn open(&self) -> crate::error::Result<WinDrive> {
-        WinDrive::open(&self.path).await
+        if let Self::SdCard { path, .. } = self {
+            WinDrive::open(path).await
+        } else {
+            unreachable!()
+        }
     }
 }
 

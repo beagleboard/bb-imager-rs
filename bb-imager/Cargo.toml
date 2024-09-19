@@ -25,6 +25,8 @@ rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
 fatfs = "0.3.6"
 fscommon = "0.1.1"
 mbrman = "0.5.2"
+hidapi = "2.6.3"
+bin_file = "0.1.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = "0.1.0"

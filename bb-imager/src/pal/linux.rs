@@ -16,34 +16,40 @@ impl crate::common::Destination {
             os::fd::{FromRawFd, IntoRawFd},
         };
 
-        let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
+        if let Self::SdCard { path, .. } = self {
+            let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
-        let devs = dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", self.path.as_str().into())]),
-                HashMap::new(),
-            )
-            .await
-            .map_err(Error::from)?;
+            let devs = dbus_client
+                .manager()
+                .resolve_device(
+                    HashMap::from([("path", path.as_str().into())]),
+                    HashMap::new(),
+                )
+                .await
+                .map_err(Error::from)?;
 
-        let block = devs
-            .first()
-            .ok_or(Error::FailedToOpenDestionation(self.path.clone()))?
-            .to_owned();
+            let block = devs
+                .first()
+                .ok_or(Error::FailedToOpenDestionation(path.clone()))?
+                .to_owned();
 
-        let obj = dbus_client
-            .object(block)
-            .unwrap()
-            .block()
-            .await
-            .map_err(Error::from)?;
+            let obj = dbus_client
+                .object(block)
+                .unwrap()
+                .block()
+                .await
+                .map_err(Error::from)?;
 
-        let fd = obj
-            .open_device("rw", Default::default())
-            .await
-            .map_err(Error::from)?;
+            let fd = obj
+                .open_device("rw", Default::default())
+                .await
+                .map_err(Error::from)?;
 
-        Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
+            Ok(unsafe {
+                tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd())
+            })
+        } else {
+            unreachable!()
+        }
     }
 }
