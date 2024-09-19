@@ -34,6 +34,8 @@ linux_host:
     - APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage
   artifacts:
     paths:
+      - target/distrib/*.zip
+      - target/distrib/*.zip.*
       - target/distrib/*.tar.*
       - target/appimage/gui.AppImage
 
