@@ -12,10 +12,14 @@ use tokio::{
 
 impl crate::common::Destination {
     pub async fn open(&self) -> crate::error::Result<File> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || open_auth(path))
-            .await
-            .unwrap()
+        if let Self::SdCard { path, .. } = self {
+            let path = path.clone();
+            tokio::task::spawn_blocking(move || open_auth(path))
+                .await
+                .unwrap()
+        } else {
+            unreachable!()
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 use bb_imager::DownloadFlashingStatus;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{
+    ffi::CString,
     path::PathBuf,
     sync::{Once, OnceLock},
 };
@@ -31,6 +32,7 @@ enum Commands {
 enum FlashTarget {
     Bcf,
     Sd,
+    Msp430,
 }
 
 impl From<FlashTarget> for bb_imager::config::Flasher {
@@ -38,6 +40,7 @@ impl From<FlashTarget> for bb_imager::config::Flasher {
         match value {
             FlashTarget::Bcf => Self::BeagleConnectFreedom,
             FlashTarget::Sd => Self::SdCard,
+            FlashTarget::Msp430 => Self::Msp430Usb,
         }
     }
 }
@@ -63,12 +66,12 @@ async fn main() {
                     println!("| {: <12} | {: <12} |", "Sd Card", "Size");
                     println!("|--------------|--------------|");
                     for d in dsts {
-                        println!("| {: <12} | {: <12} |", d.path, d.size.unwrap())
+                        println!("| {: <12} | {: <12} |", d, d.size())
                     }
                 }
-                FlashTarget::Bcf => {
+                FlashTarget::Bcf | FlashTarget::Msp430 => {
                     for d in dsts {
-                        println!("{}", d.name)
+                        println!("{}", d)
                     }
                 }
             }
@@ -81,7 +84,8 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
     let dst = match target {
         FlashTarget::Bcf => bb_imager::Destination::port(dst),
-        FlashTarget::Sd => bb_imager::Destination::from_path(dst),
+        FlashTarget::Sd => bb_imager::Destination::sd_card(dst.clone(), 0, dst),
+        FlashTarget::Msp430 => bb_imager::Destination::hidraw(CString::new(dst).unwrap()),
     };
 
     if !quite {
@@ -182,6 +186,13 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                 user: None,
                 wifi: None,
             }),
+        ),
+        FlashTarget::Msp430 => bb_imager::Flasher::new(
+            bb_imager::SelectedImage::local(img),
+            dst,
+            downloader,
+            tx,
+            bb_imager::FlashingConfig::Msp430,
         ),
     };
 

@@ -1,7 +1,8 @@
 //! Stuff common to all the flashers
 
 use std::{
-    io::{Seek, SeekFrom, Write},
+    ffi::CString,
+    io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
     time::Duration,
 };
@@ -9,13 +10,13 @@ use thiserror::Error;
 use tokio::io::AsyncSeekExt;
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::flasher::{bcf, sd};
+use crate::flasher::{bcf, msp430, sd};
 
 pub(crate) const BUF_SIZE: usize = 32 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Failed to Open Destination")]
+    #[error("Failed to Open Destination: {0}")]
     FailedToOpenDestination(String),
 }
 
@@ -30,45 +31,71 @@ pub enum DownloadFlashingStatus {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
-pub struct Destination {
-    pub name: String,
-    pub path: String,
-    pub size: Option<u64>,
+pub enum Destination {
+    Port(String),
+    SdCard {
+        name: String,
+        path: String,
+        size: u64,
+    },
+    HidRaw(std::ffi::CString),
 }
 
 impl Destination {
-    pub fn port(name: String) -> Self {
-        Self {
-            name: name.clone(),
-            path: name,
-            size: None,
+    pub const fn port(name: String) -> Self {
+        Self::Port(name)
+    }
+
+    pub const fn size(&self) -> u64 {
+        if let Self::SdCard { size, .. } = self {
+            *size
+        } else {
+            0
         }
     }
 
-    pub(crate) const fn sd_card(name: String, size: u64, path: String) -> Self {
-        Self {
-            name,
-            path,
-            size: Some(size),
-        }
+    pub const fn sd_card(name: String, size: u64, path: String) -> Self {
+        Self::SdCard { name, path, size }
     }
 
-    pub fn from_path(path: String) -> Self {
-        Self {
-            name: path.clone(),
-            path,
-            size: None,
-        }
+    pub const fn hidraw(path: CString) -> Self {
+        Self::HidRaw(path)
     }
 
     pub fn open_port(&self) -> crate::error::Result<tokio_serial::SerialStream> {
-        tokio_serial::new(&self.name, 500000)
-            .timeout(Duration::from_millis(500))
-            .open_native_async()
-            .map_err(|_| {
-                Error::FailedToOpenDestination(format!("Failed to open serial port {}", self.name))
-            })
-            .map_err(Into::into)
+        if let Self::Port(path) = self {
+            tokio_serial::new(path, 500000)
+                .timeout(Duration::from_millis(500))
+                .open_native_async()
+                .map_err(|_| {
+                    Error::FailedToOpenDestination(format!("Failed to open serial port {}", path))
+                })
+                .map_err(Into::into)
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn open_hidraw(&self) -> crate::error::Result<hidapi::HidDevice> {
+        if let Self::HidRaw(path) = self {
+            hidapi::HidApi::new()
+                .map_err(|e| Error::FailedToOpenDestination(e.to_string()))?
+                .open_path(path)
+                .map_err(|e| Error::FailedToOpenDestination(e.to_string()))
+                .map_err(Into::into)
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+impl std::fmt::Display for Destination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Destination::Port(p) => write!(f, "{}", p),
+            Destination::SdCard { name, .. } => write!(f, "{}", name),
+            Destination::HidRaw(p) => write!(f, "{}", p.to_string_lossy()),
+        }
     }
 }
 
@@ -182,6 +209,27 @@ impl Flasher {
 
                 bcf::flash(img, port, &self.chan, config.verify).await
             }
+            FlashingConfig::Msp430 => {
+                let mut img = crate::img::OsImage::from_selected_image(
+                    self.img,
+                    &self.downloader,
+                    &self.chan,
+                )
+                .await?;
+                tracing::info!("Image opened");
+
+                let mut data = String::new();
+                img.read_to_string(&mut data).unwrap();
+
+                let data: Vec<&str> = data.split_whitespace().collect();
+
+                let mut bin = bin_file::BinFile::new();
+                bin.add_ihex(data, true).unwrap();
+
+                tokio::task::spawn_blocking(move || msp430::flash(bin, self.dst, &self.chan))
+                    .await
+                    .unwrap()
+            }
         }
     }
 }
@@ -190,6 +238,7 @@ impl Flasher {
 pub enum FlashingConfig {
     LinuxSd(FlashingSdLinuxConfig),
     Bcf(FlashingBcfConfig),
+    Msp430,
 }
 
 impl From<crate::config::Flasher> for FlashingConfig {
@@ -197,6 +246,7 @@ impl From<crate::config::Flasher> for FlashingConfig {
         match value {
             crate::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
             crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
+            crate::config::Flasher::Msp430Usb => Self::Msp430,
         }
     }
 }

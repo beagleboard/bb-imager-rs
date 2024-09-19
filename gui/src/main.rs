@@ -392,7 +392,7 @@ impl BBImager {
         });
 
         let choose_dst_btn = match &self.selected_dst {
-            Some(x) => button(x.name.as_str()),
+            Some(x) => button(text(x)),
             None => button("CHOOSE DESTINATION"),
         }
         .padding(HOME_BTN_PADDING)
@@ -570,15 +570,15 @@ impl BBImager {
             .destinations
             .iter()
             .filter(|x| {
-                x.name
+                x.to_string()
                     .to_lowercase()
                     .contains(&self.search_bar.to_lowercase())
             })
             .map(|x| {
-                let mut row2 = widget::column![text(x.name.as_str()),];
+                let mut row2 = widget::column![text(x),];
 
-                if let Some(size) = x.size {
-                    let s = (size as f32) / (1024.0 * 1024.0 * 1024.0);
+                if let bb_imager::Destination::SdCard { size, .. } = x {
+                    let s = (*size as f32) / (1024.0 * 1024.0 * 1024.0);
                     row2 = row2.push(text(format!("{:.2} GB", s)));
                 }
 
@@ -630,6 +630,7 @@ impl BBImager {
                     ))
                 }
             )],
+            bb_imager::FlashingConfig::Msp430 => widget::column([]),
         }
         .spacing(5)
         .width(iced::Length::Fill);
