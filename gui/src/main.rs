@@ -19,6 +19,8 @@ const FILE_ADD_ICON: &[u8] = include_bytes!("../../icons/file-add.svg");
 const USB_ICON: &[u8] = include_bytes!("../../icons/usb.svg");
 const REFRESH_ICON: &[u8] = include_bytes!("../../icons/refresh.svg");
 
+const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
+
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
 
@@ -223,7 +225,13 @@ impl BBImager {
                 }
             }
             BBImagerMessage::StartFlashing => {
-                self.screen = Screen::Flashing(Default::default());
+                self.screen = Screen::Flashing(FlashingScreen::new(
+                    self.selected_board
+                        .as_ref()
+                        .unwrap()
+                        .documentation
+                        .to_string(),
+                ));
 
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().unwrap();
@@ -331,7 +339,7 @@ impl BBImager {
     }
 
     const fn theme(&self) -> iced::Theme {
-        iced::Theme::KanagawaLotus
+        iced::Theme::Oxocarbon
     }
 }
 
@@ -350,22 +358,16 @@ impl BBImager {
     }
 
     fn home_view(&self) -> Element<BBImagerMessage> {
-        const HOME_BTN_PADDING: u16 = 10;
-
-        let logo = widget::image(widget::image::Handle::from_bytes(BB_BANNER)).width(500);
-
         let choose_device_btn = match &self.selected_board {
-            Some(x) => button(x.name.as_str()),
-            None => button("CHOOSE DEVICE"),
+            Some(x) => home_btn(x.name.as_str()),
+            None => home_btn("CHOOSE DEVICE"),
         }
-        .padding(HOME_BTN_PADDING)
         .on_press(BBImagerMessage::SwitchScreen(Screen::BoardSelection));
 
         let choose_image_btn = match &self.selected_image {
-            Some(x) => button(text(x.to_string())),
-            None => button("CHOOSE IMAGE"),
+            Some(x) => home_btn(x.to_string()),
+            None => home_btn("CHOOSE IMAGE"),
         }
-        .padding(HOME_BTN_PADDING)
         .on_press_maybe(if self.selected_board.is_none() {
             None
         } else {
@@ -373,21 +375,18 @@ impl BBImager {
         });
 
         let choose_dst_btn = match &self.selected_dst {
-            Some(x) => button(text(x.to_string())),
-            None => button("CHOOSE DESTINATION"),
+            Some(x) => home_btn(x.to_string()),
+            None => home_btn("CHOOSE DESTINATION"),
         }
-        .padding(HOME_BTN_PADDING)
         .on_press_maybe(if self.selected_image.is_none() {
             None
         } else {
             Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
         });
 
-        let reset_btn = button("RESET")
-            .padding(HOME_BTN_PADDING)
-            .on_press(BBImagerMessage::Reset);
+        let reset_btn = home_btn("RESET").on_press(BBImagerMessage::Reset);
 
-        let next_btn = button("NEXT").padding(HOME_BTN_PADDING).on_press_maybe(
+        let next_btn = home_btn("NEXT").on_press_maybe(
             if self.selected_board.is_none()
                 || self.selected_image.is_none()
                 || self.selected_dst.is_none()
@@ -400,29 +399,35 @@ impl BBImager {
 
         let choice_btn_row = widget::row![
             widget::column![text("Board"), choose_device_btn]
-                .spacing(5)
+                .spacing(8)
+                .width(iced::Length::FillPortion(1))
                 .align_x(iced::Alignment::Center),
-            widget::horizontal_space(),
             widget::column![text("Image"), choose_image_btn]
-                .spacing(5)
+                .spacing(8)
+                .width(iced::Length::FillPortion(1))
                 .align_x(iced::Alignment::Center),
-            widget::horizontal_space(),
             widget::column![text("Destination"), choose_dst_btn]
-                .spacing(5)
+                .spacing(8)
+                .width(iced::Length::FillPortion(1))
                 .align_x(iced::Alignment::Center)
         ]
+        .padding(64)
+        .spacing(48)
         .width(iced::Length::Fill)
         .height(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
-        let action_btn_row = widget::row![reset_btn, widget::horizontal_space(), next_btn]
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_y(iced::Alignment::Center);
+        let action_btn_row = widget::row![
+            reset_btn.width(iced::Length::FillPortion(1)),
+            widget::horizontal_space().width(iced::Length::FillPortion(5)),
+            next_btn.width(iced::Length::FillPortion(1))
+        ]
+        .padding(64)
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .align_y(iced::Alignment::Center);
 
-        widget::column![logo, choice_btn_row, action_btn_row]
-            .spacing(5)
-            .padding(64)
+        widget::column![logo(), choice_btn_row, action_btn_row]
             .width(iced::Length::Fill)
             .height(iced::Length::Fill)
             .align_x(iced::Alignment::Center)
@@ -735,9 +740,15 @@ impl Default for FlashingScreen {
 }
 
 impl FlashingScreen {
+    fn new(documentation: String) -> Self {
+        Self {
+            documentation,
+            ..Default::default()
+        }
+    }
+
     fn view(&self) -> Element<BBImagerMessage> {
-        let logo = widget::image(widget::image::Handle::from_bytes(BB_BANNER)).width(500);
-        let (progress_label, progress_bar) = self.progress.bar();
+        let prog_bar = self.progress.bar();
 
         let btn = if self.progress.state == ProgressBarStatus::Fail
             || self.progress.state == ProgressBarStatus::Success
@@ -749,29 +760,30 @@ impl FlashingScreen {
         .padding(10);
 
         widget::column![
-            logo,
+            logo(),
             widget::vertical_space(),
-            button("The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.")
-                .style(widget::button::text)
-                .on_press(BBImagerMessage::OpenUrl(
-                    "https://www.beagleboard.org/about".into()
-                )),
-            button("For more information, check out our documentation")
-                .style(widget::button::text)
-                .on_press(BBImagerMessage::OpenUrl(
-                    self.documentation.clone()
-                        .into()
-                )),
+            self.about(),
             widget::vertical_space(),
             btn,
-            progress_label,
-            progress_bar
+            prog_bar
         ]
         .spacing(10)
-        .padding(30)
         .width(iced::Length::Fill)
         .height(iced::Length::Fill)
         .align_x(iced::Alignment::Center)
+        .into()
+    }
+
+    fn about(&self) -> Element<'_, BBImagerMessage> {
+        widget::container(widget::rich_text![
+            widget::span(BEAGLE_BOARD_ABOUT).link(BBImagerMessage::OpenUrl(
+                "https://www.beagleboard.org/about".into()
+            )),
+            widget::span("\n\n"),
+            widget::span("For more information, check out our documentation")
+                .link(BBImagerMessage::OpenUrl(self.documentation.clone().into()))
+        ])
+        .padding(30)
         .into()
     }
 }
@@ -838,18 +850,21 @@ impl ProgressBarState {
         Self::new(label, 1.0, ProgressBarStatus::Fail)
     }
 
-    fn bar(&self) -> (widget::Text, widget::ProgressBar) {
+    fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
         use std::ops::RangeInclusive;
         use widget::progress_bar;
 
         const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
 
-        (
+        widget::column![
             text(self.label.clone()),
             progress_bar(RANGE, self.progress)
                 .height(10)
                 .style(self.state.style()),
-        )
+        ]
+        .align_x(iced::Alignment::Center)
+        .padding(30)
+        .spacing(10)
     }
 }
 
@@ -1008,4 +1023,24 @@ fn element_with_label<'a>(
         .padding(10)
         .spacing(10)
         .align_y(iced::Alignment::Center)
+}
+
+fn home_btn<'a>(txt: impl text::IntoFragment<'a>) -> widget::Button<'a, BBImagerMessage> {
+    const HOME_BTN_PADDING: u16 = 16;
+
+    button(
+        text(txt)
+            .align_x(iced::Alignment::Center)
+            .align_y(iced::Alignment::Center)
+            .width(iced::Length::Fill),
+    )
+    .width(iced::Length::Fill)
+    .padding(HOME_BTN_PADDING)
+}
+
+fn logo<'a>() -> widget::Container<'a, BBImagerMessage> {
+    widget::container(widget::image(widget::image::Handle::from_bytes(BB_BANNER)).width(500))
+        .padding(64)
+        .width(iced::Length::Fill)
+        .style(|_| widget::container::background(iced::Color::WHITE))
 }
