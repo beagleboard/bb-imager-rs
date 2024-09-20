@@ -40,7 +40,7 @@ impl MSP430 {
     fn request(cmd: u8, data: &[u8]) -> Vec<u8> {
         [USB_MSG_HEADER, (data.len() + 1) as u8, cmd]
             .into_iter()
-            .chain(data.into_iter().cloned())
+            .chain(data.iter().cloned())
             .collect()
     }
 
@@ -57,7 +57,7 @@ impl MSP430 {
     fn cmd(&self, cmd: u8, data: &[u8]) -> Result<Vec<u8>> {
         let mut ans = [0u8; 256];
 
-        let req = Vec::from(Self::request(cmd, data));
+        let req = Self::request(cmd, data);
         self.0
             .write(&req)
             .map_err(|e| Error::FailedToWrite(e.to_string()))?;
@@ -117,7 +117,7 @@ impl MSP430 {
         let addr = three_bytes(addr);
         let data: Vec<u8> = addr
             .into_iter()
-            .chain(block[..bytes_to_write].into_iter().cloned())
+            .chain(block[..bytes_to_write].iter().cloned())
             .collect();
 
         self.cmd_no_resp(CMD_RX_DATA_BLOCK_FAST, &data)?;

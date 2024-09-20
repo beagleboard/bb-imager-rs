@@ -290,7 +290,7 @@ impl BeagleConnectFreedom {
 
 impl Drop for BeagleConnectFreedom {
     fn drop(&mut self) {
-        let _ = self.send_reset();
+        let _ = futures::executor::block_on(async move { self.send_reset().await });
     }
 }
 

@@ -1,7 +1,7 @@
 //! Module for downloading remote images for flashing
 
 use directories::ProjectDirs;
-use futures_util::{Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use sha2::{Digest as _, Sha256};
 use std::{
     io,
