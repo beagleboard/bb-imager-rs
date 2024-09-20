@@ -11,9 +11,9 @@ A Rust rewrite of [bb-imager](https://openbeagle.org/beagleboard/bb-imager) with
 - [ ] Supported Flashers
     - [x] Generic Linux (BeaglePlay, Beagle AI64, etc)
     - [x] BeagleConnect Freedom
-    - [ ] BeagleConnect Freedom MSP430
+    - [x] BeagleConnect Freedom MSP430
     - [ ] BeaglePlay CC1352
-- [ ] Support flash time configuration (ssh, wifi, etc)
+- [x] Support flash time configuration (ssh, wifi, etc)
 - [ ] Remote `config.json` file
 
 # Run
