@@ -1,4 +1,4 @@
-# BB Imager Rust
+# BeagleBoard Imager Rust
 
 A Rust rewrite of [bb-imager](https://openbeagle.org/beagleboard/bb-imager) with support for flashing boards not using Linux.
 
@@ -27,3 +27,9 @@ cargo run --package gui --release
 The boards and images are configured using a `config.json` file. This file will typically reside in a remote server. It is quite similar to the one used in `bb-imager` with slight modifications to allow use with non-linux targets along with more verfication.
 
 See [config.json](config.json) for example.
+
+# Screenshots
+
+![BBImager Home Screen](assets/screenshots/home.png)
+![BBImager Configuration Screen](assets/screenshots/config.png)
+![BBImager Flashing Screen](assets/screenshots/flash.png)
