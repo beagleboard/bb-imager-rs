@@ -3,32 +3,24 @@
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use futures_util::SinkExt;
+use helpers::ProgressBarState;
 use iced::{
     widget::{self, button, text},
     Element, Task,
 };
 
-// TODO: Load Config from network
-const CONFIG: &[u8] = include_bytes!("../../config.json");
-
-const WINDOW_ICON: &[u8] = include_bytes!("../icon.png");
-const BB_BANNER: &[u8] = include_bytes!("../../icons/bb-banner.png");
-const ARROW_BACK_ICON: &[u8] = include_bytes!("../../icons/arrow-back.svg");
-const DOWNLOADING_ICON: &[u8] = include_bytes!("../../icons/downloading.svg");
-const FILE_ADD_ICON: &[u8] = include_bytes!("../../icons/file-add.svg");
-const USB_ICON: &[u8] = include_bytes!("../../icons/usb.svg");
-const REFRESH_ICON: &[u8] = include_bytes!("../../icons/refresh.svg");
-
-const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
+mod constants;
+mod helpers;
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
 
-    let icon = iced::window::icon::from_file_data(WINDOW_ICON, None).ok();
-
+    let icon = iced::window::icon::from_file_data(constants::WINDOW_ICON, None).ok();
     assert!(icon.is_some());
 
-    let config = bb_imager::config::Config::from_json(CONFIG).expect("Failed to parse config");
+    // TODO: Load Config from network
+    let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)
+        .expect("Failed to parse config");
 
     iced::application("BeagleBoard Imager", BBImager::update, BBImager::view)
         .theme(BBImager::theme)
@@ -284,7 +276,7 @@ impl BBImager {
                 return Task::stream(s);
             }
             BBImagerMessage::StopFlashing(x) => {
-                let content = x.label.to_string();
+                let content = x.content();
 
                 let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
                 let notification_task = Task::perform(
@@ -427,7 +419,7 @@ impl BBImager {
         .height(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
-        widget::column![logo(), choice_btn_row, action_btn_row]
+        widget::column![helpers::logo(), choice_btn_row, action_btn_row]
             .width(iced::Length::Fill)
             .height(iced::Length::Fill)
             .align_x(iced::Alignment::Center)
@@ -447,9 +439,11 @@ impl BBImager {
             .map(|x| {
                 let image: Element<BBImagerMessage> = match &x.icon_local {
                     Some(y) => img_or_svg(y, 100),
-                    None => widget::svg(widget::svg::Handle::from_memory(DOWNLOADING_ICON))
-                        .width(40)
-                        .into(),
+                    None => widget::svg(widget::svg::Handle::from_memory(
+                        constants::DOWNLOADING_ICON,
+                    ))
+                    .width(40)
+                    .into(),
                 };
 
                 button(
@@ -501,7 +495,10 @@ impl BBImager {
 
                 let icon = match &x.icon_local {
                     Some(y) => img_or_svg(y, 80),
-                    None => widget::svg(widget::svg::Handle::from_memory(DOWNLOADING_ICON)).into(),
+                    None => widget::svg(widget::svg::Handle::from_memory(
+                        constants::DOWNLOADING_ICON,
+                    ))
+                    .into(),
                 };
 
                 button(
@@ -526,7 +523,8 @@ impl BBImager {
             .chain(std::iter::once(
                 button(
                     widget::row![
-                        widget::svg(widget::svg::Handle::from_memory(FILE_ADD_ICON)).width(100),
+                        widget::svg(widget::svg::Handle::from_memory(constants::FILE_ADD_ICON))
+                            .width(100),
                         text("Use Custom Image").size(18),
                     ]
                     .spacing(10),
@@ -566,7 +564,8 @@ impl BBImager {
 
                 button(
                     widget::row![
-                        widget::svg(widget::svg::Handle::from_memory(USB_ICON)).width(40),
+                        widget::svg(widget::svg::Handle::from_memory(constants::USB_ICON))
+                            .width(40),
                         row2
                     ]
                     .align_y(iced::Alignment::Center)
@@ -673,7 +672,7 @@ impl BBImager {
             )
             .padding(10)
             .style(widget::container::bordered_box),
-            widget::container(input_with_label(
+            widget::container(helpers::input_with_label(
                 "Set Hostname",
                 "beagle",
                 config.hostname.as_deref().unwrap_or_default(),
@@ -683,9 +682,12 @@ impl BBImager {
                 }
             ))
             .style(widget::container::bordered_box),
-            widget::container(element_with_label("Set Timezone", timezone_box.into()))
-                .style(widget::container::bordered_box),
-            widget::container(element_with_label("Set Keymap", keymap_box.into()))
+            widget::container(helpers::element_with_label(
+                "Set Timezone",
+                timezone_box.into()
+            ))
+            .style(widget::container::bordered_box),
+            widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
                 .style(widget::container::bordered_box),
             uname_pass_form(config),
             wifi_form(config)
@@ -694,7 +696,7 @@ impl BBImager {
 
     fn search_bar(&self, refresh: Option<BBImagerMessage>) -> Element<BBImagerMessage> {
         let mut row = widget::row![button(
-            widget::svg(widget::svg::Handle::from_memory(ARROW_BACK_ICON)).width(22)
+            widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22)
         )
         .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
         .style(widget::button::secondary)]
@@ -702,9 +704,12 @@ impl BBImager {
 
         if let Some(r) = refresh {
             row = row.push(
-                button(widget::svg(widget::svg::Handle::from_memory(REFRESH_ICON)).width(22))
-                    .on_press(r)
-                    .style(widget::button::secondary),
+                button(
+                    widget::svg(widget::svg::Handle::from_memory(constants::REFRESH_ICON))
+                        .width(22),
+                )
+                .on_press(r)
+                .style(widget::button::secondary),
             );
         }
 
@@ -750,17 +755,15 @@ impl FlashingScreen {
     fn view(&self) -> Element<BBImagerMessage> {
         let prog_bar = self.progress.bar();
 
-        let btn = if self.progress.state == ProgressBarStatus::Fail
-            || self.progress.state == ProgressBarStatus::Success
-        {
-            button("HOME").on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-        } else {
+        let btn = if self.progress.running() {
             button("CANCEL").on_press(BBImagerMessage::CancelFlashing)
+        } else {
+            button("HOME").on_press(BBImagerMessage::SwitchScreen(Screen::Home))
         }
         .padding(10);
 
         widget::column![
-            logo(),
+            helpers::logo(),
             widget::vertical_space(),
             self.about(),
             widget::vertical_space(),
@@ -776,7 +779,7 @@ impl FlashingScreen {
 
     fn about(&self) -> Element<'_, BBImagerMessage> {
         widget::container(widget::rich_text![
-            widget::span(BEAGLE_BOARD_ABOUT).link(BBImagerMessage::OpenUrl(
+            widget::span(constants::BEAGLE_BOARD_ABOUT).link(BBImagerMessage::OpenUrl(
                 "https://www.beagleboard.org/about".into()
             )),
             widget::span("\n\n"),
@@ -801,107 +804,6 @@ fn img_or_svg(path: &std::path::Path, width: u16) -> Element<BBImagerMessage> {
             .width(width)
             .height(width)
             .into(),
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-struct ProgressBarState {
-    label: Cow<'static, str>,
-    progress: f32,
-    state: ProgressBarStatus,
-}
-
-impl ProgressBarState {
-    const FLASHING_SUCCESS: Self =
-        Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success);
-    const PREPARING: Self = Self::loading("Preparing...");
-    const VERIFYING: Self = Self::loading("Verifying...");
-
-    const fn const_new(label: &'static str, progress: f32, state: ProgressBarStatus) -> Self {
-        Self {
-            label: Cow::Borrowed(label),
-            progress,
-            state,
-        }
-    }
-
-    fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
-        Self {
-            label: label.into(),
-            progress,
-            state,
-        }
-    }
-
-    /// Progress should be between 0 to 1.0
-    fn progress(prefix: &'static str, progress: f32) -> Self {
-        Self::new(
-            format!("{prefix}... {}%", (progress * 100.0).round() as usize),
-            progress,
-            ProgressBarStatus::Normal,
-        )
-    }
-
-    const fn loading(label: &'static str) -> Self {
-        Self::const_new(label, 0.5, ProgressBarStatus::Loading)
-    }
-
-    fn fail(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(label, 1.0, ProgressBarStatus::Fail)
-    }
-
-    fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
-        use std::ops::RangeInclusive;
-        use widget::progress_bar;
-
-        const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
-
-        widget::column![
-            text(self.label.clone()),
-            progress_bar(RANGE, self.progress)
-                .height(10)
-                .style(self.state.style()),
-        ]
-        .align_x(iced::Alignment::Center)
-        .padding(30)
-        .spacing(10)
-    }
-}
-
-impl From<bb_imager::DownloadFlashingStatus> for ProgressBarState {
-    fn from(value: bb_imager::DownloadFlashingStatus) -> Self {
-        match value {
-            bb_imager::DownloadFlashingStatus::Preparing => Self::PREPARING,
-            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
-                Self::progress("Downloading Image", p)
-            }
-            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => Self::progress("Flashing", p),
-            bb_imager::DownloadFlashingStatus::Verifying => Self::VERIFYING,
-            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
-                Self::progress("Verifying", p)
-            }
-            bb_imager::DownloadFlashingStatus::Finished => Self::FLASHING_SUCCESS,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum ProgressBarStatus {
-    #[default]
-    Normal,
-    Success,
-    Fail,
-    Loading,
-}
-
-impl ProgressBarStatus {
-    fn style(&self) -> impl Fn(&widget::Theme) -> widget::progress_bar::Style {
-        match self {
-            ProgressBarStatus::Normal => widget::progress_bar::primary,
-            ProgressBarStatus::Success => widget::progress_bar::success,
-            ProgressBarStatus::Fail => widget::progress_bar::danger,
-            ProgressBarStatus::Loading => widget::progress_bar::primary,
-        }
     }
 }
 
@@ -941,13 +843,13 @@ fn uname_pass_form(
 
     if let Some((u, p)) = &config.user {
         form = form.extend([
-            input_with_label("Username", "username", u, |inp| {
+            helpers::input_with_label("Username", "username", u, |inp| {
                 bb_imager::FlashingConfig::LinuxSd(
                     config.clone().update_user(Some((inp, p.clone()))),
                 )
             })
             .into(),
-            input_with_label("Password", "password", p, |inp| {
+            helpers::input_with_label("Password", "password", p, |inp| {
                 bb_imager::FlashingConfig::LinuxSd(
                     config.clone().update_user(Some((u.clone(), inp))),
                 )
@@ -977,13 +879,13 @@ fn wifi_form(config: &bb_imager::FlashingSdLinuxConfig) -> widget::Container<BBI
 
     if let Some((ssid, psk)) = &config.wifi {
         form = form.extend([
-            input_with_label("SSID", "SSID", ssid, |inp| {
+            helpers::input_with_label("SSID", "SSID", ssid, |inp| {
                 bb_imager::FlashingConfig::LinuxSd(
                     config.clone().update_wifi(Some((inp, psk.clone()))),
                 )
             })
             .into(),
-            input_with_label("Password", "password", psk, |inp| {
+            helpers::input_with_label("Password", "password", psk, |inp| {
                 bb_imager::FlashingConfig::LinuxSd(
                     config.clone().update_wifi(Some((ssid.clone(), inp))),
                 )
@@ -997,37 +899,7 @@ fn wifi_form(config: &bb_imager::FlashingSdLinuxConfig) -> widget::Container<BBI
         .style(widget::container::bordered_box)
 }
 
-fn input_with_label<'a, F>(
-    label: &'static str,
-    placeholder: &'static str,
-    val: &'a str,
-    func: F,
-) -> widget::Row<'a, BBImagerMessage>
-where
-    F: 'a + Fn(String) -> bb_imager::FlashingConfig,
-{
-    element_with_label(
-        label,
-        widget::text_input(placeholder, val)
-            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(func(inp)))
-            .width(200)
-            .into(),
-    )
-}
-
-fn element_with_label<'a>(
-    label: &'static str,
-    el: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![text(label), widget::horizontal_space(), el]
-        .padding(10)
-        .spacing(10)
-        .align_y(iced::Alignment::Center)
-}
-
 fn home_btn<'a>(txt: impl text::IntoFragment<'a>) -> widget::Button<'a, BBImagerMessage> {
-    const HOME_BTN_PADDING: u16 = 16;
-
     button(
         text(txt)
             .align_x(iced::Alignment::Center)
@@ -1035,12 +907,5 @@ fn home_btn<'a>(txt: impl text::IntoFragment<'a>) -> widget::Button<'a, BBImager
             .width(iced::Length::Fill),
     )
     .width(iced::Length::Fill)
-    .padding(HOME_BTN_PADDING)
-}
-
-fn logo<'a>() -> widget::Container<'a, BBImagerMessage> {
-    widget::container(widget::image(widget::image::Handle::from_bytes(BB_BANNER)).width(500))
-        .padding(64)
-        .width(iced::Length::Fill)
-        .style(|_| widget::container::background(iced::Color::WHITE))
+    .padding(16)
 }

@@ -479,7 +479,7 @@ dependencies = [
  "directories",
  "fatfs",
  "fscommon",
- "futures-util",
+ "futures",
  "hidapi",
  "liblzma",
  "mbrman",
