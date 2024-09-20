@@ -10,9 +10,7 @@ bb-imager = { path = "../bb-imager" }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 iced_aw = { version = "0.10.0", default-features = false, features = ["badge"] }
-url = "2.5.2"
 image = "0.25.2"
-futures-util = "0.3.30"
 tokio = { version = "1.39.2", default-features = false, features = ["macros"] }
 webbrowser = "1.0.1"
 notify-rust = "4.11.1"

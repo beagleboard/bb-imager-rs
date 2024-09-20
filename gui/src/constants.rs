@@ -1,4 +1,5 @@
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
+pub const APP_NAME: &str = "BeagleBoard Imager";
 
 pub const WINDOW_ICON: &[u8] = include_bytes!("../icon.png");
 pub const BB_BANNER: &[u8] = include_bytes!("../../icons/bb-banner.png");

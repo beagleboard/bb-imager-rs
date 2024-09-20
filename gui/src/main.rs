@@ -2,9 +2,9 @@
 
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
-use futures_util::SinkExt;
 use helpers::ProgressBarState;
 use iced::{
+    futures::SinkExt,
     widget::{self, button, text},
     Element, Task,
 };
@@ -22,8 +22,14 @@ fn main() -> iced::Result {
     let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)
         .expect("Failed to parse config");
 
-    iced::application("BeagleBoard Imager", BBImager::update, BBImager::view)
+    let settings = iced::window::Settings {
+        min_size: Some(iced::Size::new(850.0, 720.0)),
+        ..Default::default()
+    };
+
+    iced::application(constants::APP_NAME, BBImager::update, BBImager::view)
         .theme(BBImager::theme)
+        .window(settings)
         .run_with(move || BBImager::new(config))
 }
 
@@ -279,21 +285,19 @@ impl BBImager {
                 let content = x.content();
 
                 let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
-                let notification_task = Task::perform(
-                    async move {
-                        let res = tokio::task::spawn_blocking(move || {
-                            notify_rust::Notification::new()
-                                .appname("BeagleBoard Imager")
-                                .body(&content)
-                                .finalize()
-                                .show()
-                        })
-                        .await
-                        .unwrap();
-                        tracing::debug!("Notification response {res:?}");
-                    },
-                    |_| BBImagerMessage::Null,
-                );
+                let notification_task = Task::future(async move {
+                    let res = tokio::task::spawn_blocking(move || {
+                        notify_rust::Notification::new()
+                            .appname("BeagleBoard Imager")
+                            .body(&content)
+                            .finalize()
+                            .show()
+                    })
+                    .await
+                    .unwrap();
+                    tracing::debug!("Notification response {res:?}");
+                    BBImagerMessage::Null
+                });
 
                 return Task::batch([progress_task, notification_task]);
             }
@@ -305,13 +309,11 @@ impl BBImager {
             }
             BBImagerMessage::UpdateFlashConfig(x) => self.flashing_config = Some(x),
             BBImagerMessage::OpenUrl(x) => {
-                return Task::perform(
-                    async move {
-                        let res = webbrowser::open(&x);
-                        tracing::info!("Open Url Resp {res:?}");
-                    },
-                    |_| BBImagerMessage::Null,
-                );
+                return Task::future(async move {
+                    let res = webbrowser::open(&x);
+                    tracing::info!("Open Url Resp {res:?}");
+                    BBImagerMessage::Null
+                });
             }
             BBImagerMessage::Null => {}
         };
@@ -344,9 +346,10 @@ impl BBImager {
     fn refresh_destinations(&self) -> Task<BBImagerMessage> {
         let flasher = self.selected_board.clone().unwrap().flasher;
 
-        Task::perform(async move { flasher.destinations().await }, |x| {
-            BBImagerMessage::Destinations(x)
-        })
+        Task::perform(
+            async move { flasher.destinations().await },
+            BBImagerMessage::Destinations,
+        )
     }
 
     fn home_view(&self) -> Element<BBImagerMessage> {
@@ -589,15 +592,15 @@ impl BBImager {
 
     fn extra_config_view(&self) -> Element<BBImagerMessage> {
         let action_btn_row = widget::row![
-            button("BACK")
-                .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-                .padding(10),
-            widget::horizontal_space(),
-            button("WRITE")
+            home_btn("BACK")
+                .width(iced::Length::FillPortion(1))
+                .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
+            widget::horizontal_space().width(iced::Length::FillPortion(5)),
+            home_btn("WRITE")
+                .width(iced::Length::FillPortion(1))
                 .on_press(BBImagerMessage::StartFlashing)
-                .padding(10)
         ]
-        .padding(40)
+        .padding(32)
         .width(iced::Length::Fill);
 
         let form = match self.flashing_config.as_ref().unwrap() {
@@ -614,15 +617,16 @@ impl BBImager {
         .spacing(5)
         .width(iced::Length::Fill);
 
-        let form = widget::scrollable(form.push(action_btn_row));
-
         widget::column![
             text("Extra Configuration").size(28),
             widget::horizontal_rule(2),
             form,
+            widget::vertical_space(),
+            action_btn_row
         ]
         .spacing(10)
         .padding(10)
+        .height(iced::Length::Fill)
         .width(iced::Length::Fill)
         .align_x(iced::Alignment::Center)
         .into()
@@ -671,6 +675,7 @@ impl BBImager {
                     })
             )
             .padding(10)
+            .width(iced::Length::Fill)
             .style(widget::container::bordered_box),
             widget::container(helpers::input_with_label(
                 "Set Hostname",
@@ -689,8 +694,8 @@ impl BBImager {
             .style(widget::container::bordered_box),
             widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
                 .style(widget::container::bordered_box),
-            uname_pass_form(config),
-            wifi_form(config)
+            uname_pass_form(config).width(iced::Length::Fill),
+            wifi_form(config).width(iced::Length::Fill)
         ]
     }
 
