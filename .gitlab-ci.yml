@@ -23,21 +23,14 @@ linux_host:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends file wget libudev-dev gcc-mingw-w64
     - curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.20.0/cargo-dist-installer.sh | sh
-    - cargo install cargo-appimage
-    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
-    - chmod +x /usr/local/bin/appimagetool
-    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add x86_64-pc-windows-gnu
   script:
     - cargo dist build --target x86_64-pc-windows-gnu --target x86_64-unknown-linux-gnu
-    - cd gui
-    - APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage
   artifacts:
     paths:
       - target/distrib/*.zip
       - target/distrib/*.zip.*
       - target/distrib/*.tar.*
-      - target/appimage/gui.AppImage
 
 macos:
   image: macos-14-xcode-15
@@ -54,3 +47,34 @@ macos:
   artifacts:
     paths:
       - target/distrib/*.tar.*
+
+deploy:
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "running release_job for $CI_COMMIT_TAG"
+    - echo "Upload artifacts"
+    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/gui-x86_64-pc-windows-gnu.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-pc-windows-gnu.zip'
+    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/gui-x86_64-unknown-linux-gnu.tar.xz ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-unknown-linux-gnu.tar.xz'
+    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/cli-x86_64-pc-windows-gnu.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-pc-windows-gnu.zip'
+    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/cli-x86_64-unknown-linux-gnu.tar.xz ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-unknown-linux-gnu.tar.xz'
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: 'BeagleBoard Imager $CI_COMMIT_TAG'
+    description: 'BeagleBoard Image Flasher $CI_COMMIT_TAG'
+    assets:
+      links:
+        - name: 'x86_64-bb-imager-gui-windows'
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-pc-windows-gnu.zip'
+          link_type: 'package'
+        - name: 'x86_64-bb-imager-gui-linux'
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-unknown-linux-gnu.tar.xz'
+          link_type: 'package'
+        - name: 'x86_64-bb-imager-cli-windows'
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-pc-windows-gnu.zip'
+          link_type: 'package'
+        - name: 'x86_64-bb-imager-cli-linux'
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/cli-x86_64-unknown-linux-gnu.tar.xz'
+          link_type: 'package'
