@@ -27,7 +27,6 @@ pub enum DownloadFlashingStatus {
     FlashingProgress(f32),
     Verifying,
     VerifyingProgress(f32),
-    Finished,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]

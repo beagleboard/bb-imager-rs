@@ -96,7 +96,7 @@ impl ProgressBarState {
         const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
 
         widget::column![
-            text(self.label.clone()),
+            text(self.label.clone()).color(iced::Color::WHITE),
             progress_bar(RANGE, self.progress)
                 .height(10)
                 .style(self.state.style()),
@@ -119,7 +119,6 @@ impl From<bb_imager::DownloadFlashingStatus> for ProgressBarState {
             bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
                 Self::progress("Verifying", p)
             }
-            bb_imager::DownloadFlashingStatus::Finished => Self::FLASHING_SUCCESS,
         }
     }
 }
@@ -150,5 +149,4 @@ pub fn logo<'a>() -> widget::Container<'a, BBImagerMessage> {
     )
     .padding(64)
     .width(iced::Length::Fill)
-    .style(|_| widget::container::background(iced::Color::WHITE))
 }
