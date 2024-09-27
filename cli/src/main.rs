@@ -153,13 +153,6 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
 
                         bar.set_position((p * 100.0) as u64);
                     }
-                    DownloadFlashingStatus::Finished => {
-                        if let Some(x) = VERIFYING.get() {
-                            if !x.is_finished() {
-                                x.finish()
-                            }
-                        }
-                    }
                 };
             }
         });

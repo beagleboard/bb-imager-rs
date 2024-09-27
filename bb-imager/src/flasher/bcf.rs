@@ -288,12 +288,6 @@ impl BeagleConnectFreedom {
     }
 }
 
-impl Drop for BeagleConnectFreedom {
-    fn drop(&mut self) {
-        let _ = futures::executor::block_on(async move { self.send_reset().await });
-    }
-}
-
 fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
@@ -347,7 +341,7 @@ pub async fn flash(
         )));
     }
 
-    if verify {
+    let res = if verify {
         let _ = chan.try_send(crate::DownloadFlashingStatus::Verifying);
         if bcf.verify(img_crc32).await? {
             info!("Flashing Successful");
@@ -358,7 +352,11 @@ pub async fn flash(
         }
     } else {
         Ok(())
-    }
+    };
+
+    let _ = bcf.send_reset();
+
+    res
 }
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {

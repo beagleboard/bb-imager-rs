@@ -187,8 +187,6 @@ pub fn flash(
     tracing::info!("Flashing");
     msp430.load_binfile(&img)?;
 
-    let _ = chan.try_send(crate::DownloadFlashingStatus::Finished);
-
     Ok(())
 }
 
