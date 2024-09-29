@@ -71,7 +71,7 @@ impl Config {
     pub fn images_by_device<'a>(
         &'a self,
         device: &'a Device,
-    ) -> impl Iterator<Item = &OsList> + 'a {
+    ) -> impl Iterator<Item = &'a OsList> + 'a {
         self.os_list
             .iter()
             .filter(|x| x.devices.contains(&device.name))
