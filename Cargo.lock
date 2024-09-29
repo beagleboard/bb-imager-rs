@@ -503,8 +503,7 @@ dependencies = [
 [[package]]
 name = "bin_file"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6992a872d89b4372adb176ab4e7d95c92d70f50565f5ffa2fc934f1b80d06361"
+source = "git+https://gitlab.com/Ayush1325/bin_file.git?branch=from-str#ffe1456b92286ec678231f7877274f98832258c2"
 dependencies = [
  "ansi_term",
  "bytesize",

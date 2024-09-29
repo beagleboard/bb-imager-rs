@@ -25,7 +25,7 @@ fatfs = "0.3.6"
 fscommon = "0.1.1"
 mbrman = "0.5.2"
 hidapi = "2.6.3"
-bin_file = "0.1.1"
+bin_file = { git = "https://gitlab.com/Ayush1325/bin_file.git", branch = "from-str" }
 futures = "0.3.30"
 
 [target.'cfg(target_os = "linux")'.dependencies]

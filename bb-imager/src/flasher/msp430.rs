@@ -154,9 +154,8 @@ fn load_bsl(dst: &crate::Destination) -> Result<()> {
     tracing::info!("Unlock");
     msp430.unlock()?;
 
-    let mut bin = bin_file::BinFile::new();
-    let ti_txt: Vec<&str> = BSL.lines().collect();
-    bin.add_ti_txt(&ti_txt, true).unwrap();
+    let bin = bin_file::BinFile::from_str(BSL).unwrap();
+    tracing::info!("BSL: {}", bin);
 
     tracing::info!("Load BSL");
     msp430.load_binfile(&bin)?;
