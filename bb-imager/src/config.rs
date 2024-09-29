@@ -91,7 +91,7 @@ impl Flasher {
         match self {
             Flasher::SdCard => ("image", &["img", "xz"]),
             Flasher::BeagleConnectFreedom => ("firmware", &["bin", "xz"]),
-            Flasher::Msp430Usb => ("firmware", &["hex"]),
+            Flasher::Msp430Usb => ("firmware", &["hex", "txt", "xz"]),
         }
     }
 }
