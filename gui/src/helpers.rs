@@ -60,10 +60,6 @@ impl ProgressBarState {
         self.label.to_string()
     }
 
-    pub fn running(&self) -> bool {
-        self.state != ProgressBarStatus::Fail || self.state != ProgressBarStatus::Success
-    }
-
     fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
         Self {
             label: label.into(),
