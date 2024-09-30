@@ -292,8 +292,30 @@ fn progress(off: u32) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
+fn open_firmware(mut img: crate::img::OsImage) -> Result<Vec<u8>> {
+    let mut img_data = Vec::with_capacity(FIRMWARE_SIZE as usize);
+    img.read_to_end(&mut img_data)
+        .map_err(|_| Error::InvalidImage)?;
+
+    match String::from_utf8(img_data) {
+        Ok(x) => bin_file::BinFile::from_str(x)
+            .map_err(|_| Error::InvalidImage)?
+            .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xFF))
+            .map_err(|_| Error::InvalidImage.into())
+            .map(|x| x.to_vec()),
+        Err(e) => {
+            let img_data = e.into_bytes();
+            if img_data.len() != FIRMWARE_SIZE as usize {
+                Err(Error::InvalidImage.into())
+            } else {
+                Ok(img_data)
+            }
+        }
+    }
+}
+
 pub async fn flash(
-    mut img: crate::img::OsImage,
+    img: crate::img::OsImage,
     port: tokio_serial::SerialStream,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
     verify: bool,
@@ -301,11 +323,7 @@ pub async fn flash(
     let mut bcf = BeagleConnectFreedom::new(port).await?;
     info!("BeagleConnectFreedom Connected");
 
-    let mut firmware = Vec::with_capacity(FIRMWARE_SIZE as usize);
-    img.read_to_end(&mut firmware)?;
-    drop(img);
-
-    assert_eq!(firmware.len(), FIRMWARE_SIZE as usize);
+    let firmware = open_firmware(img)?;
     let img_crc32 = crc32fast::hash(firmware.as_slice());
 
     let _ = chan.try_send(crate::DownloadFlashingStatus::FlashingProgress(0.0));

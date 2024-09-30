@@ -219,11 +219,7 @@ impl Flasher {
 
                 let mut data = String::new();
                 img.read_to_string(&mut data).unwrap();
-
-                let data: Vec<&str> = data.split_whitespace().collect();
-
-                let mut bin = bin_file::BinFile::new();
-                bin.add_ihex(data, true).unwrap();
+                let bin = bin_file::BinFile::from_str(data).unwrap();
 
                 tokio::task::spawn_blocking(move || msp430::flash(bin, self.dst, &self.chan))
                     .await

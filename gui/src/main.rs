@@ -160,6 +160,7 @@ impl BBImager {
             BBImagerMessage::ProgressBar(x) => {
                 if let Screen::Flashing(mut s) = self.screen.clone() {
                     s.progress = x;
+                    s.running = self.cancel_flashing.is_some();
                     self.screen = Screen::Flashing(s)
                 } else {
                     unreachable!()
@@ -277,6 +278,7 @@ impl BBImager {
                 return t;
             }
             BBImagerMessage::StopFlashing(x) => {
+                let _ = self.cancel_flashing.take();
                 let content = x.content();
 
                 let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
@@ -763,6 +765,7 @@ enum Screen {
 struct FlashingScreen {
     progress: ProgressBarState,
     documentation: String,
+    running: bool,
 }
 
 impl Default for FlashingScreen {
@@ -770,6 +773,7 @@ impl Default for FlashingScreen {
         FlashingScreen {
             progress: ProgressBarState::PREPARING,
             documentation: String::new(),
+            running: true,
         }
     }
 }
@@ -785,7 +789,7 @@ impl FlashingScreen {
     fn view(&self) -> Element<BBImagerMessage> {
         let prog_bar = self.progress.bar();
 
-        let btn = if self.progress.running() {
+        let btn = if self.running {
             home_btn("CANCEL", true, iced::Length::Shrink).on_press(BBImagerMessage::CancelFlashing)
         } else {
             home_btn("HOME", true, iced::Length::Shrink)
