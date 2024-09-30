@@ -1,7 +1,11 @@
 [package]
-name = "gui"
-version = "0.1.0"
+name = "bb-imager-gui"
+version = "0.0.1"
 edition = "2021"
+authors = ["Ayush Singh <ayush@beagleboard.org>"]
+description = "Library to support bb-imager-cli and bb-imager-gui"
+repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
+license = "MIT"
 
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced"] }

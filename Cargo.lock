@@ -470,7 +470,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bb-imager"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "bin_file",
  "chrono",
@@ -498,6 +498,35 @@ dependencies = [
  "url",
  "windows 0.58.0",
  "zip",
+]
+
+[[package]]
+name = "bb-imager-cli"
+version = "0.0.1"
+dependencies = [
+ "bb-imager",
+ "clap",
+ "indicatif",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "bb-imager-gui"
+version = "0.0.1"
+dependencies = [
+ "bb-imager",
+ "embed-resource",
+ "iced",
+ "iced_aw",
+ "image 0.25.2",
+ "notify-rust",
+ "rfd",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "webbrowser",
 ]
 
 [[package]]
@@ -825,18 +854,6 @@ name = "clap_lex"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "bb-imager",
- "clap",
- "indicatif",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "clipboard-win"
@@ -1922,23 +1939,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bf0b36e6f090b7e1d8a4b49c0cb81c1f8376f72198c65dd3ad9ff3556b8b78c"
 dependencies = [
  "bitflags 2.6.0",
-]
-
-[[package]]
-name = "gui"
-version = "0.1.0"
-dependencies = [
- "bb-imager",
- "embed-resource",
- "iced",
- "iced_aw",
- "image 0.25.2",
- "notify-rust",
- "rfd",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "webbrowser",
 ]
 
 [[package]]

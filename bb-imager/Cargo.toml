@@ -1,7 +1,11 @@
 [package]
 name = "bb-imager"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+authors = ["Ayush Singh <ayush@beagleboard.org>"]
+description = "Library to support bb-imager-cli and bb-imager-gui"
+repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
+license = "MIT"
 
 [dependencies]
 liblzma = { version = "0.3.3", features = ["static", "parallel"] }
