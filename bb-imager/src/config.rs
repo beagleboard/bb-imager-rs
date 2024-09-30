@@ -83,14 +83,14 @@ impl Flasher {
         match self {
             Flasher::SdCard => tokio::task::block_in_place(sd::destinations),
             Flasher::BeagleConnectFreedom => tokio::task::block_in_place(bcf::possible_devices),
-            Flasher::Msp430Usb => tokio::task::block_in_place(msp430::possible_devices)
+            Flasher::Msp430Usb => tokio::task::block_in_place(msp430::possible_devices),
         }
     }
 
     pub fn file_filter(&self) -> (&'static str, &'static [&'static str]) {
         match self {
             Flasher::SdCard => ("image", &["img", "xz"]),
-            Flasher::BeagleConnectFreedom => ("firmware", &["bin", "xz"]),
+            Flasher::BeagleConnectFreedom => ("firmware", &["bin", "hex", "txt", "xz"]),
             Flasher::Msp430Usb => ("firmware", &["hex", "txt", "xz"]),
         }
     }
