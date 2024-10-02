@@ -101,3 +101,21 @@ linux_arm:
   artifacts:
     paths:
       - release/
+
+macos:
+  image: macos-14-xcode-15
+  stage: build
+  tags:
+    - macos
+  variables:
+    RUST_BUILDER: cargo
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source "$HOME/.cargo/env"
+    - rustup target add x86_64-apple-darwin aarch64-apple-darwin
+  script:
+    - rustc --version
+    - make release-darwin
+  artifacts:
+    paths:
+      - release/
