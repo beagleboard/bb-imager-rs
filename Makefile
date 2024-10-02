@@ -37,6 +37,14 @@ build-linux-arm:
 	$(info "Building Linux release for arm")
 	$(RUST_BUILDER) build --release --target armv7-unknown-linux-gnueabihf
 
+build-darwin-x86_64:
+	$(info "Building MacOS release for x86_64")
+	$(RUST_BUILDER) build --release --target x86_64-apple-darwin
+
+build-darwin-aarch64:
+	$(info "Building MacOS release for aarch64")
+	$(RUST_BUILDER) build --release --target aarch64-apple-darwin
+
 release-windows-x86_64: build-windows-x86_64
 	$(info "Generating Windows release for x86_64")
 	mkdir -p release/windows/x86_64-pc-windows-gnu
@@ -66,6 +74,16 @@ release-linux-cli-arm: build-linux-arm
 	$(info "Generating Linux CLI release for x86_64")
 	$(call cli,armv7-unknown-linux-gnueabihf)
 
+release-darwin-x86_64: build-darwin-x86_64
+	$(info "Generating MacOS release for x86_64")
+	mkdir -p release/darwin/x86_64-apple-darwin
+	cp target/x86_64-apple-darwin/release/bb-imager-cli release/darwin/x86_64-apple-darwin/
+
+release-darwin-aarch64: build-darwin-aarch64
+	$(info "Generating MacOS release for aarch64")
+	mkdir -p release/darwin/aarch64-apple-darwin
+	cp target/aarch64-apple-darwin/release/bb-imager-cli release/darwin/aarch64-apple-darwin/
+
 release-linux-x86_64: release-linux-cli-x86_64 release-linux-gui-appimage-x86_64
 
 release-linux-aarch64: release-linux-cli-aarch64 release-linux-gui-appimage-aarch64
@@ -76,3 +94,5 @@ release-linux: release-linux-x86_64 release-linux-aarch64 release-linux-arm
 
 # TODO: Add aarch64 windows.
 release-windows: release-windows-x86_64
+
+release-darwin: release-darwin-x86_64 release-darwin-aarch64
