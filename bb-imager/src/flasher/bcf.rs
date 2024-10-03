@@ -100,7 +100,7 @@ impl BeagleConnectFreedom {
         info!("Invoke Bootloader");
 
         let _ = self.port.set_break();
-        let _ = tokio::time::sleep(Duration::from_millis(500)).await;
+        let _ = tokio::time::sleep(Duration::from_secs(2)).await;
         let _ = self.port.clear_break();
 
         let _ = tokio::time::sleep(Duration::from_millis(500)).await;
