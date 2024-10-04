@@ -15,7 +15,7 @@ endef
 # Build Executable for BeagleBoardImager CLI
 define cli
 	mkdir -p release/linux/$(1)
-	cp target/$(1)/release/bb-imager-cli release/linux/$(1)/
+	xz -vc target/$(1)/release/bb-imager-cli > release/linux/$(1)/bb-imager-cli.xz
 endef
 
 clean:
@@ -48,7 +48,8 @@ build-darwin-aarch64:
 release-windows-x86_64: build-windows-x86_64
 	$(info "Generating Windows release for x86_64")
 	mkdir -p release/windows/x86_64-pc-windows-gnu
-	cp target/x86_64-pc-windows-gnu/release/*.exe release/windows/x86_64-pc-windows-gnu/
+	zip -j release/windows/x86_64-pc-windows-gnu/bb-imager-cli.zip target/x86_64-pc-windows-gnu/release/bb-imager-cli.exe
+	zip -j release/windows/x86_64-pc-windows-gnu/bb-imager-gui.zip target/x86_64-pc-windows-gnu/release/bb-imager-gui.exe
 
 release-linux-gui-appimage-x86_64: build-linux-x86_64
 	$(info "Generating Linux Appimage release for x86_64")
@@ -77,12 +78,12 @@ release-linux-cli-arm: build-linux-arm
 release-darwin-x86_64: build-darwin-x86_64
 	$(info "Generating MacOS release for x86_64")
 	mkdir -p release/darwin/x86_64-apple-darwin
-	cp target/x86_64-apple-darwin/release/bb-imager-cli release/darwin/x86_64-apple-darwin/
+	zip -j release/darwin/x86_64-apple-darwin/bb-imager-cli.zip target/x86_64-apple-darwin/release/bb-imager-cli
 
 release-darwin-aarch64: build-darwin-aarch64
 	$(info "Generating MacOS release for aarch64")
 	mkdir -p release/darwin/aarch64-apple-darwin
-	cp target/aarch64-apple-darwin/release/bb-imager-cli release/darwin/aarch64-apple-darwin/
+	zip -j release/darwin/aarch64-apple-darwin/bb-imager-cli.zip target/aarch64-apple-darwin/release/bb-imager-cli
 
 release-linux-x86_64: release-linux-cli-x86_64 release-linux-gui-appimage-x86_64
 

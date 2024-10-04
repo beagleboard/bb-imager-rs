@@ -23,7 +23,7 @@ windows:
   stage: build
   before_script:
     - echo "Download dependencies"
-    - apt-get update && apt-get --assume-yes install gcc-mingw-w64
+    - apt-get update && apt-get --assume-yes install gcc-mingw-w64 zip
     - rustup target add x86_64-pc-windows-gnu
   script:
     - make release-windows
