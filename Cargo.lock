@@ -470,7 +470,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bb-imager"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "bin_file",
  "chrono",
@@ -498,6 +498,35 @@ dependencies = [
  "url",
  "windows 0.58.0",
  "zip",
+]
+
+[[package]]
+name = "bb-imager-cli"
+version = "0.0.1"
+dependencies = [
+ "bb-imager",
+ "clap",
+ "indicatif",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "bb-imager-gui"
+version = "0.0.1"
+dependencies = [
+ "bb-imager",
+ "embed-resource",
+ "iced",
+ "iced_aw",
+ "image 0.25.2",
+ "notify-rust",
+ "rfd",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "webbrowser",
 ]
 
 [[package]]
@@ -825,18 +854,6 @@ name = "clap_lex"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "bb-imager",
- "clap",
- "indicatif",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "clipboard-win"
@@ -1925,23 +1942,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gui"
-version = "0.1.0"
-dependencies = [
- "bb-imager",
- "embed-resource",
- "iced",
- "iced_aw",
- "image 0.25.2",
- "notify-rust",
- "rfd",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "webbrowser",
-]
-
-[[package]]
 name = "guillotiere"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2722,9 +2722,9 @@ dependencies = [
 
 [[package]]
 name = "liblzma"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3139da5a723df5ecc87bea4f09c5622b0f6e40a1448c839aefa56727834491d"
+checksum = "a7c45fc6fcf5b527d3cf89c1dee8c327943984b0dc8bfcf6e100473b00969e63"
 dependencies = [
  "liblzma-sys",
  "num_cpus",
@@ -2732,9 +2732,9 @@ dependencies = [
 
 [[package]]
 name = "liblzma-sys"
-version = "0.3.6"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e80e6c899a9fcbcfddb3e6d3e95c91303d416870fa812c49dc1689efaa94f1"
+checksum = "63117d31458acdb7b406f6c60090aa8e1e7cd6e283f8ee02ce585ed68c53fe39"
 dependencies = [
  "cc",
  "libc",

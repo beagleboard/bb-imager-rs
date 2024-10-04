@@ -14,67 +14,108 @@ test:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --verbose
 
-# Build all possible images in Linux host
-linux_host:
+windows:
   image: "rust:latest"
   tags:
     - docker-amd64
+  variables:
+    RUST_BUILDER: cargo
   stage: build
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends file wget libudev-dev gcc-mingw-w64
-    - curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.20.0/cargo-dist-installer.sh | sh
+    - echo "Download dependencies"
+    - apt-get update && apt-get --assume-yes install gcc-mingw-w64
     - rustup target add x86_64-pc-windows-gnu
   script:
-    - cargo dist build --target x86_64-pc-windows-gnu --target x86_64-unknown-linux-gnu
+    - make release-windows
   artifacts:
     paths:
-      - target/distrib/*.zip
-      - target/distrib/*.zip.*
-      - target/distrib/*.tar.*
+      - release/
+
+linux_x86_64:
+  image: "rust:latest"
+  tags:
+    - docker-amd64
+  variables:
+    RUST_BUILDER: cargo
+  stage: build
+  before_script:
+    - echo "Download dependencies"
+    - apt-get update && apt-get --assume-yes install libssl-dev libudev-dev desktop-file-utils
+    - echo "Setup appimagetool"
+    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
+    - chmod +x /usr/local/bin/appimagetool
+    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
+    - rustup target add x86_64-unknown-linux-gnu
+  script:
+    - make release-linux-x86_64
+  artifacts:
+    paths:
+      - release/
+
+linux_aarch64:
+  image: "rust:latest"
+  tags:
+    - docker-amd64
+  variables:
+    RUST_BUILDER: cargo
+    CROSS_ARCH: arm64
+    PKG_CONFIG_ALLOW_CROSS: 1
+    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+  stage: build
+  before_script:
+    - echo "Download dependencies"
+    - dpkg --add-architecture ${CROSS_ARCH}
+    - apt-get update && apt-get --assume-yes install libssl-dev:${CROSS_ARCH} libudev-dev:${CROSS_ARCH} desktop-file-utils gcc-aarch64-linux-gnu
+    - echo "Setup appimagetool"
+    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
+    - chmod +x /usr/local/bin/appimagetool
+    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
+    - rustup target add aarch64-unknown-linux-gnu
+  script:
+    - PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-aarch64
+  artifacts:
+    paths:
+      - release/
+
+linux_arm:
+  image: "rust:latest"
+  tags:
+    - docker-amd64
+  variables:
+    RUST_BUILDER: cargo
+    CROSS_ARCH: armhf
+    PKG_CONFIG_ALLOW_CROSS: 1
+    CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+  stage: build
+  before_script:
+    - echo "Download dependencies"
+    - dpkg --add-architecture ${CROSS_ARCH}
+    - apt-get update && apt-get --assume-yes install libssl-dev:${CROSS_ARCH} libudev-dev:${CROSS_ARCH} desktop-file-utils gcc-arm-linux-gnueabihf
+    - echo "Setup appimagetool"
+    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
+    - chmod +x /usr/local/bin/appimagetool
+    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
+    - rustup target add armv7-unknown-linux-gnueabihf
+  script:
+    - PKG_CONFIG_PATH="/usr/lib/arm-linux-gnueabihf/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-arm
+  artifacts:
+    paths:
+      - release/
 
 macos:
   image: macos-14-xcode-15
   stage: build
   tags:
     - macos
+  variables:
+    RUST_BUILDER: cargo
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source "$HOME/.cargo/env"
-    - curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.20.0/cargo-dist-installer.sh | sh
+    - rustup target add x86_64-apple-darwin aarch64-apple-darwin
   script:
     - rustc --version
-    - cargo dist build --target aarch64-apple-darwin
+    - make release-darwin
   artifacts:
     paths:
-      - target/distrib/*.tar.*
-
-deploy:
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
-  stage: deploy
-  rules:
-    - if: $CI_COMMIT_TAG
-  script:
-    - echo "running release_job for $CI_COMMIT_TAG"
-    - echo "Upload artifacts"
-    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/gui-x86_64-pc-windows-gnu.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-pc-windows-gnu.zip'
-    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/gui-x86_64-unknown-linux-gnu.tar.xz ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-unknown-linux-gnu.tar.xz'
-    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/cli-x86_64-pc-windows-gnu.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-pc-windows-gnu.zip'
-    - 'curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file target/distrib/cli-x86_64-unknown-linux-gnu.tar.xz ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-unknown-linux-gnu.tar.xz'
-  release:
-    tag_name: $CI_COMMIT_TAG
-    name: 'BeagleBoard Imager $CI_COMMIT_TAG'
-    description: 'BeagleBoard Image Flasher $CI_COMMIT_TAG'
-    assets:
-      links:
-        - name: 'x86_64-bb-imager-gui-windows'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-pc-windows-gnu.zip'
-          link_type: 'package'
-        - name: 'x86_64-bb-imager-gui-linux'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/gui-x86_64-unknown-linux-gnu.tar.xz'
-          link_type: 'package'
-        - name: 'x86_64-bb-imager-cli-windows'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/cli-x86_64-pc-windows-gnu.zip'
-          link_type: 'package'
-        - name: 'x86_64-bb-imager-cli-linux'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/cli-x86_64-unknown-linux-gnu.tar.xz'
-          link_type: 'package'
+      - release/
