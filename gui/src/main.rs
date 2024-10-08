@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use std::{borrow::Cow, collections::HashSet, path::PathBuf};
+use std::{borrow::Cow, collections::HashSet};
 
 use helpers::ProgressBarState;
 use iced::{
@@ -55,6 +55,7 @@ struct BBImager {
 
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
+    UpdateConfig(Box<bb_imager::config::Config>),
     BoardSelected(Box<bb_imager::config::Device>),
     SelectImage(bb_imager::SelectedImage),
     SelectLocalImage,
@@ -71,9 +72,6 @@ enum BBImagerMessage {
     StopFlashing(ProgressBarState),
     UpdateFlashConfig(bb_imager::FlashingConfig),
 
-    BoardImageDownloaded { index: usize, path: PathBuf },
-    OsListImageDownloaded { index: usize, path: PathBuf },
-
     OpenUrl(Cow<'static, str>),
 
     Null,
@@ -83,12 +81,52 @@ impl BBImager {
     fn new(config: bb_imager::config::Config) -> (Self, Task<BBImagerMessage>) {
         let downloader = bb_imager::download::Downloader::default();
 
+        // Fetch old config
+        let client = downloader.client();
+        let config_clone = config.clone();
+        let config_task = Task::perform(
+            async move {
+                let data: bb_imager::config::compact::Config = client
+                    .get(constants::BB_IMAGER_ORIGINAL_CONFIG)
+                    .send()
+                    .await
+                    .map_err(|e| format!("Config download failed: {e}"))?
+                    .json()
+                    .await
+                    .map_err(|e| format!("Config parsing failed: {e}"))?;
+                tokio::task::spawn_blocking(|| Ok(config_clone.merge_compact(data)))
+                    .await
+                    .unwrap()
+            },
+            |x: Result<bb_imager::config::Config, String>| match x {
+                Ok(y) => BBImagerMessage::UpdateConfig(y.into()),
+                Err(e) => {
+                    tracing::error!("Failed to fetch config: {e}");
+                    BBImagerMessage::Null
+                }
+            },
+        );
+
+        let ans = Self {
+            config: config.clone(),
+            downloader: downloader.clone(),
+            timezones: Some(timezone()),
+            keymaps: Some(keymap()),
+            ..Default::default()
+        };
+
         // Fetch all board images
-        let board_image = config.devices().iter().enumerate().map(|(index, v)| {
+        let board_image_task = ans.fetch_board_images();
+
+        (ans, Task::batch([config_task, board_image_task]))
+    }
+
+    fn fetch_board_images(&self) -> Task<BBImagerMessage> {
+        let tasks = self.config.devices().iter().enumerate().map(|(index, v)| {
             Task::perform(
-                downloader.clone().download(v.icon.clone(), v.icon_sha256),
+                self.downloader.clone().download_image(v.icon.clone()),
                 move |p| match p {
-                    Ok(path) => BBImagerMessage::BoardImageDownloaded { index, path },
+                    Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
                         tracing::warn!("Failed to fetch image for board {index}");
                         BBImagerMessage::Null
@@ -96,32 +134,15 @@ impl BBImager {
                 },
             )
         });
-
-        let os_image_from_cache = config.os_list.iter().enumerate().map(|(index, v)| {
-            let downloader_clone = downloader.clone();
-            let icon = v.icon.clone();
-            let sha = v.icon_sha256;
-
-            Task::perform(downloader_clone.check_cache(icon, sha), move |p| match p {
-                Some(path) => BBImagerMessage::OsListImageDownloaded { index, path },
-                None => BBImagerMessage::Null,
-            })
-        });
-
-        (
-            Self {
-                config: config.clone(),
-                downloader: downloader.clone(),
-                timezones: Some(timezone()),
-                keymaps: Some(keymap()),
-                ..Default::default()
-            },
-            Task::batch(board_image.chain(os_image_from_cache)),
-        )
+        Task::batch(tasks)
     }
 
     fn update(&mut self, message: BBImagerMessage) -> Task<BBImagerMessage> {
         match message {
+            BBImagerMessage::UpdateConfig(c) => {
+                self.config = *c;
+                return self.fetch_board_images();
+            }
             BBImagerMessage::BoardSelected(x) => {
                 // Reset any previously selected values
                 self.selected_dst.take();
@@ -136,15 +157,13 @@ impl BBImager {
                     .os_list
                     .iter()
                     .enumerate()
-                    .filter(|(_, x)| x.icon_local.is_none())
+                    .filter(|(_, x)| self.downloader.clone().check_image(&x.icon).is_none())
                     .filter(|(_, v)| v.devices.contains(&x.name))
                     .map(|(index, v)| {
                         Task::perform(
-                            self.downloader
-                                .clone()
-                                .download(v.icon.clone(), v.icon_sha256),
+                            self.downloader.clone().download_image(v.icon.clone()),
                             move |p| match p {
-                                Ok(path) => BBImagerMessage::OsListImageDownloaded { index, path },
+                                Ok(_path) => BBImagerMessage::Null,
                                 Err(e) => {
                                     tracing::warn!(
                                         "Failed to download image for os {index} with error {e}"
@@ -214,12 +233,6 @@ impl BBImager {
             }
             BBImagerMessage::Search(x) => {
                 self.search_bar = x;
-            }
-            BBImagerMessage::BoardImageDownloaded { index, path } => {
-                self.config.imager.devices[index].icon_local = Some(path);
-            }
-            BBImagerMessage::OsListImageDownloaded { index, path } => {
-                self.config.os_list[index].icon_local = Some(path);
             }
             BBImagerMessage::CancelFlashing => {
                 if let Some(task) = self.cancel_flashing.take() {
@@ -465,14 +478,15 @@ impl BBImager {
                     .contains(&self.search_bar.to_lowercase())
             })
             .map(|x| {
-                let image: Element<BBImagerMessage> = match &x.icon_local {
-                    Some(y) => img_or_svg(y, 100),
-                    None => widget::svg(widget::svg::Handle::from_memory(
-                        constants::DOWNLOADING_ICON,
-                    ))
-                    .width(40)
-                    .into(),
-                };
+                let image: Element<BBImagerMessage> =
+                    match self.downloader.clone().check_image(&x.icon) {
+                        Some(y) => img_or_svg(y, 100),
+                        None => widget::svg(widget::svg::Handle::from_memory(
+                            constants::DOWNLOADING_ICON,
+                        ))
+                        .width(40)
+                        .into(),
+                    };
 
                 button(
                     widget::row![
@@ -513,7 +527,8 @@ impl BBImager {
             })
             .map(|x| {
                 let mut row3 =
-                    widget::row![text(x.release_date.to_string()), widget::horizontal_space(),]
+                    widget::row![text(x.release_date.to_string()), widget::horizontal_space()]
+                        .spacing(4)
                         .width(iced::Length::Fill);
 
                 row3 = x
@@ -521,7 +536,7 @@ impl BBImager {
                     .iter()
                     .fold(row3, |acc, t| acc.push(iced_aw::Badge::new(text(t))));
 
-                let icon = match &x.icon_local {
+                let icon = match self.downloader.clone().check_image(&x.icon) {
                     Some(y) => img_or_svg(y, 80),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,
@@ -829,7 +844,7 @@ impl FlashingScreen {
     }
 }
 
-fn img_or_svg(path: &std::path::Path, width: u16) -> Element<BBImagerMessage> {
+fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
     let img = std::fs::read(path).unwrap();
 
     match image::guess_format(&img) {

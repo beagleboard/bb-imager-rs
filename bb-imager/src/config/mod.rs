@@ -1,9 +1,11 @@
 //! Configuration for bb-imager to use.
 
-use std::{collections::HashSet, path::PathBuf};
+pub mod compact;
+
+use std::collections::{HashMap, HashSet};
 
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{
@@ -11,38 +13,32 @@ use crate::{
     Destination,
 };
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct Config {
     pub imager: Imager,
     pub os_list: Vec<OsList>,
 }
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct Imager {
-    latest_version: Option<Version>,
+    pub latest_version: Option<Version>,
     pub devices: Vec<Device>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Device {
     pub name: String,
     pub description: String,
     pub icon: Url,
-    #[serde(with = "const_hex")]
-    pub icon_sha256: [u8; 32],
-    pub icon_local: Option<PathBuf>,
     pub flasher: Flasher,
     pub documentation: Url,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct OsList {
     pub name: String,
     pub description: String,
     pub icon: Url,
-    #[serde(with = "const_hex")]
-    pub icon_sha256: [u8; 32],
-    pub icon_local: Option<PathBuf>,
     pub url: Url,
     pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
@@ -52,7 +48,7 @@ pub struct OsList {
     pub tags: HashSet<String>,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
 pub enum Flasher {
     SdCard,
     BeagleConnectFreedom,
@@ -75,6 +71,30 @@ impl Config {
         self.os_list
             .iter()
             .filter(|x| x.devices.contains(&device.name))
+    }
+
+    pub fn merge_compact(mut self, comp: compact::Config) -> Self {
+        let mut mapper = HashMap::new();
+
+        // Imager
+        self.imager.devices.reserve(comp.imager.devices.len());
+        for d in comp.imager.devices {
+            if d.name == "No filtering" {
+                continue;
+            }
+
+            let temp = d.convert(&mut mapper);
+            self.imager.devices.push(temp);
+        }
+
+        // OsList
+        self.os_list.reserve(comp.os_list.len());
+        for item in comp.os_list {
+            let mut temp = item.convert(&mapper);
+            self.os_list.append(&mut temp);
+        }
+
+        self
     }
 }
 
@@ -100,7 +120,7 @@ impl Flasher {
 mod tests {
     #[test]
     fn basic() {
-        let data = include_bytes!("../../config.json");
+        let data = include_bytes!("../../../config.json");
         super::Config::from_json(data).unwrap();
     }
 }

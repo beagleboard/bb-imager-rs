@@ -64,18 +64,65 @@ impl Downloader {
         Self { client, dirs }
     }
 
-    pub async fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub fn client(&self) -> reqwest::Client {
+        self.client.clone()
+    }
+
+    pub fn check_cache(self, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let x = sha256_file(&file_path).await.ok()?;
-            if x == sha256 {
-                return Some(file_path);
-            }
+            Some(file_path)
+        } else {
+            None
+        }
+    }
+
+    fn image_path(&self, url: &url::Url) -> PathBuf {
+        let file_name: [u8; 32] = Sha256::new()
+            .chain_update(url.as_str())
+            .finalize()
+            .as_slice()
+            .try_into()
+            .expect("SHA-256 is 32 bytes");
+        let file_name = const_hex::encode(file_name);
+        self.dirs.cache_dir().join(file_name)
+    }
+
+    pub fn check_image(self, url: &url::Url) -> Option<PathBuf> {
+        // Use hash of url for file name
+        let file_path = self.image_path(url);
+        if file_path.exists() {
+            Some(file_path)
+        } else {
+            None
+        }
+    }
+
+    pub async fn download_image(self, url: url::Url) -> Result<PathBuf> {
+        // Use hash of url for file name
+        let file_path = self.image_path(&url);
+
+        if file_path.exists() {
+            return Ok(file_path);
         }
 
-        None
+        let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
+        let response = self.client.get(url).send().await.map_err(Error::from)?;
+
+        let mut response_stream = response.bytes_stream();
+
+        while let Some(x) = response_stream.next().await {
+            let mut data = x.map_err(Error::from)?;
+            file.write_all_buf(&mut data).await?;
+        }
+
+        if !file_path.exists() {
+            tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
+        }
+
+        Ok(file_path)
     }
 
     pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
@@ -149,12 +196,6 @@ impl Downloader {
 
         Ok(file_path)
     }
-}
-
-async fn sha256_file(path: &Path) -> Result<[u8; 32]> {
-    let (tx, _) = tokio::sync::mpsc::channel(1);
-
-    sha256_file_progress(path, &tx).await
 }
 
 async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {
