@@ -64,18 +64,19 @@ impl Downloader {
         Self { client, dirs }
     }
 
-    pub async fn check_cache(self, _url: url::Url, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub fn client(&self) -> reqwest::Client {
+        self.client.clone()
+    }
+
+    pub fn check_cache(self, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
 
         if file_path.exists() {
-            let x = sha256_file(&file_path).await.ok()?;
-            if x == sha256 {
-                return Some(file_path);
-            }
+            Some(file_path)
+        } else {
+            None
         }
-
-        None
     }
 
     pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {

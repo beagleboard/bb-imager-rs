@@ -3,7 +3,8 @@ resolver = "2"
 
 members = [
 	"bb-imager",
-	"cli", "gui",
+	"cli", 
+	"gui",
 ]
 
 [profile.release]

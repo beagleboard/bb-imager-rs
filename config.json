@@ -11,14 +11,6 @@
                 "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
             },
             {
-                "name": "BeaglePlay",
-                "description": "BeaglePlay and other boards based on Ti AM62",
-                "icon": "https://www.beagleboard.org/app/uploads/2023/03/45front.webp",
-                "icon_sha256": "a78111eb3eeb319582d376f3a8981fb3cf3c47ab669159bfeb35c0671233990e",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/latest/boards/beagleplay/index.html"
-            },
-            {
                 "name": "BeagleConnect Freedom MSP430",
                 "description": "BeagleConnect Freedom USB to UART bridge based on MSP430F5503",
                 "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
@@ -43,38 +35,6 @@
             ],
             "tags": [
                 "zephyr"
-            ]
-        },
-        {
-            "name": "Debian 12.6 2024-07-04 XFCE Flasher",
-            "description": "Debian eMMC Flasher graphical user interface (Xfce) image for BeaglePlay based on TI AM62 processor",
-            "icon": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Debian-OpenLogo.svg",
-            "icon_sha256": "a759c381560e82e8d719e0038d0d95209b85c00b0d0f6b92c5fc510b959226b7",
-            "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/beagleplay-emmc-flasher-debian-12.6-xfce-arm64-2024-07-04-12gb.img.xz",
-            "release_date": "2024-07-04",
-            "extract_sha256": "a7d0e4b70ef9780a69d457e60d69684eb2cd0e8f1ef465be742de854165a5942",
-            "devices": [
-                "BeaglePlay"
-            ],
-            "tags": [
-                "linux",
-                "debian"
-            ]
-        },
-        {
-            "name": "Debian 12.6 2024-07-04 Minimal Flasher",
-            "description": "Debian Minimal eMMC Flasher (non-graphical) image for BeaglePlay based on TI AM62 processor",
-            "icon": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Debian-OpenLogo.svg",
-            "icon_sha256": "a759c381560e82e8d719e0038d0d95209b85c00b0d0f6b92c5fc510b959226b7",
-            "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/beagleplay-emmc-flasher-debian-12.6-minimal-arm64-2024-07-04-8gb.img.xz",
-            "release_date": "2024-07-04",
-            "extract_sha256": "dabdd08a23068dc4027b49c72a7fcc6486949620369bbe54e53507ab8efa98df",
-            "devices": [
-                "BeaglePlay"
-            ],
-            "tags": [
-                "linux",
-                "debian"
             ]
         },
         {
