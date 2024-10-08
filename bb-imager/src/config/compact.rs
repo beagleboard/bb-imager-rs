@@ -4,9 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use semver::Version;
 use serde::Deserialize;
-use sha2::Digest;
 use url::Url;
 
 const DEVICE_DEFAULT_ICON: &str = "https://w7.pngwing.com/pngs/132/880/png-transparent-beagleboard-beaglebone-gumstix-raspberry-pi-arm-architecture-others-miscellaneous-electronics-carnivoran-thumbnail.png";
@@ -34,15 +32,10 @@ pub struct Device {
 }
 
 impl Device {
-    pub async fn convert(
-        self,
-        client: &reqwest::Client,
-        mapper: &mut HashMap<String, Vec<String>>,
-    ) -> super::Device {
+    pub fn convert(self, mapper: &mut HashMap<String, Vec<String>>) -> super::Device {
         let icon = self
             .icon
             .unwrap_or(Url::parse(DEVICE_DEFAULT_ICON).unwrap());
-        let icon_sha256 = icon_sha256(client, icon.clone()).await;
 
         for item in self.tags {
             if let Some(x) = mapper.get_mut(&item) {
@@ -54,7 +47,6 @@ impl Device {
 
         super::Device {
             icon,
-            icon_sha256,
             flasher: super::Flasher::SdCard,
             documentation: Self::docs(&self.name),
             name: self.name,
@@ -63,9 +55,16 @@ impl Device {
     }
 
     fn docs(board: &str) -> Url {
-        match board {
-            _ => Url::parse("https://docs.beagleboard.org/").unwrap(),
-        }
+        let temp = match board {
+            "BeagleY-AI" => "https://docs.beagleboard.org/boards/beagley/ai/index.html",
+            "BeaglePlay" => "https://docs.beagleboard.org/boards/beagleplay/index.html",
+            "BeagleBone AI-64" => "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html",
+            "BeagleV-Fire" => "https://docs.beagleboard.org/boards/beaglev/fire/index.html",
+            "BeagleBone Black" => "https://docs.beagleboard.org/boards/beaglebone/black/index.html",
+            _ => "https://docs.beagleboard.org/",
+        };
+
+        Url::parse(temp).unwrap()
     }
 }
 
@@ -90,13 +89,11 @@ pub struct OsList {
 }
 
 impl OsList {
-    async fn convert_item(
+    fn convert_item(
         self,
-        client: &reqwest::Client,
         mapper: &HashMap<String, Vec<String>>,
         tags: HashSet<String>,
     ) -> super::OsList {
-        let icon_sha256 = icon_sha256(client, self.icon.clone()).await;
         let devices: HashSet<String> =
             self.devices.into_iter().fold(HashSet::new(), |mut acc, t| {
                 if let Some(items) = mapper.get(&t) {
@@ -109,7 +106,6 @@ impl OsList {
             name: self.name,
             description: self.description,
             icon: self.icon,
-            icon_sha256,
             url: self.url.unwrap(),
             release_date: self.release_date.unwrap(),
             extract_sha256: self.extract_sha256,
@@ -119,15 +115,9 @@ impl OsList {
         }
     }
 
-    pub(crate) async fn convert(
-        self,
-        client: &reqwest::Client,
-        mapper: &HashMap<String, Vec<String>>,
-    ) -> Vec<super::OsList> {
+    pub(crate) fn convert(self, mapper: &HashMap<String, Vec<String>>) -> Vec<super::OsList> {
         if self.subitems.is_empty() {
-            let temp = self
-                .convert_item(client, mapper, HashSet::from(["linux".to_string()]))
-                .await;
+            let temp = self.convert_item(mapper, HashSet::from(["linux".to_string()]));
             Vec::from([temp])
         } else {
             let mut ans = Vec::new();
@@ -138,27 +128,10 @@ impl OsList {
             };
 
             for item in self.subitems {
-                let temp = item.convert_item(client, mapper, tags.clone()).await;
+                let temp = item.convert_item(mapper, tags.clone());
                 ans.push(temp);
             }
             ans
         }
     }
-}
-
-async fn icon_sha256(client: &reqwest::Client, icon: Url) -> [u8; 32] {
-    let icon_data = client
-        .get(icon)
-        .send()
-        .await
-        .unwrap()
-        .bytes()
-        .await
-        .unwrap();
-
-    sha2::Sha256::new()
-        .chain_update(&icon_data)
-        .finalize()
-        .try_into()
-        .unwrap()
 }

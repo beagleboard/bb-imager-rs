@@ -30,8 +30,6 @@ pub struct Device {
     pub name: String,
     pub description: String,
     pub icon: Url,
-    #[serde(with = "const_hex")]
-    pub icon_sha256: [u8; 32],
     pub flasher: Flasher,
     pub documentation: Url,
 }
@@ -41,8 +39,6 @@ pub struct OsList {
     pub name: String,
     pub description: String,
     pub icon: Url,
-    #[serde(with = "const_hex")]
-    pub icon_sha256: [u8; 32],
     pub url: Url,
     pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
@@ -77,7 +73,7 @@ impl Config {
             .filter(|x| x.devices.contains(&device.name))
     }
 
-    pub async fn merge_compact(mut self, comp: compact::Config, client: reqwest::Client) -> Self {
+    pub fn merge_compact(mut self, comp: compact::Config) -> Self {
         let mut mapper = HashMap::new();
 
         // Imager
@@ -87,14 +83,14 @@ impl Config {
                 continue;
             }
 
-            let temp = d.convert(&client, &mut mapper).await;
+            let temp = d.convert(&mut mapper);
             self.imager.devices.push(temp);
         }
 
         // OsList
         self.os_list.reserve(comp.os_list.len());
         for item in comp.os_list {
-            let mut temp = item.convert(&client, &mapper).await;
+            let mut temp = item.convert(&mapper);
             self.os_list.append(&mut temp);
         }
 

@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use std::{borrow::Cow, collections::HashSet, path::PathBuf};
+use std::{borrow::Cow, collections::HashSet};
 
 use helpers::ProgressBarState;
 use iced::{
@@ -94,7 +94,9 @@ impl BBImager {
                     .json()
                     .await
                     .map_err(|e| format!("Config parsing failed: {e}"))?;
-                Ok(config_clone.merge_compact(data, client).await)
+                tokio::task::spawn_blocking(|| Ok(config_clone.merge_compact(data)))
+                    .await
+                    .unwrap()
             },
             |x: Result<bb_imager::config::Config, String>| match x {
                 Ok(y) => BBImagerMessage::UpdateConfig(y.into()),
@@ -122,9 +124,7 @@ impl BBImager {
     fn fetch_board_images(&self) -> Task<BBImagerMessage> {
         let tasks = self.config.devices().iter().enumerate().map(|(index, v)| {
             Task::perform(
-                self.downloader
-                    .clone()
-                    .download(v.icon.clone(), v.icon_sha256),
+                self.downloader.clone().download_image(v.icon.clone()),
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -157,13 +157,11 @@ impl BBImager {
                     .os_list
                     .iter()
                     .enumerate()
-                    .filter(|(_, x)| self.downloader.clone().check_cache(x.icon_sha256).is_none())
+                    .filter(|(_, x)| self.downloader.clone().check_image(&x.icon).is_none())
                     .filter(|(_, v)| v.devices.contains(&x.name))
                     .map(|(index, v)| {
                         Task::perform(
-                            self.downloader
-                                .clone()
-                                .download(v.icon.clone(), v.icon_sha256),
+                            self.downloader.clone().download_image(v.icon.clone()),
                             move |p| match p {
                                 Ok(_path) => BBImagerMessage::Null,
                                 Err(e) => {
@@ -481,7 +479,7 @@ impl BBImager {
             })
             .map(|x| {
                 let image: Element<BBImagerMessage> =
-                    match self.downloader.clone().check_cache(x.icon_sha256) {
+                    match self.downloader.clone().check_image(&x.icon) {
                         Some(y) => img_or_svg(y, 100),
                         None => widget::svg(widget::svg::Handle::from_memory(
                             constants::DOWNLOADING_ICON,
@@ -538,7 +536,7 @@ impl BBImager {
                     .iter()
                     .fold(row3, |acc, t| acc.push(iced_aw::Badge::new(text(t))));
 
-                let icon = match self.downloader.clone().check_cache(x.icon_sha256) {
+                let icon = match self.downloader.clone().check_image(&x.icon) {
                     Some(y) => img_or_svg(y, 80),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,
