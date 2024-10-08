@@ -6,7 +6,6 @@
                 "name": "BeagleConnect Freedom",
                 "description": "BeagleConnect Freedom based on Ti CC1352P7",
                 "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
-                "icon_sha256": "790c74aa8e4bcfe59dca18907e2c775b1874daacac7f399ddb130a572e79cd6d",
                 "flasher": "BeagleConnectFreedom",
                 "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
             },
@@ -14,7 +13,6 @@
                 "name": "BeagleConnect Freedom MSP430",
                 "description": "BeagleConnect Freedom USB to UART bridge based on MSP430F5503",
                 "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
-                "icon_sha256": "790c74aa8e4bcfe59dca18907e2c775b1874daacac7f399ddb130a572e79cd6d",
                 "flasher": "Msp430Usb",
                 "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
             }
@@ -25,11 +23,9 @@
             "name": "MicroBlocks",
             "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
             "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-            "icon_sha256": "25d1645efaa383bfb7801159a04c46e137319a37ba48f15577c4dd715d88bb04",
-            "url": "https://files.beagle.cc/file/beagleboard-public-2021/images/zephyr-microblocks-rc2.zip",
-            "release_date": "2024-07-01",
-            "extract_sha256": "10085f9c93607843cb842580bc860151004f7f991a1166acde1d69d746c29754",
-            "extract_path": "zephyr/build/beagleconnect_freedom/zephyr/zephyr.bin",
+            "url": "https://openbeagle.org/api/v4/projects/809/packages/generic/stable/244/microblocks.bin.xz",
+            "release_date": "2024-07-31",
+            "extract_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
             "devices": [
                 "BeagleConnect Freedom"
             ],
@@ -41,7 +37,6 @@
             "name": "BeagleConnect Freedom MSP430 USB To UART Bridge",
             "description": "MSP430 USB to UART firmware with Windows Support",
             "icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-            "icon_sha256": "b260b35b9fe669c8ee792753fcaf4a3f70b6e3516961839cc8351dfe95a6bc4d",
             "url": "https://openbeagle.org/beagleconnect/msp430/usb_uart_bridge/-/jobs/38525/artifacts/raw/usb_uart_bridge.hex?inline=false",
             "release_date": "2024-09-19",
             "extract_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
