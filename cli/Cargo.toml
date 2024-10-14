@@ -1,6 +1,6 @@
 [package]
 name = "bb-imager-cli"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 description = "Library to support bb-imager-cli and bb-imager-gui"
