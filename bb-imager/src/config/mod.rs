@@ -42,7 +42,7 @@ pub struct OsList {
     pub url: Url,
     pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
-    pub extract_sha256: [u8; 32],
+    pub image_sha256: [u8; 32],
     pub extract_path: Option<String>,
     pub devices: HashSet<String>,
     pub tags: HashSet<String>,

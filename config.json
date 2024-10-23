@@ -25,7 +25,7 @@
             "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
             "url": "https://openbeagle.org/api/v4/projects/809/packages/generic/stable/244/microblocks.bin.xz",
             "release_date": "2024-07-31",
-            "extract_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
+            "image_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
             "devices": [
                 "BeagleConnect Freedom"
             ],
@@ -39,7 +39,7 @@
             "icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
             "url": "https://openbeagle.org/beagleconnect/msp430/usb_uart_bridge/-/jobs/38525/artifacts/raw/usb_uart_bridge.hex?inline=false",
             "release_date": "2024-09-19",
-            "extract_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
+            "image_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
             "devices": [
                 "BeagleConnect Freedom MSP430"
             ],

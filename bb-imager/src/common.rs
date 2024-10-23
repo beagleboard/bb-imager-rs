@@ -143,7 +143,7 @@ impl From<&crate::config::OsList> for SelectedImage {
         Self::remote(
             value.name.clone(),
             value.url.clone(),
-            value.extract_sha256,
+            value.image_sha256,
             value.extract_path.clone(),
         )
     }

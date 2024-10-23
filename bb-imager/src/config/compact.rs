@@ -108,7 +108,7 @@ impl OsList {
             icon: self.icon,
             url: self.url.unwrap(),
             release_date: self.release_date.unwrap(),
-            extract_sha256: self.extract_sha256,
+            image_sha256: self.image_download_sha256,
             extract_path: None,
             devices,
             tags,

@@ -470,7 +470,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bb-imager"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "bin_file",
  "chrono",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "bb-imager",
  "clap",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "bb-imager",
  "embed-resource",
