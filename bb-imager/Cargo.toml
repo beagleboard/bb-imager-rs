@@ -1,11 +1,11 @@
 [package]
 name = "bb-imager"
-version = "0.0.2"
-edition = "2021"
-authors = ["Ayush Singh <ayush@beagleboard.org>"]
 description = "Library to support bb-imager-cli and bb-imager-gui"
-repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
-license = "MIT"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 liblzma = { version = "0.3.4", features = ["static", "parallel"] }
@@ -23,12 +23,12 @@ thiserror = "1.0.63"
 tokio = { version = "1.39.1", default-features = false, features = ["rt-multi-thread", "process", "fs", "time", "sync"] }
 tracing = "0.1.40"
 url = { version = "2.5.2", features = ["serde"] }
-rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
+rs-drivelist = "0.9.4"
 fatfs = "0.3.6"
 fscommon = "0.1.1"
 mbrman = "0.5.2"
 hidapi = "2.6.3"
-bin_file = { git = "https://gitlab.com/Ayush1325/bin_file.git", branch = "from-str" }
+bin_file = "0.1.1"
 futures = "0.3.30"
 
 [target.'cfg(target_os = "linux")'.dependencies]

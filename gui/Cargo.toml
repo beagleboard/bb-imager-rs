@@ -1,16 +1,16 @@
 [package]
 name = "bb-imager-gui"
-version = "0.0.2"
-edition = "2021"
-authors = ["Ayush Singh <ayush@beagleboard.org>"]
 description = "Library to support bb-imager-cli and bb-imager-gui"
-repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
-license = "MIT"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced"] }
 rfd = { version = "0.14.1", default-features = false, features = ["xdg-portal", "tokio"] }
-bb-imager = { path = "../bb-imager" }
+bb-imager = { path = "../bb-imager", version = "0.0.3" }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 iced_aw = { version = "0.10.0", default-features = false, features = ["badge"] }

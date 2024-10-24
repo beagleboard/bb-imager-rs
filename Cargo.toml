@@ -10,3 +10,14 @@ members = [
 [profile.release]
 strip = true
 lto = "thin"
+
+[patch.crates-io]
+bin_file = { git = "https://gitlab.com/Ayush1325/bin_file.git", branch = "from-str" }
+rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
+
+[workspace.package]
+version = "0.0.3"
+edition = "2021"
+authors = ["Ayush Singh <ayush@beagleboard.org>"]
+repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
+license = "MIT"
