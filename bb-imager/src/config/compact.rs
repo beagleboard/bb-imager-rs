@@ -24,11 +24,11 @@ pub(crate) struct Imager {
 pub struct Device {
     pub(crate) name: String,
     pub(crate) tags: Vec<String>,
-    #[serde(default)]
-    pub(crate) default: bool,
+    // #[serde(default)]
+    // pub(crate) default: bool,
     pub(crate) icon: Option<Url>,
     pub(crate) description: String,
-    pub(crate) matching_type: String,
+    // pub(crate) matching_type: String,
 }
 
 impl Device {
@@ -74,14 +74,14 @@ pub struct OsList {
     description: String,
     icon: Url,
     url: Option<Url>,
-    extract_size: Option<u64>,
-    #[serde(with = "const_hex", default)]
-    extract_sha256: [u8; 32],
-    image_download_size: Option<u64>,
+    // extract_size: Option<u64>,
+    // #[serde(with = "const_hex", default)]
+    // extract_sha256: [u8; 32],
+    // image_download_size: Option<u64>,
     #[serde(with = "const_hex", default)]
     image_download_sha256: [u8; 32],
     release_date: Option<chrono::NaiveDate>,
-    init_format: Option<String>,
+    // init_format: Option<String>,
     #[serde(default)]
     devices: Vec<String>,
     #[serde(default)]
@@ -97,7 +97,7 @@ impl OsList {
         let devices: HashSet<String> =
             self.devices.into_iter().fold(HashSet::new(), |mut acc, t| {
                 if let Some(items) = mapper.get(&t) {
-                    acc.extend(items.into_iter().cloned());
+                    acc.extend(items.iter().cloned());
                 }
                 acc
             });

@@ -372,7 +372,7 @@ pub async fn flash(
         Ok(())
     };
 
-    let _ = bcf.send_reset();
+    let _ = bcf.send_reset().await;
 
     res
 }
