@@ -3,6 +3,17 @@ stages:
   - build
   - deploy
 
+clippy:
+  image: "rust:latest"
+  stage: test
+  tags:
+    - docker-amd64
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends libudev-dev
+    - rustup component add clippy
+  script:
+    - cargo clippy --all-targets --all-features --no-deps
+
 test:
   image: "rust:latest"
   stage: test
