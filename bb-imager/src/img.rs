@@ -9,14 +9,7 @@ use std::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
-    #[error("Zip Error: {0}")]
-    ZipError(#[from] zip::result::ZipError),
-    #[error("Zip file require inner path")]
-    ZipPathError,
-    #[error("Zip file sha256 error")]
-    ZipSha256Error,
-}
+pub enum Error {}
 
 pub struct OsImage {
     size: u64,
@@ -38,23 +31,22 @@ impl OsImage {
     ) -> Result<Self> {
         match img {
             crate::SelectedImage::Local(x) => {
-                tokio::task::block_in_place(move || Self::from_path(&x, None))
+                tokio::task::block_in_place(move || Self::from_path(&x))
             }
             crate::SelectedImage::Remote {
                 url,
                 extract_sha256,
-                extract_path,
                 ..
             } => {
                 let p = downloader
                     .download_progress(url, extract_sha256, chan)
                     .await?;
-                tokio::task::block_in_place(move || Self::from_path(&p, extract_path.as_deref()))
+                tokio::task::block_in_place(move || Self::from_path(&p))
             }
         }
     }
 
-    pub fn from_path(path: &Path, inner_path: Option<&str>) -> Result<Self> {
+    pub fn from_path(path: &Path) -> Result<Self> {
         let mut file = std::fs::File::open(path)?;
 
         let mut magic = [0u8; 6];
@@ -63,9 +55,6 @@ impl OsImage {
         file.seek(std::io::SeekFrom::Start(0))?;
 
         match magic {
-            [0x50, 0x4b, 0x03, 0x04, _, _] => {
-                Self::from_zip(file, inner_path.ok_or(Error::ZipPathError)?)
-            }
             [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => {
                 let size = liblzma::uncompressed_size(&mut file)?;
 
@@ -90,24 +79,6 @@ impl OsImage {
                 })
             }
         }
-    }
-
-    /// TODO: Find way to extract Zipfile with Send
-    pub fn from_zip(file: std::fs::File, inner_path: &str) -> Result<Self> {
-        let mut res = Vec::new();
-        zip::ZipArchive::new(file)
-            .map_err(Error::from)?
-            .by_name(inner_path)
-            .map_err(Error::from)?
-            .read_to_end(&mut res)?;
-
-        let hasher = Sha256::new();
-
-        Ok(Self {
-            hasher,
-            size: res.len() as u64,
-            img: OsImageReader::Memory(std::io::Cursor::new(res)),
-        })
     }
 
     pub fn sha256(&self) -> [u8; 32] {

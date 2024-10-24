@@ -105,7 +105,6 @@ pub enum SelectedImage {
         name: String,
         url: url::Url,
         extract_sha256: [u8; 32],
-        extract_path: Option<String>,
     },
 }
 
@@ -114,17 +113,11 @@ impl SelectedImage {
         Self::Local(name)
     }
 
-    pub const fn remote(
-        name: String,
-        url: url::Url,
-        download_sha256: [u8; 32],
-        extract_path: Option<String>,
-    ) -> Self {
+    pub const fn remote(name: String, url: url::Url, download_sha256: [u8; 32]) -> Self {
         Self::Remote {
             name,
             url,
             extract_sha256: download_sha256,
-            extract_path,
         }
     }
 }
@@ -140,12 +133,7 @@ impl std::fmt::Display for SelectedImage {
 
 impl From<&crate::config::OsList> for SelectedImage {
     fn from(value: &crate::config::OsList) -> Self {
-        Self::remote(
-            value.name.clone(),
-            value.url.clone(),
-            value.image_sha256,
-            value.extract_path.clone(),
-        )
+        Self::remote(value.name.clone(), value.url.clone(), value.image_sha256)
     }
 }
 
