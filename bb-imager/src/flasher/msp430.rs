@@ -12,7 +12,7 @@ const USB_MSG_HEADER: u8 = 0x3f;
 
 const COMMAND_MAX_SIZE: usize = 48;
 
-const BSL: &str = include_str!("../../../assets/MSP430_BSL.00.06.05.34.txt");
+const BSL: &str = include_str!("../../assets/MSP430_BSL.00.06.05.34.txt");
 const BSL_VERSION: [u8; 4] = [0, 0x06, 0x05, 0x34];
 const BSL_START_ADDR: [u8; 3] = three_bytes(0x2504);
 

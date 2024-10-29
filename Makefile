@@ -4,7 +4,7 @@ APPIMAGETOOL ?= appimagetool
 # Build Appimage for BeagleBoardImager GUI
 define appimage
 	mkdir -p release/linux/$(1)/AppDir/usr/bin
-	cp assets/AppRun release/linux/$(1)/AppDir/AppRun
+	cp gui/assets/AppRun release/linux/$(1)/AppDir/AppRun
 	cp target/$(1)/release/bb-imager-gui release/linux/$(1)/AppDir/usr/bin/
 	cp gui/BeagleBoardImager.desktop release/linux/$(1)/AppDir/
 	cp gui/icon.png release/linux/$(1)/AppDir/

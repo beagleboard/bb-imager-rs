@@ -861,7 +861,7 @@ fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerM
 }
 
 fn timezone() -> widget::combo_box::State<String> {
-    let temp = include_str!("../../assets/timezones.txt")
+    let temp = include_str!("../assets/timezones.txt")
         .split_whitespace()
         .map(|x| x.to_string())
         .collect();
@@ -870,7 +870,7 @@ fn timezone() -> widget::combo_box::State<String> {
 }
 
 fn keymap() -> widget::combo_box::State<String> {
-    let temp = include_str!("../../assets/keymap-layouts.txt")
+    let temp = include_str!("../assets/keymap-layouts.txt")
         .split_whitespace()
         .map(|x| x.to_string())
         .collect();

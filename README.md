@@ -30,6 +30,6 @@ See [config.json](config.json) for example.
 
 # Screenshots
 
-![BBImager Home Screen](assets/screenshots/home.png)
-![BBImager Configuration Screen](assets/screenshots/config.png)
-![BBImager Flashing Screen](assets/screenshots/flash.png)
+![BBImager Home Screen](screenshots/home.png)
+![BBImager Configuration Screen](screenshots/config.png)
+![BBImager Flashing Screen](screenshots/flash.png)
