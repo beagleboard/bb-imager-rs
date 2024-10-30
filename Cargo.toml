@@ -11,9 +11,6 @@ members = [
 strip = true
 lto = "thin"
 
-[patch.crates-io]
-rs-drivelist = { git = "https://github.com/ir1keren/rs-drivelist.git" }
-
 [workspace.package]
 version = "0.0.3"
 edition = "2021"

@@ -92,8 +92,20 @@ pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin
 //     fatfs::format_volume(disk, fatfs::FormatVolumeOptions::new())
 // }
 
+#[cfg(not(target_os = "macos"))]
 pub fn destinations() -> std::collections::HashSet<crate::Destination> {
     rs_drivelist::drive_list()
+        .unwrap()
+        .into_iter()
+        .filter(|x| x.isRemovable)
+        .filter(|x| !x.isVirtual)
+        .map(|x| crate::Destination::sd_card(x.description, x.size, x.raw))
+        .collect()
+}
+
+#[cfg(target_os = "macos")]
+pub fn destinations() -> std::collections::HashSet<crate::Destination> {
+    crate::pal::macos::rs_drivelist::diskutil()
         .unwrap()
         .into_iter()
         .filter(|x| x.isRemovable)
