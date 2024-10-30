@@ -23,7 +23,8 @@ fn main() -> iced::Result {
         .expect("Failed to parse config");
 
     let settings = iced::window::Settings {
-        min_size: Some(iced::Size::new(850.0, 720.0)),
+        min_size: Some(constants::WINDOW_SIZE),
+        size: constants::WINDOW_SIZE,
         ..Default::default()
     };
 
@@ -436,10 +437,9 @@ impl BBImager {
             .width(iced::Length::FillPortion(1))
             .align_x(iced::Alignment::Center)
         ]
-        .padding(64)
+        .padding(48)
         .spacing(48)
         .width(iced::Length::Fill)
-        .height(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
         let action_btn_row = widget::row![
@@ -447,16 +447,18 @@ impl BBImager {
             widget::horizontal_space().width(iced::Length::FillPortion(5)),
             next_btn.width(iced::Length::FillPortion(1))
         ]
-        .padding(64)
+        .padding(48)
         .width(iced::Length::Fill)
-        .height(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
         let bottom = widget::container(
-            widget::column![choice_btn_row, action_btn_row]
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .align_x(iced::Alignment::Center),
+            widget::column![
+                choice_btn_row.height(iced::Length::FillPortion(1)),
+                action_btn_row.height(iced::Length::FillPortion(1))
+            ]
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .align_x(iced::Alignment::Center),
         )
         .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
 
@@ -631,46 +633,47 @@ impl BBImager {
     }
 
     fn extra_config_view(&self) -> Element<BBImagerMessage> {
-        let action_btn_row = widget::row![
-            home_btn("BACK", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
-            widget::horizontal_space().width(iced::Length::FillPortion(5)),
-            home_btn("WRITE", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::StartFlashing)
-        ]
-        .padding(32)
-        .width(iced::Length::Fill);
+        widget::responsive(|size| {
+            let action_btn_row = widget::row![
+                home_btn("BACK", true, iced::Length::Fill)
+                    .style(widget::button::secondary)
+                    .width(iced::Length::FillPortion(1))
+                    .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
+                widget::horizontal_space().width(iced::Length::FillPortion(5)),
+                home_btn("WRITE", true, iced::Length::Fill)
+                    .style(widget::button::secondary)
+                    .width(iced::Length::FillPortion(1))
+                    .on_press(BBImagerMessage::StartFlashing)
+            ]
+            .padding(32)
+            .width(iced::Length::Fill);
 
-        let form = match self.flashing_config.as_ref().unwrap() {
-            bb_imager::FlashingConfig::LinuxSd(x) => self.linux_sd_form(x),
-            bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(!x.verify)
-                .label("Skip Verification")
-                .on_toggle(|y| {
-                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::Bcf(
-                        x.clone().update_verify(!y),
-                    ))
-                })],
-            bb_imager::FlashingConfig::Msp430 => widget::column([]),
-        }
-        .spacing(5)
-        .width(iced::Length::Fill);
+            let form = match self.flashing_config.as_ref().unwrap() {
+                bb_imager::FlashingConfig::LinuxSd(x) => self.linux_sd_form(x),
+                bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(!x.verify)
+                    .label("Skip Verification")
+                    .on_toggle(|y| {
+                        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::Bcf(
+                            x.clone().update_verify(!y),
+                        ))
+                    })],
+                bb_imager::FlashingConfig::Msp430 => widget::column([]),
+            }
+            .spacing(5);
 
-        widget::column![
-            text("Extra Configuration").size(28),
-            widget::horizontal_rule(2),
-            form,
-            widget::vertical_space(),
-            action_btn_row
-        ]
-        .spacing(10)
-        .padding(10)
-        .height(iced::Length::Fill)
-        .width(iced::Length::Fill)
-        .align_x(iced::Alignment::Center)
+            widget::column![
+                text("Extra Configuration").size(28),
+                widget::horizontal_rule(2),
+                widget::scrollable(form).height(size.height - 210.0),
+                action_btn_row,
+            ]
+            .spacing(10)
+            .padding(10)
+            .height(iced::Length::Fill)
+            .width(iced::Length::Fill)
+            .align_x(iced::Alignment::Center)
+            .into()
+        })
         .into()
     }
 
@@ -802,33 +805,37 @@ impl FlashingScreen {
     }
 
     fn view(&self) -> Element<BBImagerMessage> {
-        let prog_bar = self.progress.bar();
+        widget::responsive(|size| {
+            let prog_bar = self.progress.bar();
 
-        let btn = if self.running {
-            home_btn("CANCEL", true, iced::Length::Shrink).on_press(BBImagerMessage::CancelFlashing)
-        } else {
-            home_btn("HOME", true, iced::Length::Shrink)
-                .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-        };
+            let btn = if self.running {
+                home_btn("CANCEL", true, iced::Length::Shrink)
+                    .on_press(BBImagerMessage::CancelFlashing)
+            } else {
+                home_btn("HOME", true, iced::Length::Shrink)
+                    .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
+            };
 
-        let bottom = widget::container(
-            widget::column![self.about(), widget::vertical_space(), btn, prog_bar]
+            let bottom = widget::container(
+                widget::column![self.about().height(size.height - 410.0), btn, prog_bar]
+                    .width(iced::Length::Fill)
+                    .height(iced::Length::Fill)
+                    .align_x(iced::Alignment::Center),
+            )
+            .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
+
+            widget::column![helpers::logo(), bottom]
+                .spacing(10)
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill)
-                .align_x(iced::Alignment::Center),
-        )
-        .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
-
-        widget::column![helpers::logo(), bottom]
-            .spacing(10)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center)
-            .into()
+                .align_x(iced::Alignment::Center)
+                .into()
+        })
+        .into()
     }
 
-    fn about(&self) -> Element<'_, BBImagerMessage> {
-        widget::container(widget::rich_text![
+    fn about(&self) -> widget::Container<'_, BBImagerMessage> {
+        widget::container(widget::scrollable(widget::rich_text![
             widget::span(constants::BEAGLE_BOARD_ABOUT)
                 .link(BBImagerMessage::OpenUrl(
                     "https://www.beagleboard.org/about".into()
@@ -838,9 +845,8 @@ impl FlashingScreen {
             widget::span("For more information, check out our documentation")
                 .link(BBImagerMessage::OpenUrl(self.documentation.clone().into()))
                 .color(iced::Color::WHITE)
-        ])
-        .padding(30)
-        .into()
+        ]))
+        .padding(32)
     }
 }
 

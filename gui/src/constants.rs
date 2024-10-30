@@ -21,3 +21,5 @@ pub const FONT_BOLD: iced::Font = {
 };
 pub const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
 pub const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
+
+pub const WINDOW_SIZE: iced::Size = iced::Size::new(850.0, 600.0);
