@@ -10,7 +10,10 @@ use thiserror::Error;
 use tokio::io::AsyncSeekExt;
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::flasher::{bcf, msp430, sd};
+use crate::{
+    flasher::{bcf, msp430, sd},
+    util,
+};
 
 pub(crate) const BUF_SIZE: usize = 32 * 1024;
 
@@ -207,7 +210,7 @@ impl Flasher {
 
                 let mut data = String::new();
                 img.read_to_string(&mut data).unwrap();
-                let bin = bin_file::BinFile::from_str(data).unwrap();
+                let bin = util::bin_file_from_str(data).unwrap();
 
                 tokio::task::spawn_blocking(move || msp430::flash(bin, self.dst, &self.chan))
                     .await

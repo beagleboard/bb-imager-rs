@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::error::Result;
+use crate::{error::Result, util};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_serial::SerialPort;
@@ -298,7 +298,7 @@ fn open_firmware(mut img: crate::img::OsImage) -> Result<Vec<u8>> {
         .map_err(|_| Error::InvalidImage)?;
 
     match String::from_utf8(img_data) {
-        Ok(x) => bin_file::BinFile::from_str(x)
+        Ok(x) => util::bin_file_from_str(x)
             .map_err(|_| Error::InvalidImage)?
             .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xFF))
             .map_err(|_| Error::InvalidImage.into())

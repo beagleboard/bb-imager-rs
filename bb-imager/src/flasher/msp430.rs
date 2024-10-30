@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::error::Result;
+use crate::{error::Result, util};
 use thiserror::Error;
 
 const VID: u16 = 0x2047;
@@ -154,7 +154,7 @@ fn load_bsl(dst: &crate::Destination) -> Result<()> {
     tracing::info!("Unlock");
     msp430.unlock()?;
 
-    let bin = bin_file::BinFile::from_str(BSL).unwrap();
+    let bin = util::bin_file_from_str(BSL).unwrap();
     tracing::info!("BSL: {}", bin);
 
     tracing::info!("Load BSL");
