@@ -9,15 +9,15 @@ license.workspace = true
 
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced"] }
-rfd = { version = "0.14.1", default-features = false, features = ["xdg-portal", "tokio"] }
+rfd = { version = "0.15.0", default-features = false, features = ["xdg-portal", "tokio"] }
 bb-imager = { path = "../bb-imager", version = "0.0.3" }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
-iced_aw = { version = "0.10.0", default-features = false, features = ["badge"] }
-image = "0.25.2"
-tokio = { version = "1.39.2", default-features = false, features = ["macros"] }
-webbrowser = "1.0.1"
-notify-rust = "4.11.1"
+iced_aw = { version = "0.11.0", default-features = false, features = ["badge"] }
+image = "0.25.4"
+tokio = { version = "1.41.0", default-features = false, features = ["macros"] }
+webbrowser = "1.0.2"
+notify-rust = "4.11.3"
 
 [build-dependencies]
-embed-resource = "2.4"
+embed-resource = "2.5.0"

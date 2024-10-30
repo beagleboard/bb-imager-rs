@@ -8,19 +8,19 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-liblzma = { version = "0.3.4", features = ["static", "parallel"] }
+liblzma = { version = "0.3.5", features = ["static"] }
 chrono = { version = "0.4.38", features = ["serde"] }
-const-hex = { version = "1.12.0", features = ["serde"] }
+const-hex = { version = "1.13.1", features = ["serde"] }
 crc32fast = "1.4.2"
 directories = "5.0.1"
-reqwest = { version = "0.12.5", features = ["stream", "json"] }
+reqwest = { version = "0.12.9", features = ["stream", "json"] }
 semver = { version = "1.0.23", features = ["serde"] }
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
 tokio-serial = "5.4.4"
 sha2 = "0.10.8"
-thiserror = "1.0.63"
-tokio = { version = "1.39.1", default-features = false, features = ["rt-multi-thread", "process", "fs", "time", "sync"] }
+thiserror = "1.0.65"
+tokio = { version = "1.41.0", default-features = false, features = ["rt-multi-thread", "process", "fs", "time", "sync"] }
 tracing = "0.1.40"
 url = { version = "2.5.2", features = ["serde"] }
 rs-drivelist = "0.9.4"
@@ -29,7 +29,7 @@ fscommon = "0.1.1"
 mbrman = "0.5.2"
 hidapi = "2.6.3"
 bin_file = "0.1.1"
-futures = "0.3.30"
+futures = "0.3.31"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = "0.1.0"
@@ -39,6 +39,6 @@ tokio-serial = { version = "5.4.4", features = ["libudev"] }
 windows = { version = "0.58.0", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.11.1"
+security-framework = "3.0.0"
 plist = "1.7.0"
 anyhow = "1.0.91"
