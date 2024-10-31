@@ -305,3 +305,25 @@ pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBIma
             .into(),
     }
 }
+
+pub fn search_bar(refresh: Option<BBImagerMessage>, cur_search: &str) -> Element<BBImagerMessage> {
+    let mut row = widget::row![button(
+        widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22)
+    )
+    .on_press(BBImagerMessage::SwitchScreen(crate::pages::Screen::Home))
+    .style(widget::button::secondary)]
+    .spacing(10);
+
+    if let Some(r) = refresh {
+        row = row.push(
+            button(
+                widget::svg(widget::svg::Handle::from_memory(constants::REFRESH_ICON)).width(22),
+            )
+            .on_press(r)
+            .style(widget::button::secondary),
+        );
+    }
+
+    row.push(widget::text_input("Search", cur_search).on_input(BBImagerMessage::Search))
+        .into()
+}

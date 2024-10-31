@@ -3,16 +3,17 @@ use iced::{
     Element,
 };
 
-use crate::{constants, BBImagerMessage};
+use crate::{constants, helpers, BBImagerMessage};
 
-pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
-    let items = bbimager
-        .destinations
-        .iter()
+pub fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, BBImagerMessage>
+where
+    D: Iterator<Item = &'a bb_imager::Destination>,
+{
+    let items = destinations
         .filter(|x| {
             x.to_string()
                 .to_lowercase()
-                .contains(&bbimager.search_bar.to_lowercase())
+                .contains(&search_bar.to_lowercase())
         })
         .map(|x| {
             let mut row2 = widget::column![text(x.to_string())];
@@ -37,7 +38,7 @@ pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
         .map(Into::into);
 
     widget::column![
-        bbimager.search_bar(Some(BBImagerMessage::RefreshDestinations)),
+        helpers::search_bar(Some(BBImagerMessage::RefreshDestinations), search_bar),
         widget::horizontal_rule(2),
         widget::scrollable(widget::column(items).spacing(10))
     ]

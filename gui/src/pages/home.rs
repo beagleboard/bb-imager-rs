@@ -10,39 +10,39 @@ use crate::{
 
 use super::Screen;
 
-pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
-    let choose_device_btn = match &bbimager.selected_board {
-        Some(x) => home_btn(x.as_str(), true, iced::Length::Fill),
+pub fn view<'a>(
+    selected_board: Option<&'a str>,
+    selected_image: Option<&'a bb_imager::common::SelectedImage>,
+    selected_dst: Option<&'a bb_imager::Destination>,
+) -> Element<'a, BBImagerMessage> {
+    let choose_device_btn = match selected_board {
+        Some(x) => home_btn(x, true, iced::Length::Fill),
         None => home_btn("CHOOSE DEVICE", true, iced::Length::Fill),
     }
     .width(iced::Length::Fill)
     .on_press(BBImagerMessage::SwitchScreen(Screen::BoardSelection));
 
-    let choose_image_btn = match &bbimager.selected_image {
+    let choose_image_btn = match selected_image {
         Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
-        None => home_btn(
-            "CHOOSE IMAGE",
-            bbimager.selected_board.is_some(),
-            iced::Length::Fill,
-        ),
+        None => home_btn("CHOOSE IMAGE", selected_board.is_some(), iced::Length::Fill),
     }
     .width(iced::Length::Fill)
-    .on_press_maybe(if bbimager.selected_board.is_none() {
+    .on_press_maybe(if selected_board.is_none() {
         None
     } else {
         Some(BBImagerMessage::SwitchScreen(Screen::ImageSelection))
     });
 
-    let choose_dst_btn = match &bbimager.selected_dst {
+    let choose_dst_btn = match selected_dst {
         Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
         None => home_btn(
             "CHOOSE DESTINATION",
-            bbimager.selected_image.is_some(),
+            selected_image.is_some(),
             iced::Length::Fill,
         ),
     }
     .width(iced::Length::Fill)
-    .on_press_maybe(if bbimager.selected_image.is_none() {
+    .on_press_maybe(if selected_image.is_none() {
         None
     } else {
         Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
@@ -52,9 +52,8 @@ pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
         .on_press(BBImagerMessage::Reset)
         .width(iced::Length::Fill);
 
-    let next_btn_active = bbimager.selected_board.is_none()
-        || bbimager.selected_image.is_none()
-        || bbimager.selected_dst.is_none();
+    let next_btn_active =
+        selected_board.is_none() || selected_image.is_none() || selected_dst.is_none();
 
     let next_btn = home_btn("NEXT", !next_btn_active, iced::Length::Fill)
         .width(iced::Length::Fill)

@@ -3,11 +3,7 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use helpers::ProgressBarState;
-use iced::{
-    futures::SinkExt,
-    widget::{self, button},
-    Element, Task,
-};
+use iced::{futures::SinkExt, widget, Element, Task};
 use pages::Screen;
 
 mod constants;
@@ -348,11 +344,27 @@ impl BBImager {
 
     fn view(&self) -> Element<BBImagerMessage> {
         match &self.screen {
-            Screen::Home => pages::home::view(self),
-            Screen::BoardSelection => pages::board_selection::view(self),
-            Screen::ImageSelection => pages::image_selection::view(self),
-            Screen::DestinationSelection => pages::destination_selection::view(self),
-            Screen::ExtraConfiguration => pages::configuration::view(self),
+            Screen::Home => pages::home::view(
+                self.selected_board.as_deref(),
+                self.selected_image.as_ref(),
+                self.selected_dst.as_ref(),
+            ),
+            Screen::BoardSelection => {
+                pages::board_selection::view(&self.boards, &self.search_bar, &self.downloader)
+            }
+            Screen::ImageSelection => {
+                let board = self.selected_board.as_ref().unwrap();
+                let images = self.boards.images(board);
+                pages::image_selection::view(images, &self.search_bar, &self.downloader)
+            }
+            Screen::DestinationSelection => {
+                pages::destination_selection::view(self.destinations.iter(), &self.search_bar)
+            }
+            Screen::ExtraConfiguration => pages::configuration::view(
+                self.flashing_config.as_ref(),
+                &self.timezones,
+                &self.keymaps,
+            ),
             Screen::Flashing(s) => s.view(),
         }
     }
@@ -376,28 +388,5 @@ impl BBImager {
             async move { flasher.destinations().await },
             BBImagerMessage::Destinations,
         )
-    }
-
-    fn search_bar(&self, refresh: Option<BBImagerMessage>) -> Element<BBImagerMessage> {
-        let mut row = widget::row![button(
-            widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22)
-        )
-        .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-        .style(widget::button::secondary)]
-        .spacing(10);
-
-        if let Some(r) = refresh {
-            row = row.push(
-                button(
-                    widget::svg(widget::svg::Handle::from_memory(constants::REFRESH_ICON))
-                        .width(22),
-                )
-                .on_press(r)
-                .style(widget::button::secondary),
-            );
-        }
-
-        row.push(widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search))
-            .into()
     }
 }

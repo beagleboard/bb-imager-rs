@@ -10,8 +10,12 @@ use crate::{
 
 use super::Screen;
 
-pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
-    widget::responsive(|size| {
+pub fn view<'a>(
+    flashing_config: Option<&'a bb_imager::FlashingConfig>,
+    timezones: &'a widget::combo_box::State<String>,
+    keymaps: &'a widget::combo_box::State<String>,
+) -> Element<'a, BBImagerMessage> {
+    widget::responsive(move |size| {
         let action_btn_row = widget::row![
             home_btn("BACK", true, iced::Length::Fill)
                 .style(widget::button::secondary)
@@ -26,8 +30,8 @@ pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
         .padding(32)
         .width(iced::Length::Fill);
 
-        let form = match bbimager.flashing_config.as_ref().unwrap() {
-            bb_imager::FlashingConfig::LinuxSd(x) => linux_sd_form(bbimager, x),
+        let form = match flashing_config.unwrap() {
+            bb_imager::FlashingConfig::LinuxSd(x) => linux_sd_form(timezones, keymaps, x),
             bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(!x.verify)
                 .label("Skip Verification")
                 .on_toggle(|y| {
@@ -56,35 +60,27 @@ pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
 }
 
 fn linux_sd_form<'a>(
-    bbimager: &'a crate::BBImager,
+    timezones: &'a widget::combo_box::State<String>,
+    keymaps: &'a widget::combo_box::State<String>,
     config: &'a bb_imager::FlashingSdLinuxConfig,
 ) -> widget::Column<'a, BBImagerMessage> {
     let xc = config.clone();
-    let timezone_box = widget::combo_box(
-        &bbimager.timezones,
-        "Timezone",
-        config.timezone.as_ref(),
-        move |t| {
+    let timezone_box =
+        widget::combo_box(timezones, "Timezone", config.timezone.as_ref(), move |t| {
             let tz = if t.is_empty() { None } else { Some(t) };
             BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
                 xc.clone().update_timezone(tz),
             ))
-        },
-    )
-    .width(200);
+        })
+        .width(200);
 
     let xc = config.clone();
-    let keymap_box = widget::combo_box(
-        &bbimager.keymaps,
-        "Keymap",
-        config.keymap.as_ref(),
-        move |t| {
-            let tz = if t.is_empty() { None } else { Some(t) };
-            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
-                xc.clone().update_keymap(tz),
-            ))
-        },
-    )
+    let keymap_box = widget::combo_box(keymaps, "Keymap", config.keymap.as_ref(), move |t| {
+        let tz = if t.is_empty() { None } else { Some(t) };
+        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+            xc.clone().update_keymap(tz),
+        ))
+    })
     .width(200);
 
     widget::column![

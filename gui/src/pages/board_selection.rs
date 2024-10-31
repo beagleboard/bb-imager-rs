@@ -3,26 +3,29 @@ use iced::{
     Element,
 };
 
-use crate::{constants, helpers::img_or_svg, BBImagerMessage};
+use crate::{
+    constants,
+    helpers::{self, img_or_svg},
+    BBImagerMessage,
+};
 
-pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
-    let items = bbimager
-        .boards
+pub fn view<'a>(
+    boards: &'a helpers::Boards,
+    search_bar: &'a str,
+    downloader: &'a bb_imager::download::Downloader,
+) -> Element<'a, BBImagerMessage> {
+    let items = boards
         .devices()
-        .filter(|(name, _)| {
-            name.to_lowercase()
-                .contains(&bbimager.search_bar.to_lowercase())
-        })
+        .filter(|(name, _)| name.to_lowercase().contains(&search_bar.to_lowercase()))
         .map(|(name, dev)| {
-            let image: Element<BBImagerMessage> =
-                match bbimager.downloader.clone().check_image(&dev.icon) {
-                    Some(y) => img_or_svg(y, 100),
-                    None => widget::svg(widget::svg::Handle::from_memory(
-                        constants::DOWNLOADING_ICON,
-                    ))
-                    .width(40)
-                    .into(),
-                };
+            let image: Element<BBImagerMessage> = match downloader.clone().check_image(&dev.icon) {
+                Some(y) => img_or_svg(y, 100),
+                None => widget::svg(widget::svg::Handle::from_memory(
+                    constants::DOWNLOADING_ICON,
+                ))
+                .width(40)
+                .into(),
+            };
 
             button(
                 widget::row![
@@ -45,8 +48,12 @@ pub fn view(bbimager: &crate::BBImager) -> Element<BBImagerMessage> {
 
     let items = widget::scrollable(widget::column(items).spacing(10));
 
-    widget::column![bbimager.search_bar(None), widget::horizontal_rule(2), items]
-        .spacing(10)
-        .padding(10)
-        .into()
+    widget::column![
+        helpers::search_bar(None, search_bar),
+        widget::horizontal_rule(2),
+        items
+    ]
+    .spacing(10)
+    .padding(10)
+    .into()
 }
