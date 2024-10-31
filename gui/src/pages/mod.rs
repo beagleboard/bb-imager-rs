@@ -1,4 +1,5 @@
 pub mod flash;
+pub mod configuration;
 
 #[derive(Default, Debug, Clone)]
 pub enum Screen {
