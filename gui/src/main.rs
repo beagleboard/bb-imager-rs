@@ -2,10 +2,10 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use helpers::{home_btn, ProgressBarState};
+use helpers::ProgressBarState;
 use iced::{
     futures::SinkExt,
-    widget::{self, button, text},
+    widget::{self, button},
     Element, Task,
 };
 use pages::Screen;
@@ -348,7 +348,7 @@ impl BBImager {
 
     fn view(&self) -> Element<BBImagerMessage> {
         match &self.screen {
-            Screen::Home => self.home_view(),
+            Screen::Home => pages::home::view(self),
             Screen::BoardSelection => pages::board_selection::view(self),
             Screen::ImageSelection => pages::image_selection::view(self),
             Screen::DestinationSelection => pages::destination_selection::view(self),
@@ -376,112 +376,6 @@ impl BBImager {
             async move { flasher.destinations().await },
             BBImagerMessage::Destinations,
         )
-    }
-
-    fn home_view(&self) -> Element<BBImagerMessage> {
-        let choose_device_btn = match &self.selected_board {
-            Some(x) => home_btn(x.as_str(), true, iced::Length::Fill),
-            None => home_btn("CHOOSE DEVICE", true, iced::Length::Fill),
-        }
-        .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::SwitchScreen(Screen::BoardSelection));
-
-        let choose_image_btn = match &self.selected_image {
-            Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
-            None => home_btn(
-                "CHOOSE IMAGE",
-                self.selected_board.is_some(),
-                iced::Length::Fill,
-            ),
-        }
-        .width(iced::Length::Fill)
-        .on_press_maybe(if self.selected_board.is_none() {
-            None
-        } else {
-            Some(BBImagerMessage::SwitchScreen(Screen::ImageSelection))
-        });
-
-        let choose_dst_btn = match &self.selected_dst {
-            Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
-            None => home_btn(
-                "CHOOSE DESTINATION",
-                self.selected_image.is_some(),
-                iced::Length::Fill,
-            ),
-        }
-        .width(iced::Length::Fill)
-        .on_press_maybe(if self.selected_image.is_none() {
-            None
-        } else {
-            Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
-        });
-
-        let reset_btn = home_btn("RESET", true, iced::Length::Fill)
-            .on_press(BBImagerMessage::Reset)
-            .width(iced::Length::Fill);
-
-        let next_btn_active = self.selected_board.is_none()
-            || self.selected_image.is_none()
-            || self.selected_dst.is_none();
-
-        let next_btn = home_btn("NEXT", !next_btn_active, iced::Length::Fill)
-            .width(iced::Length::Fill)
-            .on_press_maybe(if next_btn_active {
-                None
-            } else {
-                Some(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration))
-            });
-
-        let choice_btn_row = widget::row![
-            widget::column![
-                text("BeagleBoard").color(iced::Color::WHITE),
-                choose_device_btn
-            ]
-            .spacing(8)
-            .width(iced::Length::FillPortion(1))
-            .align_x(iced::Alignment::Center),
-            widget::column![text("Image").color(iced::Color::WHITE), choose_image_btn]
-                .spacing(8)
-                .width(iced::Length::FillPortion(1))
-                .align_x(iced::Alignment::Center),
-            widget::column![
-                text("Destination").color(iced::Color::WHITE),
-                choose_dst_btn
-            ]
-            .spacing(8)
-            .width(iced::Length::FillPortion(1))
-            .align_x(iced::Alignment::Center)
-        ]
-        .padding(48)
-        .spacing(48)
-        .width(iced::Length::Fill)
-        .align_y(iced::Alignment::Center);
-
-        let action_btn_row = widget::row![
-            reset_btn.width(iced::Length::FillPortion(1)),
-            widget::horizontal_space().width(iced::Length::FillPortion(5)),
-            next_btn.width(iced::Length::FillPortion(1))
-        ]
-        .padding(48)
-        .width(iced::Length::Fill)
-        .align_y(iced::Alignment::Center);
-
-        let bottom = widget::container(
-            widget::column![
-                choice_btn_row.height(iced::Length::FillPortion(1)),
-                action_btn_row.height(iced::Length::FillPortion(1))
-            ]
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center),
-        )
-        .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
-
-        widget::column![helpers::logo(), bottom]
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center)
-            .into()
     }
 
     fn search_bar(&self, refresh: Option<BBImagerMessage>) -> Element<BBImagerMessage> {
