@@ -8,6 +8,7 @@ use iced::{
     widget::{self, button, text},
     Element, Task,
 };
+use pages::Screen;
 
 mod constants;
 mod helpers;
@@ -774,17 +775,6 @@ impl BBImager {
         row.push(widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search))
             .into()
     }
-}
-
-#[derive(Default, Debug, Clone)]
-enum Screen {
-    #[default]
-    Home,
-    BoardSelection,
-    ImageSelection,
-    DestinationSelection,
-    ExtraConfiguration,
-    Flashing(pages::flash::FlashingScreen),
 }
 
 fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
