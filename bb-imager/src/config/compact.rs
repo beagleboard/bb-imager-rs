@@ -17,6 +17,7 @@ pub struct Config {
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Imager {
+    pub(crate) latest_version: semver::Version,
     pub(crate) devices: Vec<Device>,
 }
 

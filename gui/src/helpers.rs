@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 use iced::{
     widget::{self, text},
@@ -145,4 +148,113 @@ pub fn logo<'a>() -> widget::Container<'a, BBImagerMessage> {
     )
     .padding(64)
     .width(iced::Length::Fill)
+}
+
+#[derive(Debug, Clone)]
+pub struct Device {
+    pub description: String,
+    pub icon: url::Url,
+    pub flasher: bb_imager::config::Flasher,
+    pub documentation: url::Url,
+}
+
+impl From<bb_imager::config::Device> for Device {
+    fn from(value: bb_imager::config::Device) -> Self {
+        Self {
+            description: value.description,
+            icon: value.icon,
+            flasher: value.flasher,
+            documentation: value.documentation,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Image {
+    pub name: String,
+    pub description: String,
+    pub icon: url::Url,
+    pub url: url::Url,
+    pub release_date: chrono::NaiveDate,
+    pub image_sha256: [u8; 32],
+    pub tags: HashSet<String>,
+}
+
+impl From<bb_imager::config::OsList> for Image {
+    fn from(value: bb_imager::config::OsList) -> Self {
+        Self {
+            name: value.name,
+            description: value.description,
+            icon: value.icon,
+            url: value.url,
+            release_date: value.release_date,
+            image_sha256: value.image_sha256,
+            tags: value.tags,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Boards(HashMap<String, (Device, Vec<Image>)>);
+
+impl Boards {
+    pub fn merge(mut self, config: bb_imager::config::Config) -> Self {
+        for dev in config.imager.devices {
+            if !self.0.contains_key(&dev.name) {
+                let temp = self.0.insert(dev.name.clone(), (dev.into(), Vec::new()));
+                assert!(temp.is_none());
+            }
+        }
+
+        for image in config.os_list {
+            for board in image.devices.iter() {
+                match self.0.get_mut(board) {
+                    Some(val) => val.1.push(Image::from(image.clone())),
+                    None => tracing::warn!("Unknown Board: {}", board),
+                }
+            }
+        }
+
+        self
+    }
+
+    pub fn devices<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a Device)> {
+        self.0.iter().map(|(x, (y, _))| (x.as_str(), y))
+    }
+
+    pub fn images<'a>(&'a self, board: &'a str) -> impl Iterator<Item = &'a Image> {
+        self.0.get(board).expect("Board does not exist").1.iter()
+    }
+
+    pub fn device<'a>(&'a self, board: &'a str) -> &'a Device {
+        &self.0.get(board).expect("Board does not exist").0
+    }
+}
+
+impl From<bb_imager::config::Config> for Boards {
+    fn from(value: bb_imager::config::Config) -> Self {
+        let mut ans: HashMap<String, (Device, Vec<Image>)> = value
+            .imager
+            .devices
+            .into_iter()
+            .map(|x| (x.name.clone(), (x.into(), Vec::new())))
+            .collect();
+
+        for image in value.os_list {
+            for board in image.devices.iter() {
+                match ans.get_mut(board) {
+                    Some(val) => val.1.push(Image::from(image.clone())),
+                    None => tracing::warn!("Unknown Board: {}", board),
+                }
+            }
+        }
+
+        Self(ans)
+    }
+}
+
+impl From<&Image> for bb_imager::SelectedImage {
+    fn from(value: &Image) -> Self {
+        Self::remote(value.name.clone(), value.url.clone(), value.image_sha256)
+    }
 }

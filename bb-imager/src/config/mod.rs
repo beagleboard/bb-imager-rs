@@ -71,29 +71,37 @@ impl Config {
             .iter()
             .filter(|x| x.devices.contains(&device.name))
     }
+}
 
-    pub fn merge_compact(mut self, comp: compact::Config) -> Self {
+impl From<compact::Config> for Config {
+    fn from(value: compact::Config) -> Self {
         let mut mapper = HashMap::new();
+        let mut devices = Vec::with_capacity(value.imager.devices.len());
+        let mut os_list = Vec::with_capacity(value.os_list.len());
 
         // Imager
-        self.imager.devices.reserve(comp.imager.devices.len());
-        for d in comp.imager.devices {
+        for d in value.imager.devices {
             if d.name == "No filtering" {
                 continue;
             }
 
             let temp = d.convert(&mut mapper);
-            self.imager.devices.push(temp);
+            devices.push(temp);
         }
 
         // OsList
-        self.os_list.reserve(comp.os_list.len());
-        for item in comp.os_list {
+        for item in value.os_list {
             let mut temp = item.convert(&mapper);
-            self.os_list.append(&mut temp);
+            os_list.append(&mut temp);
         }
 
-        self
+        Self {
+            imager: Imager {
+                latest_version: Some(value.imager.latest_version),
+                devices,
+            },
+            os_list,
+        }
     }
 }
 
