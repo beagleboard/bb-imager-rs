@@ -351,7 +351,7 @@ impl BBImager {
             Screen::Home => self.home_view(),
             Screen::BoardSelection => self.board_selction_view(),
             Screen::ImageSelection => self.image_selection_view(),
-            Screen::DestinationSelection => self.destination_selection_view(),
+            Screen::DestinationSelection => pages::destination_selection::view(self),
             Screen::ExtraConfiguration => pages::configuration::view(self),
             Screen::Flashing(s) => s.view(),
         }
@@ -595,48 +595,6 @@ impl BBImager {
 
         widget::column![
             self.search_bar(None),
-            widget::horizontal_rule(2),
-            widget::scrollable(widget::column(items).spacing(10))
-        ]
-        .spacing(10)
-        .padding(10)
-        .into()
-    }
-
-    fn destination_selection_view(&self) -> Element<BBImagerMessage> {
-        let items = self
-            .destinations
-            .iter()
-            .filter(|x| {
-                x.to_string()
-                    .to_lowercase()
-                    .contains(&self.search_bar.to_lowercase())
-            })
-            .map(|x| {
-                let mut row2 = widget::column![text(x.to_string())];
-
-                if let bb_imager::Destination::SdCard { size, .. } = x {
-                    let s = (*size as f32) / (1024.0 * 1024.0 * 1024.0);
-                    row2 = row2.push(text(format!("{:.2} GB", s)));
-                }
-
-                button(
-                    widget::row![
-                        widget::svg(widget::svg::Handle::from_memory(constants::USB_ICON))
-                            .width(40),
-                        row2
-                    ]
-                    .align_y(iced::Alignment::Center)
-                    .spacing(10),
-                )
-                .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectPort(x.clone()))
-                .style(widget::button::secondary)
-            })
-            .map(Into::into);
-
-        widget::column![
-            self.search_bar(Some(BBImagerMessage::RefreshDestinations)),
             widget::horizontal_rule(2),
             widget::scrollable(widget::column(items).spacing(10))
         ]
