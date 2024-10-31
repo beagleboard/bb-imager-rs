@@ -12,6 +12,29 @@ define appimage
 	rm -rf release/linux/$(1)/AppDir
 endef
 
+# Build Macos dmg for BeagleBoardImager GUI
+define dmg
+	sed -i'.bak' -e "s/0\.0\.0/${CI_COMMIT_TAG}/g" -e "s/fffffff/${CI_COMMIT_SHA:0:7}/g" gui/assets/packaging/macos/Info.plist
+	mkdir -p release/darwin/$(1)/AppDir/BeagleBoardImager.app/Contents/{MacOS,Resources}
+	cp gui/assets/packaging/macos/Info.plist release/darwin/$(1)/AppDir/BeagleBoardImager.app/Contents/
+	cp gui/assets/icons/icon.icns release/darwin/$(1)/AppDir/BeagleBoardImager.app/Contents/Resources/
+	cp target/$(1)/release/bb-imager-gui release/darwin/$(1)/AppDir/BeagleBoardImager.app/Contents/MacOS/
+	create-dmg \
+		--volname "BeagleBoardImager Installer" \
+		--volicon "gui/assets/icons/icon.icns" \
+		--window-pos 200 120 \
+		--window-size 800 400 \
+		--icon-size 100 \
+		--icon "BeagleBoardImager.app" 200 190 \
+		--hide-extension "BeagleBoardImager.app" \
+		--app-drop-link 600 185 \
+		--hdiutil-verbose \
+		--skip-jenkins \
+		"release/darwin/$(1)/BeagleBoardImager.dmg" \
+		"release/darwin/$(1)/AppDir/"
+	rm -rf release/darwin/$(1)/AppDir/
+endef
+
 # Build Executable for BeagleBoardImager CLI
 define cli
 	mkdir -p release/linux/$(1)
@@ -81,15 +104,27 @@ release-linux-cli-arm: build-linux-arm
 	$(info "Generating Linux CLI release for x86_64")
 	$(call cli,armv7-unknown-linux-gnueabihf)
 
-release-darwin-x86_64: build-darwin-x86_64
-	$(info "Generating MacOS release for x86_64")
+release-darwin-cli-x86_64: build-darwin-x86_64
+	$(info "Generating MacOS CLI release for x86_64")
 	mkdir -p release/darwin/x86_64-apple-darwin
 	zip -j release/darwin/x86_64-apple-darwin/bb-imager-cli.zip target/x86_64-apple-darwin/release/bb-imager-cli
 
-release-darwin-aarch64: build-darwin-aarch64
-	$(info "Generating MacOS release for aarch64")
+release-darwin-gui-x86_64: build-darwin-x86_64
+	$(info "Generating MacOS GUI release for x86_64")
+	$(call dmg,x86_64-apple-darwin)
+
+release-darwin-x86_64: release-darwin-cli-x86_64 release-darwin-gui-x86_64
+
+release-darwin-cli-aarch64: build-darwin-aarch64
+	$(info "Generating MacOS CLI release for aarch64")
 	mkdir -p release/darwin/aarch64-apple-darwin
 	zip -j release/darwin/aarch64-apple-darwin/bb-imager-cli.zip target/aarch64-apple-darwin/release/bb-imager-cli
+
+release-darwin-gui-aarch64: build-darwin-aarch64
+	$(info "Generating MacOS GUI release for aarch64")
+	$(call dmg,aarch64-apple-darwin)
+
+release-darwin-aarch64: release-darwin-cli-aarch64 release-darwin-gui-aarch64
 
 release-linux-x86_64: release-linux-cli-x86_64 release-linux-gui-appimage-x86_64
 

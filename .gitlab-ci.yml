@@ -121,8 +121,10 @@ macos:
   variables:
     RUST_BUILDER: cargo
   before_script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    - source "$HOME/.cargo/env"
+    - brew install create-dmg rustup git-lfs
+    - git lfs install
+    - git lfs fetch
+    - git lfs checkout
     - rustup target add x86_64-apple-darwin aarch64-apple-darwin
   script:
     - rustc --version
