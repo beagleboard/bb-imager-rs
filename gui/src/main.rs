@@ -50,8 +50,8 @@ struct BBImager {
     cancel_flashing: Option<iced::task::Handle>,
     flashing_config: Option<bb_imager::FlashingConfig>,
 
-    timezones: Option<widget::combo_box::State<String>>,
-    keymaps: Option<widget::combo_box::State<String>>,
+    timezones: widget::combo_box::State<String>,
+    keymaps: widget::combo_box::State<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -79,22 +79,20 @@ enum BBImagerMessage {
 }
 
 impl BBImager {
-    fn new(config: helpers::Boards) -> (Self, Task<BBImagerMessage>) {
+    fn new(boards: helpers::Boards) -> (Self, Task<BBImagerMessage>) {
         let downloader = bb_imager::download::Downloader::default();
 
         // Fetch old config
-        let client = downloader.client();
-        let boards_clone = config.clone();
+        let client = downloader.clone();
+        let boards_clone = boards.clone();
         let config_task = Task::perform(
             async move {
                 let data: bb_imager::config::compact::Config = client
-                    .get(constants::BB_IMAGER_ORIGINAL_CONFIG)
-                    .send()
-                    .await
-                    .map_err(|e| format!("Config download failed: {e}"))?
-                    .json()
+                    .download_json(constants::BB_IMAGER_ORIGINAL_CONFIG)
                     .await
                     .map_err(|e| format!("Config parsing failed: {e}"))?;
+
+                // If spawn_blocking fails, there is a problem with the underlying runtime
                 tokio::task::spawn_blocking(|| Ok(boards_clone.merge(data.into())))
                     .await
                     .unwrap()
@@ -109,10 +107,20 @@ impl BBImager {
         );
 
         let ans = Self {
-            boards: config,
+            boards,
             downloader: downloader.clone(),
-            timezones: Some(timezone()),
-            keymaps: Some(keymap()),
+            timezones: widget::combo_box::State::new(
+                constants::TIMEZONES
+                    .into_iter()
+                    .map(|x| x.to_string())
+                    .collect(),
+            ),
+            keymaps: widget::combo_box::State::new(
+                constants::KEYMAP_LAYOUTS
+                    .into_iter()
+                    .map(|x| x.to_string())
+                    .collect(),
+            ),
             ..Default::default()
         };
 
@@ -123,6 +131,7 @@ impl BBImager {
     }
 
     fn fetch_board_images(&self) -> Task<BBImagerMessage> {
+        // Do not try downloading same image multiple times
         let icons: HashSet<url::Url> = self
             .boards
             .devices()
@@ -178,12 +187,11 @@ impl BBImager {
                 return Task::batch(jobs.chain([self.refresh_destinations()]));
             }
             BBImagerMessage::ProgressBar(x) => {
+                // Ignore progress bar update if not in the current screen
                 if let Screen::Flashing(mut s) = self.screen.clone() {
                     s.progress = x;
                     s.running = self.cancel_flashing.is_some();
                     self.screen = Screen::Flashing(s)
-                } else {
-                    unreachable!()
                 }
             }
             BBImagerMessage::SelectImage(x) => {
@@ -350,9 +358,7 @@ impl BBImager {
     const fn theme(&self) -> iced::Theme {
         iced::Theme::Light
     }
-}
 
-impl BBImager {
     fn back_home(&mut self) {
         self.search_bar.clear();
         self.screen = Screen::Home;
@@ -688,7 +694,7 @@ impl BBImager {
     ) -> widget::Column<'a, BBImagerMessage> {
         let xc = config.clone();
         let timezone_box = widget::combo_box(
-            self.timezones.as_ref().unwrap(),
+            &self.timezones,
             "Timezone",
             config.timezone.as_ref(),
             move |t| {
@@ -701,18 +707,14 @@ impl BBImager {
         .width(200);
 
         let xc = config.clone();
-        let keymap_box = widget::combo_box(
-            self.keymaps.as_ref().unwrap(),
-            "Keymap",
-            config.keymap.as_ref(),
-            move |t| {
+        let keymap_box =
+            widget::combo_box(&self.keymaps, "Keymap", config.keymap.as_ref(), move |t| {
                 let tz = if t.is_empty() { None } else { Some(t) };
                 BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
                     xc.clone().update_keymap(tz),
                 ))
-            },
-        )
-        .width(200);
+            })
+            .width(200);
 
         widget::column![
             widget::container(
@@ -871,24 +873,6 @@ fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerM
     }
 }
 
-fn timezone() -> widget::combo_box::State<String> {
-    let temp = include_str!("../assets/timezones.txt")
-        .split_whitespace()
-        .map(|x| x.to_string())
-        .collect();
-
-    widget::combo_box::State::new(temp)
-}
-
-fn keymap() -> widget::combo_box::State<String> {
-    let temp = include_str!("../assets/keymap-layouts.txt")
-        .split_whitespace()
-        .map(|x| x.to_string())
-        .collect();
-
-    widget::combo_box::State::new(temp)
-}
-
 fn uname_pass_form(
     config: &bb_imager::FlashingSdLinuxConfig,
 ) -> widget::Container<BBImagerMessage> {
@@ -977,21 +961,19 @@ fn home_btn<'a>(
     )
     .padding(16);
 
-    if active {
-        btn.style(|_, _| active_btn_style())
+    let style = if active {
+        widget::button::Style {
+            background: Some(iced::Color::WHITE.into()),
+            text_color: iced::Color::parse("#aa5137").unwrap(),
+            ..Default::default()
+        }
     } else {
-        btn.style(|_, _| widget::button::Style {
+        widget::button::Style {
             background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
             text_color: iced::Color::BLACK.scale_alpha(0.8),
             ..Default::default()
-        })
-    }
-}
+        }
+    };
 
-fn active_btn_style() -> widget::button::Style {
-    widget::button::Style {
-        background: Some(iced::Color::WHITE.into()),
-        text_color: iced::Color::parse("#aa5137").unwrap(),
-        ..Default::default()
-    }
+    btn.style(move |_, _| style)
 }

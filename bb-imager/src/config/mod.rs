@@ -58,19 +58,6 @@ impl Config {
     pub fn from_json(data: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(data)
     }
-
-    pub fn devices(&self) -> &[Device] {
-        &self.imager.devices
-    }
-
-    pub fn images_by_device<'a>(
-        &'a self,
-        device: &'a Device,
-    ) -> impl Iterator<Item = &'a OsList> + 'a {
-        self.os_list
-            .iter()
-            .filter(|x| x.devices.contains(&device.name))
-    }
 }
 
 impl From<compact::Config> for Config {

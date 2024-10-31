@@ -2,6 +2,7 @@
 
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
+use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
     io,
@@ -23,6 +24,8 @@ pub enum Error {
     ReqwestError(String),
     #[error("Incorrect Sha256. File might be corrupted")]
     Sha256Error,
+    #[error("Json Parsing Error: {0}")]
+    JsonError(String),
 }
 
 impl From<reqwest::Error> for Error {
@@ -64,10 +67,6 @@ impl Downloader {
         Self { client, dirs }
     }
 
-    pub fn client(&self) -> reqwest::Client {
-        self.client.clone()
-    }
-
     pub fn check_cache(self, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_name = const_hex::encode(sha256);
         let file_path = self.dirs.cache_dir().join(file_name);
@@ -98,6 +97,21 @@ impl Downloader {
         } else {
             None
         }
+    }
+
+    pub async fn download_json<T, U>(self, url: U) -> Result<T>
+    where
+        T: DeserializeOwned,
+        U: reqwest::IntoUrl,
+    {
+        self.client
+            .get(url)
+            .send()
+            .await
+            .map_err(Error::from)?
+            .json()
+            .await
+            .map_err(|e| Error::JsonError(e.to_string()).into())
     }
 
     pub async fn download_image(self, url: url::Url) -> Result<PathBuf> {

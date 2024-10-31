@@ -218,7 +218,7 @@ impl Boards {
         self
     }
 
-    pub fn devices<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a Device)> {
+    pub fn devices(&self) -> impl Iterator<Item = (&str, &Device)> {
         self.0.iter().map(|(x, (y, _))| (x.as_str(), y))
     }
 
