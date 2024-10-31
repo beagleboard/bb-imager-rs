@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use helpers::{home_btn, ProgressBarState};
+use helpers::{home_btn, img_or_svg, ProgressBarState};
 use iced::{
     futures::SinkExt,
     widget::{self, button, text},
@@ -349,7 +349,7 @@ impl BBImager {
     fn view(&self) -> Element<BBImagerMessage> {
         match &self.screen {
             Screen::Home => self.home_view(),
-            Screen::BoardSelection => self.board_selction_view(),
+            Screen::BoardSelection => pages::board_selection::view(self),
             Screen::ImageSelection => self.image_selection_view(),
             Screen::DestinationSelection => pages::destination_selection::view(self),
             Screen::ExtraConfiguration => pages::configuration::view(self),
@@ -484,52 +484,6 @@ impl BBImager {
             .into()
     }
 
-    fn board_selction_view(&self) -> Element<BBImagerMessage> {
-        let items = self
-            .boards
-            .devices()
-            .filter(|(name, _)| {
-                name.to_lowercase()
-                    .contains(&self.search_bar.to_lowercase())
-            })
-            .map(|(name, dev)| {
-                let image: Element<BBImagerMessage> =
-                    match self.downloader.clone().check_image(&dev.icon) {
-                        Some(y) => img_or_svg(y, 100),
-                        None => widget::svg(widget::svg::Handle::from_memory(
-                            constants::DOWNLOADING_ICON,
-                        ))
-                        .width(40)
-                        .into(),
-                    };
-
-                button(
-                    widget::row![
-                        image,
-                        widget::column![
-                            text(name).size(18),
-                            widget::horizontal_space(),
-                            text(dev.description.as_str())
-                        ]
-                        .padding(5)
-                    ]
-                    .align_y(iced::Alignment::Center)
-                    .spacing(10),
-                )
-                .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::BoardSelected(name.to_string()))
-                .style(widget::button::secondary)
-            })
-            .map(Into::into);
-
-        let items = widget::scrollable(widget::column(items).spacing(10));
-
-        widget::column![self.search_bar(None), widget::horizontal_rule(2), items]
-            .spacing(10)
-            .padding(10)
-            .into()
-    }
-
     fn image_selection_view(&self) -> Element<BBImagerMessage> {
         let board = self.selected_board.as_ref().unwrap();
         let items = self
@@ -624,21 +578,5 @@ impl BBImager {
 
         row.push(widget::text_input("Search", &self.search_bar).on_input(BBImagerMessage::Search))
             .into()
-    }
-}
-
-fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).unwrap();
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
     }
 }

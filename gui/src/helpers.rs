@@ -289,3 +289,19 @@ pub fn home_btn<'a>(
 
     btn.style(move |_, _| style)
 }
+
+pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
+    let img = std::fs::read(path).unwrap();
+
+    match image::guess_format(&img) {
+        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
+            .width(width)
+            .height(width)
+            .into(),
+
+        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
+            .width(width)
+            .height(width)
+            .into(),
+    }
+}
