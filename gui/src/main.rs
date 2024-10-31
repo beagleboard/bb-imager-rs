@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use helpers::ProgressBarState;
+use helpers::{home_btn, ProgressBarState};
 use iced::{
     futures::SinkExt,
     widget::{self, button, text},
@@ -11,6 +11,7 @@ use iced::{
 
 mod constants;
 mod helpers;
+mod pages;
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
@@ -188,10 +189,9 @@ impl BBImager {
             }
             BBImagerMessage::ProgressBar(x) => {
                 // Ignore progress bar update if not in the current screen
-                if let Screen::Flashing(mut s) = self.screen.clone() {
-                    s.progress = x;
-                    s.running = self.cancel_flashing.is_some();
-                    self.screen = Screen::Flashing(s)
+                if let Screen::Flashing(s) = self.screen.clone() {
+                    self.screen =
+                        Screen::Flashing(s.update_progress(x, self.cancel_flashing.is_some()))
                 }
             }
             BBImagerMessage::SelectImage(x) => {
@@ -263,7 +263,8 @@ impl BBImager {
                     .boards
                     .device(self.selected_board.as_ref().unwrap())
                     .documentation;
-                self.screen = Screen::Flashing(FlashingScreen::new(docs_url.to_string()));
+                self.screen =
+                    Screen::Flashing(pages::flash::FlashingScreen::new(docs_url.to_string()));
 
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().unwrap();
@@ -783,78 +784,7 @@ enum Screen {
     ImageSelection,
     DestinationSelection,
     ExtraConfiguration,
-    Flashing(FlashingScreen),
-}
-
-#[derive(Debug, Clone)]
-struct FlashingScreen {
-    progress: ProgressBarState,
-    documentation: String,
-    running: bool,
-}
-
-impl Default for FlashingScreen {
-    fn default() -> Self {
-        FlashingScreen {
-            progress: ProgressBarState::PREPARING,
-            documentation: String::new(),
-            running: true,
-        }
-    }
-}
-
-impl FlashingScreen {
-    fn new(documentation: String) -> Self {
-        Self {
-            documentation,
-            ..Default::default()
-        }
-    }
-
-    fn view(&self) -> Element<BBImagerMessage> {
-        widget::responsive(|size| {
-            let prog_bar = self.progress.bar();
-
-            let btn = if self.running {
-                home_btn("CANCEL", true, iced::Length::Shrink)
-                    .on_press(BBImagerMessage::CancelFlashing)
-            } else {
-                home_btn("HOME", true, iced::Length::Shrink)
-                    .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-            };
-
-            let bottom = widget::container(
-                widget::column![self.about().height(size.height - 410.0), btn, prog_bar]
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fill)
-                    .align_x(iced::Alignment::Center),
-            )
-            .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
-
-            widget::column![helpers::logo(), bottom]
-                .spacing(10)
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .align_x(iced::Alignment::Center)
-                .into()
-        })
-        .into()
-    }
-
-    fn about(&self) -> widget::Container<'_, BBImagerMessage> {
-        widget::container(widget::scrollable(widget::rich_text![
-            widget::span(constants::BEAGLE_BOARD_ABOUT)
-                .link(BBImagerMessage::OpenUrl(
-                    "https://www.beagleboard.org/about".into()
-                ))
-                .color(iced::Color::WHITE),
-            widget::span("\n\n"),
-            widget::span("For more information, check out our documentation")
-                .link(BBImagerMessage::OpenUrl(self.documentation.clone().into()))
-                .color(iced::Color::WHITE)
-        ]))
-        .padding(32)
-    }
+    Flashing(pages::flash::FlashingScreen),
 }
 
 fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
@@ -945,35 +875,4 @@ fn wifi_form(config: &bb_imager::FlashingSdLinuxConfig) -> widget::Container<BBI
     widget::container(form)
         .padding(10)
         .style(widget::container::bordered_box)
-}
-
-fn home_btn<'a>(
-    txt: impl text::IntoFragment<'a>,
-    active: bool,
-    text_width: iced::Length,
-) -> widget::Button<'a, BBImagerMessage> {
-    let btn = button(
-        text(txt)
-            .font(constants::FONT_BOLD)
-            .align_x(iced::Alignment::Center)
-            .align_y(iced::Alignment::Center)
-            .width(text_width),
-    )
-    .padding(16);
-
-    let style = if active {
-        widget::button::Style {
-            background: Some(iced::Color::WHITE.into()),
-            text_color: iced::Color::parse("#aa5137").unwrap(),
-            ..Default::default()
-        }
-    } else {
-        widget::button::Style {
-            background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-            text_color: iced::Color::BLACK.scale_alpha(0.8),
-            ..Default::default()
-        }
-    };
-
-    btn.style(move |_, _| style)
 }

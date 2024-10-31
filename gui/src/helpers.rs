@@ -4,7 +4,7 @@ use std::{
 };
 
 use iced::{
-    widget::{self, text},
+    widget::{self, button, text},
     Element,
 };
 
@@ -257,4 +257,35 @@ impl From<&Image> for bb_imager::SelectedImage {
     fn from(value: &Image) -> Self {
         Self::remote(value.name.clone(), value.url.clone(), value.image_sha256)
     }
+}
+
+pub fn home_btn<'a>(
+    txt: impl text::IntoFragment<'a>,
+    active: bool,
+    text_width: iced::Length,
+) -> widget::Button<'a, BBImagerMessage> {
+    let btn = button(
+        text(txt)
+            .font(constants::FONT_BOLD)
+            .align_x(iced::Alignment::Center)
+            .align_y(iced::Alignment::Center)
+            .width(text_width),
+    )
+    .padding(16);
+
+    let style = if active {
+        widget::button::Style {
+            background: Some(iced::Color::WHITE.into()),
+            text_color: iced::Color::parse("#aa5137").unwrap(),
+            ..Default::default()
+        }
+    } else {
+        widget::button::Style {
+            background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
+            text_color: iced::Color::BLACK.scale_alpha(0.8),
+            ..Default::default()
+        }
+    };
+
+    btn.style(move |_, _| style)
 }
