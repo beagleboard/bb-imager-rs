@@ -31,7 +31,8 @@ pub fn view<'a>(
         .width(iced::Length::Fill);
 
         let form = match flashing_config.unwrap() {
-            bb_imager::FlashingConfig::LinuxSd(x) => linux_sd_form(timezones, keymaps, x),
+            bb_imager::FlashingConfig::LinuxSd(None) => widget::column([]),
+            bb_imager::FlashingConfig::LinuxSd(Some(x)) => linux_sd_form(timezones, keymaps, x),
             bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(!x.verify)
                 .label("Skip Verification")
                 .on_toggle(|y| {
@@ -68,18 +69,18 @@ fn linux_sd_form<'a>(
     let timezone_box =
         widget::combo_box(timezones, "Timezone", config.timezone.as_ref(), move |t| {
             let tz = if t.is_empty() { None } else { Some(t) };
-            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(Some(
                 xc.clone().update_timezone(tz),
-            ))
+            )))
         })
         .width(200);
 
     let xc = config.clone();
     let keymap_box = widget::combo_box(keymaps, "Keymap", config.keymap.as_ref(), move |t| {
         let tz = if t.is_empty() { None } else { Some(t) };
-        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+        BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(Some(
             xc.clone().update_keymap(tz),
-        ))
+        )))
     })
     .width(200);
 
@@ -88,9 +89,9 @@ fn linux_sd_form<'a>(
             widget::toggler(!config.verify)
                 .label("Skip Verification")
                 .on_toggle(|y| {
-                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+                    BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(Some(
                         config.clone().update_verify(!y),
-                    ))
+                    )))
                 })
         )
         .padding(10)
@@ -102,7 +103,7 @@ fn linux_sd_form<'a>(
             config.hostname.as_deref().unwrap_or_default(),
             |inp| {
                 let h = if inp.is_empty() { None } else { Some(inp) };
-                bb_imager::FlashingConfig::LinuxSd(config.clone().update_hostname(h))
+                bb_imager::FlashingConfig::LinuxSd(Some(config.clone().update_hostname(h)))
             }
         ))
         .style(widget::container::bordered_box),
@@ -129,23 +130,23 @@ fn uname_pass_form(
             } else {
                 None
             };
-            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(Some(
                 config.clone().update_user(c),
-            ))
+            )))
         })];
 
     if let Some((u, p)) = &config.user {
         form = form.extend([
             helpers::input_with_label("Username", "username", u, |inp| {
-                bb_imager::FlashingConfig::LinuxSd(
+                bb_imager::FlashingConfig::LinuxSd(Some(
                     config.clone().update_user(Some((inp, p.clone()))),
-                )
+                ))
             })
             .into(),
             helpers::input_with_label("Password", "password", p, |inp| {
-                bb_imager::FlashingConfig::LinuxSd(
+                bb_imager::FlashingConfig::LinuxSd(Some(
                     config.clone().update_user(Some((u.clone(), inp))),
-                )
+                ))
             })
             .into(),
         ]);
@@ -165,23 +166,23 @@ fn wifi_form(config: &bb_imager::FlashingSdLinuxConfig) -> widget::Container<BBI
             } else {
                 None
             };
-            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(bb_imager::FlashingConfig::LinuxSd(Some(
                 config.clone().update_wifi(c),
-            ))
+            )))
         })];
 
     if let Some((ssid, psk)) = &config.wifi {
         form = form.extend([
             helpers::input_with_label("SSID", "SSID", ssid, |inp| {
-                bb_imager::FlashingConfig::LinuxSd(
+                bb_imager::FlashingConfig::LinuxSd(Some(
                     config.clone().update_wifi(Some((inp, psk.clone()))),
-                )
+                ))
             })
             .into(),
             helpers::input_with_label("Password", "password", psk, |inp| {
-                bb_imager::FlashingConfig::LinuxSd(
+                bb_imager::FlashingConfig::LinuxSd(Some(
                     config.clone().update_wifi(Some((ssid.clone(), inp))),
-                )
+                ))
             })
             .into(),
         ]);

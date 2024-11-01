@@ -13,6 +13,8 @@ pub enum Error {
     Sha256VerificationError,
     #[error("Failed to get removable flash drives")]
     DriveFetchError,
+    #[error("Failed to format drive {0}")]
+    FormatError(String),
 }
 
 fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> {
@@ -41,12 +43,15 @@ fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> 
     }
 }
 
-pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin>(
+pub(crate) async fn flash<W>(
     mut img: crate::img::OsImage,
     mut sd: W,
     chan: &tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     verify: bool,
-) -> Result<()> {
+) -> Result<()>
+where
+    W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin,
+{
     let size = img.size();
 
     let mut buf = [0u8; BUF_SIZE];
@@ -84,13 +89,13 @@ pub(crate) async fn flash<W: AsyncReadExt + AsyncWriteExt + AsyncSeekExt + Unpin
     Ok(())
 }
 
-// pub fn format(dev: &Path) -> io::Result<()> {
-//     let disk = std::fs::OpenOptions::new()
-//         .read(true)
-//         .write(true)
-//         .open(dev)?;
-//     fatfs::format_volume(disk, fatfs::FormatVolumeOptions::new())
-// }
+pub fn format<W>(dev: W) -> Result<()>
+where
+    W: std::io::Write + std::io::Seek + std::io::Read,
+{
+    fatfs::format_volume(dev, fatfs::FormatVolumeOptions::new())
+        .map_err(|e| Error::FormatError(e.to_string()).into())
+}
 
 #[cfg(not(target_os = "macos"))]
 pub fn destinations() -> std::collections::HashSet<crate::Destination> {

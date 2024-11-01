@@ -171,14 +171,14 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
             dst,
             downloader,
             tx,
-            bb_imager::FlashingConfig::LinuxSd(bb_imager::FlashingSdLinuxConfig {
+            bb_imager::FlashingConfig::LinuxSd(Some(bb_imager::FlashingSdLinuxConfig {
                 verify,
                 hostname: None,
                 timezone: None,
                 keymap: None,
                 user: None,
                 wifi: None,
-            }),
+            })),
         ),
         FlashTarget::Msp430 => bb_imager::Flasher::new(
             bb_imager::SelectedImage::local(img),

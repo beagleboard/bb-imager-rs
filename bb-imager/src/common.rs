@@ -109,6 +109,8 @@ pub enum SelectedImage {
         url: url::Url,
         extract_sha256: [u8; 32],
     },
+    /// For cases like formatting where no image needs to be selected.
+    Null(&'static str),
 }
 
 impl SelectedImage {
@@ -130,6 +132,7 @@ impl std::fmt::Display for SelectedImage {
         match self {
             SelectedImage::Local(p) => write!(f, "{}", p.file_name().unwrap().to_string_lossy()),
             SelectedImage::Remote { name, .. } => write!(f, "{}", name),
+            SelectedImage::Null(x) => write!(f, "{}", x),
         }
     }
 }
@@ -168,7 +171,13 @@ impl Flasher {
 
     pub async fn download_flash_customize(self) -> crate::error::Result<()> {
         match self.config {
-            FlashingConfig::LinuxSd(config) => {
+            FlashingConfig::LinuxSd(None) => {
+                let disk = self.dst.open().await?.into_std().await;
+                tokio::task::spawn_blocking(move || sd::format(disk))
+                    .await
+                    .unwrap()
+            }
+            FlashingConfig::LinuxSd(Some(config)) => {
                 let mut disk = self.dst.open().await?;
                 let img = crate::img::OsImage::from_selected_image(
                     self.img,
@@ -222,9 +231,22 @@ impl Flasher {
 
 #[derive(Clone, Debug)]
 pub enum FlashingConfig {
-    LinuxSd(FlashingSdLinuxConfig),
+    LinuxSd(Option<FlashingSdLinuxConfig>),
     Bcf(FlashingBcfConfig),
     Msp430,
+}
+
+impl FlashingConfig {
+    pub fn new(flasher: crate::config::Flasher, image: SelectedImage) -> Self {
+        match flasher {
+            crate::config::Flasher::SdCard => match image {
+                SelectedImage::Null(_) => Self::LinuxSd(None),
+                _ => Self::LinuxSd(Some(Default::default())),
+            },
+            crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
+            crate::config::Flasher::Msp430Usb => Self::Msp430,
+        }
+    }
 }
 
 impl From<crate::config::Flasher> for FlashingConfig {

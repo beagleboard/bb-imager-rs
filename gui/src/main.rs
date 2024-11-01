@@ -355,7 +355,18 @@ impl BBImager {
             Screen::ImageSelection => {
                 let board = self.selected_board.as_ref().unwrap();
                 let images = self.boards.images(board);
-                pages::image_selection::view(images, &self.search_bar, &self.downloader)
+                pages::image_selection::view(
+                    images,
+                    &self.search_bar,
+                    &self.downloader,
+                    Some((
+                        "Format Sd Card",
+                        constants::FORMAT_ICON,
+                        BBImagerMessage::SelectImage(bb_imager::SelectedImage::Null(
+                            "Format Sd Card",
+                        )),
+                    )),
+                )
             }
             Screen::DestinationSelection => {
                 pages::destination_selection::view(self.destinations.iter(), &self.search_bar)
