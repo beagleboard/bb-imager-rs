@@ -1,15 +1,25 @@
-RUST_BUILDER ?= cross
-APPIMAGETOOL ?= appimagetool
+RUST_BUILDER ?= $(shell which cross)
+APPIMAGETOOL ?= $(shell which appimagetool)
+
+RELEASE_DIR ?= release
+LINUX_RELEASE_DIR ?= ${RELEASE_DIR}/linux
+WINDOWS_RELEASE_DIR ?= ${RELEASE_DIR}/windows
+DARWIN_RELEASE_DIR ?= ${RELEASE_DIR}/darwin
+
+VERSION ?= $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+GUI_ASSETS = gui/assets
+LINUX_GUI_ASSETS = ${GUI_ASSETS}/packages/linux
 
 # Build Appimage for BeagleBoardImager GUI
 define appimage
-	mkdir -p release/linux/$(1)/AppDir/usr/bin
-	cp gui/assets/AppRun release/linux/$(1)/AppDir/AppRun
-	cp target/$(1)/release/bb-imager-gui release/linux/$(1)/AppDir/usr/bin/
-	cp gui/BeagleBoardImager.desktop release/linux/$(1)/AppDir/
-	cp gui/icon.png release/linux/$(1)/AppDir/
-	ARCH=$(2) $(APPIMAGETOOL) --appimage-extract-and-run release/linux/$(1)/AppDir release/linux/$(1)/BeagleBoardImager.AppImage
-	rm -rf release/linux/$(1)/AppDir
+	mkdir -p ${LINUX_RELEASE_DIR}/$(1)/AppDir/usr/bin
+	cp ${LINUX_GUI_ASSETS}/appimage/AppRun ${LINUX_RELEASE_DIR}/$(1)/AppDir/AppRun
+	cp target/$(1)/release/bb-imager-gui ${LINUX_RELEASE_DIR}/$(1)/AppDir/usr/bin/
+	cp ${LINUX_GUI_ASSETS}/BeagleBoardImager.desktop ${LINUX_RELEASE_DIR}/$(1)/AppDir/
+	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${LINUX_RELEASE_DIR}/$(1)/AppDir/BeagleBoardImager.desktop
+	cp gui/icon.png ${LINUX_RELEASE_DIR}/$(1)/AppDir/
+	ARCH=$(2) $(APPIMAGETOOL) --appimage-extract-and-run ${LINUX_RELEASE_DIR}/$(1)/AppDir ${LINUX_RELEASE_DIR}/$(1)/BeagleBoardImager.AppImage
+	rm -rf ${LINUX_RELEASE_DIR}/$(1)/AppDir
 endef
 
 # Build Macos dmg for BeagleBoardImager GUI
@@ -37,18 +47,37 @@ endef
 
 # Build Executable for BeagleBoardImager CLI
 define cli
-	mkdir -p release/linux/$(1)
-	xz -vc target/$(1)/release/bb-imager-cli > release/linux/$(1)/bb-imager-cli.xz
+	mkdir -p ${LINUX_RELEASE_DIR}/$(1)
+	xz -vc target/$(1)/release/bb-imager-cli > ${LINUX_RELEASE_DIR}/$(1)/bb-imager-cli.xz
+endef
+
+# Upload to Package Registry
+#
+# Arg 1: source
+# Arg 2: destination
+define upload_artifact
+	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file $(1) $(2)
 endef
 
 # Upload linux artifacts
 define upload_linux_artifact
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/linux/$(1)/BeagleBoardImager.AppImage ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/$(1).AppImage
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/linux/$(1)/bb-imager-cli.xz ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/$(1).xz
+	$(call upload_artifact,"${LINUX_RELEASE_DIR}/$(1)/BeagleBoardImager.AppImage","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${VERSION}/$(1).AppImage")
+	$(call upload_artifact,"${LINUX_RELEASE_DIR}/$(1)/bb-imager-cli.xz","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${VERSION}/$(1).xz")
+endef
+
+# Upload Windows artifacts
+define upload_windows_artifact
+	$(call upload_artifact,"${WINDOWS_RELEASE_DIR}/$(1)/bb-imager-gui.zip","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${VERSION}/$(1).zip")
+	$(call upload_artifact,"${WINDOWS_RELEASE_DIR}/$(1)/bb-imager-cli.zip","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${VERSION}/$(1).zip")
+endef
+
+define upload_darwin_artifact
+	$(call upload_artifact,"${DARWIN_RELEASE_DIR}/$(1)/BeagleBoardImager.dmg","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${VERSION}/$(1).dmg")
+	$(call upload_artifact,"${DARWIN_RELEASE_DIR}/$(1)/bb-imager-cli.zip","${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${VERSION}/$(1).zip")
 endef
 
 clean:
-	rm -rf release
+	rm -rf ${RELEASE_DIR}
 
 build-windows-x86_64:
 	$(info "Building Windows release for x86_64")
@@ -76,9 +105,9 @@ build-darwin-aarch64:
 
 release-windows-x86_64: build-windows-x86_64
 	$(info "Generating Windows release for x86_64")
-	mkdir -p release/windows/x86_64-pc-windows-gnu
-	zip -j release/windows/x86_64-pc-windows-gnu/bb-imager-cli.zip target/x86_64-pc-windows-gnu/release/bb-imager-cli.exe
-	zip -j release/windows/x86_64-pc-windows-gnu/bb-imager-gui.zip target/x86_64-pc-windows-gnu/release/bb-imager-gui.exe
+	mkdir -p ${WINDOWS_RELEASE_DIR}/x86_64-pc-windows-gnu
+	zip -j ${WINDOWS_RELEASE_DIR}/x86_64-pc-windows-gnu/bb-imager-cli.zip target/x86_64-pc-windows-gnu/release/bb-imager-cli.exe
+	zip -j ${WINDOWS_RELEASE_DIR}/x86_64-pc-windows-gnu/bb-imager-gui.zip target/x86_64-pc-windows-gnu/release/bb-imager-gui.exe
 
 release-linux-gui-appimage-x86_64: build-linux-x86_64
 	$(info "Generating Linux Appimage release for x86_64")
@@ -141,8 +170,7 @@ release-darwin: release-darwin-x86_64 release-darwin-aarch64
 
 upload-artifacts-windows-x86_64:
 	$(info "Upload Windows x86_64 artifacts")
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/windows/x86_64-pc-windows-gnu/bb-imager-gui.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/x86_64-pc-windows-gnu.zip
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/windows/x86_64-pc-windows-gnu/bb-imager-cli.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-pc-windows-gnu.zip
+	$(call upload_windows_artifact,x86_64-pc-windows-gnu)
 
 upload-artifacts-linux-x86_64:
 	$(info "Upload Linux x86_64 artifacts")
@@ -155,15 +183,14 @@ upload-artifacts-linux-aarch64:
 upload-artifacts-linux-arm:
 	$(info "Upload Linux arm artifacts")
 	$(call upload_linux_artifact,armv7-unknown-linux-gnueabihf)
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/darwin/x86_64-apple-darwin/bb-imager-cli.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-apple-darwin.zip
 
 upload-artifacts-darwin-x86_64:
 	$(info "Upload MacOS x86_64 artifacts")
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/darwin/x86_64-apple-darwin/bb-imager-cli.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-apple-darwin.zip
+	$(call upload_darwin_artifact,x86_64-apple-darwin)
 
 upload-artifacts-darwin-aarch64:
 	$(info "Upload MacOS aarch64 artifacts")
-	curl --fail-with-body --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file release/darwin/aarch64-apple-darwin/bb-imager-cli.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/aarch64-apple-darwin.zip
+	$(call upload_darwin_artifact,aarch64-apple-darwin)
 
 upload-artifacts-linux: upload-artifacts-linux-x86_64 upload-artifacts-linux-aarch64 upload-artifacts-linux-arm
 
