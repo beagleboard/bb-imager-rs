@@ -13,7 +13,11 @@ mod pages;
 fn main() -> iced::Result {
     tracing_subscriber::fmt().init();
 
-    let icon = iced::window::icon::from_file_data(constants::WINDOW_ICON, None).ok();
+    let icon = iced::window::icon::from_file_data(
+        constants::WINDOW_ICON,
+        Some(iced::advanced::graphics::image::image_rs::ImageFormat::Png),
+    )
+    .ok();
     assert!(icon.is_some());
 
     let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)

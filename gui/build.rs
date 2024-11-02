@@ -1,3 +1,3 @@
 fn main() {
-    embed_resource::compile("gui-manifest.rc", embed_resource::NONE);
+    embed_resource::compile("assets/packages/windows/gui-manifest.rc", embed_resource::NONE);
 }

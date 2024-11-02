@@ -2,7 +2,7 @@ pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://dl.beagle.cc/distros.json";
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
 pub const APP_NAME: &str = "BeagleBoard Imager";
 
-pub const WINDOW_ICON: &[u8] = include_bytes!("../icon.png");
+pub const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
 pub const BB_BANNER: &[u8] = include_bytes!("../assets/icons/bb-banner.png");
 pub const ARROW_BACK_ICON: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
 pub const DOWNLOADING_ICON: &[u8] = include_bytes!("../assets/icons/downloading.svg");
