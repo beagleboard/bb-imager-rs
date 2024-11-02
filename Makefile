@@ -17,7 +17,7 @@ define appimage
 	cp target/$(1)/release/bb-imager-gui ${LINUX_RELEASE_DIR}/$(1)/AppDir/usr/bin/
 	cp ${LINUX_GUI_ASSETS}/BeagleBoardImager.desktop ${LINUX_RELEASE_DIR}/$(1)/AppDir/
 	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${LINUX_RELEASE_DIR}/$(1)/AppDir/BeagleBoardImager.desktop
-	cp gui/icon.png ${LINUX_RELEASE_DIR}/$(1)/AppDir/
+	cp gui/assets/icons/icon.png ${LINUX_RELEASE_DIR}/$(1)/AppDir/
 	ARCH=$(2) $(APPIMAGETOOL) --appimage-extract-and-run ${LINUX_RELEASE_DIR}/$(1)/AppDir ${LINUX_RELEASE_DIR}/$(1)/BeagleBoardImager.AppImage
 	rm -rf ${LINUX_RELEASE_DIR}/$(1)/AppDir
 endef
