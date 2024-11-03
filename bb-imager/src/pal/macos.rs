@@ -1,14 +1,16 @@
 use std::{
-    io::Write,
-    os::fd::FromRawFd,
+    io::{IoSliceMut, Write},
+    os::{
+        fd::{AsRawFd, FromRawFd, OwnedFd, RawFd},
+        unix::net::UnixStream,
+    },
     process::{Command, Stdio},
 };
 
+use nix::cmsg_space;
+use nix::sys::socket::{ControlMessageOwned, MsgFlags};
 use security_framework::authorization::{Authorization, AuthorizationItemSetBuilder, Flags};
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
-};
+use tokio::fs::File;
 
 impl crate::common::Destination {
     pub async fn open(&self) -> crate::error::Result<File> {
@@ -37,12 +39,17 @@ fn open_auth(path: String) -> crate::error::Result<File> {
     .unwrap();
 
     let form = auth.make_external_form().unwrap();
+    let (pipe0, pipe1) = UnixStream::pair().unwrap();
+
+    let _ = Command::new("diskutil")
+        .args(["unmountDisk", &path])
+        .output()
+        .unwrap();
 
     let mut cmd = Command::new("/usr/libexec/authopen")
         .args(["-stdoutpipe", "-extauth", "-o", "2", &path])
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(OwnedFd::from(pipe1))
         .spawn()
         .unwrap();
 
@@ -51,13 +58,40 @@ fn open_auth(path: String) -> crate::error::Result<File> {
     stdin.write_all(&form_bytes).unwrap();
     drop(stdin);
 
-    let output = cmd.wait_with_output().unwrap();
+    const IOV_BUF_SIZE: usize =
+        unsafe { libc::CMSG_SPACE(std::mem::size_of::<std::ffi::c_int>() as u32) } as usize;
+    let mut iov_buf = [0u8; IOV_BUF_SIZE];
+    let mut iov = [IoSliceMut::new(&mut iov_buf)];
 
-    tracing::info!("Raw output: {output:#?}");
-    tracing::info!("String output: {}", String::from_utf8_lossy(&output.stdout));
+    let mut cmsg = cmsg_space!([RawFd; 1]);
 
-    let fd = i32::from_ne_bytes(output.stdout.try_into().unwrap());
-    Ok(unsafe { tokio::fs::File::from_raw_fd(fd) })
+    match nix::sys::socket::recvmsg::<()>(
+        pipe0.as_raw_fd(),
+        &mut iov,
+        Some(&mut cmsg),
+        MsgFlags::empty(),
+    ) {
+        Ok(result) => {
+            tracing::info!("Result: {:#?}", result);
+
+            for msg in result.cmsgs().unwrap() {
+                if let ControlMessageOwned::ScmRights(scm_rights) = msg {
+                    for fd in scm_rights {
+                        tracing::debug!("receive file descriptor: {fd}");
+                        return Ok(unsafe { tokio::fs::File::from_raw_fd(fd) });
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Macos Error: {}", e);
+        }
+    }
+
+    let status = cmd.wait().unwrap();
+    tracing::debug!("Exit Status: {:?}", status);
+
+    panic!("fd not found");
 }
 
 /// TODO: Remove once a new version of rs_drivelist is published to crates.io
