@@ -237,22 +237,12 @@ pub enum FlashingConfig {
 }
 
 impl FlashingConfig {
-    pub fn new(flasher: crate::config::Flasher, image: SelectedImage) -> Self {
+    pub fn new(flasher: crate::config::Flasher, image: &SelectedImage) -> Self {
         match flasher {
             crate::config::Flasher::SdCard => match image {
                 SelectedImage::Null(_) => Self::LinuxSd(None),
                 _ => Self::LinuxSd(Some(Default::default())),
             },
-            crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
-            crate::config::Flasher::Msp430Usb => Self::Msp430,
-        }
-    }
-}
-
-impl From<crate::config::Flasher> for FlashingConfig {
-    fn from(value: crate::config::Flasher) -> Self {
-        match value {
-            crate::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
             crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             crate::config::Flasher::Msp430Usb => Self::Msp430,
         }

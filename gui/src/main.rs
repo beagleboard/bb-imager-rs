@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
+use bb_imager::FlashingConfig;
 use helpers::ProgressBarState;
 use iced::{futures::SinkExt, widget, Element, Task};
 use pages::Screen;
@@ -242,7 +243,10 @@ impl BBImager {
                             .boards
                             .device(self.selected_board.as_ref().unwrap())
                             .flasher;
-                        self.flashing_config = Some(flasher.into());
+                        self.flashing_config = Some(FlashingConfig::new(
+                            flasher,
+                            self.selected_image.as_ref().unwrap(),
+                        ));
                     }
                     _ => {}
                 }
