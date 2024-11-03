@@ -103,6 +103,12 @@ build-darwin-aarch64:
 	$(info "Building MacOS release for aarch64")
 	$(RUST_BUILDER) build --release --target aarch64-apple-darwin
 
+build-darwin-universal: build-darwin-aarch64 build-darwin-x86_64
+	$(info "Building MacOS release for universal")
+	mkdir -p target/universal-apple-darwin/release
+	lipo -create target/x86_64-apple-darwin/release/bb-imager-gui target/aarch64-apple-darwin/release/bb-imager-gui -output target/universal-apple-darwin/release/bb-imager-gui
+	lipo -create target/x86_64-apple-darwin/release/bb-imager-cli target/aarch64-apple-darwin/release/bb-imager-cli -output target/universal-apple-darwin/release/bb-imager-cli
+
 release-windows-x86_64: build-windows-x86_64
 	$(info "Generating Windows release for x86_64")
 	mkdir -p ${WINDOWS_RELEASE_DIR}/x86_64-pc-windows-gnu
@@ -153,6 +159,17 @@ release-darwin-gui-aarch64: build-darwin-aarch64
 	$(info "Generating MacOS GUI release for aarch64")
 	$(call dmg,aarch64-apple-darwin)
 
+release-darwin-gui-universal: build-darwin-universal
+	$(info "Generating MacOS GUI release for universal")
+	$(call dmg,universal-apple-darwin)
+
+release-darwin-cli-universal: build-darwin-universal
+	$(info "Generating MacOS CLI release for universal")
+	mkdir -p release/darwin/universal-apple-darwin
+	zip -j release/darwin/universal-apple-darwin/bb-imager-cli.zip target/universal-apple-darwin/release/bb-imager-cli
+
+release-darwin-universal: release-darwin-cli-universal release-darwin-gui-universal
+
 release-darwin-aarch64: release-darwin-cli-aarch64 release-darwin-gui-aarch64
 
 release-linux-x86_64: release-linux-cli-x86_64 release-linux-gui-appimage-x86_64
@@ -166,7 +183,7 @@ release-linux: release-linux-x86_64 release-linux-aarch64 release-linux-arm
 # TODO: Add aarch64 windows.
 release-windows: release-windows-x86_64
 
-release-darwin: release-darwin-x86_64 release-darwin-aarch64
+release-darwin: release-darwin-x86_64 release-darwin-aarch64 release-darwin-universal
 
 upload-artifacts-windows-x86_64:
 	$(info "Upload Windows x86_64 artifacts")
@@ -191,6 +208,10 @@ upload-artifacts-darwin-x86_64:
 upload-artifacts-darwin-aarch64:
 	$(info "Upload MacOS aarch64 artifacts")
 	$(call upload_darwin_artifact,aarch64-apple-darwin)
+
+upload-artifacts-darwin-universal:
+	$(info "Upload MacOS aarch64 artifacts")
+	$(call upload_darwin_artifact,universal-apple-darwin)
 
 upload-artifacts-linux: upload-artifacts-linux-x86_64 upload-artifacts-linux-aarch64 upload-artifacts-linux-arm
 
