@@ -171,12 +171,7 @@ impl Flasher {
 
     pub async fn download_flash_customize(self) -> crate::error::Result<()> {
         match self.config {
-            FlashingConfig::LinuxSd(None) => {
-                let disk = self.dst.open().await?.into_std().await;
-                tokio::task::spawn_blocking(move || sd::format(disk))
-                    .await
-                    .unwrap()
-            }
+            FlashingConfig::LinuxSd(None) => self.dst.format().await,
             FlashingConfig::LinuxSd(Some(config)) => {
                 let mut disk = self.dst.open().await?;
                 let img = crate::img::OsImage::from_selected_image(

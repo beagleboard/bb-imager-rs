@@ -13,6 +13,10 @@ use security_framework::authorization::{Authorization, AuthorizationItemSetBuild
 use tokio::fs::File;
 
 impl crate::common::Destination {
+    pub async fn format(&self) -> crate::error::Result<()> {
+        todo!()
+    }
+
     pub async fn open(&self) -> crate::error::Result<File> {
         if let Self::SdCard { path, .. } = self {
             let path = path.clone();
@@ -96,10 +100,10 @@ fn open_auth(path: String) -> crate::error::Result<File> {
 
 /// TODO: Remove once a new version of rs_drivelist is published to crates.io
 pub(crate) mod rs_drivelist {
+    use anyhow::Result;
     use rs_drivelist::device::{DeviceDescriptor, MountPoint};
     use serde::Deserialize;
     use std::process::Command;
-    use anyhow::Result;
 
     #[derive(Deserialize, Debug)]
     struct Disks {
@@ -181,7 +185,9 @@ pub(crate) mod rs_drivelist {
     }
 
     pub(crate) fn diskutil() -> Result<Vec<DeviceDescriptor>> {
-        let output = Command::new("diskutil").args(["list", "-plist", "physical"]).output()?;
+        let output = Command::new("diskutil")
+            .args(["list", "-plist", "physical"])
+            .output()?;
         if !output.status.success() {
             return Err(anyhow::Error::msg(format!(
                 "diskutil list failed: {}",

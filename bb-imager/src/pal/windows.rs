@@ -83,6 +83,17 @@ impl Drop for WinDriveStd {
 }
 
 impl crate::common::Destination {
+    pub async fn format(&self) -> crate::error::Result<()> {
+        if let Self::SdCard { path, .. } = self {
+            tracing::debug!("Trying to format {path}");
+            diskpart_format(path).await.unwrap();
+
+            Ok(())
+        } else {
+            unreachable!()
+        }
+    }
+
     pub(crate) async fn open(&self) -> crate::error::Result<WinDrive> {
         if let Self::SdCard { path, .. } = self {
             WinDrive::open(path).await
@@ -158,6 +169,34 @@ async fn diskpart_clean(path: &str) -> crate::error::Result<()> {
     stdin.write_all(b"\n").await?;
     stdin.write_all(b"clean\n").await?;
     stdin.write_all(b"rescan\n").await?;
+    stdin.write_all(b"exit\n").await?;
+
+    drop(stdin);
+
+    cmd.wait().await?;
+
+    Ok(())
+}
+
+async fn diskpart_format(path: &str) -> crate::error::Result<()> {
+    let disk_num = path
+        .strip_prefix("\\\\.\\PhysicalDrive")
+        .ok_or(Error::InvalidDrive)?;
+
+    let mut cmd = Command::new("diskpart")
+        .stderr(Stdio::null())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()?;
+
+    let mut stdin = cmd.stdin.take().unwrap();
+    stdin.write_all(b"select disk ").await?;
+    stdin.write_all(disk_num.as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.write_all(b"clean\n").await?;
+    stdin.write_all(b"create partition primary\n").await?;
+    stdin.write_all(b"format quick fs=fat32\n").await?;
+    stdin.write_all(b"assign\n").await?;
     stdin.write_all(b"exit\n").await?;
 
     drop(stdin);

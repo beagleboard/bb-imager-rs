@@ -89,14 +89,6 @@ where
     Ok(())
 }
 
-pub fn format<W>(dev: W) -> Result<()>
-where
-    W: std::io::Write + std::io::Seek + std::io::Read,
-{
-    fatfs::format_volume(dev, fatfs::FormatVolumeOptions::new())
-        .map_err(|e| Error::FormatError(e.to_string()).into())
-}
-
 #[cfg(not(target_os = "macos"))]
 pub fn destinations() -> std::collections::HashSet<crate::Destination> {
     rs_drivelist::drive_list()

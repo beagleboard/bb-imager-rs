@@ -1,5 +1,10 @@
 use thiserror::Error;
 
+use std::{
+    collections::HashMap,
+    os::fd::{FromRawFd, IntoRawFd},
+};
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to open destination {0}")]
@@ -10,12 +15,45 @@ pub enum Error {
 }
 
 impl crate::common::Destination {
-    pub async fn open(&self) -> crate::error::Result<tokio::fs::File> {
-        use std::{
-            collections::HashMap,
-            os::fd::{FromRawFd, IntoRawFd},
-        };
+    pub async fn format(&self) -> crate::error::Result<()> {
+        if let Self::SdCard { path, .. } = self {
+            let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
+            let devs = dbus_client
+                .manager()
+                .resolve_device(
+                    HashMap::from([("path", path.as_str().into())]),
+                    HashMap::new(),
+                )
+                .await
+                .map_err(Error::from)?;
+
+            let block = devs
+                .first()
+                .ok_or(Error::FailedToOpenDestionation(path.clone()))?
+                .to_owned();
+
+            let obj = dbus_client
+                .object(block)
+                .unwrap()
+                .block()
+                .await
+                .map_err(Error::from)?;
+
+            obj.format(
+                "vfat",
+                HashMap::from([("update-partition-type", true.into())]),
+            )
+            .await
+            .unwrap();
+
+            Ok(())
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub async fn open(&self) -> crate::error::Result<tokio::fs::File> {
         if let Self::SdCard { path, .. } = self {
             let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
