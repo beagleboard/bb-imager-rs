@@ -21,6 +21,10 @@ fn main() -> iced::Result {
     .ok();
     assert!(icon.is_some());
 
+    #[cfg(target_os = "macos")]
+    // HACK: mac_notification_sys set application name (not an option in notify-rust)
+    let _ = notify_rust::set_application("org.beagleboard.imagingutility");
+
     let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)
         .expect("Failed to parse config");
     let boards = helpers::Boards::from(config);
