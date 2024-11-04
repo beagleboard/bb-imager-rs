@@ -11,22 +11,33 @@ use crate::{
 
 const ICON_WIDTH: u16 = 80;
 
-pub fn view<'a, I>(
+pub(crate) struct ExtraImageEntry {
+    label: &'static str,
+    icon: &'static [u8],
+    msg: BBImagerMessage,
+}
+
+impl ExtraImageEntry {
+    pub(crate) const fn new(
+        label: &'static str,
+        icon: &'static [u8],
+        msg: BBImagerMessage,
+    ) -> Self {
+        Self { label, icon, msg }
+    }
+}
+
+pub fn view<'a, I, E>(
     images: I,
     search_bar: &'a str,
     downloader: &'a bb_imager::download::Downloader,
     // Allow optional format entry
-    format_entry: Option<(&'a str, &'static [u8], BBImagerMessage)>,
+    extra_entries: E,
 ) -> Element<'a, BBImagerMessage>
 where
     I: Iterator<Item = &'a helpers::Image>,
+    E: Iterator<Item = ExtraImageEntry>,
 {
-    let custom_image_btn = custom_btn(
-        "Use Custom Image",
-        constants::FILE_ADD_ICON,
-        BBImagerMessage::SelectLocalImage,
-    );
-
     let items = images
         .filter(|x| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
         .map(|x| {
@@ -69,10 +80,7 @@ where
             ))
             .style(widget::button::secondary)
         })
-        .chain(match format_entry {
-            Some((label, icon, msg)) => vec![custom_image_btn, custom_btn(label, icon, msg)],
-            None => vec![custom_image_btn],
-        })
+        .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
         .map(Into::into);
 
     widget::column![
