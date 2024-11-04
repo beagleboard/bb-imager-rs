@@ -99,6 +99,7 @@ pub(crate) mod rs_drivelist {
     use rs_drivelist::device::{DeviceDescriptor, MountPoint};
     use serde::Deserialize;
     use std::process::Command;
+    use anyhow::Result;
 
     #[derive(Deserialize, Debug)]
     struct Disks {
@@ -130,6 +131,14 @@ pub(crate) mod rs_drivelist {
         size: u64,
     }
 
+    #[derive(Deserialize, Debug)]
+    struct DiskInfo {
+        #[serde(rename = "Ejectable")]
+        ejectable: bool,
+        #[serde(rename = "IORegistryEntryName")]
+        io_registry_entry_name: String,
+    }
+
     impl From<Disk> for DeviceDescriptor {
         fn from(value: Disk) -> Self {
             DeviceDescriptor {
@@ -157,28 +166,49 @@ pub(crate) mod rs_drivelist {
         }
     }
 
-    pub(crate) fn diskutil() -> anyhow::Result<Vec<DeviceDescriptor>> {
-        let output = Command::new("diskutil").args(["list", "-plist"]).output()?;
-
-        if let Some(code) = output.status.code() {
-            if code != 0 {
-                return Err(anyhow::Error::msg(format!("lsblk ExitCode: {}", code)));
-            }
-        }
-
-        if output.stderr.len() > 0 {
+    fn get_disk_info(device: &str) -> Result<DiskInfo> {
+        let output = Command::new("diskutil")
+            .args(["info", "-plist", device])
+            .output()?;
+        if !output.status.success() {
             return Err(anyhow::Error::msg(format!(
-                "lsblk stderr: {}",
+                "diskutil info failed: {}",
+                std::str::from_utf8(&output.stderr).unwrap()
+            )));
+        }
+        let disk_info: DiskInfo = plist::from_bytes(&output.stdout)?;
+        Ok(disk_info)
+    }
+
+    pub(crate) fn diskutil() -> Result<Vec<DeviceDescriptor>> {
+        let output = Command::new("diskutil").args(["list", "-plist", "physical"]).output()?;
+        if !output.status.success() {
+            return Err(anyhow::Error::msg(format!(
+                "diskutil list failed: {}",
                 std::str::from_utf8(&output.stderr).unwrap()
             )));
         }
 
         let parsed: Disks = plist::from_bytes(&output.stdout).unwrap();
 
-        Ok(parsed
-            .all_disks_and_partitions
-            .into_iter()
-            .map(DeviceDescriptor::from)
-            .collect())
+        let mut devices = Vec::new();
+
+        for disk in parsed.all_disks_and_partitions {
+            let device_path = format!("/dev/{}", disk.device_identifier);
+            match get_disk_info(&device_path) {
+                Ok(info) => {
+                    if info.ejectable {
+                        let mut device_descriptor: DeviceDescriptor = disk.into();
+                        device_descriptor.description = info.io_registry_entry_name;
+                        devices.push(device_descriptor);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to get disk info for {}: {}", device_path, e);
+                }
+            }
+        }
+
+        Ok(devices)
     }
 }
