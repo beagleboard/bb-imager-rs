@@ -25,6 +25,8 @@ pub enum Error {
     InvalidDrive,
     #[error("Windows Error: {0}")]
     WindowsError(#[from] windows::core::Error),
+    #[error("Failed to Format drive: {0}")]
+    FailedToFormat(String),
 }
 
 pub(crate) struct WinDrive {
@@ -86,9 +88,9 @@ impl crate::common::Destination {
     pub async fn format(&self) -> crate::error::Result<()> {
         if let Self::SdCard { path, .. } = self {
             tracing::debug!("Trying to format {path}");
-            diskpart_format(path).await.unwrap();
-
-            Ok(())
+            diskpart_format(path)
+                .await
+                .map_err(|e| Error::FailedToFormat(e.to_string()).into())
         } else {
             unreachable!()
         }
@@ -137,7 +139,7 @@ async fn open_and_lock_volume(path: &str) -> crate::error::Result<File> {
 
 fn physical_drive_to_volume(drive: &str) -> crate::error::Result<String> {
     let desc = rs_drivelist::drive_list()
-        .unwrap()
+        .expect("Unexpected error")
         .into_iter()
         .find(|x| x.device == drive)
         .ok_or(Error::DriveNotFound(drive.to_string()))?;
@@ -147,7 +149,10 @@ fn physical_drive_to_volume(drive: &str) -> crate::error::Result<String> {
         .get(0)
         .ok_or(Error::DriveNotFound(drive.to_string()))?;
 
-    let mount_path = format!("\\\\.\\{}", mount.path.strip_suffix("\\").unwrap());
+    let mount_path = format!(
+        "\\\\.\\{}",
+        mount.path.strip_suffix("\\").ok_or(Error::InvalidDrive)?
+    );
 
     Ok(mount_path)
 }
@@ -163,7 +168,7 @@ async fn diskpart_clean(path: &str) -> crate::error::Result<()> {
         .stdout(Stdio::null())
         .spawn()?;
 
-    let mut stdin = cmd.stdin.take().unwrap();
+    let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
     stdin.write_all(b"select disk ").await?;
     stdin.write_all(disk_num.as_bytes()).await?;
     stdin.write_all(b"\n").await?;
@@ -189,7 +194,7 @@ async fn diskpart_format(path: &str) -> crate::error::Result<()> {
         .stdout(Stdio::null())
         .spawn()?;
 
-    let mut stdin = cmd.stdin.take().unwrap();
+    let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
     stdin.write_all(b"select disk ").await?;
     stdin.write_all(disk_num.as_bytes()).await?;
     stdin.write_all(b"\n").await?;

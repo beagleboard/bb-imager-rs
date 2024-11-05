@@ -51,9 +51,10 @@ impl Downloader {
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .build()
-            .unwrap();
+            .expect("Unsupported OS");
 
-        let dirs = ProjectDirs::from("org", "beagleboard", "bb-imager").unwrap();
+        let dirs = ProjectDirs::from("org", "beagleboard", "imagingutility")
+            .expect("Failed to find project directories");
 
         if let Err(e) = std::fs::create_dir_all(dirs.cache_dir()) {
             if e.kind() != io::ErrorKind::AlreadyExists {

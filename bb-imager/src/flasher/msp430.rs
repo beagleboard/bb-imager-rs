@@ -154,7 +154,7 @@ fn load_bsl(dst: &crate::Destination) -> Result<()> {
     tracing::info!("Unlock");
     msp430.unlock()?;
 
-    let bin = util::bin_file_from_str(BSL).unwrap();
+    let bin = util::bin_file_from_str(BSL).expect("Failed to parse MSP430 BSL");
     tracing::info!("BSL: {}", bin);
 
     tracing::info!("Load BSL");
@@ -191,7 +191,7 @@ pub fn flash(
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     hidapi::HidApi::new()
-        .unwrap()
+        .expect("Failed to create hidapi context")
         .device_list()
         .filter(|x| x.vendor_id() == VID && x.product_id() == PID)
         .map(|x| crate::Destination::hidraw(x.path().to_owned()))

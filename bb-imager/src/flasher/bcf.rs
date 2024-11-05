@@ -379,7 +379,7 @@ pub async fn flash(
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     tokio_serial::available_ports()
-        .unwrap()
+        .expect("Unsupported OS")
         .into_iter()
         .filter(|x| {
             if cfg!(target_os = "linux") {

@@ -8,3 +8,5 @@ pub(crate) mod pal;
 pub(crate) mod flasher;
 
 pub use common::*;
+
+pub use flasher::sd::FlashingSdLinuxConfig;

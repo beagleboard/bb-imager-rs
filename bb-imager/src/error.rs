@@ -28,4 +28,7 @@ pub enum Error {
     #[cfg(target_os = "linux")]
     #[error("{0}")]
     LinuxError(#[from] crate::pal::linux::Error),
+    #[cfg(target_os = "macos")]
+    #[error("{0}")]
+    MacosError(#[from] crate::pal::macos::Error)
 }
