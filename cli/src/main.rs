@@ -85,7 +85,9 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
     let dst = match target {
         FlashTarget::Bcf => bb_imager::Destination::port(dst),
         FlashTarget::Sd => bb_imager::Destination::sd_card(dst.clone(), 0, dst),
-        FlashTarget::Msp430 => bb_imager::Destination::hidraw(CString::new(dst).unwrap()),
+        FlashTarget::Msp430 => {
+            bb_imager::Destination::hidraw(CString::new(dst).expect("Failed to parse destination"))
+        }
     };
 
     if !quite {
@@ -113,7 +115,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                                 indicatif::ProgressStyle::with_template(
                                     "[2/3] {msg}  [{wide_bar}] [{percent} %]",
                                 )
-                                .unwrap(),
+                                .expect("Failed to create progress bar"),
                             );
                             bar.set_message("Flashing");
                             bar
@@ -145,7 +147,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                                 indicatif::ProgressStyle::with_template(
                                     "[3/3] {msg} [{wide_bar}] [{percent} %]",
                                 )
-                                .unwrap(),
+                                .expect("Failed to create progress bar"),
                             );
                             bar.set_message("Verifying");
                             bar
@@ -189,5 +191,8 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
         ),
     };
 
-    flasher.download_flash_customize().await.unwrap();
+    flasher
+        .download_flash_customize()
+        .await
+        .expect("Failed to flash");
 }
