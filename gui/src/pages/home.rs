@@ -106,7 +106,9 @@ pub fn view<'a>(
         .height(iced::Length::Fill)
         .align_x(iced::Alignment::Center),
     )
-    .style(|_| widget::container::background(iced::Color::parse("#aa5137").unwrap()));
+    .style(|_| {
+        widget::container::background(iced::Color::parse("#aa5137").expect("unexpected error"))
+    });
 
     widget::column![helpers::logo(), bottom]
         .width(iced::Length::Fill)
