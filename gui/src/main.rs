@@ -371,13 +371,21 @@ impl BBImager {
                     images,
                     &self.search_bar,
                     &self.downloader,
-                    Some((
-                        "Format Sd Card",
-                        constants::FORMAT_ICON,
-                        BBImagerMessage::SelectImage(bb_imager::SelectedImage::Null(
+                    [
+                        pages::image_selection::ExtraImageEntry::new(
+                            "Custom Image",
+                            constants::FILE_ADD_ICON,
+                            BBImagerMessage::SelectLocalImage,
+                        ),
+                        pages::image_selection::ExtraImageEntry::new(
                             "Format Sd Card",
-                        )),
-                    )),
+                            constants::FORMAT_ICON,
+                            BBImagerMessage::SelectImage(bb_imager::SelectedImage::Null(
+                                "Format Sd Card",
+                            )),
+                        ),
+                    ]
+                    .into_iter(),
                 )
             }
             Screen::DestinationSelection => {

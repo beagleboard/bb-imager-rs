@@ -15,6 +15,41 @@
                 "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
                 "flasher": "Msp430Usb",
                 "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
+            },
+            {
+                "name": "BeagleY-AI",
+                "description": "BeagleY-AI based on TI AM67A",
+                "icon": "https://www.beagleboard.org/app/uploads/2024/06/beagley-ai.svg",
+                "flasher": "SdCard",
+                "documentation": "https://docs.beagleboard.org/boards/beagley/ai/index.html#beagley-ai-home"
+            },
+            {
+                "name": "BeaglePlay",
+                "description": "BeaglePlay and other boards based on TI AM62",
+                "icon": "https://www.beagleboard.org/app/uploads/2024/03/image6.png",
+                "flasher": "SdCard",
+                "documentation": "https://docs.beagleboard.org/boards/beagleplay/index.html#beagleplay-home"
+            },
+            {
+                "name": "BeagleBone AI-64",
+                "description": "BeagleBone AI-64 based on TI TDA4VM",
+                "icon": "https://www.beagleboard.org/app/uploads/2024/06/bbai64-front-a-2.png",
+                "flasher": "SdCard",
+                "documentation": "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html#bbai64-home"
+            },
+            {
+                "name": "BeagleV-Fire",
+                "description": "BeagleV-Fire based on Microchip PolarFire SoC",
+                "icon": "https://www.beagleboard.org/app/uploads/2023/10/1-102110898-BeagleV-Fire-45-degree-front.jpg",
+                "flasher": "SdCard",
+                "documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home"
+            },
+            {
+                "name": "BeagleBone Black",
+                "description": "BeagleBone Black and other boards based on TI AM335",
+                "icon": "https://www.beagleboard.org/app/uploads/2022/10/product_beaglebone_black.jpg",
+                "flasher": "SdCard",
+                "documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home"
             }
         ]
     },
