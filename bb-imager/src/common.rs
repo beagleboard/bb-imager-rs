@@ -236,7 +236,7 @@ impl Flasher {
 #[derive(Clone, Debug)]
 pub enum FlashingConfig {
     LinuxSd(Option<sd::FlashingSdLinuxConfig>),
-    Bcf(FlashingBcfConfig),
+    Bcf(bcf::FlashingBcfConfig),
     Msp430,
 }
 
@@ -250,23 +250,5 @@ impl FlashingConfig {
             crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             crate::config::Flasher::Msp430Usb => Self::Msp430,
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FlashingBcfConfig {
-    pub verify: bool,
-}
-
-impl FlashingBcfConfig {
-    pub fn update_verify(mut self, verify: bool) -> Self {
-        self.verify = verify;
-        self
-    }
-}
-
-impl Default for FlashingBcfConfig {
-    fn default() -> Self {
-        Self { verify: true }
     }
 }

@@ -398,3 +398,21 @@ pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
         .map(crate::Destination::port)
         .collect()
 }
+
+#[derive(Clone, Debug)]
+pub struct FlashingBcfConfig {
+    pub verify: bool,
+}
+
+impl FlashingBcfConfig {
+    pub fn update_verify(mut self, verify: bool) -> Self {
+        self.verify = verify;
+        self
+    }
+}
+
+impl Default for FlashingBcfConfig {
+    fn default() -> Self {
+        Self { verify: true }
+    }
+}
