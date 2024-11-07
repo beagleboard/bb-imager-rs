@@ -379,7 +379,7 @@ pub async fn flash(
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     tokio_serial::available_ports()
-        .unwrap()
+        .expect("Unsupported OS")
         .into_iter()
         .filter(|x| {
             if cfg!(target_os = "linux") {
@@ -397,4 +397,22 @@ pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
         .map(|x| x.port_name)
         .map(crate::Destination::port)
         .collect()
+}
+
+#[derive(Clone, Debug)]
+pub struct FlashingBcfConfig {
+    pub verify: bool,
+}
+
+impl FlashingBcfConfig {
+    pub fn update_verify(mut self, verify: bool) -> Self {
+        self.verify = verify;
+        self
+    }
+}
+
+impl Default for FlashingBcfConfig {
+    fn default() -> Self {
+        Self { verify: true }
+    }
 }

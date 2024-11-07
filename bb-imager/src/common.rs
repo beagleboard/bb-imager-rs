@@ -2,7 +2,7 @@
 
 use std::{
     ffi::CString,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, SeekFrom},
     path::PathBuf,
     time::Duration,
 };
@@ -130,7 +130,13 @@ impl SelectedImage {
 impl std::fmt::Display for SelectedImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SelectedImage::Local(p) => write!(f, "{}", p.file_name().unwrap().to_string_lossy()),
+            SelectedImage::Local(p) => write!(
+                f,
+                "{}",
+                p.file_name()
+                    .expect("image cannot be a directory")
+                    .to_string_lossy()
+            ),
             SelectedImage::Remote { name, .. } => write!(f, "{}", name),
             SelectedImage::Null(x) => write!(f, "{}", x),
         }
@@ -188,7 +194,7 @@ impl Flasher {
 
                 tokio::task::spawn_blocking(move || config.customize(&mut std_disk))
                     .await
-                    .unwrap()
+                    .expect("Tokio runtime failed to spawn blocking task")
             }
             FlashingConfig::Bcf(config) => {
                 let port = self.dst.open_port()?;
@@ -213,12 +219,15 @@ impl Flasher {
                 tracing::info!("Image opened");
 
                 let mut data = String::new();
-                img.read_to_string(&mut data).unwrap();
-                let bin = util::bin_file_from_str(data).unwrap();
+                img.read_to_string(&mut data)
+                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
+                let bin = util::bin_file_from_str(data).map_err(|e| {
+                    crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
+                })?;
 
                 tokio::task::spawn_blocking(move || msp430::flash(bin, self.dst, &self.chan))
                     .await
-                    .unwrap()
+                    .expect("Tokio runtime failed to spawn blocking task")
             }
         }
     }
@@ -226,8 +235,8 @@ impl Flasher {
 
 #[derive(Clone, Debug)]
 pub enum FlashingConfig {
-    LinuxSd(Option<FlashingSdLinuxConfig>),
-    Bcf(FlashingBcfConfig),
+    LinuxSd(Option<sd::FlashingSdLinuxConfig>),
+    Bcf(bcf::FlashingBcfConfig),
     Msp430,
 }
 
@@ -241,156 +250,5 @@ impl FlashingConfig {
             crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             crate::config::Flasher::Msp430Usb => Self::Msp430,
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FlashingSdLinuxConfig {
-    pub verify: bool,
-    pub hostname: Option<String>,
-    pub timezone: Option<String>,
-    pub keymap: Option<String>,
-    pub user: Option<(String, String)>,
-    pub wifi: Option<(String, String)>,
-}
-
-impl FlashingSdLinuxConfig {
-    pub fn customize<D: std::io::Write + std::io::Seek + std::io::Read>(
-        &self,
-        dst: &mut D,
-    ) -> crate::error::Result<()> {
-        let boot_partition = {
-            let mbr = mbrman::MBR::read_from(dst, 512).unwrap();
-
-            let boot_part = mbr.get(1).unwrap();
-            assert_eq!(boot_part.sys, 12);
-            let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
-            let end_offset: u64 =
-                start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
-            let slice = fscommon::StreamSlice::new(dst, start_offset, end_offset).unwrap();
-            let boot_stream = fscommon::BufStream::new(slice);
-            fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new()).unwrap()
-        };
-
-        let boot_root = boot_partition.root_dir();
-
-        if self.hostname.is_some()
-            || self.timezone.is_some()
-            || self.keymap.is_some()
-            || self.user.is_some()
-            || self.wifi.is_some()
-        {
-            let mut sysconf = boot_root.create_file("sysconf.txt").unwrap();
-            sysconf.seek(SeekFrom::End(0)).unwrap();
-
-            if let Some(h) = &self.hostname {
-                sysconf
-                    .write_all(format!("hostname={h}\n").as_bytes())
-                    .unwrap();
-            }
-
-            if let Some(tz) = &self.timezone {
-                sysconf
-                    .write_all(format!("timezone={tz}\n").as_bytes())
-                    .unwrap();
-            }
-
-            if let Some(k) = &self.keymap {
-                sysconf
-                    .write_all(format!("keymap={k}\n").as_bytes())
-                    .unwrap();
-            }
-
-            if let Some((u, p)) = &self.user {
-                sysconf
-                    .write_all(format!("user_name={u}\n").as_bytes())
-                    .unwrap();
-                sysconf
-                    .write_all(format!("user_password={p}\n").as_bytes())
-                    .unwrap();
-            }
-
-            if let Some((ssid, _)) = &self.wifi {
-                sysconf
-                    .write_all(format!("iwd_psk_file={ssid}.psk\n").as_bytes())
-                    .unwrap();
-            }
-        }
-
-        if let Some((ssid, psk)) = &self.wifi {
-            let mut wifi_file = boot_root
-                .create_file(format!("services/{ssid}.psk").as_str())
-                .unwrap();
-
-            wifi_file
-                .write_all(
-                    format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
-                        .as_bytes(),
-                )
-                .unwrap();
-        }
-
-        Ok(())
-    }
-
-    pub fn update_verify(mut self, verify: bool) -> Self {
-        self.verify = verify;
-        self
-    }
-
-    pub fn update_hostname(mut self, hostname: Option<String>) -> Self {
-        self.hostname = hostname;
-        self
-    }
-
-    pub fn update_timezone(mut self, timezone: Option<String>) -> Self {
-        self.timezone = timezone;
-        self
-    }
-
-    pub fn update_keymap(mut self, k: Option<String>) -> Self {
-        self.keymap = k;
-        self
-    }
-
-    pub fn update_user(mut self, v: Option<(String, String)>) -> Self {
-        self.user = v;
-        self
-    }
-
-    pub fn update_wifi(mut self, v: Option<(String, String)>) -> Self {
-        self.wifi = v;
-        self
-    }
-}
-
-impl Default for FlashingSdLinuxConfig {
-    fn default() -> Self {
-        Self {
-            verify: true,
-            hostname: Default::default(),
-            timezone: Default::default(),
-            keymap: Default::default(),
-            user: Default::default(),
-            wifi: Default::default(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FlashingBcfConfig {
-    pub verify: bool,
-}
-
-impl FlashingBcfConfig {
-    pub fn update_verify(mut self, verify: bool) -> Self {
-        self.verify = verify;
-        self
-    }
-}
-
-impl Default for FlashingBcfConfig {
-    fn default() -> Self {
-        Self { verify: true }
     }
 }

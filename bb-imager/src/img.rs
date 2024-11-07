@@ -9,7 +9,10 @@ use std::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {}
+pub enum Error {
+    #[error("Failed to read image {0}")]
+    FailedToReadImage(String),
+}
 
 pub struct OsImage {
     size: u64,

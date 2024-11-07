@@ -30,7 +30,7 @@ pub fn view<'a>(
         .padding(32)
         .width(iced::Length::Fill);
 
-        let form = match flashing_config.unwrap() {
+        let form = match flashing_config.expect("Missing flashing config") {
             bb_imager::FlashingConfig::LinuxSd(None) => widget::column([]),
             bb_imager::FlashingConfig::LinuxSd(Some(x)) => linux_sd_form(timezones, keymaps, x),
             bb_imager::FlashingConfig::Bcf(x) => widget::column![widget::toggler(!x.verify)

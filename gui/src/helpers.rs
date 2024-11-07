@@ -276,7 +276,7 @@ pub fn home_btn<'a>(
     let style = if active {
         widget::button::Style {
             background: Some(iced::Color::WHITE.into()),
-            text_color: iced::Color::parse("#aa5137").unwrap(),
+            text_color: iced::Color::parse("#aa5137").expect("unexpected error"),
             ..Default::default()
         }
     } else {
@@ -291,7 +291,7 @@ pub fn home_btn<'a>(
 }
 
 pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).unwrap();
+    let img = std::fs::read(path).expect("Failed to open image");
 
     match image::guess_format(&img) {
         Ok(_) => widget::image(widget::image::Handle::from_bytes(img))

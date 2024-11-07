@@ -35,7 +35,7 @@ impl crate::common::Destination {
 
             let obj = dbus_client
                 .object(block)
-                .unwrap()
+                .expect("Unexpected error")
                 .block()
                 .await
                 .map_err(Error::from)?;
@@ -45,7 +45,7 @@ impl crate::common::Destination {
                 HashMap::from([("update-partition-type", true.into())]),
             )
             .await
-            .unwrap();
+            .map_err(Error::from)?;
 
             Ok(())
         } else {
@@ -73,7 +73,7 @@ impl crate::common::Destination {
 
             let obj = dbus_client
                 .object(block)
-                .unwrap()
+                .expect("Unexpected error")
                 .block()
                 .await
                 .map_err(Error::from)?;

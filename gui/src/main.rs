@@ -102,7 +102,7 @@ impl BBImager {
                 // If spawn_blocking fails, there is a problem with the underlying runtime
                 tokio::task::spawn_blocking(|| Ok(boards_clone.merge(data.into())))
                     .await
-                    .unwrap()
+                    .expect("Tokio runtime failed to spawn blocking task")
             },
             |x: Result<helpers::Boards, String>| match x {
                 Ok(y) => BBImagerMessage::UpdateConfig(y),
@@ -207,7 +207,11 @@ impl BBImager {
             BBImagerMessage::SelectLocalImage => {
                 let flasher = self
                     .boards
-                    .device(self.selected_board.as_ref().unwrap())
+                    .device(
+                        self.selected_board
+                            .as_ref()
+                            .expect("Image cannot be selected before board"),
+                    )
                     .flasher;
                 let (name, extensions) = flasher.file_filter();
                 return Task::perform(
@@ -245,11 +249,11 @@ impl BBImager {
                     Screen::ExtraConfiguration => {
                         let flasher = self
                             .boards
-                            .device(self.selected_board.as_ref().unwrap())
+                            .device(self.selected_board.as_ref().expect("Missing board"))
                             .flasher;
                         self.flashing_config = Some(FlashingConfig::new(
                             flasher,
-                            self.selected_image.as_ref().unwrap(),
+                            self.selected_image.as_ref().expect("Missing os image"),
                         ));
                     }
                     _ => {}
@@ -270,15 +274,18 @@ impl BBImager {
             BBImagerMessage::StartFlashing => {
                 let docs_url = &self
                     .boards
-                    .device(self.selected_board.as_ref().unwrap())
+                    .device(self.selected_board.as_ref().expect("Missing board"))
                     .documentation;
                 self.screen =
                     Screen::Flashing(pages::flash::FlashingScreen::new(docs_url.to_string()));
 
                 let dst = self.selected_dst.clone().expect("No destination selected");
-                let img = self.selected_image.clone().unwrap();
+                let img = self.selected_image.clone().expect("Missing os image");
                 let downloader = self.downloader.clone();
-                let config = self.flashing_config.clone().unwrap();
+                let config = self
+                    .flashing_config
+                    .clone()
+                    .expect("Missing flashing config");
 
                 let s = iced::stream::channel(20, move |mut chan| async move {
                     let _ = chan
@@ -296,7 +303,9 @@ impl BBImager {
                         let _ = chan.try_send(BBImagerMessage::ProgressBar(progress.into()));
                     }
 
-                    let res = flash_task.await.unwrap();
+                    let res = flash_task
+                        .await
+                        .expect("Tokio runtime failed to spawn task");
                     let res = match res {
                         Ok(_) => BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS),
                         Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
@@ -327,7 +336,8 @@ impl BBImager {
                             .show()
                     })
                     .await
-                    .unwrap();
+                    .expect("Tokio runtime failed to spawn blocking task");
+
                     tracing::debug!("Notification response {res:?}");
                     BBImagerMessage::Null
                 });
@@ -365,7 +375,7 @@ impl BBImager {
                 pages::board_selection::view(&self.boards, &self.search_bar, &self.downloader)
             }
             Screen::ImageSelection => {
-                let board = self.selected_board.as_ref().unwrap();
+                let board = self.selected_board.as_ref().expect("Missing Board");
                 let images = self.boards.images(board);
                 pages::image_selection::view(
                     images,
@@ -412,7 +422,7 @@ impl BBImager {
     fn refresh_destinations(&self) -> Task<BBImagerMessage> {
         let flasher = self
             .boards
-            .device(self.selected_board.as_ref().unwrap())
+            .device(self.selected_board.as_ref().expect("Missing board"))
             .flasher;
 
         Task::perform(

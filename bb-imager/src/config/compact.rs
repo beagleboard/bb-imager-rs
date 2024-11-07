@@ -36,7 +36,7 @@ impl Device {
     pub fn convert(self, mapper: &mut HashMap<String, Vec<String>>) -> super::Device {
         let icon = self
             .icon
-            .unwrap_or(Url::parse(DEVICE_DEFAULT_ICON).unwrap());
+            .unwrap_or(Url::parse(DEVICE_DEFAULT_ICON).expect("Invalid default icon url"));
 
         for item in self.tags {
             if let Some(x) = mapper.get_mut(&item) {
@@ -65,7 +65,7 @@ impl Device {
             _ => "https://docs.beagleboard.org/",
         };
 
-        Url::parse(temp).unwrap()
+        Url::parse(temp).expect("Unexpected error")
     }
 }
 
@@ -74,14 +74,14 @@ pub struct OsList {
     name: String,
     description: String,
     icon: Url,
-    url: Option<Url>,
+    url: Url,
     // extract_size: Option<u64>,
     // #[serde(with = "const_hex", default)]
     // extract_sha256: [u8; 32],
     // image_download_size: Option<u64>,
     #[serde(with = "const_hex", default)]
     image_download_sha256: [u8; 32],
-    release_date: Option<chrono::NaiveDate>,
+    release_date: chrono::NaiveDate,
     // init_format: Option<String>,
     #[serde(default)]
     devices: Vec<String>,
@@ -107,8 +107,8 @@ impl OsList {
             name: self.name,
             description: self.description,
             icon: self.icon,
-            url: self.url.unwrap(),
-            release_date: self.release_date.unwrap(),
+            url: self.url,
+            release_date: self.release_date,
             image_sha256: self.image_download_sha256,
             devices,
             tags,

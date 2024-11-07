@@ -10,7 +10,14 @@ use std::{
 use nix::cmsg_space;
 use nix::sys::socket::{ControlMessageOwned, MsgFlags};
 use security_framework::authorization::{Authorization, AuthorizationItemSetBuilder, Flags};
+use thiserror::Error;
 use tokio::fs::File;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to open destination {0}")]
+    FailedToOpenDestionation(String),
+}
 
 impl crate::common::Destination {
     pub async fn format(&self) -> crate::error::Result<()> {
@@ -22,7 +29,7 @@ impl crate::common::Destination {
             let path = path.clone();
             tokio::task::spawn_blocking(move || open_auth(path))
                 .await
-                .unwrap()
+                .expect("Tokio runtime failed to spawn blocking task")
         } else {
             unreachable!()
         }
@@ -32,7 +39,7 @@ impl crate::common::Destination {
 fn open_auth(path: String) -> crate::error::Result<File> {
     let rights = AuthorizationItemSetBuilder::new()
         .add_right(format!("sys.openfile.readwrite.{}", &path))
-        .unwrap()
+        .expect("Failed to create right")
         .build();
 
     let auth = Authorization::new(
@@ -40,26 +47,31 @@ fn open_auth(path: String) -> crate::error::Result<File> {
         None,
         Flags::INTERACTION_ALLOWED | Flags::EXTEND_RIGHTS | Flags::PREAUTHORIZE,
     )
-    .unwrap();
+    .expect("Failed to create authorization");
 
-    let form = auth.make_external_form().unwrap();
-    let (pipe0, pipe1) = UnixStream::pair().unwrap();
+    let form = auth
+        .make_external_form()
+        .expect("Failed to make external form");
+    let (pipe0, pipe1) = UnixStream::pair().expect("Failed to create socket");
 
     let _ = Command::new("diskutil")
         .args(["unmountDisk", &path])
         .output()
-        .unwrap();
+        .map_err(|e| Error::FailedToOpenDestionation(format!("Failed to unmount disk")))?;
 
     let mut cmd = Command::new("/usr/libexec/authopen")
         .args(["-stdoutpipe", "-extauth", "-o", "2", &path])
         .stdin(Stdio::piped())
         .stdout(OwnedFd::from(pipe1))
         .spawn()
-        .unwrap();
+        .map_err(|e| Error::FailedToOpenDestionation(format!("Failed to open disk")))?;
 
-    let mut stdin = cmd.stdin.take().unwrap();
+    // Send authorization form
+    let mut stdin = cmd.stdin.take().expect("Missing stdin");
     let form_bytes: Vec<u8> = form.bytes.into_iter().map(|x| x as u8).collect();
-    stdin.write_all(&form_bytes).unwrap();
+    stdin
+        .write_all(&form_bytes)
+        .expect("Failed to write to stdin");
     drop(stdin);
 
     const IOV_BUF_SIZE: usize =
@@ -78,7 +90,7 @@ fn open_auth(path: String) -> crate::error::Result<File> {
         Ok(result) => {
             tracing::info!("Result: {:#?}", result);
 
-            for msg in result.cmsgs().unwrap() {
+            for msg in result.cmsgs().expect("Unexpected error") {
                 if let ControlMessageOwned::ScmRights(scm_rights) = msg {
                     for fd in scm_rights {
                         tracing::debug!("receive file descriptor: {fd}");
@@ -92,10 +104,9 @@ fn open_auth(path: String) -> crate::error::Result<File> {
         }
     }
 
-    let status = cmd.wait().unwrap();
-    tracing::debug!("Exit Status: {:?}", status);
+    let _ = cmd.wait();
 
-    panic!("fd not found");
+    Err(Error::FailedToOpenDestionation("Authopen failed to open the file".to_string()).into())
 }
 
 /// TODO: Remove once a new version of rs_drivelist is published to crates.io
@@ -175,10 +186,7 @@ pub(crate) mod rs_drivelist {
             .args(["info", "-plist", device])
             .output()?;
         if !output.status.success() {
-            return Err(anyhow::Error::msg(format!(
-                "diskutil info failed: {}",
-                std::str::from_utf8(&output.stderr).unwrap()
-            )));
+            return Err(anyhow::Error::msg("diskutil info failed"));
         }
         let disk_info: DiskInfo = plist::from_bytes(&output.stdout)?;
         Ok(disk_info)
@@ -189,13 +197,11 @@ pub(crate) mod rs_drivelist {
             .args(["list", "-plist", "physical"])
             .output()?;
         if !output.status.success() {
-            return Err(anyhow::Error::msg(format!(
-                "diskutil list failed: {}",
-                std::str::from_utf8(&output.stderr).unwrap()
-            )));
+            return Err(anyhow::Error::msg("diskutil list failed"));
         }
 
-        let parsed: Disks = plist::from_bytes(&output.stdout).unwrap();
+        let parsed: Disks =
+            plist::from_bytes(&output.stdout).expect("Failed to parse diskutil plist output");
 
         let mut devices = Vec::new();
 
