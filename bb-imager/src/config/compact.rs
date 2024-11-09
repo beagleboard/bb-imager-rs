@@ -74,14 +74,14 @@ pub struct OsList {
     name: String,
     description: String,
     icon: Url,
-    url: Url,
+    url: Option<Url>,
     // extract_size: Option<u64>,
     // #[serde(with = "const_hex", default)]
     // extract_sha256: [u8; 32],
     // image_download_size: Option<u64>,
     #[serde(with = "const_hex", default)]
     image_download_sha256: [u8; 32],
-    release_date: chrono::NaiveDate,
+    release_date: Option<chrono::NaiveDate>,
     // init_format: Option<String>,
     #[serde(default)]
     devices: Vec<String>,
@@ -107,8 +107,8 @@ impl OsList {
             name: self.name,
             description: self.description,
             icon: self.icon,
-            url: self.url,
-            release_date: self.release_date,
+            url: self.url.expect("Missing URL"),
+            release_date: self.release_date.expect("Missing Release date"),
             image_sha256: self.image_download_sha256,
             devices,
             tags,
