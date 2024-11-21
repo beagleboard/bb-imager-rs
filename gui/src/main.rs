@@ -6,13 +6,18 @@ use bb_imager::FlashingConfig;
 use helpers::ProgressBarState;
 use iced::{futures::SinkExt, widget, Element, Task};
 use pages::Screen;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod constants;
 mod helpers;
 mod pages;
 
 fn main() -> iced::Result {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init()
+        .expect("Failed to register tracing_subscriber");
 
     let icon = iced::window::icon::from_file_data(
         constants::WINDOW_ICON,

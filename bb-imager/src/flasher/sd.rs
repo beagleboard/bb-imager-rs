@@ -68,10 +68,11 @@ where
         }
 
         pos += count;
-
         let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(
             pos as f32 / size as f32,
         ));
+
+        tracing::debug!("Write: {} bytes", count);
 
         sd.write_all(&buf[..count]).await?;
     }
