@@ -15,7 +15,7 @@ use crate::{
     util,
 };
 
-pub(crate) const BUF_SIZE: usize = 32 * 1024;
+pub(crate) const BUF_SIZE: usize = 128 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {
