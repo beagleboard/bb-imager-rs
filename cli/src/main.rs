@@ -63,10 +63,10 @@ async fn main() {
 
             match target {
                 FlashTarget::Sd => {
-                    println!("| {: <12} | {: <12} |", "Sd Card", "Size");
+                    println!("| {: <12} | {: <12} |", "Sd Card", "Size (in G)");
                     println!("|--------------|--------------|");
                     for d in dsts {
-                        println!("| {: <12} | {: <12} |", d, d.size())
+                        println!("| {: <12} | {: <12} |", d.path().to_str().unwrap(), d.size() / (1024 * 1024 * 1024))
                     }
                 }
                 FlashTarget::Bcf | FlashTarget::Msp430 => {

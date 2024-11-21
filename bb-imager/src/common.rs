@@ -89,6 +89,14 @@ impl Destination {
             unreachable!()
         }
     }
+
+    pub fn path(&self) -> PathBuf {
+        match self {
+            Destination::Port(p) => PathBuf::from(p),
+            Destination::SdCard { path, .. } => PathBuf::from(path),
+            Destination::HidRaw(p) => PathBuf::from(p.to_str().unwrap()),
+        }
+    }
 }
 
 impl std::fmt::Display for Destination {
