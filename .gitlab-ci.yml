@@ -37,7 +37,7 @@ windows:
     - apt-get update && apt-get --assume-yes install gcc-mingw-w64 zip
     - rustup target add x86_64-pc-windows-gnu
   script:
-    - make release-windows
+    - make release-windows-x86_64-pc-windows-gnu
   artifacts:
     paths:
       - release/
@@ -58,7 +58,7 @@ linux_x86_64:
     - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add x86_64-unknown-linux-gnu
   script:
-    - make release-linux-x86_64
+    - make release-linux-x86_64-unknown-linux-gnu
   artifacts:
     paths:
       - release/
@@ -83,7 +83,7 @@ linux_aarch64:
     - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add aarch64-unknown-linux-gnu
   script:
-    - PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-aarch64
+    - PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-aarch64-unknown-linux-gnu
   artifacts:
     paths:
       - release/
@@ -108,7 +108,7 @@ linux_arm:
     - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add armv7-unknown-linux-gnueabihf
   script:
-    - PKG_CONFIG_PATH="/usr/lib/arm-linux-gnueabihf/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-arm
+    - PKG_CONFIG_PATH="/usr/lib/arm-linux-gnueabihf/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-armv7-unknown-linux-gnueabihf
   artifacts:
     paths:
       - release/
@@ -128,7 +128,8 @@ macos:
     - rustup target add x86_64-apple-darwin aarch64-apple-darwin
   script:
     - rustc --version
-    - make release-darwin
+    - make release-darwin-x86_64-apple-darwin
+    - make release-darwin-aarch64-apple-darwin
   artifacts:
     paths:
       - release/
@@ -140,6 +141,9 @@ deploy:
     - if: $CI_COMMIT_TAG
   variables:
     VERSION: ${CI_COMMIT_TAG}
+    PACKAGE_REGISTRY_URL: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic
+    PACKAGE_REGISTRY_GUI_URL: ${PACKAGE_REGISTRY_URL}/bb-imager-gui/${VERSION}
+    PACKAGE_REGISTRY_CLI_URL: ${PACKAGE_REGISTRY_CLI_URL}/bb-imager-cli/${VERSION}
   before_script:
     - apk add --no-cache make curl jq
   script:
@@ -153,45 +157,86 @@ deploy:
     ref: '$CI_COMMIT_SHA'
     assets:
       links:
-        - name: 'x86_64-bb-imager-gui-windows.zip'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/x86_64-pc-windows-gnu.zip'
-          link_type: 'package'
         - name: 'x86_64-bb-imager-cli-windows.zip'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-pc-windows-gnu.zip'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-pc-windows-gnu.zip'
           link_type: 'package'
-        - name: 'x86_64-bb-imager-gui-linux.AppImage'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/x86_64-unknown-linux-gnu.AppImage'
+        - name: 'x86_64-bb-imager-cli-windows.zip.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-pc-windows-gnu.zip.sha256'
+
+        - name: 'x86_64-bb-imager-gui-windows.zip'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-pc-windows-gnu.zip'
           link_type: 'package'
+        - name: 'x86_64-bb-imager-gui-windows.zip.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-pc-windows-gnu.zip.sha256'
+
         - name: 'x86_64-bb-imager-cli-linux.xz'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-unknown-linux-gnu.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu.xz'
           link_type: 'package'
-        - name: 'aarch64-bb-imager-gui-linux.AppImage'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/aarch64-unknown-linux-gnu.AppImage'
+        - name: 'x86_64-bb-imager-cli-linux.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu.xz.sha256'
+
+        - name: 'x86_64-bb-imager-gui-linux.AppImage'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-unknown-linux-gnu.AppImage'
           link_type: 'package'
+        - name: 'x86_64-bb-imager-gui-linux.AppImage.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-unknown-linux-gnu.AppImage.sha256'
+
         - name: 'aarch64-bb-imager-cli-linux.xz'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/aarch64-unknown-linux-gnu.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu.xz'
           link_type: 'package'
-        - name: 'arm-bb-imager-gui-linux.AppImage'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/armv7-unknown-linux-gnueabihf.AppImage'
+        - name: 'aarch64-bb-imager-cli-linux.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu.xz.sha256'
+
+        - name: 'aarch64-bb-imager-gui-linux.AppImage'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/aarch64-unknown-linux-gnu.AppImage'
           link_type: 'package'
+        - name: 'aarch64-bb-imager-gui-linux.AppImage.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/aarch64-unknown-linux-gnu.AppImage.sha256'
+
         - name: 'arm-bb-imager-cli-linux.xz'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/armv7-unknown-linux-gnueabihf.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf.xz'
           link_type: 'package'
+        - name: 'arm-bb-imager-cli-linux.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf.xz.sha256'
+
+        - name: 'arm-bb-imager-gui-linux.AppImage'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/armv7-unknown-linux-gnueabihf.AppImage'
+          link_type: 'package'
+        - name: 'arm-bb-imager-gui-linux.AppImage.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/armv7-unknown-linux-gnueabihf.AppImage.sha256'
+
         - name: 'aarch64-bb-imager-cli-darwin.zip'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/aarch64-apple-darwin.zip'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-apple-darwin.zip'
           link_type: 'package'
+        - name: 'aarch64-bb-imager-cli-darwin.zip.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-apple-darwin.zip.sha256'
+
         - name: 'aarch64-bb-imager-gui-darwin.dmg'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/aarch64-apple-darwin.dmg'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/aarch64-apple-darwin.dmg'
           link_type: 'package'
+        - name: 'aarch64-bb-imager-gui-darwin.dmg.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/aarch64-apple-darwin.dmg.sha256'
+
         - name: 'x86_64-bb-imager-cli-darwin.zip'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/x86_64-apple-darwin.zip'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-apple-darwin.zip'
           link_type: 'package'
+        - name: 'x86_64-bb-imager-cli-darwin.zip.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-apple-darwin.zip.sha256'
+
         - name: 'x86_64-bb-imager-gui-darwin.dmg'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/x86_64-apple-darwin.dmg'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-apple-darwin.dmg'
           link_type: 'package'
+        - name: 'x86_64-bb-imager-gui-darwin.dmg.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-apple-darwin.dmg.sha256'
+
         - name: 'universal-bb-imager-cli-darwin.zip'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-cli/${CI_COMMIT_TAG}/universal-apple-darwin.zip'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/universal-apple-darwin.zip'
           link_type: 'package'
+        - name: 'universal-bb-imager-cli-darwin.zip.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/universal-apple-darwin.zip.sha256'
+
         - name: 'universal-bb-imager-gui-darwin.dmg'
-          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/bb-imager-gui/${CI_COMMIT_TAG}/universal-apple-darwin.dmg'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/universal-apple-darwin.dmg'
           link_type: 'package'
+        - name: 'universal-bb-imager-gui-darwin.dmg.sha256'
+          url: '${PACKAGE_REGISTRY_GUI_URL}/universal-apple-darwin.dmg.sha256'
