@@ -26,22 +26,16 @@ fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> 
         let count = img.read(&mut buf[pos..])?;
 
         if count == 0 {
-            break;
+            let end = pos + pos % 512;
+            buf[pos..end].fill(0);
+            return Ok(end);
         }
 
         pos += count;
-
+        // The buffer size is always a multiple of 512
         if pos % 512 == 0 {
-            break;
+            return Ok(pos);
         }
-    }
-
-    if pos == 0 || pos % 512 == 0 {
-        Ok(pos)
-    } else {
-        let rem = pos % 512;
-        buf[pos..rem].fill(0);
-        Ok(pos + rem)
     }
 }
 
@@ -67,14 +61,14 @@ where
             break;
         }
 
+        tracing::debug!("Write: {} bytes", count);
+
+        sd.write_all(&buf[..count]).await?;
+
         pos += count;
         let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(
             pos as f32 / size as f32,
         ));
-
-        tracing::debug!("Write: {} bytes", count);
-
-        sd.write_all(&buf[..count]).await?;
     }
 
     if verify {

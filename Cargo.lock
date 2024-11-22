@@ -2657,6 +2657,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "603222e049bf0da71529325ada5d02dc3871cbd3679cf905429f7f0de93da87b"
 dependencies = [
  "liblzma-sys",
+ "num_cpus",
 ]
 
 [[package]]

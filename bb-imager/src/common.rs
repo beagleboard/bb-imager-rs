@@ -15,7 +15,7 @@ use crate::{
     util,
 };
 
-pub(crate) const BUF_SIZE: usize = 32 * 1024;
+pub(crate) const BUF_SIZE: usize = 128 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -87,6 +87,14 @@ impl Destination {
                 .map_err(Into::into)
         } else {
             unreachable!()
+        }
+    }
+
+    pub fn path(&self) -> PathBuf {
+        match self {
+            Destination::Port(p) => PathBuf::from(p),
+            Destination::SdCard { path, .. } => PathBuf::from(path),
+            Destination::HidRaw(p) => PathBuf::from(p.to_str().unwrap()),
         }
     }
 }

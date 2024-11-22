@@ -63,7 +63,7 @@ impl OsImage {
                 let size = liblzma::uncompressed_size(&mut file)?;
 
                 file.seek(std::io::SeekFrom::Start(0))?;
-                let img = liblzma::read::XzDecoder::new(file);
+                let img = liblzma::read::XzDecoder::new_parallel(file);
                 let hasher = Sha256::new();
 
                 Ok(Self {
