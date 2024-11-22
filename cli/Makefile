@@ -13,6 +13,10 @@ package-cli-linux-xz-%: build-cli-%
 	mkdir -p ${RELEASE_DIR_LINUX}/$*
 	xz -vc target/$*/release/bb-imager-cli > ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.xz
 
+package-cli-linux-deb-%: build-cli-%
+	$(info "Create CLI Linux deb $*")
+	cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip
+
 package-cli-darwin-zip-%: build-cli-%
 	$(info "Create CLI Darwin zip $*")
 	mkdir -p ${RELEASE_DIR_DARWIN}/$*

@@ -26,7 +26,7 @@ clean:
 	cargo clean
 	rm -rf release
 
-release-linux-%: package-cli-linux-xz-% package-gui-linux-appimage-%;
+release-linux-%: package-cli-linux-xz-% package-cli-linux-deb-% package-gui-linux-appimage-% package-gui-linux-deb-%;
 
 release-darwin-%: package-cli-darwin-zip-% package-gui-darwin-dmg-%;
 

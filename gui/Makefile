@@ -15,9 +15,13 @@ package-gui-linux-appimage-%: build-gui-%
 	cp target/$*/release/bb-imager-gui ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
 	cp ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop ${RELEASE_DIR_LINUX}/$*/AppDir/
 	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${RELEASE_DIR_LINUX}/$*/AppDir/BeagleBoardImager.desktop
-	cp gui/assets/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/
+	cp gui/assets/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
 	ARCH=${APPIMAGE_ARCH_$*} $(APPIMAGETOOL) --appimage-extract-and-run ${RELEASE_DIR_LINUX}/$*/AppDir ${RELEASE_DIR_LINUX}/$*/BeagleBoardImager.AppImage
 	rm -rf ${RELEASE_DIR_LINUX}/$*/AppDir
+
+package-gui-linux-deb-%: build-gui-%
+	$(info "Create GUI Linux deb $*")
+	cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
 
 package-gui-darwin-dmg-%: build-gui-%
 	$(info "Create GUI Darwin dmg $*")
