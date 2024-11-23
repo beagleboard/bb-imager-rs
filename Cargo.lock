@@ -507,8 +507,6 @@ dependencies = [
  "clap",
  "indicatif",
  "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
