@@ -1,6 +1,10 @@
 # Helpers for creating Gitlab Releases
 CURL ?= $(shell which curl)
 
+PACKAGE_REGISTRY_URL = ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic
+PACKAGE_REGISTRY_GUI_URL = ${PACKAGE_REGISTRY_URL}/bb-imager-gui/${VERSION}
+PACKAGE_REGISTRY_CLI_URL = ${PACKAGE_REGISTRY_URL}/bb-imager-cli/${VERSION}
+
 # Upload to Package Registry. Also upload checksum
 #
 # Arg 1: source
@@ -33,3 +37,7 @@ upload-artifact-linux: upload-artifact-linux-x86_64-unknown-linux-gnu upload-art
 upload-artifact-darwin: upload-artifact-darwin-x86_64-apple-darwin upload-artifact-darwin-aarch64-apple-darwin upload-artifact-darwin-universal-apple-darwin;
 
 upload-artifact-windows: upload-artifact-windows-x86_64-pc-windows-gnu;
+
+release-notes:
+	$(info "Generate release notes for $VERSION")
+	curl -H "PRIVATE-TOKEN: ${CI_API_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/changelog?version=${VERSION}" | jq -r .notes > release_notes.md
