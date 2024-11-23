@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=BeagleBoard Imager
-Icon=icon
+Icon=bb-imager
 Exec=bb-imager-gui
 Categories=Utility;
 StartupNotify=false
