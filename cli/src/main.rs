@@ -66,7 +66,11 @@ async fn main() {
                     println!("| {: <12} | {: <12} |", "Sd Card", "Size (in G)");
                     println!("|--------------|--------------|");
                     for d in dsts {
-                        println!("| {: <12} | {: <12} |", d.path().to_str().unwrap(), d.size() / (1024 * 1024 * 1024))
+                        println!(
+                            "| {: <12} | {: <12} |",
+                            d.path().to_str().unwrap(),
+                            d.size() / (1024 * 1024 * 1024)
+                        )
                     }
                 }
                 FlashTarget::Bcf | FlashTarget::Msp430 => {
@@ -102,7 +106,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                         static PREPARING: Once = Once::new();
 
                         PREPARING.call_once(|| {
-                            println!("[1/3] Preparing");
+                            println!("Preparing");
                         });
                     }
                     DownloadFlashingStatus::DownloadingProgress(_) => {
@@ -113,7 +117,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                             let bar = bars.add(indicatif::ProgressBar::new(100));
                             bar.set_style(
                                 indicatif::ProgressStyle::with_template(
-                                    "[2/3] {msg}  [{wide_bar}] [{percent} %]",
+                                    "{msg}  [{wide_bar}] [{percent} %]",
                                 )
                                 .expect("Failed to create progress bar"),
                             );
@@ -132,7 +136,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                             }
                         }
 
-                        VERIFYING.call_once(|| println!("[3/3] Verifying"));
+                        VERIFYING.call_once(|| println!("Verifying"));
                     }
                     DownloadFlashingStatus::VerifyingProgress(p) => {
                         if let Some(x) = FLASHING.get() {
@@ -145,7 +149,7 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                             let bar = bars.add(indicatif::ProgressBar::new(100));
                             bar.set_style(
                                 indicatif::ProgressStyle::with_template(
-                                    "[3/3] {msg} [{wide_bar}] [{percent} %]",
+                                    "{msg} [{wide_bar}] [{percent} %]",
                                 )
                                 .expect("Failed to create progress bar"),
                             );
@@ -154,6 +158,20 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
                         });
 
                         bar.set_position((p * 100.0) as u64);
+                    }
+                    DownloadFlashingStatus::Customizing => {
+                        static CUSTOMIZING: Once = Once::new();
+
+                        // Finish verifying progress if not already done
+                        if let Some(x) = VERIFYING.get() {
+                            if !x.is_finished() {
+                                x.finish()
+                            }
+                        }
+
+                        CUSTOMIZING.call_once(|| {
+                            println!("Customizing");
+                        });
                     }
                 };
             }

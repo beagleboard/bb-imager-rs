@@ -1,4 +1,4 @@
-pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://dl.beagle.cc/distros.json";
+pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
 pub const APP_NAME: &str = "BeagleBoard Imager";
 

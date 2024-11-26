@@ -28,10 +28,10 @@ pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
 
     loop {
         let count = reader.read(&mut buffer).await?;
-
         if count == 0 {
             break;
         }
+
         hasher.update(&buffer[..count]);
 
         pos += count;

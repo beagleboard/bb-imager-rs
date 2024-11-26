@@ -63,8 +63,6 @@ where
             break;
         }
 
-        tracing::debug!("Write: {} bytes", count);
-
         sd.write_all(&buf[..count]).await?;
 
         pos += count;
@@ -81,6 +79,8 @@ where
         let hash = crate::util::sha256_reader_progress(sd.take(size), size, chan).await?;
 
         if hash != sha256 {
+            tracing::debug!("Image SHA256: {}", const_hex::encode(sha256));
+            tracing::debug!("Sd SHA256: {}", const_hex::encode(hash));
             return Err(Error::Sha256VerificationError.into());
         }
     }
