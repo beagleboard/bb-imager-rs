@@ -5,7 +5,7 @@ pub mod flash;
 pub mod home;
 pub mod image_selection;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy)]
 pub enum Screen {
     #[default]
     Home,
@@ -13,5 +13,5 @@ pub enum Screen {
     ImageSelection,
     DestinationSelection,
     ExtraConfiguration,
-    Flashing(flash::FlashingScreen),
+    Flashing,
 }

@@ -7,68 +7,22 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct FlashingScreen {
-    progress: ProgressBarState,
+pub struct FlashingState {
+    pub(crate) progress: ProgressBarState,
     documentation: String,
-    running: bool,
 }
 
-impl Default for FlashingScreen {
-    fn default() -> Self {
-        FlashingScreen {
-            progress: ProgressBarState::PREPARING,
-            documentation: String::new(),
-            running: true,
-        }
-    }
-}
-
-impl FlashingScreen {
-    pub fn new(documentation: String) -> Self {
+impl FlashingState {
+    pub fn new(progress: ProgressBarState, documentation: String) -> Self {
         Self {
             documentation,
-            ..Default::default()
+            progress,
         }
     }
 
-    pub fn update_progress(mut self, progress: ProgressBarState, running: bool) -> Self {
+    pub fn update(mut self, progress: ProgressBarState) -> Self {
         self.progress = progress;
-        self.running = running;
         self
-    }
-
-    pub fn view(&self) -> Element<BBImagerMessage> {
-        widget::responsive(|size| {
-            let prog_bar = self.progress.bar();
-
-            let btn = if self.running {
-                home_btn("CANCEL", true, iced::Length::Shrink)
-                    .on_press(BBImagerMessage::CancelFlashing)
-            } else {
-                home_btn("HOME", true, iced::Length::Shrink)
-                    .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-            };
-
-            let bottom = widget::container(
-                widget::column![self.about().height(size.height - 410.0), btn, prog_bar]
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fill)
-                    .align_x(iced::Alignment::Center),
-            )
-            .style(|_| {
-                widget::container::background(
-                    iced::Color::parse("#aa5137").expect("unexpected error"),
-                )
-            });
-
-            widget::column![helpers::logo(), bottom]
-                .spacing(10)
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .align_x(iced::Alignment::Center)
-                .into()
-        })
-        .into()
     }
 
     fn about(&self) -> widget::Container<'_, BBImagerMessage> {
@@ -85,4 +39,35 @@ impl FlashingScreen {
         ]))
         .padding(32)
     }
+}
+
+pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
+    widget::responsive(move |size| {
+        let prog_bar = state.progress.bar();
+
+        let btn = if running {
+            home_btn("CANCEL", true, iced::Length::Shrink).on_press(BBImagerMessage::CancelFlashing)
+        } else {
+            home_btn("HOME", true, iced::Length::Shrink)
+                .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
+        };
+
+        let bottom = widget::container(
+            widget::column![state.about().height(size.height - 410.0), btn, prog_bar]
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .align_x(iced::Alignment::Center),
+        )
+        .style(|_| {
+            widget::container::background(iced::Color::parse("#aa5137").expect("unexpected error"))
+        });
+
+        widget::column![helpers::logo(), bottom]
+            .spacing(10)
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .align_x(iced::Alignment::Center)
+            .into()
+    })
+    .into()
 }
