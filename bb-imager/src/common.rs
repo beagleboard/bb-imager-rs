@@ -15,8 +15,6 @@ use crate::{
     util,
 };
 
-pub(crate) const BUF_SIZE: usize = 128 * 1024;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to Open Destination: {0}")]

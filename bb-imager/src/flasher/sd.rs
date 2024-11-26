@@ -2,10 +2,12 @@
 
 use std::io::{Read, Seek, SeekFrom, Write};
 
+use crate::error::Result;
 use crate::DownloadFlashingStatus;
-use crate::{error::Result, BUF_SIZE};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+
+const BUF_SIZE: usize = 128 * 1024;
 
 #[derive(Error, Debug)]
 pub enum Error {

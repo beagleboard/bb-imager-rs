@@ -1,9 +1,11 @@
 //! Helper functions
 
-use crate::{error::Result, BUF_SIZE};
+use crate::error::Result;
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
+
+const BUF_SIZE: usize = 4 * 1024;
 
 pub(crate) async fn sha256_file_progress(
     path: &Path,
