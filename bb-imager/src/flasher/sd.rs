@@ -12,13 +12,13 @@ const BUF_SIZE: usize = 128 * 1024;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Sha256 verification error")]
-    Sha256VerificationError,
+    Sha256Verification,
     #[error("Failed to get removable flash drives")]
-    DriveFetchError,
+    DriveFetch,
     #[error("Failed to format drive {0}")]
-    FormatError(String),
+    Format(String),
     #[error("Failed to customize flashed image {0}")]
-    CustomizationError(String),
+    Customization(String),
 }
 
 fn read_aligned(img: &mut crate::img::OsImage, buf: &mut [u8]) -> Result<usize> {
@@ -81,7 +81,7 @@ where
         if hash != sha256 {
             tracing::debug!("Image SHA256: {}", const_hex::encode(sha256));
             tracing::debug!("Sd SHA256: {}", const_hex::encode(hash));
-            return Err(Error::Sha256VerificationError.into());
+            return Err(Error::Sha256Verification.into());
         }
     }
 
@@ -127,21 +127,20 @@ impl FlashingSdLinuxConfig {
     ) -> crate::error::Result<()> {
         let boot_partition = {
             let mbr = mbrman::MBR::read_from(dst, 512)
-                .map_err(|e| Error::CustomizationError(format!("Failed to read mbr: {e}")))?;
+                .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
 
-            let boot_part = mbr.get(1).ok_or(Error::CustomizationError(format!(
-                "Failed to get boot partition"
-            )))?;
+            let boot_part = mbr.get(1).ok_or(Error::Customization(
+                "Failed to get boot partition".to_string(),
+            ))?;
             assert_eq!(boot_part.sys, 12);
             let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
             let end_offset: u64 =
                 start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
             let slice = fscommon::StreamSlice::new(dst, start_offset, end_offset)
-                .map_err(|_| Error::CustomizationError(format!("Failed to read partition")))?;
+                .map_err(|_| Error::Customization("Failed to read partition".to_string()))?;
             let boot_stream = fscommon::BufStream::new(slice);
-            fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new()).map_err(|e| {
-                Error::CustomizationError(format!("Failed to open boot partition: {e}"))
-            })?
+            fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new())
+                .map_err(|e| Error::Customization(format!("Failed to open boot partition: {e}")))?
         };
 
         let boot_root = boot_partition.root_dir();
@@ -152,18 +151,18 @@ impl FlashingSdLinuxConfig {
             || self.user.is_some()
             || self.wifi.is_some()
         {
-            let mut sysconf = boot_root.create_file("sysconf.txt").map_err(|e| {
-                Error::CustomizationError(format!("Failed to create sysconf.txt: {e}"))
-            })?;
+            let mut sysconf = boot_root
+                .create_file("sysconf.txt")
+                .map_err(|e| Error::Customization(format!("Failed to create sysconf.txt: {e}")))?;
             sysconf.seek(SeekFrom::End(0)).map_err(|e| {
-                Error::CustomizationError(format!("Failed to seek to end of sysconf.txt: {e}"))
+                Error::Customization(format!("Failed to seek to end of sysconf.txt: {e}"))
             })?;
 
             if let Some(h) = &self.hostname {
                 sysconf
                     .write_all(format!("hostname={h}\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
+                        Error::Customization(format!(
                             "Failed to write hostname to sysconf.txt: {e}"
                         ))
                     })?;
@@ -173,7 +172,7 @@ impl FlashingSdLinuxConfig {
                 sysconf
                     .write_all(format!("timezone={tz}\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
+                        Error::Customization(format!(
                             "Failed to write timezone to sysconf.txt: {e}"
                         ))
                     })?;
@@ -183,9 +182,7 @@ impl FlashingSdLinuxConfig {
                 sysconf
                     .write_all(format!("keymap={k}\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
-                            "Failed to write keymap to sysconf.txt: {e}"
-                        ))
+                        Error::Customization(format!("Failed to write keymap to sysconf.txt: {e}"))
                     })?;
             }
 
@@ -193,14 +190,14 @@ impl FlashingSdLinuxConfig {
                 sysconf
                     .write_all(format!("user_name={u}\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
+                        Error::Customization(format!(
                             "Failed to write user_name to sysconf.txt: {e}"
                         ))
                     })?;
                 sysconf
                     .write_all(format!("user_password={p}\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
+                        Error::Customization(format!(
                             "Failed to write user_password to sysconf.txt: {e}"
                         ))
                     })?;
@@ -210,7 +207,7 @@ impl FlashingSdLinuxConfig {
                 sysconf
                     .write_all(format!("iwd_psk_file={ssid}.psk\n").as_bytes())
                     .map_err(|e| {
-                        Error::CustomizationError(format!(
+                        Error::Customization(format!(
                             "Failed to write iwd_psk_file to sysconf.txt: {e}"
                         ))
                     })?;
@@ -220,9 +217,7 @@ impl FlashingSdLinuxConfig {
         if let Some((ssid, psk)) = &self.wifi {
             let mut wifi_file = boot_root
                 .create_file(format!("services/{ssid}.psk").as_str())
-                .map_err(|e| {
-                    Error::CustomizationError(format!("Failed to create iwd_psk_file: {e}"))
-                })?;
+                .map_err(|e| Error::Customization(format!("Failed to create iwd_psk_file: {e}")))?;
 
             wifi_file
                 .write_all(
@@ -230,7 +225,7 @@ impl FlashingSdLinuxConfig {
                         .as_bytes(),
                 )
                 .map_err(|e| {
-                    Error::CustomizationError(format!("Failed to write to iwd_psk_file: {e}"))
+                    Error::Customization(format!("Failed to write to iwd_psk_file: {e}"))
                 })?;
         }
 

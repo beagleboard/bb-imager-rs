@@ -123,14 +123,11 @@ impl BBImager {
             boards,
             downloader: downloader.clone(),
             timezones: widget::combo_box::State::new(
-                constants::TIMEZONES
-                    .into_iter()
-                    .map(|x| x.to_string())
-                    .collect(),
+                constants::TIMEZONES.iter().map(|x| x.to_string()).collect(),
             ),
             keymaps: widget::combo_box::State::new(
                 constants::KEYMAP_LAYOUTS
-                    .into_iter()
+                    .iter()
                     .map(|x| x.to_string())
                     .collect(),
             ),
@@ -244,7 +241,7 @@ impl BBImager {
                 self.destinations.clear();
             }
             BBImagerMessage::SwitchScreen(x) => {
-                self.screen = x.clone();
+                self.screen = x;
                 match x {
                     Screen::Home => self.back_home(),
                     Screen::DestinationSelection => {
