@@ -153,7 +153,7 @@ impl BBImager {
 
         let tasks = icons.into_iter().map(|icon| {
             Task::perform(
-                self.downloader.clone().download_image(icon.clone()),
+                self.downloader.clone().download_without_sha(icon.clone()),
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -186,7 +186,7 @@ impl BBImager {
 
                 let jobs = icons.into_iter().map(|x| {
                     Task::perform(
-                        self.downloader.clone().download_image(x.clone()),
+                        self.downloader.clone().download_without_sha(x.clone()),
                         move |p| match p {
                             Ok(_path) => BBImagerMessage::Null,
                             Err(e) => {
