@@ -56,7 +56,6 @@ linux_x86_64:
     - echo "Setup appimagetool"
     - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
     - chmod +x /usr/local/bin/appimagetool
-    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add x86_64-unknown-linux-gnu
     - cargo install cargo-deb
   script:
@@ -82,7 +81,6 @@ linux_aarch64:
     - echo "Setup appimagetool"
     - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
     - chmod +x /usr/local/bin/appimagetool
-    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add aarch64-unknown-linux-gnu
     - cargo install cargo-deb
   script:
@@ -108,7 +106,6 @@ linux_arm:
     - echo "Setup appimagetool"
     - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
     - chmod +x /usr/local/bin/appimagetool
-    - sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
     - rustup target add armv7-unknown-linux-gnueabihf
     - cargo install cargo-deb
   script:
