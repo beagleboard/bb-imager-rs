@@ -61,6 +61,7 @@ struct BBImager {
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
     flashing_config: Option<bb_imager::FlashingConfig>,
+    flashing_state: Option<pages::flash::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
     keymaps: widget::combo_box::State<String>,
@@ -122,14 +123,11 @@ impl BBImager {
             boards,
             downloader: downloader.clone(),
             timezones: widget::combo_box::State::new(
-                constants::TIMEZONES
-                    .into_iter()
-                    .map(|x| x.to_string())
-                    .collect(),
+                constants::TIMEZONES.iter().map(|x| x.to_string()).collect(),
             ),
             keymaps: widget::combo_box::State::new(
                 constants::KEYMAP_LAYOUTS
-                    .into_iter()
+                    .iter()
                     .map(|x| x.to_string())
                     .collect(),
             ),
@@ -152,7 +150,7 @@ impl BBImager {
 
         let tasks = icons.into_iter().map(|icon| {
             Task::perform(
-                self.downloader.clone().download_image(icon.clone()),
+                self.downloader.clone().download_without_sha(icon.clone()),
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -185,7 +183,7 @@ impl BBImager {
 
                 let jobs = icons.into_iter().map(|x| {
                     Task::perform(
-                        self.downloader.clone().download_image(x.clone()),
+                        self.downloader.clone().download_without_sha(x.clone()),
                         move |p| match p {
                             Ok(_path) => BBImagerMessage::Null,
                             Err(e) => {
@@ -199,10 +197,8 @@ impl BBImager {
                 return Task::batch(jobs.chain([self.refresh_destinations()]));
             }
             BBImagerMessage::ProgressBar(x) => {
-                // Ignore progress bar update if not in the current screen
-                if let Screen::Flashing(s) = self.screen.clone() {
-                    self.screen =
-                        Screen::Flashing(s.update_progress(x, self.cancel_flashing.is_some()))
+                if let Some(state) = self.flashing_state.take() {
+                    self.flashing_state = Some(state.update(x));
                 }
             }
             BBImagerMessage::SelectImage(x) => {
@@ -245,7 +241,7 @@ impl BBImager {
                 self.destinations.clear();
             }
             BBImagerMessage::SwitchScreen(x) => {
-                self.screen = x.clone();
+                self.screen = x;
                 match x {
                     Screen::Home => self.back_home(),
                     Screen::DestinationSelection => {
@@ -272,17 +268,22 @@ impl BBImager {
                     task.abort();
                 }
 
-                return Task::done(BBImagerMessage::StopFlashing(ProgressBarState::fail(
-                    "Flashing Cancelled by user",
-                )));
+                if let Some(x) = &self.flashing_state {
+                    if let Some(y) = x.progress.cancel() {
+                        return Task::done(BBImagerMessage::StopFlashing(y));
+                    }
+                }
             }
             BBImagerMessage::StartFlashing => {
                 let docs_url = &self
                     .boards
                     .device(self.selected_board.as_ref().expect("Missing board"))
                     .documentation;
-                self.screen =
-                    Screen::Flashing(pages::flash::FlashingScreen::new(docs_url.to_string()));
+                self.screen = Screen::Flashing;
+                self.flashing_state = Some(pages::flash::FlashingState::new(
+                    ProgressBarState::PREPARING,
+                    docs_url.to_string(),
+                ));
 
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().expect("Missing os image");
@@ -411,7 +412,10 @@ impl BBImager {
                 &self.timezones,
                 &self.keymaps,
             ),
-            Screen::Flashing(s) => s.view(),
+            Screen::Flashing => pages::flash::view(
+                self.flashing_state.as_ref().unwrap(),
+                self.cancel_flashing.is_some(),
+            ),
         }
     }
 

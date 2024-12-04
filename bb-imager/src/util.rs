@@ -1,9 +1,11 @@
 //! Helper functions
 
-use crate::{error::Result, BUF_SIZE};
+use crate::error::Result;
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
+
+const BUF_SIZE: usize = 4 * 1024;
 
 pub(crate) async fn sha256_file_progress(
     path: &Path,
@@ -26,10 +28,10 @@ pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
 
     loop {
         let count = reader.read(&mut buffer).await?;
-
         if count == 0 {
             break;
         }
+
         hasher.update(&buffer[..count]);
 
         pos += count;

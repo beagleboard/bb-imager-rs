@@ -10,11 +10,9 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use crate::{error::Result, util::sha256_file_progress, DownloadFlashingStatus};
-
-const FILE_NAME_TRIES: usize = 10;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -56,6 +54,7 @@ impl Downloader {
         let dirs = ProjectDirs::from("org", "beagleboard", "imagingutility")
             .expect("Failed to find project directories");
 
+        tracing::info!("Cache Dir: {:?}", dirs.cache_dir());
         if let Err(e) = std::fs::create_dir_all(dirs.cache_dir()) {
             if e.kind() != io::ErrorKind::AlreadyExists {
                 panic!(
@@ -69,8 +68,7 @@ impl Downloader {
     }
 
     pub fn check_cache(self, sha256: [u8; 32]) -> Option<PathBuf> {
-        let file_name = const_hex::encode(sha256);
-        let file_path = self.dirs.cache_dir().join(file_name);
+        let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {
             Some(file_path)
@@ -79,20 +77,9 @@ impl Downloader {
         }
     }
 
-    fn image_path(&self, url: &url::Url) -> PathBuf {
-        let file_name: [u8; 32] = Sha256::new()
-            .chain_update(url.as_str())
-            .finalize()
-            .as_slice()
-            .try_into()
-            .expect("SHA-256 is 32 bytes");
-        let file_name = const_hex::encode(file_name);
-        self.dirs.cache_dir().join(file_name)
-    }
-
     pub fn check_image(self, url: &url::Url) -> Option<PathBuf> {
         // Use hash of url for file name
-        let file_path = self.image_path(url);
+        let file_path = self.path_from_url(url);
         if file_path.exists() {
             Some(file_path)
         } else {
@@ -115,35 +102,27 @@ impl Downloader {
             .map_err(|e| Error::JsonError(e.to_string()).into())
     }
 
-    pub async fn download_image(self, url: url::Url) -> Result<PathBuf> {
+    pub async fn download_without_sha(self, url: url::Url) -> Result<PathBuf> {
         // Use hash of url for file name
-        let file_path = self.image_path(&url);
+        let file_path = self.path_from_url(&url);
 
         if file_path.exists() {
             return Ok(file_path);
         }
 
-        let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
+        let mut tmp_file = AsyncTempFile::new()?;
+
         let response = self.client.get(url).send().await.map_err(Error::from)?;
 
         let mut response_stream = response.bytes_stream();
 
         while let Some(x) = response_stream.next().await {
             let mut data = x.map_err(Error::from)?;
-            file.write_all_buf(&mut data).await?;
+            tmp_file.as_mut().write_all_buf(&mut data).await?;
         }
 
-        if !file_path.exists() {
-            tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
-        }
-
+        tmp_file.persist(&file_path).await?;
         Ok(file_path)
-    }
-
-    pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
-        let (tx, _) = tokio::sync::mpsc::channel(1);
-
-        self.download_progress(url, sha256, &tx).await
     }
 
     pub async fn download_progress(
@@ -152,8 +131,7 @@ impl Downloader {
         sha256: [u8; 32],
         chan: &tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     ) -> Result<PathBuf> {
-        let file_name = const_hex::encode(sha256);
-        let file_path = self.dirs.cache_dir().join(file_name);
+        let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {
             let _ = chan.try_send(DownloadFlashingStatus::VerifyingProgress(0.0));
@@ -168,7 +146,7 @@ impl Downloader {
         }
         let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(0.0));
 
-        let (mut file, tmp_file_path) = create_tmp_file(&file_path).await?;
+        let mut tmp_file = AsyncTempFile::new()?;
         let response = self.client.get(url).send().await.map_err(Error::from)?;
 
         let mut cur_pos = 0;
@@ -187,7 +165,7 @@ impl Downloader {
             let mut data = x.map_err(Error::from)?;
             cur_pos += data.len();
             hasher.update(&data);
-            file.write_all_buf(&mut data).await?;
+            tmp_file.as_mut().write_all_buf(&mut data).await?;
 
             let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(
                 (cur_pos as f32) / (response_size as f32),
@@ -207,43 +185,50 @@ impl Downloader {
             return Err(Error::Sha256Error.into());
         }
 
-        tokio::fs::rename(tmp_file_path.path(), &file_path).await?;
+        tmp_file.persist(&file_path).await?;
 
         Ok(file_path)
     }
-}
 
-async fn create_tmp_file(path: &Path) -> Result<(tokio::fs::File, TempFile)> {
-    for i in 0..FILE_NAME_TRIES {
-        let p = path.with_extension(format!("tmp.{}", i));
-        if let Ok(f) = tokio::fs::File::create_new(&p).await {
-            return Ok((f, TempFile::new(p)));
-        }
+    pub async fn download(self, url: url::Url, sha256: [u8; 32]) -> Result<PathBuf> {
+        let (tx, _) = tokio::sync::mpsc::channel(1);
+        self.download_progress(url, sha256, &tx).await
     }
 
-    Err(crate::error::Error::IoError(io::Error::new(
-        io::ErrorKind::Other,
-        "Failed to create tmp file",
-    )))
-}
-
-#[derive(Clone)]
-struct TempFile {
-    path: PathBuf,
-}
-
-impl TempFile {
-    fn new(path: PathBuf) -> Self {
-        Self { path }
+    fn path_from_url(&self, url: &url::Url) -> PathBuf {
+        let file_name: [u8; 32] = Sha256::new()
+            .chain_update(url.as_str())
+            .finalize()
+            .as_slice()
+            .try_into()
+            .expect("SHA-256 is 32 bytes");
+        self.path_from_sha(file_name)
     }
 
-    fn path(&self) -> &Path {
-        &self.path
+    fn path_from_sha(&self, sha256: [u8; 32]) -> PathBuf {
+        let file_name = const_hex::encode(sha256);
+        self.dirs.cache_dir().join(file_name)
     }
 }
 
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+struct AsyncTempFile(tokio::fs::File);
+
+impl AsyncTempFile {
+    fn new() -> Result<Self> {
+        let f = tempfile::tempfile()?;
+        Ok(Self(tokio::fs::File::from_std(f)))
+    }
+
+    async fn persist(&mut self, path: &Path) -> Result<()> {
+        let mut f = tokio::fs::File::create_new(path).await?;
+        self.0.seek(io::SeekFrom::Start(0)).await?;
+        tokio::io::copy(&mut self.0, &mut f).await?;
+        Ok(())
+    }
+}
+
+impl AsMut<tokio::fs::File> for AsyncTempFile {
+    fn as_mut(&mut self) -> &mut tokio::fs::File {
+        &mut self.0
     }
 }

@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
+use bb_imager::DownloadFlashingStatus;
 use iced::{
     widget::{self, button, text},
     Element,
@@ -43,19 +44,28 @@ pub struct ProgressBarState {
     label: Cow<'static, str>,
     progress: f32,
     state: ProgressBarStatus,
+    inner_state: Option<DownloadFlashingStatus>,
 }
 
 impl ProgressBarState {
     pub const FLASHING_SUCCESS: Self =
-        Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success);
-    pub const PREPARING: Self = Self::loading("Preparing...");
-    pub const VERIFYING: Self = Self::loading("Verifying...");
+        Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success, None);
+    pub const PREPARING: Self = Self::loading("Preparing...", DownloadFlashingStatus::Preparing);
+    pub const VERIFYING: Self = Self::loading("Verifying...", DownloadFlashingStatus::Verifying);
+    pub const CUSTOMIZING: Self =
+        Self::loading("Customizing...", DownloadFlashingStatus::Customizing);
 
-    const fn const_new(label: &'static str, progress: f32, state: ProgressBarStatus) -> Self {
+    const fn const_new(
+        label: &'static str,
+        progress: f32,
+        state: ProgressBarStatus,
+        inner_state: Option<DownloadFlashingStatus>,
+    ) -> Self {
         Self {
             label: Cow::Borrowed(label),
             progress,
             state,
+            inner_state,
         }
     }
 
@@ -63,29 +73,36 @@ impl ProgressBarState {
         self.label.to_string()
     }
 
-    fn new(label: impl Into<Cow<'static, str>>, progress: f32, state: ProgressBarStatus) -> Self {
+    fn new(
+        label: impl Into<Cow<'static, str>>,
+        progress: f32,
+        state: ProgressBarStatus,
+        inner_state: Option<DownloadFlashingStatus>,
+    ) -> Self {
         Self {
             label: label.into(),
             progress,
             state,
+            inner_state,
         }
     }
 
     /// Progress should be between 0 to 1.0
-    fn progress(prefix: &'static str, progress: f32) -> Self {
+    fn progress(prefix: &'static str, progress: f32, inner_state: DownloadFlashingStatus) -> Self {
         Self::new(
             format!("{prefix}... {}%", (progress * 100.0).round() as usize),
             progress,
             ProgressBarStatus::Normal,
+            Some(inner_state),
         )
     }
 
-    const fn loading(label: &'static str) -> Self {
-        Self::const_new(label, 0.5, ProgressBarStatus::Loading)
+    const fn loading(label: &'static str, inner_state: DownloadFlashingStatus) -> Self {
+        Self::const_new(label, 0.5, ProgressBarStatus::Loading, Some(inner_state))
     }
 
     pub fn fail(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(label, 1.0, ProgressBarStatus::Fail)
+        Self::new(label, 1.0, ProgressBarStatus::Fail, None)
     }
 
     pub fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
@@ -104,20 +121,40 @@ impl ProgressBarState {
         .padding(30)
         .spacing(10)
     }
+
+    pub fn cancel(&self) -> Option<Self> {
+        let x = match self.inner_state? {
+            DownloadFlashingStatus::Preparing => Self::fail("Preparation cancelled by user"),
+            DownloadFlashingStatus::DownloadingProgress(_) => {
+                Self::fail("Downloading cancelled by user")
+            }
+            DownloadFlashingStatus::FlashingProgress(_) => Self::fail("Flashing cancelled by user"),
+            DownloadFlashingStatus::Verifying | DownloadFlashingStatus::VerifyingProgress(_) => {
+                Self::fail("Verification cancelled by user")
+            }
+            DownloadFlashingStatus::Customizing => Self::fail("Customization cancelled by user"),
+        };
+        Some(x)
+    }
 }
 
-impl From<bb_imager::DownloadFlashingStatus> for ProgressBarState {
-    fn from(value: bb_imager::DownloadFlashingStatus) -> Self {
+impl From<DownloadFlashingStatus> for ProgressBarState {
+    fn from(value: DownloadFlashingStatus) -> Self {
         match value {
-            bb_imager::DownloadFlashingStatus::Preparing => Self::PREPARING,
-            bb_imager::DownloadFlashingStatus::DownloadingProgress(p) => {
-                Self::progress("Downloading Image", p)
+            DownloadFlashingStatus::Preparing => Self::PREPARING,
+            DownloadFlashingStatus::DownloadingProgress(p) => Self::progress(
+                "Downloading Image",
+                p,
+                DownloadFlashingStatus::DownloadingProgress(0.0),
+            ),
+            DownloadFlashingStatus::FlashingProgress(p) => {
+                Self::progress("Flashing", p, DownloadFlashingStatus::FlashingProgress(0.0))
             }
-            bb_imager::DownloadFlashingStatus::FlashingProgress(p) => Self::progress("Flashing", p),
-            bb_imager::DownloadFlashingStatus::Verifying => Self::VERIFYING,
-            bb_imager::DownloadFlashingStatus::VerifyingProgress(p) => {
-                Self::progress("Verifying", p)
+            DownloadFlashingStatus::Verifying => Self::VERIFYING,
+            DownloadFlashingStatus::VerifyingProgress(p) => {
+                Self::progress("Verifying", p, DownloadFlashingStatus::Verifying)
             }
+            DownloadFlashingStatus::Customizing => Self::CUSTOMIZING,
         }
     }
 }

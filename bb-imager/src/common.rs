@@ -15,8 +15,6 @@ use crate::{
     util,
 };
 
-pub(crate) const BUF_SIZE: usize = 128 * 1024;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to Open Destination: {0}")]
@@ -30,6 +28,7 @@ pub enum DownloadFlashingStatus {
     FlashingProgress(f32),
     Verifying,
     VerifyingProgress(f32),
+    Customizing,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -196,6 +195,8 @@ impl Flasher {
                 .await?;
 
                 sd::flash(img, &mut disk, &self.chan, config.verify).await?;
+
+                let _ = self.chan.try_send(DownloadFlashingStatus::Customizing);
                 disk.seek(SeekFrom::Start(0)).await?;
 
                 let mut std_disk = disk.into_std().await;
