@@ -4,7 +4,8 @@ use iced::{
 };
 
 use crate::{
-    helpers::{self, home_btn},
+    constants,
+    helpers::{self, home_btn_svg, home_btn_text},
     BBImagerMessage,
 };
 
@@ -16,15 +17,15 @@ pub fn view<'a>(
     selected_dst: Option<&'a bb_imager::Destination>,
 ) -> Element<'a, BBImagerMessage> {
     let choose_device_btn = match selected_board {
-        Some(x) => home_btn(x, true, iced::Length::Fill),
-        None => home_btn("CHOOSE DEVICE", true, iced::Length::Fill),
+        Some(x) => home_btn_text(x, true, iced::Length::Fill),
+        None => home_btn_text("CHOOSE DEVICE", true, iced::Length::Fill),
     }
     .width(iced::Length::Fill)
     .on_press(BBImagerMessage::SwitchScreen(Screen::BoardSelection));
 
     let choose_image_btn = match selected_image {
-        Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
-        None => home_btn("CHOOSE IMAGE", selected_board.is_some(), iced::Length::Fill),
+        Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
+        None => home_btn_text("CHOOSE IMAGE", selected_board.is_some(), iced::Length::Fill),
     }
     .width(iced::Length::Fill)
     .on_press_maybe(if selected_board.is_none() {
@@ -34,8 +35,8 @@ pub fn view<'a>(
     });
 
     let choose_dst_btn = match selected_dst {
-        Some(x) => home_btn(x.to_string(), true, iced::Length::Fill),
-        None => home_btn(
+        Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
+        None => home_btn_text(
             "CHOOSE DESTINATION",
             selected_image.is_some(),
             iced::Length::Fill,
@@ -48,19 +49,27 @@ pub fn view<'a>(
         Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
     });
 
-    let reset_btn = home_btn("RESET", true, iced::Length::Fill)
+    let reset_btn = home_btn_text("RESET", true, iced::Length::Fill)
         .on_press(BBImagerMessage::Reset)
         .width(iced::Length::Fill);
 
+    let config_btn_active = selected_board.is_some() && selected_image.is_some();
+    let config_btn = home_btn_svg(constants::SETTINGS_ICON, config_btn_active).on_press_maybe(
+        if config_btn_active {
+            Some(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration))
+        } else {
+            None
+        },
+    );
+
     let next_btn_active =
         selected_board.is_none() || selected_image.is_none() || selected_dst.is_none();
-
-    let next_btn = home_btn("NEXT", !next_btn_active, iced::Length::Fill)
+    let next_btn = home_btn_text("WRITE", !next_btn_active, iced::Length::Fill)
         .width(iced::Length::Fill)
         .on_press_maybe(if next_btn_active {
             None
         } else {
-            Some(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration))
+            Some(BBImagerMessage::StartFlashing)
         });
 
     let choice_btn_row = widget::row![
@@ -89,9 +98,11 @@ pub fn view<'a>(
     .align_y(iced::Alignment::Center);
 
     let action_btn_row = widget::row![
-        reset_btn.width(iced::Length::FillPortion(1)),
-        widget::horizontal_space().width(iced::Length::FillPortion(5)),
-        next_btn.width(iced::Length::FillPortion(1))
+        reset_btn,
+        widget::horizontal_space(),
+        config_btn,
+        widget::horizontal_space(),
+        next_btn
     ]
     .padding(48)
     .width(iced::Length::Fill)

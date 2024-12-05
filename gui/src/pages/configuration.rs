@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::{
-    helpers::{self, home_btn},
+    helpers::{self, home_btn_text},
     BBImagerMessage,
 };
 
@@ -17,15 +17,15 @@ pub fn view<'a>(
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
         let action_btn_row = widget::row![
-            home_btn("BACK", true, iced::Length::Fill)
+            home_btn_text("RESET", true, iced::Length::Fill)
+                .style(widget::button::secondary)
+                .width(iced::Length::FillPortion(1))
+                .on_press(BBImagerMessage::ResetConfig),
+            widget::horizontal_space().width(iced::Length::FillPortion(5)),
+            home_btn_text("SAVE", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
                 .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
-            widget::horizontal_space().width(iced::Length::FillPortion(5)),
-            home_btn("WRITE", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::StartFlashing)
         ]
         .padding(32)
         .width(iced::Length::Fill);

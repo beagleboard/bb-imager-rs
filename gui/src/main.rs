@@ -60,7 +60,7 @@ struct BBImager {
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
-    flashing_config: Option<bb_imager::FlashingConfig>,
+    flashing_config: Option<FlashingConfig>,
     flashing_state: Option<pages::flash::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
@@ -80,11 +80,12 @@ enum BBImagerMessage {
     Destinations(HashSet<bb_imager::Destination>),
     RefreshDestinations,
     Reset,
+    ResetConfig,
 
     StartFlashing,
     CancelFlashing,
     StopFlashing(ProgressBarState),
-    UpdateFlashConfig(bb_imager::FlashingConfig),
+    UpdateFlashConfig(FlashingConfig),
 
     OpenUrl(Cow<'static, str>),
 
@@ -174,6 +175,7 @@ impl BBImager {
                 self.selected_dst.take();
                 self.selected_image.take();
                 self.destinations.clear();
+                self.flashing_config.take();
 
                 let icons: HashSet<url::Url> =
                     self.boards.images(&x).map(|x| x.icon.clone()).collect();
@@ -240,6 +242,9 @@ impl BBImager {
                 self.search_bar.clear();
                 self.destinations.clear();
             }
+            BBImagerMessage::ResetConfig => {
+                self.flashing_config = Some(self.config());
+            }
             BBImagerMessage::SwitchScreen(x) => {
                 self.screen = x;
                 match x {
@@ -248,14 +253,9 @@ impl BBImager {
                         return self.refresh_destinations();
                     }
                     Screen::ExtraConfiguration => {
-                        let flasher = self
-                            .boards
-                            .device(self.selected_board.as_ref().expect("Missing board"))
-                            .flasher;
-                        self.flashing_config = Some(FlashingConfig::new(
-                            flasher,
-                            self.selected_image.as_ref().expect("Missing os image"),
-                        ));
+                        if self.flashing_config.is_none() {
+                            self.flashing_config = Some(self.config());
+                        }
                     }
                     _ => {}
                 }
@@ -288,10 +288,7 @@ impl BBImager {
                 let dst = self.selected_dst.clone().expect("No destination selected");
                 let img = self.selected_image.clone().expect("Missing os image");
                 let downloader = self.downloader.clone();
-                let config = self
-                    .flashing_config
-                    .clone()
-                    .expect("Missing flashing config");
+                let config = self.flashing_config.clone().unwrap_or(self.config());
 
                 let s = iced::stream::channel(20, move |mut chan| async move {
                     let _ = chan
@@ -371,6 +368,8 @@ impl BBImager {
     }
 
     fn view(&self) -> Element<BBImagerMessage> {
+        tracing::info!("Config: {:#?}", self.flashing_config);
+
         match &self.screen {
             Screen::Home => pages::home::view(
                 self.selected_board.as_deref(),
@@ -437,6 +436,17 @@ impl BBImager {
         Task::perform(
             async move { flasher.destinations().await },
             BBImagerMessage::Destinations,
+        )
+    }
+
+    fn config(&self) -> FlashingConfig {
+        let flasher = self
+            .boards
+            .device(self.selected_board.as_ref().expect("Missing board"))
+            .flasher;
+        FlashingConfig::new(
+            flasher,
+            self.selected_image.as_ref().expect("Missing os image"),
         )
     }
 }
