@@ -14,4 +14,5 @@ pub enum Screen {
     DestinationSelection,
     ExtraConfiguration,
     Flashing,
+    FlashingConfirmation,
 }

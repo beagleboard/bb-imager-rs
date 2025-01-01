@@ -69,7 +69,7 @@ pub fn view<'a>(
         .on_press_maybe(if next_btn_active {
             None
         } else {
-            Some(BBImagerMessage::StartFlashing)
+            Some(BBImagerMessage::Flash)
         });
 
     let choice_btn_row = widget::row![
