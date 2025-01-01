@@ -9,7 +9,7 @@ use crate::{
     BBImagerMessage,
 };
 
-const ICON_WIDTH: u16 = 80;
+const ICON_WIDTH: u16 = 60;
 
 pub(crate) struct ExtraImageEntry {
     label: &'static str,

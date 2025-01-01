@@ -16,6 +16,8 @@ pub fn view<'a>(
     keymaps: &'a widget::combo_box::State<String>,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
+        const HEADER_FOOTER_HEIGHT: f32 = 150.0;
+
         let action_btn_row = widget::row![
             home_btn_text("RESET", true, iced::Length::Fill)
                 .style(widget::button::secondary)
@@ -27,7 +29,7 @@ pub fn view<'a>(
                 .width(iced::Length::FillPortion(1))
                 .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
         ]
-        .padding(32)
+        .padding(4)
         .width(iced::Length::Fill);
 
         let form = match flashing_config.expect("Missing flashing config") {
@@ -47,7 +49,8 @@ pub fn view<'a>(
         widget::column![
             text("Extra Configuration").size(28),
             widget::horizontal_rule(2),
-            widget::scrollable(form).height(size.height - 210.0),
+            widget::scrollable(form).height(size.height - HEADER_FOOTER_HEIGHT),
+            widget::horizontal_rule(2),
             action_btn_row,
         ]
         .spacing(10)

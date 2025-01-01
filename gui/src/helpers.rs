@@ -11,7 +11,7 @@ use iced::{
 
 use crate::{constants, BBImagerMessage};
 
-const ICON_SIZE: u16 = 48;
+const ICON_SIZE: u16 = 32;
 const PADDING: u16 = 4;
 const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
 
@@ -118,12 +118,10 @@ impl ProgressBarState {
         widget::column![
             text(self.label.clone()).color(iced::Color::WHITE),
             progress_bar(RANGE, self.progress)
-                .height(10)
+                .height(8)
                 .style(self.state.style()),
         ]
         .align_x(iced::Alignment::Center)
-        .padding(30)
-        .spacing(10)
     }
 
     pub fn cancel(&self) -> Option<Self> {
@@ -181,14 +179,6 @@ impl ProgressBarStatus {
             ProgressBarStatus::Loading => widget::progress_bar::primary,
         }
     }
-}
-
-pub fn logo<'a>() -> widget::Container<'a, BBImagerMessage> {
-    widget::container(
-        widget::image(widget::image::Handle::from_bytes(constants::BB_BANNER)).width(500),
-    )
-    .padding(64)
-    .width(iced::Length::Fill)
 }
 
 #[derive(Debug, Clone)]
@@ -310,12 +300,14 @@ pub fn home_btn_text<'a>(
             widget::button::Style {
                 background: Some(iced::Color::WHITE.into()),
                 text_color: iced::Color::parse("#aa5137").expect("unexpected error"),
+                border: iced::border::rounded(4),
                 ..Default::default()
             }
         } else {
             widget::button::Style {
                 background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
                 text_color: iced::Color::BLACK.scale_alpha(0.8),
+                border: iced::border::rounded(4),
                 ..Default::default()
             }
         }
@@ -328,7 +320,7 @@ pub fn home_btn_text<'a>(
             .align_y(iced::Alignment::Center)
             .width(text_width),
     )
-    .padding(16)
+    .padding(8)
     .style(move |_, _| style(active))
 }
 
