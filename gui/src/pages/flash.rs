@@ -2,7 +2,7 @@ use iced::{widget, Element};
 
 use crate::{
     constants,
-    helpers::{self, home_btn, ProgressBarState},
+    helpers::{self, home_btn_text, ProgressBarState},
     BBImagerMessage, Screen,
 };
 
@@ -46,9 +46,10 @@ pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
         let prog_bar = state.progress.bar();
 
         let btn = if running {
-            home_btn("CANCEL", true, iced::Length::Shrink).on_press(BBImagerMessage::CancelFlashing)
+            home_btn_text("CANCEL", true, iced::Length::Shrink)
+                .on_press(BBImagerMessage::CancelFlashing)
         } else {
-            home_btn("HOME", true, iced::Length::Shrink)
+            home_btn_text("HOME", true, iced::Length::Shrink)
                 .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
         };
 

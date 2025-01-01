@@ -60,7 +60,7 @@ struct BBImager {
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
-    flashing_config: Option<bb_imager::FlashingConfig>,
+    flashing_config: Option<FlashingConfig>,
     flashing_state: Option<pages::flash::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
@@ -80,11 +80,14 @@ enum BBImagerMessage {
     Destinations(HashSet<bb_imager::Destination>),
     RefreshDestinations,
     Reset,
+    ResetConfig,
 
+    Flash,
     StartFlashing,
+    StartFlashingWithoutConfiguraton,
     CancelFlashing,
     StopFlashing(ProgressBarState),
-    UpdateFlashConfig(bb_imager::FlashingConfig),
+    UpdateFlashConfig(FlashingConfig),
 
     OpenUrl(Cow<'static, str>),
 
@@ -174,6 +177,7 @@ impl BBImager {
                 self.selected_dst.take();
                 self.selected_image.take();
                 self.destinations.clear();
+                self.flashing_config.take();
 
                 let icons: HashSet<url::Url> =
                     self.boards.images(&x).map(|x| x.icon.clone()).collect();
@@ -240,6 +244,9 @@ impl BBImager {
                 self.search_bar.clear();
                 self.destinations.clear();
             }
+            BBImagerMessage::ResetConfig => {
+                self.flashing_config = Some(self.config());
+            }
             BBImagerMessage::SwitchScreen(x) => {
                 self.screen = x;
                 match x {
@@ -248,14 +255,9 @@ impl BBImager {
                         return self.refresh_destinations();
                     }
                     Screen::ExtraConfiguration => {
-                        let flasher = self
-                            .boards
-                            .device(self.selected_board.as_ref().expect("Missing board"))
-                            .flasher;
-                        self.flashing_config = Some(FlashingConfig::new(
-                            flasher,
-                            self.selected_image.as_ref().expect("Missing os image"),
-                        ));
+                        if self.flashing_config.is_none() {
+                            self.flashing_config = Some(self.config());
+                        }
                     }
                     _ => {}
                 }
@@ -274,59 +276,14 @@ impl BBImager {
                     }
                 }
             }
+            BBImagerMessage::Flash => {
+                self.screen = Screen::FlashingConfirmation;
+            }
             BBImagerMessage::StartFlashing => {
-                let docs_url = &self
-                    .boards
-                    .device(self.selected_board.as_ref().expect("Missing board"))
-                    .documentation;
-                self.screen = Screen::Flashing;
-                self.flashing_state = Some(pages::flash::FlashingState::new(
-                    ProgressBarState::PREPARING,
-                    docs_url.to_string(),
-                ));
-
-                let dst = self.selected_dst.clone().expect("No destination selected");
-                let img = self.selected_image.clone().expect("Missing os image");
-                let downloader = self.downloader.clone();
-                let config = self
-                    .flashing_config
-                    .clone()
-                    .expect("Missing flashing config");
-
-                let s = iced::stream::channel(20, move |mut chan| async move {
-                    let _ = chan
-                        .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
-                        .await;
-
-                    let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-
-                    let flash_task = tokio::spawn(
-                        bb_imager::common::Flasher::new(img, dst, downloader, tx, config)
-                            .download_flash_customize(),
-                    );
-
-                    while let Some(progress) = rx.recv().await {
-                        let _ = chan.try_send(BBImagerMessage::ProgressBar(progress.into()));
-                    }
-
-                    let res = flash_task
-                        .await
-                        .expect("Tokio runtime failed to spawn task");
-                    let res = match res {
-                        Ok(_) => BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS),
-                        Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
-                            "Flashing Failed {e}"
-                        ))),
-                    };
-
-                    let _ = chan.send(res).await;
-                });
-
-                let (t, h) = Task::stream(s).abortable();
-
-                self.cancel_flashing = Some(h);
-
-                return t;
+                return self.start_flashing(self.flashing_config.clone().unwrap());
+            }
+            BBImagerMessage::StartFlashingWithoutConfiguraton => {
+                return self.start_flashing(self.config());
             }
             BBImagerMessage::StopFlashing(x) => {
                 let _ = self.cancel_flashing.take();
@@ -371,6 +328,8 @@ impl BBImager {
     }
 
     fn view(&self) -> Element<BBImagerMessage> {
+        tracing::info!("Config: {:#?}", self.flashing_config);
+
         match &self.screen {
             Screen::Home => pages::home::view(
                 self.selected_board.as_deref(),
@@ -416,6 +375,44 @@ impl BBImager {
                 self.flashing_state.as_ref().unwrap(),
                 self.cancel_flashing.is_some(),
             ),
+            Screen::FlashingConfirmation => {
+                let base = pages::home::view(
+                    self.selected_board.as_deref(),
+                    self.selected_image.as_ref(),
+                    self.selected_dst.as_ref(),
+                );
+                let menu = widget::column![
+                    widget::text("Would you like to apply customization settings?"),
+                    widget::row![
+                        widget::button("Edit Settings")
+                            .on_press(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration)),
+                        widget::button("Yes").on_press_maybe(if self.flashing_config.is_some() {
+                            Some(BBImagerMessage::StartFlashing)
+                        } else {
+                            None
+                        }),
+                        widget::button("No")
+                            .on_press(BBImagerMessage::StartFlashingWithoutConfiguraton),
+                        widget::button("Abort")
+                            .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
+                    ]
+                    .spacing(8)
+                ]
+                .align_x(iced::Alignment::Center)
+                .padding(16)
+                .spacing(16);
+
+                let menu = widget::container(menu)
+                    .style(|_| widget::container::background(iced::Color::WHITE));
+
+                let overlay = widget::opaque(widget::center(menu).style(|_| {
+                    widget::container::background(iced::Color {
+                        a: 0.8,
+                        ..iced::Color::BLACK
+                    })
+                }));
+                widget::stack![base, overlay].into()
+            }
         }
     }
 
@@ -438,5 +435,67 @@ impl BBImager {
             async move { flasher.destinations().await },
             BBImagerMessage::Destinations,
         )
+    }
+
+    fn config(&self) -> FlashingConfig {
+        let flasher = self
+            .boards
+            .device(self.selected_board.as_ref().expect("Missing board"))
+            .flasher;
+        FlashingConfig::new(
+            flasher,
+            self.selected_image.as_ref().expect("Missing os image"),
+        )
+    }
+
+    fn start_flashing(&mut self, config: FlashingConfig) -> Task<BBImagerMessage> {
+        let docs_url = &self
+            .boards
+            .device(self.selected_board.as_ref().expect("Missing board"))
+            .documentation;
+        self.screen = Screen::Flashing;
+        self.flashing_state = Some(pages::flash::FlashingState::new(
+            ProgressBarState::PREPARING,
+            docs_url.to_string(),
+        ));
+
+        let dst = self.selected_dst.clone().expect("No destination selected");
+        let img = self.selected_image.clone().expect("Missing os image");
+        let downloader = self.downloader.clone();
+
+        let s = iced::stream::channel(20, move |mut chan| async move {
+            let _ = chan
+                .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
+                .await;
+
+            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
+
+            let flash_task = tokio::spawn(
+                bb_imager::common::Flasher::new(img, dst, downloader, tx, config)
+                    .download_flash_customize(),
+            );
+
+            while let Some(progress) = rx.recv().await {
+                let _ = chan.try_send(BBImagerMessage::ProgressBar(progress.into()));
+            }
+
+            let res = flash_task
+                .await
+                .expect("Tokio runtime failed to spawn task");
+            let res = match res {
+                Ok(_) => BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS),
+                Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
+                    "Flashing Failed {e}"
+                ))),
+            };
+
+            let _ = chan.send(res).await;
+        });
+
+        let (t, h) = Task::stream(s).abortable();
+
+        self.cancel_flashing = Some(h);
+
+        return t;
     }
 }

@@ -11,6 +11,10 @@ use iced::{
 
 use crate::{constants, BBImagerMessage};
 
+const ICON_SIZE: u16 = 48;
+const PADDING: u16 = 4;
+const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
+
 pub fn input_with_label<'a, F>(
     label: &'static str,
     placeholder: &'static str,
@@ -296,35 +300,73 @@ impl From<&Image> for bb_imager::SelectedImage {
     }
 }
 
-pub fn home_btn<'a>(
+pub fn home_btn_text<'a>(
     txt: impl text::IntoFragment<'a>,
     active: bool,
     text_width: iced::Length,
 ) -> widget::Button<'a, BBImagerMessage> {
-    let btn = button(
+    fn style(active: bool) -> widget::button::Style {
+        if active {
+            widget::button::Style {
+                background: Some(iced::Color::WHITE.into()),
+                text_color: iced::Color::parse("#aa5137").expect("unexpected error"),
+                ..Default::default()
+            }
+        } else {
+            widget::button::Style {
+                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
+                text_color: iced::Color::BLACK.scale_alpha(0.8),
+                ..Default::default()
+            }
+        }
+    }
+
+    button(
         text(txt)
             .font(constants::FONT_BOLD)
             .align_x(iced::Alignment::Center)
             .align_y(iced::Alignment::Center)
             .width(text_width),
     )
-    .padding(16);
+    .padding(16)
+    .style(move |_, _| style(active))
+}
 
-    let style = if active {
-        widget::button::Style {
-            background: Some(iced::Color::WHITE.into()),
-            text_color: iced::Color::parse("#aa5137").expect("unexpected error"),
-            ..Default::default()
+pub fn home_btn_svg<'a>(icon: &'static [u8], active: bool) -> widget::Button<'a, BBImagerMessage> {
+    fn svg_style(active: bool) -> widget::svg::Style {
+        if active {
+            Default::default()
+        } else {
+            widget::svg::Style {
+                color: Some(iced::Color::BLACK.scale_alpha(0.5)),
+            }
         }
-    } else {
-        widget::button::Style {
-            background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-            text_color: iced::Color::BLACK.scale_alpha(0.8),
-            ..Default::default()
-        }
-    };
+    }
 
-    btn.style(move |_, _| style)
+    fn btn_style(active: bool) -> widget::button::Style {
+        if active {
+            widget::button::Style {
+                background: Some(iced::Color::WHITE.into()),
+                border: iced::border::rounded(RADIUS),
+                ..Default::default()
+            }
+        } else {
+            widget::button::Style {
+                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
+                border: iced::border::rounded(RADIUS),
+                ..Default::default()
+            }
+        }
+    }
+
+    button(
+        widget::svg(widget::svg::Handle::from_memory(icon))
+            .style(move |_, _| svg_style(active))
+            .width(ICON_SIZE)
+            .height(ICON_SIZE),
+    )
+    .style(move |_, _| btn_style(active))
+    .padding(PADDING)
 }
 
 pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
