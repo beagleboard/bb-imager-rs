@@ -75,9 +75,9 @@ where
                 .spacing(10),
             )
             .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::SelectImage(
+            .on_press(BBImagerMessage::SelectImage(helpers::BoardImage::Image(
                 bb_imager::SelectedImage::from(x),
-            ))
+            )))
             .style(widget::button::secondary)
         })
         .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))

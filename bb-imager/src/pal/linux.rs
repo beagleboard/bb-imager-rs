@@ -14,80 +14,62 @@ pub enum Error {
     DbusClientError(#[from] udisks2::zbus::Error),
 }
 
-impl crate::common::Destination {
-    pub async fn format(&self) -> crate::error::Result<()> {
-        if let Self::SdCard { path, .. } = self {
-            let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
+pub(crate) async fn format_sd(dst: &str) -> crate::error::Result<()> {
+    let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
-            let devs = dbus_client
-                .manager()
-                .resolve_device(
-                    HashMap::from([("path", path.as_str().into())]),
-                    HashMap::new(),
-                )
-                .await
-                .map_err(Error::from)?;
+    let devs = dbus_client
+        .manager()
+        .resolve_device(HashMap::from([("path", dst.into())]), HashMap::new())
+        .await
+        .map_err(Error::from)?;
 
-            let block = devs
-                .first()
-                .ok_or(Error::FailedToOpenDestionation(path.clone()))?
-                .to_owned();
+    let block = devs
+        .first()
+        .ok_or(Error::FailedToOpenDestionation(dst.to_string()))?
+        .to_owned();
 
-            let obj = dbus_client
-                .object(block)
-                .expect("Unexpected error")
-                .block()
-                .await
-                .map_err(Error::from)?;
+    let obj = dbus_client
+        .object(block)
+        .expect("Unexpected error")
+        .block()
+        .await
+        .map_err(Error::from)?;
 
-            obj.format(
-                "vfat",
-                HashMap::from([("update-partition-type", true.into())]),
-            )
-            .await
-            .map_err(Error::from)?;
+    obj.format(
+        "vfat",
+        HashMap::from([("update-partition-type", true.into())]),
+    )
+    .await
+    .map_err(Error::from)?;
 
-            Ok(())
-        } else {
-            unreachable!()
-        }
-    }
+    Ok(())
+}
 
-    pub async fn open(&self) -> crate::error::Result<tokio::fs::File> {
-        if let Self::SdCard { path, .. } = self {
-            let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
+pub(crate) async fn open_sd(dst: &str) -> crate::error::Result<tokio::fs::File> {
+    let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
-            let devs = dbus_client
-                .manager()
-                .resolve_device(
-                    HashMap::from([("path", path.as_str().into())]),
-                    HashMap::new(),
-                )
-                .await
-                .map_err(Error::from)?;
+    let devs = dbus_client
+        .manager()
+        .resolve_device(HashMap::from([("path", dst.into())]), HashMap::new())
+        .await
+        .map_err(Error::from)?;
 
-            let block = devs
-                .first()
-                .ok_or(Error::FailedToOpenDestionation(path.clone()))?
-                .to_owned();
+    let block = devs
+        .first()
+        .ok_or(Error::FailedToOpenDestionation(dst.to_string()))?
+        .to_owned();
 
-            let obj = dbus_client
-                .object(block)
-                .expect("Unexpected error")
-                .block()
-                .await
-                .map_err(Error::from)?;
+    let obj = dbus_client
+        .object(block)
+        .expect("Unexpected error")
+        .block()
+        .await
+        .map_err(Error::from)?;
 
-            let fd = obj
-                .open_device("rw", Default::default())
-                .await
-                .map_err(Error::from)?;
+    let fd = obj
+        .open_device("rw", Default::default())
+        .await
+        .map_err(Error::from)?;
 
-            Ok(unsafe {
-                tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd())
-            })
-        } else {
-            unreachable!()
-        }
-    }
+    Ok(unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
 }

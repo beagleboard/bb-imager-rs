@@ -84,27 +84,6 @@ impl Drop for WinDriveStd {
     }
 }
 
-impl crate::common::Destination {
-    pub async fn format(&self) -> crate::error::Result<()> {
-        if let Self::SdCard { path, .. } = self {
-            tracing::debug!("Trying to format {path}");
-            diskpart_format(path)
-                .await
-                .map_err(|e| Error::FailedToFormat(e.to_string()).into())
-        } else {
-            unreachable!()
-        }
-    }
-
-    pub(crate) async fn open(&self) -> crate::error::Result<WinDrive> {
-        if let Self::SdCard { path, .. } = self {
-            WinDrive::open(path).await
-        } else {
-            unreachable!()
-        }
-    }
-}
-
 async fn open_and_lock_volume(path: &str) -> crate::error::Result<File> {
     let volume = OpenOptions::new().read(true).write(true).open(path).await?;
 
@@ -269,4 +248,15 @@ impl std::io::Seek for WinDriveStd {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         self.drive.seek(pos)
     }
+}
+
+pub(crate) async fn format_sd(dst: &str) -> crate::error::Result<()> {
+    tracing::debug!("Trying to format {dst}");
+    diskpart_format(dst)
+        .await
+        .map_err(|e| Error::FailedToFormat(e.to_string()).into())
+}
+
+pub(crate) async fn open_sd(dst: &str) -> crate::error::Result<WinDrive> {
+    WinDrive::open(dst).await
 }

@@ -143,8 +143,8 @@ impl MSP430 {
     }
 }
 
-fn load_bsl(dst: &crate::Destination) -> Result<()> {
-    let msp430 = MSP430(dst.open_hidraw()?);
+fn load_bsl(dst: &std::ffi::CStr) -> Result<()> {
+    let msp430 = MSP430(open_hidraw(dst)?);
 
     tracing::info!("Mass Erase");
     msp430.mass_erase()?;
@@ -168,18 +168,18 @@ fn load_bsl(dst: &crate::Destination) -> Result<()> {
 
 pub fn flash(
     img: bin_file::BinFile,
-    dst: crate::Destination,
+    dst: &std::ffi::CStr,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<()> {
     let _ = chan.try_send(crate::DownloadFlashingStatus::Preparing);
 
-    load_bsl(&dst)?;
+    load_bsl(dst)?;
 
     std::thread::sleep(Duration::from_secs(1));
 
     let _ = chan.try_send(crate::DownloadFlashingStatus::FlashingProgress(0.5));
 
-    let msp430 = MSP430(dst.open_hidraw()?);
+    let msp430 = MSP430(open_hidraw(dst)?);
 
     tracing::info!("Get BSL Version");
     msp430.bsl_version()?;
@@ -196,4 +196,12 @@ pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
         .filter(|x| x.vendor_id() == VID && x.product_id() == PID)
         .map(|x| crate::Destination::hidraw(x.path().to_owned()))
         .collect()
+}
+
+pub fn open_hidraw(dst: &std::ffi::CStr) -> crate::error::Result<hidapi::HidDevice> {
+    hidapi::HidApi::new()
+        .map_err(|e| crate::Error::FailedToOpenDestination(e.to_string()))?
+        .open_path(dst)
+        .map_err(|e| crate::Error::FailedToOpenDestination(e.to_string()))
+        .map_err(Into::into)
 }

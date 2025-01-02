@@ -125,6 +125,11 @@ impl FlashingSdLinuxConfig {
         &self,
         dst: &mut D,
     ) -> crate::error::Result<()> {
+        // Check if any customization needs to be applied
+        if !self.has_customization() {
+            return Ok(());
+        }
+
         let boot_partition = {
             let mbr = mbrman::MBR::read_from(dst, 512)
                 .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
@@ -145,76 +150,61 @@ impl FlashingSdLinuxConfig {
 
         let boot_root = boot_partition.root_dir();
 
-        if self.hostname.is_some()
-            || self.timezone.is_some()
-            || self.keymap.is_some()
-            || self.user.is_some()
-            || self.wifi.is_some()
-        {
-            let mut sysconf = boot_root
-                .create_file("sysconf.txt")
-                .map_err(|e| Error::Customization(format!("Failed to create sysconf.txt: {e}")))?;
-            sysconf.seek(SeekFrom::End(0)).map_err(|e| {
-                Error::Customization(format!("Failed to seek to end of sysconf.txt: {e}"))
-            })?;
+        let mut sysconf = boot_root
+            .create_file("sysconf.txt")
+            .map_err(|e| Error::Customization(format!("Failed to create sysconf.txt: {e}")))?;
+        sysconf.seek(SeekFrom::End(0)).map_err(|e| {
+            Error::Customization(format!("Failed to seek to end of sysconf.txt: {e}"))
+        })?;
 
-            if let Some(h) = &self.hostname {
-                sysconf
-                    .write_all(format!("hostname={h}\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!(
-                            "Failed to write hostname to sysconf.txt: {e}"
-                        ))
-                    })?;
-            }
+        if let Some(h) = &self.hostname {
+            sysconf
+                .write_all(format!("hostname={h}\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!("Failed to write hostname to sysconf.txt: {e}"))
+                })?;
+        }
 
-            if let Some(tz) = &self.timezone {
-                sysconf
-                    .write_all(format!("timezone={tz}\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!(
-                            "Failed to write timezone to sysconf.txt: {e}"
-                        ))
-                    })?;
-            }
+        if let Some(tz) = &self.timezone {
+            sysconf
+                .write_all(format!("timezone={tz}\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!("Failed to write timezone to sysconf.txt: {e}"))
+                })?;
+        }
 
-            if let Some(k) = &self.keymap {
-                sysconf
-                    .write_all(format!("keymap={k}\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!("Failed to write keymap to sysconf.txt: {e}"))
-                    })?;
-            }
+        if let Some(k) = &self.keymap {
+            sysconf
+                .write_all(format!("keymap={k}\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!("Failed to write keymap to sysconf.txt: {e}"))
+                })?;
+        }
 
-            if let Some((u, p)) = &self.user {
-                sysconf
-                    .write_all(format!("user_name={u}\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!(
-                            "Failed to write user_name to sysconf.txt: {e}"
-                        ))
-                    })?;
-                sysconf
-                    .write_all(format!("user_password={p}\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!(
-                            "Failed to write user_password to sysconf.txt: {e}"
-                        ))
-                    })?;
-            }
-
-            if let Some((ssid, _)) = &self.wifi {
-                sysconf
-                    .write_all(format!("iwd_psk_file={ssid}.psk\n").as_bytes())
-                    .map_err(|e| {
-                        Error::Customization(format!(
-                            "Failed to write iwd_psk_file to sysconf.txt: {e}"
-                        ))
-                    })?;
-            }
+        if let Some((u, p)) = &self.user {
+            sysconf
+                .write_all(format!("user_name={u}\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!("Failed to write user_name to sysconf.txt: {e}"))
+                })?;
+            sysconf
+                .write_all(format!("user_password={p}\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!(
+                        "Failed to write user_password to sysconf.txt: {e}"
+                    ))
+                })?;
         }
 
         if let Some((ssid, psk)) = &self.wifi {
+            sysconf
+                .write_all(format!("iwd_psk_file={ssid}.psk\n").as_bytes())
+                .map_err(|e| {
+                    Error::Customization(format!(
+                        "Failed to write iwd_psk_file to sysconf.txt: {e}"
+                    ))
+                })?;
+
             let mut wifi_file = boot_root
                 .create_file(format!("services/{ssid}.psk").as_str())
                 .map_err(|e| Error::Customization(format!("Failed to create iwd_psk_file: {e}")))?;
@@ -261,6 +251,14 @@ impl FlashingSdLinuxConfig {
         self.wifi = v;
         self
     }
+
+    const fn has_customization(&self) -> bool {
+        self.hostname.is_some()
+            || self.timezone.is_some()
+            || self.keymap.is_some()
+            || self.user.is_some()
+            || self.wifi.is_some()
+    }
 }
 
 impl Default for FlashingSdLinuxConfig {
@@ -274,4 +272,36 @@ impl Default for FlashingSdLinuxConfig {
             wifi: Default::default(),
         }
     }
+}
+
+pub(crate) async fn format(dst: &str) -> crate::error::Result<()> {
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            crate::pal::linux::format_sd(dst).await
+        } else if #[cfg(target_os = "macos")] {
+            crate::pal::macos::format_sd(dst).await
+        } else if #[cfg(windows)] {
+            crate::pal::windows::format_sd(dst).await
+        } else {
+            unimplemented!()
+        }
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub(crate) async fn open(dst: &str) -> crate::error::Result<tokio::fs::File> {
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            crate::pal::linux::open_sd(dst).await
+        } else if #[cfg(target_os = "macos")] {
+            crate::pal::macos::open_sd(dst).await
+        } else {
+            unimplemented!()
+        }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) async fn open(dst: &str) -> crate::error::Result<crate::pal::windows::WinDrive> {
+    crate::pal::windows::open_sd(dst).await
 }

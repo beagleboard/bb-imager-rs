@@ -1,6 +1,10 @@
+use iced::color;
+
 pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
+pub const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub const APP_NAME: &str = "BeagleBoard Imager";
+pub const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
 
 // Icons
 pub const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
@@ -13,8 +17,7 @@ pub const REFRESH_ICON: &[u8] = include_bytes!("../assets/icons/refresh.svg");
 pub const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
 pub const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings.svg");
 
-pub const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
-
+// Font
 pub const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");
 pub const FONT_BOLD: iced::Font = {
     let mut font = FONT_REGULAR;
@@ -25,7 +28,8 @@ pub const FONT_BOLD: iced::Font = {
 pub const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
 pub const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
 
-pub const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
+// Theme
+pub const BEAGLE_BRAND_COLOR: iced::Color = color!(170, 81, 55);
 
 pub const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",

@@ -69,9 +69,7 @@ pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
             .height(iced::Length::Fill)
             .align_x(iced::Alignment::Center),
         )
-        .style(|_| {
-            widget::container::background(iced::Color::parse("#aa5137").expect("unexpected error"))
-        });
+        .style(|_| widget::container::background(constants::BEAGLE_BRAND_COLOR));
 
         widget::column![
             widget::container(

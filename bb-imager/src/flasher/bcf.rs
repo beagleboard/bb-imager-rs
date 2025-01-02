@@ -8,7 +8,7 @@ use std::{
 use crate::{error::Result, util};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio_serial::SerialPort;
+use tokio_serial::{SerialPort, SerialPortBuilderExt};
 use tracing::{error, info, warn};
 
 const ACK: u8 = 0xcc;
@@ -316,10 +316,11 @@ fn open_firmware(mut img: crate::img::OsImage) -> Result<Vec<u8>> {
 
 pub async fn flash(
     img: crate::img::OsImage,
-    port: tokio_serial::SerialStream,
+    port: &str,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
-    verify: bool,
+    verify: bool
 ) -> Result<()> {
+    let port = open_port(port)?;
     let mut bcf = BeagleConnectFreedom::new(port).await?;
     info!("BeagleConnectFreedom Connected");
 
@@ -415,4 +416,14 @@ impl Default for FlashingBcfConfig {
     fn default() -> Self {
         Self { verify: true }
     }
+}
+
+fn open_port(path: &str) -> crate::error::Result<tokio_serial::SerialStream> {
+    tokio_serial::new(path, 500000)
+        .timeout(Duration::from_millis(500))
+        .open_native_async()
+        .map_err(|_| {
+            crate::Error::FailedToOpenDestination(format!("Failed to open serial port {}", path))
+        })
+        .map_err(Into::into)
 }
