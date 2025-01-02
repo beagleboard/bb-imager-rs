@@ -299,7 +299,7 @@ pub fn home_btn_text<'a>(
         if active {
             widget::button::Style {
                 background: Some(iced::Color::WHITE.into()),
-                text_color: iced::Color::parse("#aa5137").expect("unexpected error"),
+                text_color: constants::BEAGLE_BRAND_COLOR,
                 border: iced::border::rounded(4),
                 ..Default::default()
             }

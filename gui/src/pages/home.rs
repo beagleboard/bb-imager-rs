@@ -116,9 +116,7 @@ pub fn view<'a>(
             .align_x(iced::Alignment::Center),
         )
         .padding([0.0, size.width * 0.05])
-        .style(|_| {
-            widget::container::background(iced::Color::parse("#aa5137").expect("unexpected error"))
-        });
+        .style(|_| widget::container::background(constants::BEAGLE_BRAND_COLOR));
 
         widget::column![
             widget::container(
