@@ -5,7 +5,7 @@ use iced::{
 
 use crate::{
     constants,
-    helpers::{home_btn_svg, home_btn_text},
+    helpers::{self, home_btn_svg, home_btn_text},
     BBImagerMessage,
 };
 
@@ -13,7 +13,7 @@ use super::Screen;
 
 pub fn view<'a>(
     selected_board: Option<&'a str>,
-    selected_image: Option<&'a bb_imager::common::SelectedImage>,
+    selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a bb_imager::Destination>,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {

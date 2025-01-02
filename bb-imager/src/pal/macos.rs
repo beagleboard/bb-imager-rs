@@ -19,23 +19,6 @@ pub enum Error {
     FailedToOpenDestionation(String),
 }
 
-impl crate::common::Destination {
-    pub async fn format(&self) -> crate::error::Result<()> {
-        todo!()
-    }
-
-    pub async fn open(&self) -> crate::error::Result<File> {
-        if let Self::SdCard { path, .. } = self {
-            let path = path.clone();
-            tokio::task::spawn_blocking(move || open_auth(path))
-                .await
-                .expect("Tokio runtime failed to spawn blocking task")
-        } else {
-            unreachable!()
-        }
-    }
-}
-
 fn open_auth(path: String) -> crate::error::Result<File> {
     let rights = AuthorizationItemSetBuilder::new()
         .add_right(format!("sys.openfile.readwrite.{}", &path))
@@ -223,4 +206,15 @@ pub(crate) mod rs_drivelist {
 
         Ok(devices)
     }
+}
+
+pub(crate) async fn format_sd(dst: &str) -> crate::error::Result<()> {
+    todo!()
+}
+
+pub(crate) async fn open_sd(dst: &str) -> crate::error::Result<tokio::fs::File> {
+    let path = dst.to_string();
+    tokio::task::spawn_blocking(move || open_auth(path))
+        .await
+        .expect("Tokio runtime failed to spawn blocking task")
 }

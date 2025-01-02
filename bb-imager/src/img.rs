@@ -46,7 +46,6 @@ impl OsImage {
                     .await?;
                 tokio::task::block_in_place(move || Self::from_path(&p))
             }
-            _ => panic!("No image selected"),
         }
     }
 

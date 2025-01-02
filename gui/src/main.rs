@@ -2,10 +2,9 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use bb_imager::FlashingConfig;
-use helpers::ProgressBarState;
+use helpers::{ProgressBarState, Tainted};
 use iced::{futures::SinkExt, widget, Element, Task};
-use pages::Screen;
+use pages::{configuration::FlashingCustomization, Screen};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod constants;
@@ -55,12 +54,12 @@ struct BBImager {
     downloader: bb_imager::download::Downloader,
     screen: Screen,
     selected_board: Option<String>,
-    selected_image: Option<bb_imager::common::SelectedImage>,
+    selected_image: Option<helpers::BoardImage>,
     selected_dst: Option<bb_imager::Destination>,
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
-    flashing_config: Option<FlashingConfig>,
+    customization: Option<Tainted<FlashingCustomization>>,
     flashing_state: Option<pages::flash::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
@@ -71,7 +70,7 @@ struct BBImager {
 enum BBImagerMessage {
     UpdateConfig(helpers::Boards),
     BoardSelected(String),
-    SelectImage(bb_imager::SelectedImage),
+    SelectImage(helpers::BoardImage),
     SelectLocalImage,
     SelectPort(bb_imager::Destination),
     ProgressBar(ProgressBarState),
@@ -87,7 +86,7 @@ enum BBImagerMessage {
     StartFlashingWithoutConfiguraton,
     CancelFlashing,
     StopFlashing(ProgressBarState),
-    UpdateFlashConfig(FlashingConfig),
+    UpdateFlashConfig(FlashingCustomization),
 
     OpenUrl(Cow<'static, str>),
 
@@ -177,7 +176,7 @@ impl BBImager {
                 self.selected_dst.take();
                 self.selected_image.take();
                 self.destinations.clear();
-                self.flashing_config.take();
+                self.customization.take();
 
                 let icons: HashSet<url::Url> =
                     self.boards.images(&x).map(|x| x.icon.clone()).collect();
@@ -228,7 +227,9 @@ impl BBImager {
                             .map(|x| x.path().to_path_buf())
                     },
                     |x| match x {
-                        Some(y) => BBImagerMessage::SelectImage(bb_imager::SelectedImage::local(y)),
+                        Some(y) => BBImagerMessage::SelectImage(helpers::BoardImage::Image(
+                            bb_imager::SelectedImage::local(y),
+                        )),
                         None => BBImagerMessage::Null,
                     },
                 );
@@ -245,7 +246,7 @@ impl BBImager {
                 self.destinations.clear();
             }
             BBImagerMessage::ResetConfig => {
-                self.flashing_config = Some(self.config());
+                self.customization = Some(Tainted::new(self.config()));
             }
             BBImagerMessage::SwitchScreen(x) => {
                 self.screen = x;
@@ -255,8 +256,8 @@ impl BBImager {
                         return self.refresh_destinations();
                     }
                     Screen::ExtraConfiguration => {
-                        if self.flashing_config.is_none() {
-                            self.flashing_config = Some(self.config());
+                        if self.customization.is_none() {
+                            self.customization = Some(Tainted::new(self.config()))
                         }
                     }
                     _ => {}
@@ -280,10 +281,11 @@ impl BBImager {
                 self.screen = Screen::FlashingConfirmation;
             }
             BBImagerMessage::StartFlashing => {
-                return self.start_flashing(self.flashing_config.clone().unwrap());
+                return self
+                    .start_flashing(Some(self.customization.as_ref().unwrap().as_ref().clone()));
             }
             BBImagerMessage::StartFlashingWithoutConfiguraton => {
-                return self.start_flashing(self.config());
+                return self.start_flashing(None);
             }
             BBImagerMessage::StopFlashing(x) => {
                 let _ = self.cancel_flashing.take();
@@ -313,7 +315,9 @@ impl BBImager {
             BBImagerMessage::RefreshDestinations => {
                 return self.refresh_destinations();
             }
-            BBImagerMessage::UpdateFlashConfig(x) => self.flashing_config = Some(x),
+            BBImagerMessage::UpdateFlashConfig(x) => {
+                self.customization = Some(Tainted::new_tainted(x))
+            }
             BBImagerMessage::OpenUrl(x) => {
                 return Task::future(async move {
                     let res = webbrowser::open(&x);
@@ -353,9 +357,7 @@ impl BBImager {
                         pages::image_selection::ExtraImageEntry::new(
                             "Format Sd Card",
                             constants::FORMAT_ICON,
-                            BBImagerMessage::SelectImage(bb_imager::SelectedImage::Null(
-                                "Format Sd Card",
-                            )),
+                            BBImagerMessage::SelectImage(helpers::BoardImage::SdFormat),
                         ),
                     ]
                     .into_iter(),
@@ -365,7 +367,7 @@ impl BBImager {
                 pages::destination_selection::view(self.destinations.iter(), &self.search_bar)
             }
             Screen::ExtraConfiguration => pages::configuration::view(
-                self.flashing_config.as_ref(),
+                self.customization.as_ref().unwrap().as_ref(),
                 &self.timezones,
                 &self.keymaps,
             ),
@@ -384,11 +386,13 @@ impl BBImager {
                     widget::row![
                         widget::button("Edit Settings")
                             .on_press(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration)),
-                        widget::button("Yes").on_press_maybe(if self.flashing_config.is_some() {
-                            Some(BBImagerMessage::StartFlashing)
-                        } else {
-                            None
-                        }),
+                        widget::button("Yes").on_press_maybe(
+                            if self.customization.as_ref().map(|x| x.is_tainted()) == Some(true) {
+                                Some(BBImagerMessage::StartFlashing)
+                            } else {
+                                None
+                            }
+                        ),
                         widget::button("No")
                             .on_press(BBImagerMessage::StartFlashingWithoutConfiguraton),
                         widget::button("Abort")
@@ -435,18 +439,62 @@ impl BBImager {
         )
     }
 
-    fn config(&self) -> FlashingConfig {
+    fn config(&self) -> FlashingCustomization {
         let flasher = self
             .boards
             .device(self.selected_board.as_ref().expect("Missing board"))
             .flasher;
-        FlashingConfig::new(
+        FlashingCustomization::new(
             flasher,
             self.selected_image.as_ref().expect("Missing os image"),
         )
     }
 
-    fn start_flashing(&mut self, config: FlashingConfig) -> Task<BBImagerMessage> {
+    fn flashing_config(
+        &self,
+        customization: FlashingCustomization,
+    ) -> bb_imager::common::FlashingConfig {
+        match (
+            self.selected_image.clone(),
+            customization,
+            self.selected_dst.clone(),
+        ) {
+            (
+                Some(helpers::BoardImage::SdFormat),
+                FlashingCustomization::LinuxSdFormat,
+                Some(bb_imager::Destination::SdCard { path, .. }),
+            ) => bb_imager::common::FlashingConfig::LinuxSdFormat { dst: path },
+            (
+                Some(helpers::BoardImage::Image(img)),
+                FlashingCustomization::LinuxSd(customization),
+                Some(bb_imager::Destination::SdCard { path, .. }),
+            ) => bb_imager::common::FlashingConfig::LinuxSd {
+                img,
+                dst: path,
+                customization,
+            },
+            (
+                Some(helpers::BoardImage::Image(img)),
+                FlashingCustomization::Bcf(customization),
+                Some(bb_imager::Destination::Port(port)),
+            ) => bb_imager::common::FlashingConfig::BeagleConnectFreedom {
+                img,
+                port,
+                customization,
+            },
+            (
+                Some(helpers::BoardImage::Image(img)),
+                FlashingCustomization::Msp430,
+                Some(bb_imager::Destination::HidRaw(port)),
+            ) => bb_imager::common::FlashingConfig::Msp430 { img, port },
+            _ => unreachable!(),
+        }
+    }
+
+    fn start_flashing(
+        &mut self,
+        customization: Option<FlashingCustomization>,
+    ) -> Task<BBImagerMessage> {
         let docs_url = &self
             .boards
             .device(self.selected_board.as_ref().expect("Missing board"))
@@ -457,9 +505,9 @@ impl BBImager {
             docs_url.to_string(),
         ));
 
-        let dst = self.selected_dst.clone().expect("No destination selected");
-        let img = self.selected_image.clone().expect("Missing os image");
         let downloader = self.downloader.clone();
+
+        let config = self.flashing_config(customization.unwrap_or(self.config()));
 
         let s = iced::stream::channel(20, move |mut chan| async move {
             let _ = chan
@@ -468,10 +516,7 @@ impl BBImager {
 
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
-            let flash_task = tokio::spawn(
-                bb_imager::common::Flasher::new(img, dst, downloader, tx, config)
-                    .download_flash_customize(),
-            );
+            let flash_task = tokio::spawn(config.download_flash_customize(downloader, tx));
 
             while let Some(progress) = rx.recv().await {
                 let _ = chan.try_send(BBImagerMessage::ProgressBar(progress.into()));
@@ -494,6 +539,6 @@ impl BBImager {
 
         self.cancel_flashing = Some(h);
 
-        return t;
+        t
     }
 }

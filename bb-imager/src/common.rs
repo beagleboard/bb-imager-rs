@@ -4,11 +4,9 @@ use std::{
     ffi::CString,
     io::{Read, SeekFrom},
     path::PathBuf,
-    time::Duration,
 };
 use thiserror::Error;
 use tokio::io::AsyncSeekExt;
-use tokio_serial::SerialPortBuilderExt;
 
 use crate::{
     flasher::{bcf, msp430, sd},
@@ -63,32 +61,6 @@ impl Destination {
         Self::HidRaw(path)
     }
 
-    pub fn open_port(&self) -> crate::error::Result<tokio_serial::SerialStream> {
-        if let Self::Port(path) = self {
-            tokio_serial::new(path, 500000)
-                .timeout(Duration::from_millis(500))
-                .open_native_async()
-                .map_err(|_| {
-                    Error::FailedToOpenDestination(format!("Failed to open serial port {}", path))
-                })
-                .map_err(Into::into)
-        } else {
-            unreachable!()
-        }
-    }
-
-    pub fn open_hidraw(&self) -> crate::error::Result<hidapi::HidDevice> {
-        if let Self::HidRaw(path) = self {
-            hidapi::HidApi::new()
-                .map_err(|e| Error::FailedToOpenDestination(e.to_string()))?
-                .open_path(path)
-                .map_err(|e| Error::FailedToOpenDestination(e.to_string()))
-                .map_err(Into::into)
-        } else {
-            unreachable!()
-        }
-    }
-
     pub fn path(&self) -> PathBuf {
         match self {
             Destination::Port(p) => PathBuf::from(p),
@@ -108,7 +80,7 @@ impl std::fmt::Display for Destination {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SelectedImage {
     Local(PathBuf),
     Remote {
@@ -116,8 +88,6 @@ pub enum SelectedImage {
         url: url::Url,
         extract_sha256: [u8; 32],
     },
-    /// For cases like formatting where no image needs to be selected.
-    Null(&'static str),
 }
 
 impl SelectedImage {
@@ -145,7 +115,6 @@ impl std::fmt::Display for SelectedImage {
                     .to_string_lossy()
             ),
             SelectedImage::Remote { name, .. } => write!(f, "{}", name),
-            SelectedImage::Null(x) => write!(f, "{}", x),
         }
     }
 }
@@ -156,75 +125,67 @@ impl From<&crate::config::OsList> for SelectedImage {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Flasher {
-    img: SelectedImage,
-    dst: crate::Destination,
-    downloader: crate::download::Downloader,
-    chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
-    config: FlashingConfig,
+pub enum FlashingConfig {
+    LinuxSdFormat {
+        dst: String,
+    },
+    LinuxSd {
+        img: SelectedImage,
+        dst: String,
+        customization: sd::FlashingSdLinuxConfig,
+    },
+    BeagleConnectFreedom {
+        img: SelectedImage,
+        port: String,
+        customization: bcf::FlashingBcfConfig,
+    },
+    Msp430 {
+        img: SelectedImage,
+        port: std::ffi::CString,
+    },
 }
 
-impl Flasher {
-    pub const fn new(
-        img: SelectedImage,
-        dst: crate::Destination,
+impl FlashingConfig {
+    pub async fn download_flash_customize(
+        self,
         downloader: crate::download::Downloader,
         chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
-        config: FlashingConfig,
-    ) -> Self {
-        Self {
-            img,
-            dst,
-            downloader,
-            chan,
-            config,
-        }
-    }
+    ) -> crate::error::Result<()> {
+        match self {
+            FlashingConfig::LinuxSdFormat { dst } => sd::format(&dst).await,
+            FlashingConfig::LinuxSd {
+                img,
+                dst,
+                customization,
+            } => {
+                let mut disk = sd::open(&dst).await?;
+                let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-    pub async fn download_flash_customize(self) -> crate::error::Result<()> {
-        match self.config {
-            FlashingConfig::LinuxSd(None) => self.dst.format().await,
-            FlashingConfig::LinuxSd(Some(config)) => {
-                let mut disk = self.dst.open().await?;
-                let img = crate::img::OsImage::from_selected_image(
-                    self.img,
-                    &self.downloader,
-                    &self.chan,
-                )
-                .await?;
+                sd::flash(img, &mut disk, &chan, customization.verify).await?;
 
-                sd::flash(img, &mut disk, &self.chan, config.verify).await?;
-
-                let _ = self.chan.try_send(DownloadFlashingStatus::Customizing);
+                let _ = chan.try_send(DownloadFlashingStatus::Customizing);
                 disk.seek(SeekFrom::Start(0)).await?;
 
                 let mut std_disk = disk.into_std().await;
 
-                tokio::task::spawn_blocking(move || config.customize(&mut std_disk))
+                tokio::task::spawn_blocking(move || customization.customize(&mut std_disk))
                     .await
                     .expect("Tokio runtime failed to spawn blocking task")
             }
-            FlashingConfig::Bcf(config) => {
-                let port = self.dst.open_port()?;
+            FlashingConfig::BeagleConnectFreedom {
+                img,
+                port,
+                customization,
+            } => {
                 tracing::info!("Port opened");
-                let img = crate::img::OsImage::from_selected_image(
-                    self.img,
-                    &self.downloader,
-                    &self.chan,
-                )
-                .await?;
+                let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
                 tracing::info!("Image opened");
 
-                bcf::flash(img, port, &self.chan, config.verify).await
+                bcf::flash(img, &port, &chan, customization.verify).await
             }
-            FlashingConfig::Msp430 => {
-                let mut img = crate::img::OsImage::from_selected_image(
-                    self.img,
-                    &self.downloader,
-                    &self.chan,
-                )
-                .await?;
+            FlashingConfig::Msp430 { img, port } => {
+                let mut img =
+                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
                 tracing::info!("Image opened");
 
                 let mut data = String::new();
@@ -234,30 +195,10 @@ impl Flasher {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
-                tokio::task::spawn_blocking(move || msp430::flash(bin, self.dst, &self.chan))
+                tokio::task::spawn_blocking(move || msp430::flash(bin, &port, &chan))
                     .await
                     .expect("Tokio runtime failed to spawn blocking task")
             }
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum FlashingConfig {
-    LinuxSd(Option<sd::FlashingSdLinuxConfig>),
-    Bcf(bcf::FlashingBcfConfig),
-    Msp430,
-}
-
-impl FlashingConfig {
-    pub fn new(flasher: crate::config::Flasher, image: &SelectedImage) -> Self {
-        match flasher {
-            crate::config::Flasher::SdCard => match image {
-                SelectedImage::Null(_) => Self::LinuxSd(None),
-                _ => Self::LinuxSd(Some(Default::default())),
-            },
-            crate::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
-            crate::config::Flasher::Msp430Usb => Self::Msp430,
         }
     }
 }

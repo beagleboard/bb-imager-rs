@@ -22,7 +22,7 @@ pub fn input_with_label<'a, F>(
     func: F,
 ) -> widget::Row<'a, BBImagerMessage>
 where
-    F: 'a + Fn(String) -> bb_imager::FlashingConfig,
+    F: 'a + Fn(String) -> crate::pages::configuration::FlashingCustomization,
 {
     element_with_label(
         label,
@@ -397,4 +397,45 @@ pub fn search_bar(refresh: Option<BBImagerMessage>, cur_search: &str) -> Element
 
     row.push(widget::text_input("Search", cur_search).on_input(BBImagerMessage::Search))
         .into()
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BoardImage {
+    SdFormat,
+    Image(bb_imager::common::SelectedImage),
+}
+
+impl std::fmt::Display for BoardImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BoardImage::SdFormat => write!(f, "Format SD Card"),
+            BoardImage::Image(selected_image) => selected_image.fmt(f),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Tainted<T> {
+    inner: T,
+    flag: bool,
+}
+
+impl<T> Tainted<T> {
+    pub const fn new(inner: T) -> Self {
+        Self { inner, flag: false }
+    }
+
+    pub const fn new_tainted(inner: T) -> Self {
+        Self { inner, flag: true }
+    }
+
+    pub const fn is_tainted(&self) -> bool {
+        self.flag
+    }
+}
+
+impl<T> AsRef<T> for Tainted<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
 }

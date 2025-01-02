@@ -20,8 +20,6 @@ enum Commands {
         img: PathBuf,
         dst: String,
         target: FlashTarget,
-        #[arg(long)]
-        no_verify: bool,
     },
     ListDestinations {
         target: FlashTarget,
@@ -50,12 +48,7 @@ async fn main() {
     let opt = Opt::parse();
 
     match opt.command {
-        Commands::Flash {
-            img,
-            dst,
-            target,
-            no_verify,
-        } => flash(img, dst, target, opt.quite, !no_verify).await,
+        Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite).await,
         Commands::ListDestinations { target } => {
             let dsts = bb_imager::config::Flasher::from(target)
                 .destinations()
@@ -83,16 +76,9 @@ async fn main() {
     }
 }
 
-async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, verify: bool) {
+async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-    let dst = match target {
-        FlashTarget::Bcf => bb_imager::Destination::port(dst),
-        FlashTarget::Sd => bb_imager::Destination::sd_card(dst.clone(), 0, dst),
-        FlashTarget::Msp430 => {
-            bb_imager::Destination::hidraw(CString::new(dst).expect("Failed to parse destination"))
-        }
-    };
 
     if !quite {
         tokio::task::spawn(async move {
@@ -178,39 +164,26 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool, veri
         });
     }
 
-    let flasher = match target {
-        FlashTarget::Bcf => bb_imager::Flasher::new(
-            bb_imager::SelectedImage::local(img),
+    let img = bb_imager::SelectedImage::local(img);
+    let flashing_config = match target {
+        FlashTarget::Bcf => bb_imager::FlashingConfig::BeagleConnectFreedom {
+            img,
+            port: dst,
+            customization: Default::default(),
+        },
+        FlashTarget::Sd => bb_imager::FlashingConfig::LinuxSd {
+            img,
             dst,
-            downloader,
-            tx,
-            bb_imager::FlashingConfig::Bcf(bb_imager::FlashingBcfConfig { verify }),
-        ),
-        FlashTarget::Sd => bb_imager::Flasher::new(
-            bb_imager::SelectedImage::local(img),
-            dst,
-            downloader,
-            tx,
-            bb_imager::FlashingConfig::LinuxSd(Some(bb_imager::FlashingSdLinuxConfig {
-                verify,
-                hostname: None,
-                timezone: None,
-                keymap: None,
-                user: None,
-                wifi: None,
-            })),
-        ),
-        FlashTarget::Msp430 => bb_imager::Flasher::new(
-            bb_imager::SelectedImage::local(img),
-            dst,
-            downloader,
-            tx,
-            bb_imager::FlashingConfig::Msp430,
-        ),
+            customization: Default::default(),
+        },
+        FlashTarget::Msp430 => bb_imager::FlashingConfig::Msp430 {
+            img,
+            port: CString::new(dst).expect("Failed to parse destination"),
+        },
     };
 
-    flasher
-        .download_flash_customize()
+    flashing_config
+        .download_flash_customize(downloader, tx)
         .await
         .expect("Failed to flash");
 }
