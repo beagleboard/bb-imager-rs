@@ -2,7 +2,7 @@ use iced::{widget, Element};
 
 use crate::{
     constants,
-    helpers::{self, home_btn_text, ProgressBarState},
+    helpers::{home_btn_text, ProgressBarState},
     BBImagerMessage, Screen,
 };
 
@@ -25,8 +25,8 @@ impl FlashingState {
         self
     }
 
-    fn about(&self) -> widget::Container<'_, BBImagerMessage> {
-        widget::container(widget::scrollable(widget::rich_text![
+    fn about(&self) -> widget::Scrollable<'_, BBImagerMessage> {
+        widget::scrollable(widget::rich_text![
             widget::span(constants::BEAGLE_BOARD_ABOUT)
                 .link(BBImagerMessage::OpenUrl(
                     "https://www.beagleboard.org/about".into()
@@ -36,14 +36,16 @@ impl FlashingState {
             widget::span("For more information, check out our documentation")
                 .link(BBImagerMessage::OpenUrl(self.documentation.clone().into()))
                 .color(iced::Color::WHITE)
-        ]))
-        .padding(32)
+        ])
     }
 }
 
 pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
     widget::responsive(move |size| {
-        let prog_bar = state.progress.bar();
+        const FOOTER_HEIGHT: f32 = 150.0;
+        let banner_height = size.height / 4.0;
+
+        let prog_bar = state.progress.bar().spacing(12);
 
         let btn = if running {
             home_btn_text("CANCEL", true, iced::Length::Shrink)
@@ -54,21 +56,38 @@ pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
         };
 
         let bottom = widget::container(
-            widget::column![state.about().height(size.height - 410.0), btn, prog_bar]
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .align_x(iced::Alignment::Center),
+            widget::column![
+                state
+                    .about()
+                    .height(size.height - FOOTER_HEIGHT - banner_height),
+                btn,
+                prog_bar
+            ]
+            .padding(16)
+            .spacing(12)
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .align_x(iced::Alignment::Center),
         )
         .style(|_| {
             widget::container::background(iced::Color::parse("#aa5137").expect("unexpected error"))
         });
 
-        widget::column![helpers::logo(), bottom]
-            .spacing(10)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center)
-            .into()
+        widget::column![
+            widget::container(
+                widget::image(widget::image::Handle::from_bytes(constants::BB_BANNER))
+                    .width(size.width * 0.45)
+                    .height(banner_height),
+            )
+            .padding(iced::Padding::new(0.0).left(40))
+            .width(iced::Length::Fill),
+            bottom
+        ]
+        .spacing(10)
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .align_x(iced::Alignment::Center)
+        .into()
     })
     .into()
 }

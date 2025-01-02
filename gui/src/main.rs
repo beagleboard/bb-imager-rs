@@ -328,8 +328,6 @@ impl BBImager {
     }
 
     fn view(&self) -> Element<BBImagerMessage> {
-        tracing::info!("Config: {:#?}", self.flashing_config);
-
         match &self.screen {
             Screen::Home => pages::home::view(
                 self.selected_board.as_deref(),

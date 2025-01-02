@@ -25,7 +25,7 @@ pub const FONT_BOLD: iced::Font = {
 pub const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
 pub const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
 
-pub const WINDOW_SIZE: iced::Size = iced::Size::new(850.0, 600.0);
+pub const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 
 pub const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",
