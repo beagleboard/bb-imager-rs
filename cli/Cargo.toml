@@ -1,6 +1,6 @@
 [package]
 name = "bb-imager-cli"
-description = "Library to support bb-imager-cli and bb-imager-gui"
+description = "A streamlined tool for creating, flashing, and managing OS images for BeagleBoard devices."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
