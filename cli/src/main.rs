@@ -37,6 +37,10 @@ enum Commands {
     ListDestinations {
         /// Specifies the target type for listing destinations.
         target: DestinationsTarget,
+
+        #[arg(long)]
+        /// Only print paths seperated by newline
+        no_frills: bool,
     },
 
     /// Command to format SD Card
@@ -121,29 +125,8 @@ async fn main() {
     match opt.command {
         Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite).await,
         Commands::Format { dst } => format(dst, opt.quite).await,
-        Commands::ListDestinations { target } => {
-            let dsts = bb_imager::config::Flasher::from(target)
-                .destinations()
-                .await;
-
-            match target {
-                DestinationsTarget::Sd => {
-                    println!("| {: <12} | {: <12} |", "Sd Card", "Size (in G)");
-                    println!("|--------------|--------------|");
-                    for d in dsts {
-                        println!(
-                            "| {: <12} | {: <12} |",
-                            d.path().to_str().unwrap(),
-                            d.size() / (1024 * 1024 * 1024)
-                        )
-                    }
-                }
-                DestinationsTarget::Bcf | DestinationsTarget::Msp430 => {
-                    for d in dsts {
-                        println!("{}", d)
-                    }
-                }
-            }
+        Commands::ListDestinations { target, no_frills } => {
+            list_destinations(target, no_frills).await;
         }
     }
 }
@@ -297,5 +280,95 @@ async fn format(dst: String, quite: bool) {
 
     if !quite {
         println!("Formatting successful");
+    }
+}
+
+async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
+    let term = console::Term::stdout();
+
+    let dsts = bb_imager::config::Flasher::from(target)
+        .destinations()
+        .await;
+
+    if no_frills {
+        for d in dsts {
+            term.write_line(&d.path().to_string_lossy()).unwrap();
+        }
+        return;
+    }
+
+    match target {
+        DestinationsTarget::Sd => {
+            const NAME_HEADER: &str = "SD Card";
+            const PATH_HEADER: &str = "Path";
+            const SIZE_HEADER: &str = "Size (in G)";
+            const BYTES_IN_GB: u64 = 1024 * 1024 * 1024;
+
+            let dsts_str: Vec<_> = dsts
+                .into_iter()
+                .map(|x| {
+                    (
+                        x.to_string().trim().to_string(),
+                        x.path().to_string_lossy().to_string(),
+                        (x.size() / BYTES_IN_GB).to_string(),
+                    )
+                })
+                .collect();
+
+            let max_name_len = dsts_str
+                .iter()
+                .map(|x| x.0.len())
+                .chain([NAME_HEADER.len()])
+                .max()
+                .unwrap();
+            let max_path_len = dsts_str
+                .iter()
+                .map(|x| x.1.len())
+                .chain([PATH_HEADER.len()])
+                .max()
+                .unwrap();
+            let max_size_len = dsts_str
+                .iter()
+                .map(|x| x.2.len())
+                .chain([SIZE_HEADER.len()])
+                .max()
+                .unwrap();
+
+            let table_border = format!(
+                "+-{}-+-{}-+-{}-+",
+                std::iter::repeat_n('-', max_name_len).collect::<String>(),
+                std::iter::repeat_n('-', max_path_len).collect::<String>(),
+                std::iter::repeat_n('-', SIZE_HEADER.len()).collect::<String>(),
+            );
+
+            term.write_line(&table_border).unwrap();
+
+            term.write_line(&format!(
+                "| {} | {} | {: <6} |",
+                console::pad_str(NAME_HEADER, max_name_len, console::Alignment::Left, None),
+                console::pad_str(PATH_HEADER, max_path_len, console::Alignment::Left, None),
+                console::pad_str(SIZE_HEADER, max_size_len, console::Alignment::Left, None),
+            ))
+            .unwrap();
+
+            term.write_line(&table_border).unwrap();
+
+            for d in dsts_str {
+                term.write_line(&format!(
+                    "| {} | {} | {} |",
+                    console::pad_str(&d.0, max_name_len, console::Alignment::Left, None),
+                    console::pad_str(&d.1, max_path_len, console::Alignment::Left, None),
+                    console::pad_str(&d.2, max_size_len, console::Alignment::Right, None)
+                ))
+                .unwrap();
+            }
+
+            term.write_line(&table_border).unwrap();
+        }
+        DestinationsTarget::Bcf | DestinationsTarget::Msp430 => {
+            for d in dsts {
+                term.write_line(d.to_string().as_str()).unwrap();
+            }
+        }
     }
 }
