@@ -1,10 +1,6 @@
 use bb_imager::DownloadFlashingStatus;
 use clap::{Parser, Subcommand, ValueEnum};
-use std::{
-    ffi::CString,
-    path::PathBuf,
-    sync::{Once, OnceLock},
-};
+use std::{ffi::CString, path::PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -163,84 +159,72 @@ async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommand
 
     if !quite {
         tokio::task::spawn(async move {
+            let term = console::Term::stdout();
+            let bar_style =
+                indicatif::ProgressStyle::with_template("{msg:15}  [{wide_bar}] [{percent:3} %]")
+                    .expect("Failed to create progress bar");
             let bars = indicatif::MultiProgress::new();
-            static FLASHING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
-            static VERIFYING: OnceLock<indicatif::ProgressBar> = OnceLock::new();
+
+            let mut last_bar: Option<indicatif::ProgressBar> = None;
+            let mut last_state = DownloadFlashingStatus::Preparing;
+            let mut stage = 1;
+
+            // Setting initial stage as Preparing
+            term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
+                .unwrap();
 
             while let Some(progress) = rx.recv().await {
-                match progress {
-                    DownloadFlashingStatus::Preparing => {
-                        static PREPARING: Once = Once::new();
+                // Skip if no change in stage
+                if progress == last_state {
+                    continue;
+                }
 
-                        PREPARING.call_once(|| {
-                            println!("Preparing");
-                        });
+                match (progress, last_state) {
+                    // Take care when just progress needs to be updated
+                    (
+                        DownloadFlashingStatus::DownloadingProgress(p),
+                        DownloadFlashingStatus::DownloadingProgress(_),
+                    )
+                    | (
+                        DownloadFlashingStatus::FlashingProgress(p),
+                        DownloadFlashingStatus::FlashingProgress(_),
+                    )
+                    | (
+                        DownloadFlashingStatus::VerifyingProgress(p),
+                        DownloadFlashingStatus::VerifyingProgress(_),
+                    ) => {
+                        last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
                     }
-                    DownloadFlashingStatus::DownloadingProgress(_) => {
-                        panic!("Not Supported");
-                    }
-                    DownloadFlashingStatus::FlashingProgress(p) => {
-                        let bar = FLASHING.get_or_init(|| {
-                            let bar = bars.add(indicatif::ProgressBar::new(100));
-                            bar.set_style(
-                                indicatif::ProgressStyle::with_template(
-                                    "{msg}  [{wide_bar}] [{percent} %]",
-                                )
-                                .expect("Failed to create progress bar"),
-                            );
-                            bar.set_message("Flashing");
-                            bar
-                        });
-
-                        bar.set_position((p * 100.0) as u64);
-                    }
-                    DownloadFlashingStatus::Verifying => {
-                        static VERIFYING: Once = Once::new();
-
-                        if let Some(x) = FLASHING.get() {
-                            if !x.is_finished() {
-                                x.finish()
-                            }
+                    // Create new bar when stage has changed
+                    (DownloadFlashingStatus::DownloadingProgress(p), _)
+                    | (DownloadFlashingStatus::VerifyingProgress(p), _)
+                    | (DownloadFlashingStatus::FlashingProgress(p), _) => {
+                        if let Some(b) = last_bar.take() {
+                            b.finish();
                         }
 
-                        VERIFYING.call_once(|| println!("Verifying"));
+                        stage += 1;
+
+                        let temp_bar = bars.add(indicatif::ProgressBar::new(100));
+                        temp_bar.set_style(bar_style.clone());
+                        temp_bar.set_message(stage_msg(progress, stage));
+                        temp_bar.set_position((p * 100.0) as u64);
+                        last_bar = Some(temp_bar);
                     }
-                    DownloadFlashingStatus::VerifyingProgress(p) => {
-                        if let Some(x) = FLASHING.get() {
-                            if !x.is_finished() {
-                                x.finish()
-                            }
+                    // Print stage when entering a new stage without progress
+                    (DownloadFlashingStatus::Verifying, _)
+                    | (DownloadFlashingStatus::Customizing, _)
+                    | (DownloadFlashingStatus::Preparing, _) => {
+                        if let Some(b) = last_bar.take() {
+                            b.finish();
                         }
 
-                        let bar = VERIFYING.get_or_init(|| {
-                            let bar = bars.add(indicatif::ProgressBar::new(100));
-                            bar.set_style(
-                                indicatif::ProgressStyle::with_template(
-                                    "{msg} [{wide_bar}] [{percent} %]",
-                                )
-                                .expect("Failed to create progress bar"),
-                            );
-                            bar.set_message("Verifying");
-                            bar
-                        });
-
-                        bar.set_position((p * 100.0) as u64);
+                        stage += 1;
+                        term.write_line(&stage_msg(progress, stage)).unwrap();
                     }
-                    DownloadFlashingStatus::Customizing => {
-                        static CUSTOMIZING: Once = Once::new();
+                }
 
-                        // Finish verifying progress if not already done
-                        if let Some(x) = VERIFYING.get() {
-                            if !x.is_finished() {
-                                x.finish()
-                            }
-                        }
-
-                        CUSTOMIZING.call_once(|| {
-                            println!("Customizing");
-                        });
-                    }
-                };
+                last_state = progress;
             }
         });
     }
@@ -396,4 +380,20 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
             }
         }
     }
+}
+
+const fn progress_msg(status: DownloadFlashingStatus) -> &'static str {
+    match status {
+        DownloadFlashingStatus::Preparing => "Preparing  ",
+        DownloadFlashingStatus::DownloadingProgress(_) => "Downloading",
+        DownloadFlashingStatus::FlashingProgress(_) => "Flashing",
+        DownloadFlashingStatus::Verifying | DownloadFlashingStatus::VerifyingProgress(_) => {
+            "Verifying"
+        }
+        DownloadFlashingStatus::Customizing => "Customizing",
+    }
+}
+
+fn stage_msg(status: DownloadFlashingStatus, stage: usize) -> String {
+    format!("[{stage}] {}", progress_msg(status))
 }
