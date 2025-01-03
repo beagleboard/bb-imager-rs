@@ -19,26 +19,54 @@ enum Commands {
     Flash {
         img: PathBuf,
         dst: String,
-        target: FlashTarget,
+        #[command(subcommand)]
+        target: TargetCommands,
     },
     ListDestinations {
-        target: FlashTarget,
+        target: DestinationsTarget,
     },
 }
 
+#[derive(Subcommand)]
+enum TargetCommands {
+    Bcf {
+        #[arg(long)]
+        no_verify: bool,
+    },
+    Sd {
+        #[arg(long)]
+        no_verify: bool,
+        #[arg(long)]
+        hostname: Option<String>,
+        #[arg(long)]
+        timezone: Option<String>,
+        #[arg(long)]
+        keymap: Option<String>,
+        #[arg(long, requires = "user_password")]
+        user_name: Option<String>,
+        #[arg(long, requires = "user_name")]
+        user_password: Option<String>,
+        #[arg(long, requires = "wifi_password")]
+        wifi_ssid: Option<String>,
+        #[arg(long, requires = "wifi_ssid")]
+        wifi_password: Option<String>,
+    },
+    Msp430,
+}
+
 #[derive(ValueEnum, Clone, Copy)]
-enum FlashTarget {
+enum DestinationsTarget {
     Bcf,
     Sd,
     Msp430,
 }
 
-impl From<FlashTarget> for bb_imager::config::Flasher {
-    fn from(value: FlashTarget) -> Self {
+impl From<DestinationsTarget> for bb_imager::config::Flasher {
+    fn from(value: DestinationsTarget) -> Self {
         match value {
-            FlashTarget::Bcf => Self::BeagleConnectFreedom,
-            FlashTarget::Sd => Self::SdCard,
-            FlashTarget::Msp430 => Self::Msp430Usb,
+            DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
+            DestinationsTarget::Sd => Self::SdCard,
+            DestinationsTarget::Msp430 => Self::Msp430Usb,
         }
     }
 }
@@ -55,7 +83,7 @@ async fn main() {
                 .await;
 
             match target {
-                FlashTarget::Sd => {
+                DestinationsTarget::Sd => {
                     println!("| {: <12} | {: <12} |", "Sd Card", "Size (in G)");
                     println!("|--------------|--------------|");
                     for d in dsts {
@@ -66,7 +94,7 @@ async fn main() {
                         )
                     }
                 }
-                FlashTarget::Bcf | FlashTarget::Msp430 => {
+                DestinationsTarget::Bcf | DestinationsTarget::Msp430 => {
                     for d in dsts {
                         println!("{}", d)
                     }
@@ -76,7 +104,7 @@ async fn main() {
     }
 }
 
-async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool) {
+async fn flash(img: PathBuf, dst: String, target: TargetCommands, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
@@ -166,17 +194,42 @@ async fn flash(img: PathBuf, dst: String, target: FlashTarget, quite: bool) {
 
     let img = bb_imager::SelectedImage::local(img);
     let flashing_config = match target {
-        FlashTarget::Bcf => bb_imager::FlashingConfig::BeagleConnectFreedom {
-            img,
-            port: dst,
-            customization: Default::default(),
-        },
-        FlashTarget::Sd => bb_imager::FlashingConfig::LinuxSd {
-            img,
-            dst,
-            customization: Default::default(),
-        },
-        FlashTarget::Msp430 => bb_imager::FlashingConfig::Msp430 {
+        TargetCommands::Bcf { no_verify } => {
+            let customization = bb_imager::FlashingBcfConfig { verify: !no_verify };
+            bb_imager::FlashingConfig::BeagleConnectFreedom {
+                img,
+                port: dst,
+                customization,
+            }
+        }
+        TargetCommands::Sd {
+            no_verify,
+            hostname,
+            timezone,
+            keymap,
+            user_name,
+            user_password,
+            wifi_ssid,
+            wifi_password,
+        } => {
+            let user = user_name.map(|x| (x, user_password.unwrap()));
+            let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
+
+            let customization = bb_imager::FlashingSdLinuxConfig {
+                verify: !no_verify,
+                hostname,
+                timezone,
+                keymap,
+                user,
+                wifi,
+            };
+            bb_imager::FlashingConfig::LinuxSd {
+                img,
+                dst,
+                customization,
+            }
+        }
+        TargetCommands::Msp430 => bb_imager::FlashingConfig::Msp430 {
             img,
             port: CString::new(dst).expect("Failed to parse destination"),
         },
