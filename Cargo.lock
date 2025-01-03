@@ -507,6 +507,7 @@ version = "0.0.3"
 dependencies = [
  "bb-imager",
  "clap",
+ "clap_complete",
  "console",
  "const-hex",
  "indicatif",
@@ -809,6 +810,15 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+]
+
+[[package]]
+name = "clap_complete"
+version = "4.5.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac2e663e3e3bed2d32d065a8404024dad306e699a04263ec59919529f803aee9"
+dependencies = [
+ "clap",
 ]
 
 [[package]]

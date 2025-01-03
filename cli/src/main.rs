@@ -1,5 +1,5 @@
 use bb_imager::DownloadFlashingStatus;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use std::{ffi::CString, path::PathBuf};
 
 #[derive(Parser, Debug)]
@@ -52,6 +52,12 @@ enum Commands {
     Format {
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
+    },
+
+    /// Command to generate shell completion
+    Generate {
+        /// Specifies the target shell type for completion
+        shell: clap_complete::Shell,
     },
 }
 
@@ -150,6 +156,7 @@ async fn main() {
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
         }
+        Commands::Generate { shell } => generate(shell),
     }
 }
 
@@ -396,4 +403,11 @@ const fn progress_msg(status: DownloadFlashingStatus) -> &'static str {
 
 fn stage_msg(status: DownloadFlashingStatus, stage: usize) -> String {
     format!("[{stage}] {}", progress_msg(status))
+}
+
+fn generate(target: clap_complete::Shell) {
+    let mut cmd = Opt::command();
+    const BIN_NAME: &str = env!("CARGO_PKG_NAME");
+
+    clap_complete::generate(target, &mut cmd, BIN_NAME, &mut std::io::stdout())
 }
