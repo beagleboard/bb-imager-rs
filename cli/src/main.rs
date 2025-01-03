@@ -38,6 +38,12 @@ enum Commands {
         /// Specifies the target type for listing destinations.
         target: DestinationsTarget,
     },
+
+    /// Command to format SD Card
+    Format {
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -114,6 +120,7 @@ async fn main() {
 
     match opt.command {
         Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite).await,
+        Commands::Format { dst } => format(dst, opt.quite).await,
         Commands::ListDestinations { target } => {
             let dsts = bb_imager::config::Flasher::from(target)
                 .destinations()
@@ -276,4 +283,19 @@ async fn flash(img: PathBuf, dst: String, target: TargetCommands, quite: bool) {
         .download_flash_customize(downloader, tx)
         .await
         .expect("Failed to flash");
+}
+
+async fn format(dst: String, quite: bool) {
+    let downloader = bb_imager::download::Downloader::new();
+    let (tx, _) = tokio::sync::mpsc::channel(20);
+
+    let config = bb_imager::FlashingConfig::LinuxSdFormat { dst };
+    config
+        .download_flash_customize(downloader, tx)
+        .await
+        .unwrap();
+
+    if !quite {
+        println!("Formatting successful");
+    }
 }
