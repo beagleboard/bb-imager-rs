@@ -6,7 +6,7 @@ use std::{
     sync::{Once, OnceLock},
 };
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version, about)]
 struct Opt {
     #[command(subcommand)]
@@ -18,15 +18,24 @@ struct Opt {
     quite: bool,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Command to flash an image to a specific destination.
     Flash {
-        /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
-        img: PathBuf,
-
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
+
+        #[arg(group = "image")]
+        /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
+        img: Option<PathBuf>,
+
+        #[arg(long, group = "image")]
+        /// URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats.
+        image_remote: Option<url::Url>,
+
+        #[arg(long, requires = "image_remote")]
+        /// Checksum for remote image.
+        image_sha256: Option<String>,
 
         #[command(subcommand)]
         /// Type of BeagleBoard to flash
@@ -50,7 +59,7 @@ enum Commands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum TargetCommands {
     /// Flash BeagleConnect Freedom.
     Bcf {
@@ -98,7 +107,7 @@ enum TargetCommands {
     Msp430,
 }
 
-#[derive(ValueEnum, Clone, Copy)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 enum DestinationsTarget {
     /// BeagleConnect Freedom targets.
     Bcf,
@@ -123,7 +132,24 @@ async fn main() {
     let opt = Opt::parse();
 
     match opt.command {
-        Commands::Flash { img, dst, target } => flash(img, dst, target, opt.quite).await,
+        Commands::Flash {
+            img,
+            dst,
+            target,
+            image_remote,
+            image_sha256,
+        } => {
+            let img = if let Some(local) = img {
+                bb_imager::SelectedImage::local(local)
+            } else if let (Some(remote), Some(sha)) = (image_remote, image_sha256) {
+                let sha = const_hex::decode_to_array(sha).unwrap();
+                bb_imager::SelectedImage::remote("Remote image".to_string(), remote, sha)
+            } else {
+                unreachable!()
+            };
+
+            flash(img, dst, target, opt.quite).await
+        }
         Commands::Format { dst } => format(dst, opt.quite).await,
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
@@ -131,7 +157,7 @@ async fn main() {
     }
 }
 
-async fn flash(img: PathBuf, dst: String, target: TargetCommands, quite: bool) {
+async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommands, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
@@ -219,7 +245,6 @@ async fn flash(img: PathBuf, dst: String, target: TargetCommands, quite: bool) {
         });
     }
 
-    let img = bb_imager::SelectedImage::local(img);
     let flashing_config = match target {
         TargetCommands::Bcf { no_verify } => {
             let customization = bb_imager::FlashingBcfConfig { verify: !no_verify };
