@@ -118,13 +118,3 @@ pub enum DestinationsTarget {
     /// MSP430 targets
     Msp430,
 }
-
-impl From<DestinationsTarget> for bb_imager::config::Flasher {
-    fn from(value: DestinationsTarget) -> Self {
-        match value {
-            DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
-            DestinationsTarget::Sd => Self::SdCard,
-            DestinationsTarget::Msp430 => Self::Msp430Usb,
-        }
-    }
-}

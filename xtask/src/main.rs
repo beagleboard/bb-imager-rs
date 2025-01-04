@@ -2,6 +2,10 @@ use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
+#[path = "../../cli/src/cli.rs"]
+// Allow using CLI stuff without pulling bb-imager-cli and bb-imager as dependencies
+mod bb_imager_cli;
+
 #[derive(Parser)]
 struct Opt {
     #[command(subcommand)]

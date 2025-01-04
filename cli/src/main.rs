@@ -1,6 +1,8 @@
+mod cli;
+
 use bb_imager::DownloadFlashingStatus;
-use bb_imager_cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use clap::{CommandFactory, Parser};
+use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use std::ffi::CString;
 
 #[tokio::main]
@@ -284,4 +286,14 @@ fn generate_completion(target: clap_complete::Shell) {
     const BIN_NAME: &str = env!("CARGO_PKG_NAME");
 
     clap_complete::generate(target, &mut cmd, BIN_NAME, &mut std::io::stdout())
+}
+
+impl From<DestinationsTarget> for bb_imager::config::Flasher {
+    fn from(value: DestinationsTarget) -> Self {
+        match value {
+            DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
+            DestinationsTarget::Sd => Self::SdCard,
+            DestinationsTarget::Msp430 => Self::Msp430Usb,
+        }
+    }
 }
