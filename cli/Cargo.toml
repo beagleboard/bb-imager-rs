@@ -1,6 +1,6 @@
 [package]
 name = "bb-imager-cli"
-description = "Library to support bb-imager-cli and bb-imager-gui"
+description = "A streamlined tool for creating, flashing, and managing OS images for BeagleBoard devices."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,3 +12,15 @@ clap = { version = "4.5.20", features = ["derive"] }
 bb-imager = { path = "../bb-imager", version = "0.0.3" }
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.17.8"
+console = "0.15.10"
+url = "2.5.4"
+const-hex = "1.14.0"
+clap_complete = "4.5.40"
+
+[package.metadata.deb]
+assets = [
+	["target/release/bb-imager-cli", "/usr/bin/bb-imager-cli", "755"],
+	["../target/man/*", "/usr/share/man/man1/", "644"],
+	["../target/shell-completion/_bb-imager-cli", "/usr/share/zsh/site-functions/", "644"],
+	["../target/shell-completion/bb-imager-cli.bash", "/usr/share/bash-completion/completions/bb-imager-cli", "644"]
+]

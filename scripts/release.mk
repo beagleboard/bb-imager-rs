@@ -19,7 +19,7 @@ upload-artifact-linux-%:
 	$(info "Upload Linux $* artifacts")
 	$(call upload_artifact,"${RELEASE_DIR_LINUX}/$*/BeagleBoardImager.AppImage","${PACKAGE_REGISTRY_GUI_URL}/$*/bb-imager-gui.AppImage")
 	$(call upload_artifact,"${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb","${PACKAGE_REGISTRY_GUI_URL}/$*/bb-imager-gui.deb")
-	$(call upload_artifact,"${RELEASE_DIR_LINUX}/$*/bb-imager-cli.xz","${PACKAGE_REGISTRY_CLI_URL}/$*/bb-imager-cli.xz")
+	$(call upload_artifact,"${RELEASE_DIR_LINUX}/$*/bb-imager-cli.tar.xz","${PACKAGE_REGISTRY_CLI_URL}/$*/bb-imager-cli.tar.xz")
 	$(call upload_artifact,"${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb","${PACKAGE_REGISTRY_CLI_URL}/$*/bb-imager-cli.deb")
 
 upload-artifact-darwin-%:
