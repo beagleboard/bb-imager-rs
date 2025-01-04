@@ -39,9 +39,14 @@ fn main() {
         }
         Commands::CliShellComplete { shell, out_dir } => {
             let mut cmd = bb_imager_cli::Opt::command();
-            const CLI_BIN_NAME: &str = "bb-imager-cli";
+            let cli_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .join("cli/Cargo.toml");
+            let manifest = cargo_toml::Manifest::from_path(cli_manifest_path).unwrap();
 
-            clap_complete::generate_to(shell, &mut cmd, CLI_BIN_NAME, out_dir).unwrap();
+            clap_complete::generate_to(shell, &mut cmd, manifest.package().name(), out_dir)
+                .unwrap();
         }
     }
 }
