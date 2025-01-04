@@ -21,6 +21,6 @@ clap_complete = "4.5.40"
 assets = [
 	["target/release/bb-imager-cli", "/usr/bin/bb-imager-cli", "755"],
 	["../target/man/*", "/usr/share/man/man1/", "644"],
-	["../target/shell/_bb-imager-cli", "/usr/share/zsh/site-functions/", "644"],
-	["../target/shell/bb-imager-cli.bash", "/usr/share/bash-completion/completions/bb-imager-cli", "644"]
+	["../target/shell-completion/_bb-imager-cli", "/usr/share/zsh/site-functions/", "644"],
+	["../target/shell-completion/bb-imager-cli.bash", "/usr/share/bash-completion/completions/bb-imager-cli", "644"]
 ]

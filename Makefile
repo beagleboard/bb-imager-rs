@@ -3,12 +3,12 @@ APPIMAGETOOL ?= $(shell which appimagetool)
 
 VERSION ?= $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
-RELEASE_DIR ?= release
+RELEASE_DIR ?= $(CURDIR)/release
 RELEASE_DIR_LINUX ?= ${RELEASE_DIR}/linux
 RELEASE_DIR_WINDOWS ?= ${RELEASE_DIR}/windows
 RELEASE_DIR_DARWIN ?= ${RELEASE_DIR}/darwin
 
-GUI_ASSETS = gui/assets
+GUI_ASSETS = $(CURDIR)/gui/assets
 GUI_ASSETS_LINUX = ${GUI_ASSETS}/packages/linux
 GUI_ASSETS_DARWIN = ${GUI_ASSETS}/packages/darwin
 
