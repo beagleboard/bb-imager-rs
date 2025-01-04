@@ -14,7 +14,7 @@ package-cli-linux-xz-%: build-cli-% manpage shell-completion-bash shell-completi
 	cp target/$*/release/bb-imager-cli ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
 	cp -r target/man ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
 	cp target/shell/* ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/shell-completion/
-	tar cfJ ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.xz ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
+	tar cfJ ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.tar.xz ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
 	rm -rf ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir
 
 package-cli-linux-deb-%: build-cli-% manpage shell-completion-bash shell-completion-zsh

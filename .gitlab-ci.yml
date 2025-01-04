@@ -217,11 +217,11 @@ release:
         - name: 'universal-bb-imager-gui-darwin.dmg.sha256'
           url: '${PACKAGE_REGISTRY_GUI_URL}/universal-apple-darwin/bb-imager-gui.dmg.sha256'
 
-        - name: 'x86_64-bb-imager-cli-linux.xz'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu/bb-imager-cli.xz'
+        - name: 'x86_64-bb-imager-cli-linux.tar.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu/bb-imager-cli.tar.xz'
           link_type: 'package'
-        - name: 'x86_64-bb-imager-cli-linux.xz.sha256'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu/bb-imager-cli.xz.sha256'
+        - name: 'x86_64-bb-imager-cli-linux.tar.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu/bb-imager-cli.tar.xz.sha256'
 
         - name: 'x86_64-bb-imager-cli-linux.deb'
           url: '${PACKAGE_REGISTRY_CLI_URL}/x86_64-unknown-linux-gnu/bb-imager-cli.deb'
@@ -241,11 +241,11 @@ release:
         - name: 'x86_64-bb-imager-gui-linux.deb.sha256'
           url: '${PACKAGE_REGISTRY_GUI_URL}/x86_64-unknown-linux-gnu/bb-imager-gui.deb.sha256'
 
-        - name: 'aarch64-bb-imager-cli-linux.xz'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu/bb-imager-cli.xz'
+        - name: 'aarch64-bb-imager-cli-linux.tar.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu/bb-imager-cli.tar.xz'
           link_type: 'package'
-        - name: 'aarch64-bb-imager-cli-linux.xz.sha256'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu/bb-imager-cli.xz.sha256'
+        - name: 'aarch64-bb-imager-cli-linux.tar.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu/bb-imager-cli.tar.xz.sha256'
 
         - name: 'aarch64-bb-imager-cli-linux.deb'
           url: '${PACKAGE_REGISTRY_CLI_URL}/aarch64-unknown-linux-gnu/bb-imager-cli.deb'
@@ -265,11 +265,11 @@ release:
         - name: 'aarch64-bb-imager-gui-linux.deb.sha256'
           url: '${PACKAGE_REGISTRY_GUI_URL}/aarch64-unknown-linux-gnu/bb-imager-gui.deb.sha256'
 
-        - name: 'arm-bb-imager-cli-linux.xz'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf/bb-imager-cli.xz'
+        - name: 'arm-bb-imager-cli-linux.tar.xz'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf/bb-imager-cli.tar.xz'
           link_type: 'package'
-        - name: 'arm-bb-imager-cli-linux.xz.sha256'
-          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf/bb-imager-cli.xz.sha256'
+        - name: 'arm-bb-imager-cli-linux.tar.xz.sha256'
+          url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf/bb-imager-cli.tar.xz.sha256'
 
         - name: 'arm-bb-imager-cli-linux.deb'
           url: '${PACKAGE_REGISTRY_CLI_URL}/armv7-unknown-linux-gnueabihf/bb-imager-cli.deb'
