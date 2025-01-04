@@ -42,9 +42,10 @@ package-cli-windows-zip-%: build-cli-% shell-completion-powershell
 
 manpage:
 	$(info "Generate CLI Manpages")
+	rm -rf target/man
 	mkdir -p target/man
 	cargo xtask cli-man target/man
-	gzip target/man/* -f
+	gzip target/man/*
 
 shell-completion-%:
 	$(info "Generate CLI Shell Completion")
