@@ -6772,6 +6772,7 @@ version = "0.0.3"
 dependencies = [
  "bb-imager-cli",
  "clap",
+ "clap_complete",
  "clap_mangen",
 ]
 

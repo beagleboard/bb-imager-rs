@@ -16,6 +16,13 @@ enum Commands {
         /// Directory to save manpages
         out_dir: PathBuf,
     },
+    /// Generate Shell Completion for CLI
+    CliShellComplete {
+        /// Target shell
+        shell: clap_complete::Shell,
+        /// Directory to save manpages
+        out_dir: PathBuf,
+    },
 }
 
 fn main() {
@@ -24,7 +31,13 @@ fn main() {
     match opts.command {
         Commands::CliMan { out_dir } => {
             let cmd = bb_imager_cli::Opt::command();
-            clap_mangen::generate_to(cmd, out_dir).unwrap()
+            clap_mangen::generate_to(cmd, out_dir).unwrap();
+        }
+        Commands::CliShellComplete { shell, out_dir } => {
+            let mut cmd = bb_imager_cli::Opt::command();
+            const CLI_BIN_NAME: &str = "bb-imager-cli";
+
+            clap_complete::generate_to(shell, &mut cmd, CLI_BIN_NAME, out_dir).unwrap();
         }
     }
 }

@@ -8,15 +8,16 @@ build-cli-universal-apple-darwin: build-cli-aarch64-apple-darwin build-cli-x86_6
 	mkdir -p target/universal-apple-darwin/release
 	lipo -create target/x86_64-apple-darwin/release/bb-imager-cli target/aarch64-apple-darwin/release/bb-imager-cli -output target/universal-apple-darwin/release/bb-imager-cli
 
-package-cli-linux-xz-%: build-cli-% manpage
+package-cli-linux-xz-%: build-cli-% manpage shell-completion-bash shell-completion-zsh
 	$(info "Create CLI xz $*")
-	mkdir -p ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir
+	mkdir -p ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/shell-completion
 	cp target/$*/release/bb-imager-cli ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
 	cp -r target/man ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
+	cp target/shell/* ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/shell-completion/
 	tar cfJ ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.xz ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/
 	rm -rf ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir
 
-package-cli-linux-deb-%: build-cli-% manpage
+package-cli-linux-deb-%: build-cli-% manpage shell-completion-bash shell-completion-zsh
 	$(info "Create CLI Linux deb $*")
 	cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip
 
@@ -35,3 +36,8 @@ manpage:
 	mkdir -p target/man
 	cargo xtask cli-man target/man
 	gzip target/man/* -f
+
+shell-completion-%:
+	$(info "Generate CLI Shell Completion")
+	mkdir -p target/shell/
+	cargo xtask cli-shell-complete $* target/shell/

@@ -10,3 +10,4 @@ license.workspace = true
 clap = { version = "4.5.23", features = ["derive"] }
 clap_mangen = "0.2.24"
 bb-imager-cli = { path = "../cli" }
+clap_complete = "4.5.40"
