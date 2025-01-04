@@ -16,3 +16,9 @@ console = "0.15.10"
 url = "2.5.4"
 const-hex = "1.14.0"
 clap_complete = "4.5.40"
+
+[package.metadata.deb]
+assets = [
+	["target/release/bb-imager-cli", "/usr/bin/bb-imager-cli", "755"],
+	["../target/man/*", "/usr/share/man/man1/", "644"]
+]

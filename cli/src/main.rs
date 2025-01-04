@@ -1,133 +1,7 @@
 use bb_imager::DownloadFlashingStatus;
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use std::{ffi::CString, path::PathBuf};
-
-#[derive(Parser, Debug)]
-#[command(version, about)]
-struct Opt {
-    #[command(subcommand)]
-    /// Specifies the subcommand to execute.
-    command: Commands,
-
-    #[arg(long)]
-    /// Suppress standard output messages for a quieter experience.
-    quite: bool,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-    /// Command to flash an image to a specific destination.
-    Flash {
-        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
-        dst: String,
-
-        #[arg(group = "image")]
-        /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
-        img: Option<PathBuf>,
-
-        #[arg(long, group = "image")]
-        /// URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats.
-        image_remote: Option<url::Url>,
-
-        #[arg(long, requires = "image_remote")]
-        /// Checksum for remote image.
-        image_sha256: Option<String>,
-
-        #[command(subcommand)]
-        /// Type of BeagleBoard to flash
-        target: TargetCommands,
-    },
-
-    /// Command to list available destinations for flashing based on the selected target.
-    ListDestinations {
-        /// Specifies the target type for listing destinations.
-        target: DestinationsTarget,
-
-        #[arg(long)]
-        /// Only print paths seperated by newline
-        no_frills: bool,
-    },
-
-    /// Command to format SD Card
-    Format {
-        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
-        dst: String,
-    },
-
-    /// Command to generate shell completion
-    Generate {
-        /// Specifies the target shell type for completion
-        shell: clap_complete::Shell,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum TargetCommands {
-    /// Flash BeagleConnect Freedom.
-    Bcf {
-        #[arg(long)]
-        /// Disable checksum verification after flashing to speed up the process.
-        no_verify: bool,
-    },
-    /// Flash an SD card with customizable settings for BeagleBoard devices.
-    Sd {
-        /// Disable checksum verification post-flash
-        #[arg(long)]
-        no_verify: bool,
-
-        #[arg(long)]
-        /// Set a custom hostname for the device (e.g., "beaglebone").
-        hostname: Option<String>,
-
-        #[arg(long)]
-        /// Set the timezone for the device (e.g., "America/New_York").
-        timezone: Option<String>,
-
-        #[arg(long)]
-        /// Set the keyboard layout/keymap (e.g., "us" for the US layout).
-        keymap: Option<String>,
-
-        #[arg(long, requires = "user_password", verbatim_doc_comment)]
-        /// Set a username for the default user. Requires `user_password`.
-        /// Required to enter GUI session due to regulatory requirements.
-        user_name: Option<String>,
-
-        #[arg(long, requires = "user_name", verbatim_doc_comment)]
-        /// Set a password for the default user. Requires `user_name`.
-        /// Required to enter GUI session due to regulatory requirements.
-        user_password: Option<String>,
-
-        #[arg(long, requires = "wifi_password")]
-        /// Configure a Wi-Fi SSID for network access. Requires `wifi_password`.
-        wifi_ssid: Option<String>,
-
-        #[arg(long, requires = "wifi_ssid")]
-        /// Set the password for the specified Wi-Fi SSID. Requires `wifi_ssid`.
-        wifi_password: Option<String>,
-    },
-    /// Flash MSP430 on BeagleConnectFreedom.
-    Msp430,
-}
-
-#[derive(ValueEnum, Clone, Copy, Debug)]
-enum DestinationsTarget {
-    /// BeagleConnect Freedom targets.
-    Bcf,
-    /// SD card targets for BeagleBoard devices.
-    Sd,
-    /// MSP430 targets
-    Msp430,
-}
-
-impl From<DestinationsTarget> for bb_imager::config::Flasher {
-    fn from(value: DestinationsTarget) -> Self {
-        match value {
-            DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
-            DestinationsTarget::Sd => Self::SdCard,
-            DestinationsTarget::Msp430 => Self::Msp430Usb,
-        }
-    }
-}
+use bb_imager_cli::{Commands, DestinationsTarget, Opt, TargetCommands};
+use clap::{CommandFactory, Parser};
+use std::ffi::CString;
 
 #[tokio::main]
 async fn main() {
@@ -156,7 +30,7 @@ async fn main() {
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
         }
-        Commands::Generate { shell } => generate(shell),
+        Commands::GenerateCompletion { shell } => generate_completion(shell),
     }
 }
 
@@ -405,7 +279,7 @@ fn stage_msg(status: DownloadFlashingStatus, stage: usize) -> String {
     format!("[{stage}] {}", progress_msg(status))
 }
 
-fn generate(target: clap_complete::Shell) {
+fn generate_completion(target: clap_complete::Shell) {
     let mut cmd = Opt::command();
     const BIN_NAME: &str = env!("CARGO_PKG_NAME");
 
