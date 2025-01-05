@@ -11,7 +11,7 @@ pub struct Opt {
 
     #[arg(long)]
     /// Suppress standard output messages for a quieter experience.
-    pub quite: bool,
+    pub quiet: bool,
 }
 
 #[derive(Subcommand, Debug)]

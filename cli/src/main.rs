@@ -26,9 +26,9 @@ async fn main() {
                 unreachable!()
             };
 
-            flash(img, dst, target, opt.quite).await
+            flash(img, dst, target, opt.quiet).await
         }
-        Commands::Format { dst } => format(dst, opt.quite).await,
+        Commands::Format { dst } => format(dst, opt.quiet).await,
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
         }

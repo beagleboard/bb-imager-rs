@@ -52,7 +52,7 @@ Commands:
   help                 Print this message or the help of the given subcommand(s)
 
 Options:
-      --quite    Suppress standard output messages for a quieter experience
+      --quiet    Suppress standard output messages for a quieter experience
   -h, --help     Print help
   -V, --version  Print version
 ```
@@ -91,5 +91,5 @@ Options:
 ## Flashing Local image
 
 ```shell
-❯ bb-imager-cli --quite flash $DESTINATION $IMG_PATH /dev/ttyACM0 bcf
+❯ bb-imager-cli --quiet flash $DESTINATION $IMG_PATH /dev/ttyACM0 bcf
 ```
