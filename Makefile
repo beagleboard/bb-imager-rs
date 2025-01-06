@@ -19,7 +19,7 @@ APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
 
 # Includes
 include gui/Makefile
-include cli/Makefile
+include bb-imager-cli/Makefile
 include scripts/*.mk
 
 clean:

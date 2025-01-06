@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
-#[path = "../../cli/src/cli.rs"]
+#[path = "../../bb-imager-cli/src/cli.rs"]
 // Allow using CLI stuff without pulling bb-imager-cli and bb-imager as dependencies
 mod bb_imager_cli;
 
@@ -37,7 +37,7 @@ fn main() {
             let cli_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .unwrap()
-                .join("cli/Cargo.toml");
+                .join("bb-imager-cli/Cargo.toml");
             let manifest = cargo_toml::Manifest::from_path(cli_manifest_path).unwrap();
             let cmd = bb_imager_cli::Opt::command().display_name(manifest.package().name());
 
@@ -48,7 +48,7 @@ fn main() {
             let cli_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .unwrap()
-                .join("cli/Cargo.toml");
+                .join("bb-imager-cli/Cargo.toml");
             let manifest = cargo_toml::Manifest::from_path(cli_manifest_path).unwrap();
 
             clap_complete::generate_to(shell, &mut cmd, manifest.package().name(), out_dir)
