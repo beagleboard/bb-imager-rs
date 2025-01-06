@@ -8,7 +8,7 @@ RELEASE_DIR_LINUX ?= ${RELEASE_DIR}/linux
 RELEASE_DIR_WINDOWS ?= ${RELEASE_DIR}/windows
 RELEASE_DIR_DARWIN ?= ${RELEASE_DIR}/darwin
 
-GUI_ASSETS = $(CURDIR)/gui/assets
+GUI_ASSETS = $(CURDIR)/bb-imager-gui/assets
 GUI_ASSETS_LINUX = ${GUI_ASSETS}/packages/linux
 GUI_ASSETS_DARWIN = ${GUI_ASSETS}/packages/darwin
 
@@ -18,7 +18,7 @@ APPIMAGE_ARCH_aarch64-unknown-linux-gnu = aarch64
 APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
 
 # Includes
-include gui/Makefile
+include bb-imager-gui/Makefile
 include bb-imager-cli/Makefile
 include scripts/*.mk
 
