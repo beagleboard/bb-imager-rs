@@ -195,6 +195,7 @@ pub enum FlashingCustomization {
     LinuxSd(bb_imager::flasher::FlashingSdLinuxConfig),
     Bcf(bb_imager::flasher::FlashingBcfConfig),
     Msp430,
+    Pb2Mspm0(bb_imager::flasher::FlashingPb2Mspm0Config),
 }
 
 impl FlashingCustomization {
@@ -206,6 +207,7 @@ impl FlashingCustomization {
             bb_imager::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
             bb_imager::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             bb_imager::config::Flasher::Msp430Usb => Self::Msp430,
+            bb_imager::config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(Default::default()),
         }
     }
 }

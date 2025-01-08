@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use url::Url;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -18,21 +19,6 @@ pub struct Opt {
 pub enum Commands {
     /// Command to flash an image to a specific destination.
     Flash {
-        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
-        dst: String,
-
-        #[arg(group = "image")]
-        /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
-        img: Option<PathBuf>,
-
-        #[arg(long, group = "image")]
-        /// URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats.
-        image_remote: Option<url::Url>,
-
-        #[arg(long, requires = "image_remote")]
-        /// Checksum for remote image.
-        image_sha256: Option<String>,
-
         #[command(subcommand)]
         /// Type of BeagleBoard to flash
         target: TargetCommands,
@@ -65,12 +51,24 @@ pub enum Commands {
 pub enum TargetCommands {
     /// Flash BeagleConnect Freedom.
     Bcf {
+        #[command(flatten)]
+        img: SelectedImage,
+
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: String,
+
         #[arg(long)]
         /// Disable checksum verification after flashing to speed up the process.
         no_verify: bool,
     },
     /// Flash an SD card with customizable settings for BeagleBoard devices.
     Sd {
+        #[command(flatten)]
+        img: SelectedImage,
+
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: String,
+
         /// Disable checksum verification post-flash
         #[arg(long)]
         no_verify: bool,
@@ -106,7 +104,22 @@ pub enum TargetCommands {
         wifi_password: Option<String>,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
-    Msp430,
+    Msp430 {
+        #[command(flatten)]
+        img: SelectedImage,
+
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: String,
+    },
+    /// Flash MSPM0 on Pocketbeagle2.
+    Pb2Mspm0 {
+        #[command(flatten)]
+        img: SelectedImage,
+
+        /// Do not persist EEPROM contents
+        #[arg(long)]
+        no_eeprom: bool,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -117,4 +130,26 @@ pub enum DestinationsTarget {
     Sd,
     /// MSP430 targets
     Msp430,
+    /// Pocketbeagle2 MSPM0
+    Pb2Mspm0,
+}
+
+#[derive(Args, Debug)]
+pub struct SelectedImage {
+    #[command(flatten)]
+    pub img: OsImage,
+    #[arg(long, requires = "img_remote")]
+    /// Checksum for remote image.
+    pub img_sha256: Option<String>,
+}
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub struct OsImage {
+    #[arg(long)]
+    /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
+    pub img_local: Option<PathBuf>,
+    #[arg(long, requires = "img_sha256")]
+    /// URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats.
+    pub img_remote: Option<Url>,
 }
