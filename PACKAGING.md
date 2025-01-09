@@ -137,6 +137,9 @@ MacOS Package cannot be built on a non-MacOS host.
 
 # Cross Compilation
 
-Cross Compilation is not well supported at the moment. I have used [cross](https://github.com/cross-rs/cross) in the past with some success, but since most of Docker-in-Docker requires special runners on [openbeagle](https://openbeagle.org/), I ended up dropping cross.
+Cross Compilation for linux is supported using [cross](https://github.com/cross-rs/cross). It is important to note that the git version of `cross` is required right now.
 
-It is still possible to try building the packages with [cross](https://github.com/cross-rs/cross) by setting the `RUST_BUILDER=cross` environment variable. PRs are welcome.
+```
+cargo install cross --git https://github.com/cross-rs/cross
+RUST_BUILDER=$(which cross) make {target}
+```

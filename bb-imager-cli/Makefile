@@ -19,7 +19,11 @@ package-cli-linux-xz-%: build-cli-% manpage shell-completion-bash shell-completi
 
 package-cli-linux-deb-%: build-cli-% manpage shell-completion-bash shell-completion-zsh
 	$(info "Create CLI Linux deb $*")
-	cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip
+ifeq ($(RUST_BUILDER_NAME), cross)
+	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip"
+else
+	$(RUST_BUILDER) deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip
+endif
 
 package-cli-darwin-zip-%: build-cli-% manpage shell-completion-zsh
 	$(info "Create CLI Darwin zip $*")
@@ -44,10 +48,10 @@ manpage:
 	$(info "Generate CLI Manpages")
 	rm -rf target/man
 	mkdir -p target/man
-	cargo xtask cli-man target/man
+	$(CARGO_PATH) xtask cli-man target/man
 	gzip target/man/*
 
 shell-completion-%:
 	$(info "Generate CLI Shell Completion")
 	mkdir -p target/shell-completion
-	cargo xtask cli-shell-complete $* target/shell-completion
+	$(CARGO_PATH) xtask cli-shell-complete $* target/shell-completion

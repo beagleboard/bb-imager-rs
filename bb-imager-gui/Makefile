@@ -1,3 +1,8 @@
+# Map Rust targets with Appimage Arch
+APPIMAGE_ARCH_x86_64-unknown-linux-gnu = x86_64
+APPIMAGE_ARCH_aarch64-unknown-linux-gnu = aarch64
+APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
+
 build-gui-%:
 	$(info "Building GUI for $*")
 	$(RUST_BUILDER) build --release --target $* -p bb-imager-gui
@@ -21,7 +26,11 @@ package-gui-linux-appimage-%: build-gui-%
 
 package-gui-linux-deb-%: build-gui-%
 	$(info "Create GUI Linux deb $*")
-	cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
+ifeq ($(RUST_BUILDER_NAME), cross)
+	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip"
+else
+	$(RUST_BUILDER) deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
+endif
 
 package-gui-darwin-dmg-%: build-gui-%
 	$(info "Create GUI Darwin dmg $*")
