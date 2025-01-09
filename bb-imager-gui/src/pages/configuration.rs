@@ -65,7 +65,7 @@ pub fn view<'a>(
 fn linux_sd_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a bb_imager::FlashingSdLinuxConfig,
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Column<'a, BBImagerMessage> {
     let xc = config.clone();
     let timezone_box =
@@ -122,7 +122,7 @@ fn linux_sd_form<'a>(
 }
 
 fn uname_pass_form(
-    config: &bb_imager::FlashingSdLinuxConfig,
+    config: &bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![widget::toggler(config.user.is_some())
         .label("Configure Username and Password")
@@ -155,7 +155,7 @@ fn uname_pass_form(
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &bb_imager::FlashingSdLinuxConfig) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &bb_imager::flasher::FlashingSdLinuxConfig) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![widget::toggler(config.wifi.is_some())
         .label("Configure Wireless LAN")
         .on_toggle(|t| {
@@ -195,7 +195,6 @@ pub enum FlashingCustomization {
     LinuxSd(bb_imager::flasher::FlashingSdLinuxConfig),
     Bcf(bb_imager::flasher::FlashingBcfConfig),
     Msp430,
-    Pb2Mspm0(bb_imager::flasher::FlashingPb2Mspm0Config),
 }
 
 impl FlashingCustomization {
@@ -207,7 +206,6 @@ impl FlashingCustomization {
             bb_imager::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
             bb_imager::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             bb_imager::config::Flasher::Msp430Usb => Self::Msp430,
-            bb_imager::config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(Default::default()),
         }
     }
 }

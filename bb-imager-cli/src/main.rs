@@ -101,7 +101,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             dst,
             no_verify,
         } => {
-            let customization = bb_imager::FlashingBcfConfig { verify: !no_verify };
+            let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
             bb_imager::FlashingConfig::BeagleConnectFreedom {
                 img: img.into(),
                 port: dst,
@@ -123,7 +123,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_imager::FlashingSdLinuxConfig {
+            let customization = bb_imager::flasher::FlashingSdLinuxConfig {
                 verify: !no_verify,
                 hostname,
                 timezone,
@@ -141,6 +141,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             img: img.into(),
             port: CString::new(dst).expect("Failed to parse destination"),
         },
+        #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
             img: img.into(),
             customization: bb_imager::flasher::FlashingPb2Mspm0Config { eeprom: !no_eeprom },
@@ -288,6 +289,7 @@ impl From<DestinationsTarget> for bb_imager::config::Flasher {
             DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
             DestinationsTarget::Sd => Self::SdCard,
             DestinationsTarget::Msp430 => Self::Msp430Usb,
+            #[cfg(feature = "pb2_mspm0")]
             DestinationsTarget::Pb2Mspm0 => Self::Pb2Mspm0,
         }
     }

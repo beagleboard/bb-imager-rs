@@ -13,7 +13,7 @@ clippy:
     - apt-get update && apt-get install -y --no-install-recommends libudev-dev
     - rustup component add clippy
   script:
-    - cargo clippy --all-targets --all-features --no-deps
+    - make checks
 
 test:
   image: "rust:latest"
@@ -73,6 +73,7 @@ linux_aarch64:
     CROSS_ARCH: arm64
     PKG_CONFIG_ALLOW_CROSS: 1
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+    PB2_MSPM0: 1
   stage: build
   before_script:
     - echo "Download dependencies"

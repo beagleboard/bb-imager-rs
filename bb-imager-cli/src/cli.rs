@@ -116,6 +116,7 @@ pub enum TargetCommands {
         dst: String,
     },
     /// Flash MSPM0 on Pocketbeagle2.
+    #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0 {
         #[command(flatten)]
         img: SelectedImage,
@@ -135,6 +136,7 @@ pub enum DestinationsTarget {
     /// MSP430 targets
     Msp430,
     /// Pocketbeagle2 MSPM0
+    #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0,
 }
 

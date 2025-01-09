@@ -12,3 +12,7 @@ clap_mangen = "0.2.24"
 clap_complete = "4.5.40"
 url = "2.5.4"
 cargo_toml = "0.21.0"
+
+[features]
+default = []
+pb2_mspm0 = []

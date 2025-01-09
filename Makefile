@@ -4,6 +4,10 @@ APPIMAGETOOL ?= $(shell which appimagetool)
 RUST_BUILDER_NAME = $(lastword $(subst /,  , $(RUST_BUILDER)))
 CROSS_UTIL ?= $(shell which cross-util)
 
+# Features related stuff
+RUST_FEATURE_ARGS =
+PB2_MSPM0 ?= 0
+
 VERSION ?= $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
 RELEASE_DIR ?= $(CURDIR)/release
@@ -31,3 +35,9 @@ release-darwin-%: package-cli-darwin-zip-% package-gui-darwin-dmg-%;
 release-windows-%: package-cli-windows-zip-% package-gui-windows-zip-%;
 
 upload-artifacts: upload-artifact-linux upload-artifact-windows upload-artifact-darwin;
+
+checks-clippy-%:
+	$(info "Running clippy checks for $*")
+	$(CARGO_PATH) clippy -p $* --all-targets --all-features --no-deps
+
+checks: checks-clippy-bb-imager checks-clippy-bb-imager-cli checks-clippy-bb-imager-gui

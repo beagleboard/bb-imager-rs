@@ -46,3 +46,7 @@ plist = "1.7.0"
 anyhow = "1.0.91"
 nix = { version = "0.29.0", features = ["socket", "uio"] }
 libc = "0.2.161"
+
+[features]
+default = []
+pb2_mspm0 = []

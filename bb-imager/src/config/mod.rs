@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{
-    flasher::{bcf, msp430, pb2_mspm0, sd},
+    flasher::{bcf, msp430, sd},
     Destination,
 };
 
@@ -52,6 +52,7 @@ pub enum Flasher {
     SdCard,
     BeagleConnectFreedom,
     Msp430Usb,
+    #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0,
 }
 
@@ -99,12 +100,16 @@ impl Flasher {
             Flasher::SdCard => tokio::task::block_in_place(sd::destinations),
             Flasher::BeagleConnectFreedom => tokio::task::block_in_place(bcf::possible_devices),
             Flasher::Msp430Usb => tokio::task::block_in_place(msp430::possible_devices),
-            Flasher::Pb2Mspm0 => tokio::task::block_in_place(pb2_mspm0::possible_devices),
+            #[cfg(feature = "pb2_mspm0")]
+            Flasher::Pb2Mspm0 => {
+                tokio::task::block_in_place(crate::flasher::pb2_mspm0::possible_devices)
+            }
         }
     }
 
     pub fn destination_selectable(&self) -> bool {
         match self {
+            #[cfg(feature = "pb2_mspm0")]
             Self::Pb2Mspm0 => false,
             _ => true,
         }
@@ -115,6 +120,7 @@ impl Flasher {
             Flasher::SdCard => ("image", &["img", "xz"]),
             Flasher::BeagleConnectFreedom => ("firmware", &["bin", "hex", "txt", "xz"]),
             Flasher::Msp430Usb => ("firmware", &["hex", "txt", "xz"]),
+            #[cfg(feature = "pb2_mspm0")]
             Flasher::Pb2Mspm0 => ("firmware", &["hex", "txt", "xz"]),
         }
     }

@@ -9,7 +9,7 @@ use thiserror::Error;
 use tokio::io::AsyncSeekExt;
 
 use crate::{
-    flasher::{bcf, msp430, pb2_mspm0, sd},
+    flasher::{bcf, msp430, sd},
     util,
 };
 
@@ -150,9 +150,10 @@ pub enum FlashingConfig {
         img: SelectedImage,
         port: std::ffi::CString,
     },
+    #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0 {
         img: SelectedImage,
-        customization: pb2_mspm0::FlashingPb2Mspm0Config,
+        customization: crate::flasher::pb2_mspm0::FlashingPb2Mspm0Config,
     },
 }
 
@@ -210,6 +211,7 @@ impl FlashingConfig {
                     .await
                     .expect("Tokio runtime failed to spawn blocking task")
             }
+            #[cfg(feature = "pb2_mspm0")]
             FlashingConfig::Pb2Mspm0 { img, customization } => {
                 let mut img =
                     crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
@@ -222,7 +224,7 @@ impl FlashingConfig {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
-                pb2_mspm0::flash(bin, &chan, customization).await
+                crate::flasher::pb2_mspm0::flash(bin, &chan, customization).await
             }
         }
     }
