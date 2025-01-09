@@ -9,10 +9,6 @@ pub struct Opt {
     #[command(subcommand)]
     /// Specifies the subcommand to execute.
     pub command: Commands,
-
-    #[arg(long)]
-    /// Suppress standard output messages for a quieter experience.
-    pub quiet: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -22,6 +18,10 @@ pub enum Commands {
         #[command(subcommand)]
         /// Type of BeagleBoard to flash
         target: TargetCommands,
+
+        #[arg(long)]
+        /// Suppress standard output messages for a quieter experience.
+        quiet: bool,
     },
 
     /// Command to list available destinations for flashing based on the selected target.
@@ -38,6 +38,10 @@ pub enum Commands {
     Format {
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
+
+        #[arg(long)]
+        /// Suppress standard output messages for a quieter experience.
+        quiet: bool,
     },
 
     /// Command to generate shell completion

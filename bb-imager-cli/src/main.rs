@@ -10,8 +10,8 @@ async fn main() {
     let opt = Opt::parse();
 
     match opt.command {
-        Commands::Flash { target } => flash(target, opt.quiet).await,
-        Commands::Format { dst } => format(dst, opt.quiet).await,
+        Commands::Flash { target, quiet } => flash(target, quiet).await,
+        Commands::Format { dst, quiet } => format(dst, quiet).await,
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
         }
@@ -156,6 +156,7 @@ async fn flash(target: TargetCommands, quite: bool) {
 async fn format(dst: String, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, _) = tokio::sync::mpsc::channel(20);
+    let term = console::Term::stdout();
 
     let config = bb_imager::FlashingConfig::LinuxSdFormat { dst };
     config
@@ -164,7 +165,7 @@ async fn format(dst: String, quite: bool) {
         .unwrap();
 
     if !quite {
-        println!("Formatting successful");
+        term.write_line("Formatting successful").unwrap();
     }
 }
 

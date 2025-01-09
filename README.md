@@ -42,7 +42,7 @@ See [config.json](config.json) for example.
 ❯ bb-imager-cli --help
 A streamlined tool for creating, flashing, and managing OS images for BeagleBoard devices.
 
-Usage: bb-imager-cli [OPTIONS] <COMMAND>
+Usage: bb-imager-cli <COMMAND>
 
 Commands:
   flash                Command to flash an image to a specific destination
@@ -52,7 +52,6 @@ Commands:
   help                 Print this message or the help of the given subcommand(s)
 
 Options:
-      --quiet    Suppress standard output messages for a quieter experience
   -h, --help     Print help
   -V, --version  Print version
 ```
@@ -62,9 +61,16 @@ Options:
 ```shell
 ❯ bb-imager-cli flash sd --help
 Flash an SD card with customizable settings for BeagleBoard devices
-Usage: bb-imager-cli flash <DST> sd [OPTIONS]
+
+Usage: bb-imager-cli flash sd [OPTIONS] <--img-local <IMG_LOCAL>|--img-remote <IMG_REMOTE>> <DST>
+
+Arguments:
+  <DST>  The destination device (e.g., `/dev/sdX` or specific device identifiers)
 
 Options:
+      --img-local <IMG_LOCAL>          Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats
+      --img-remote <IMG_REMOTE>        URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats
+      --img-sha256 <IMG_SHA256>        Checksum for remote image
       --no-verify                      Disable checksum verification post-flash
       --hostname <HOSTNAME>            Set a custom hostname for the device (e.g., "beaglebone")
       --timezone <TIMEZONE>            Set the timezone for the device (e.g., "America/New_York")
@@ -81,7 +87,7 @@ Options:
 ## Flashing Remote image
 
 ```shell
-❯ bb-imager-cli flash --image-remote $IMG_URL --image-sha256 $IMG_SHA256 /dev/ttyACM0 bcf
+❯ bb-imager-cli flash bcf --image-remote $IMG_URL --image-sha256 $IMG_SHA256 /dev/ttyACM0
 [1] Preparing
 [2] Verifying    [█████████████████████████████████████████████████████████████████████████████████████████████████████████████] [100 %]
 [3] Flashing     [█████████████████████████████████████████████████████████████████████████████████████████████████████████████] [100 %]
@@ -91,5 +97,5 @@ Options:
 ## Flashing Local image
 
 ```shell
-❯ bb-imager-cli --quiet flash $DESTINATION $IMG_PATH /dev/ttyACM0 bcf
+❯ bb-imager-cli flash --quiet bcf $DESTINATION --img-local $IMG_PATH /dev/ttyACM0
 ```
