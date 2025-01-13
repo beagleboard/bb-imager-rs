@@ -1,0 +1,12 @@
+[package]
+name = "bb-imager-service"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+zbus = { version = "5.3.0", default-features = false, features = ["tokio"] }
+zbus_polkit = "5.0.0"
