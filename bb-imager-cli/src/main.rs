@@ -144,7 +144,7 @@ async fn flash(target: TargetCommands, quite: bool) {
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
             img: img.into(),
-            customization: bb_imager::flasher::FlashingPb2Mspm0Config { eeprom: !no_eeprom },
+            persist_eeprom: !no_eeprom,
         },
     };
 

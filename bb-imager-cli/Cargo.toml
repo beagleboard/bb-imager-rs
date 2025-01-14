@@ -27,4 +27,4 @@ assets = [
 
 [features]
 default = []
-pb2_mspm0 = [ "bb-imager/pb2_mspm0" ]
+pb2_mspm0 = [ "bb-imager/pb2_mspm0_raw" ]

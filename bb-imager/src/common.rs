@@ -38,7 +38,7 @@ pub enum Destination {
         size: u64,
     },
     HidRaw(std::ffi::CString),
-    File(PathBuf),
+    File(String, PathBuf),
 }
 
 impl Destination {
@@ -62,8 +62,8 @@ impl Destination {
         Self::HidRaw(path)
     }
 
-    pub const fn file(path: PathBuf) -> Self {
-        Self::File(path)
+    pub const fn file(name: String, path: PathBuf) -> Self {
+        Self::File(name, path)
     }
 
     pub fn path(&self) -> PathBuf {
@@ -71,7 +71,7 @@ impl Destination {
             Destination::Port(p) => PathBuf::from(p),
             Destination::SdCard { path, .. } => PathBuf::from(path),
             Destination::HidRaw(p) => PathBuf::from(p.to_str().unwrap()),
-            Destination::File(p) => p.to_path_buf(),
+            Destination::File(_, p) => p.to_path_buf(),
         }
     }
 }
@@ -82,7 +82,7 @@ impl std::fmt::Display for Destination {
             Destination::Port(p) => write!(f, "{}", p),
             Destination::SdCard { name, .. } => write!(f, "{}", name),
             Destination::HidRaw(p) => write!(f, "{}", p.to_string_lossy()),
-            Destination::File(p) => write!(f, "{}", p.to_string_lossy()),
+            Destination::File(n, _) => write!(f, "{}", n),
         }
     }
 }
@@ -150,10 +150,10 @@ pub enum FlashingConfig {
         img: SelectedImage,
         port: std::ffi::CString,
     },
-    #[cfg(feature = "pb2_mspm0")]
+    #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
     Pb2Mspm0 {
         img: SelectedImage,
-        customization: crate::flasher::pb2_mspm0::FlashingPb2Mspm0Config,
+        persist_eeprom: bool,
     },
 }
 
@@ -211,8 +211,11 @@ impl FlashingConfig {
                     .await
                     .expect("Tokio runtime failed to spawn blocking task")
             }
-            #[cfg(feature = "pb2_mspm0")]
-            FlashingConfig::Pb2Mspm0 { img, customization } => {
+            #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
+            FlashingConfig::Pb2Mspm0 {
+                img,
+                persist_eeprom,
+            } => {
                 let mut img =
                     crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
                 tracing::info!("Image opened");
@@ -224,7 +227,7 @@ impl FlashingConfig {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
-                crate::flasher::pb2_mspm0::flash(bin, &chan, customization).await
+                crate::flasher::pb2_mspm0::flash(bin, &chan, persist_eeprom).await
             }
         }
     }
