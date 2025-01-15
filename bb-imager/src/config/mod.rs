@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, VecSkipError};
 use url::Url;
 
 use crate::{
@@ -19,9 +20,11 @@ pub struct Config {
     pub os_list: Vec<OsList>,
 }
 
+#[serde_as]
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct Imager {
     pub latest_version: Option<Version>,
+    #[serde_as(as = "VecSkipError<_>")]
     pub devices: Vec<Device>,
 }
 
