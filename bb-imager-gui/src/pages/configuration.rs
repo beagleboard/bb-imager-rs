@@ -41,6 +41,16 @@ pub fn view<'a>(
                         x.clone().update_verify(!y),
                     ))
                 })],
+            #[cfg(feature = "pb2_mspm0")]
+            FlashingCustomization::Pb2Mspm0 { persist_eeprom } => {
+                widget::column![widget::toggler(*persist_eeprom)
+                    .label("Persist EEPROM")
+                    .on_toggle(move |y| {
+                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0 {
+                            persist_eeprom: y,
+                        })
+                    })]
+            }
             _ => widget::column([]),
         }
         .spacing(5);
@@ -155,7 +165,9 @@ fn uname_pass_form(
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &bb_imager::flasher::FlashingSdLinuxConfig) -> widget::Container<BBImagerMessage> {
+fn wifi_form(
+    config: &bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![widget::toggler(config.wifi.is_some())
         .label("Configure Wireless LAN")
         .on_toggle(|t| {
@@ -195,6 +207,10 @@ pub enum FlashingCustomization {
     LinuxSd(bb_imager::flasher::FlashingSdLinuxConfig),
     Bcf(bb_imager::flasher::FlashingBcfConfig),
     Msp430,
+    #[cfg(feature = "pb2_mspm0")]
+    Pb2Mspm0 {
+        persist_eeprom: bool,
+    },
 }
 
 impl FlashingCustomization {
@@ -206,6 +222,10 @@ impl FlashingCustomization {
             bb_imager::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
             bb_imager::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
             bb_imager::config::Flasher::Msp430Usb => Self::Msp430,
+            #[cfg(feature = "pb2_mspm0")]
+            bb_imager::config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0 {
+                persist_eeprom: true,
+            },
         }
     }
 }

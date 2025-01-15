@@ -30,3 +30,6 @@ assets = [
 	["assets/packages/linux/BeagleBoardImager.desktop", "/usr/share/applications/org.beagleboard.bb-imager.desktop", "644"],
 	["assets/icons/icon.png", "/usr/share/icons/hicolor/128x128/apps/bb-imager.png", "644"]
 ]
+
+[features]
+pb2_mspm0 = ["bb-imager/pb2_mspm0_dbus"]

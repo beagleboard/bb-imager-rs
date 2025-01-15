@@ -230,6 +230,8 @@ pub enum Status {
     Verifying,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "zvariant", derive(zvariant::Type))]
 pub struct Device {
     pub name: String,
     pub path: PathBuf,

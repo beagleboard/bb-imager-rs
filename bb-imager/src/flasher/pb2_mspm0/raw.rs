@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 pub use bb_imager_flasher_pb2_mspm0::Error;
 
-pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     let d = bb_imager_flasher_pb2_mspm0::device();
     HashSet::from([crate::Destination::file(d.name, d.path)])
 }

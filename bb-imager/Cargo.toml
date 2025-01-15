@@ -33,6 +33,7 @@ futures = "0.3.31"
 tempfile = "3.14.0"
 cfg-if = "1.0.0"
 bb-imager-flasher-pb2-mspm0 = { path = "../bb-imager-flasher-pb2-mspm0", optional = true }
+zbus = { version = "5.3.0", default-features = false, features = ["tokio"], optional = true}
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = "0.1.0"
@@ -51,4 +52,4 @@ libc = "0.2.161"
 [features]
 default = []
 pb2_mspm0_raw = ["bb-imager-flasher-pb2-mspm0"]
-pb2_mspm0_dbus = []
+pb2_mspm0_dbus = ["zbus"]

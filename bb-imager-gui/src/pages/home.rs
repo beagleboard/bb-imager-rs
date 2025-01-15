@@ -15,6 +15,7 @@ pub fn view<'a>(
     selected_board: Option<&'a str>,
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a bb_imager::Destination>,
+    destination_selectable: bool,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
         let choose_device_btn = match selected_board {
@@ -36,15 +37,15 @@ pub fn view<'a>(
         });
 
         let choose_dst_btn = match selected_dst {
-            Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
+            Some(x) => home_btn_text(x.to_string(), destination_selectable, iced::Length::Fill),
             None => home_btn_text(
                 "CHOOSE DESTINATION",
-                selected_image.is_some(),
+                selected_image.is_some() && destination_selectable,
                 iced::Length::Fill,
             ),
         }
         .width(iced::Length::Fill)
-        .on_press_maybe(if selected_image.is_none() {
+        .on_press_maybe(if selected_image.is_none() || !destination_selectable {
             None
         } else {
             Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))

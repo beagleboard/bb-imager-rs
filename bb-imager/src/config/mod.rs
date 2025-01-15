@@ -101,9 +101,7 @@ impl Flasher {
             Flasher::BeagleConnectFreedom => tokio::task::block_in_place(bcf::possible_devices),
             Flasher::Msp430Usb => tokio::task::block_in_place(msp430::possible_devices),
             #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-            Flasher::Pb2Mspm0 => {
-                tokio::task::block_in_place(crate::flasher::pb2_mspm0::possible_devices)
-            }
+            Flasher::Pb2Mspm0 => crate::flasher::pb2_mspm0::possible_devices().await,
         }
     }
 
