@@ -75,6 +75,31 @@ async fn sysfs_w_open(path: &Path) -> std::io::Result<File> {
         .await
 }
 
+/// Check if the proper fw upload entries are present
+pub async fn check() -> Result<()> {
+    const FW_ENTRIES: &[&str] = &["loading", "status", "remaining_size"];
+
+    let fw_dir = Path::new(PATH);
+
+    for file in FW_ENTRIES {
+        check_file(file, &fw_dir.join(file)).await?;
+    }
+
+    Ok(())
+}
+
+async fn check_file(name: &'static str, path: &Path) -> Result<()> {
+    let temp = tokio::fs::try_exists(path)
+        .await
+        .map_err(|_| Error::FailedToOpen(name))?;
+
+    if temp {
+        Ok(())
+    } else {
+        Err(Error::FailedToOpen(name))
+    }
+}
+
 async fn flash_fw_api(
     base: &Path,
     firmware: &[u8],
@@ -198,6 +223,7 @@ pub fn device() -> Device {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Status {
     Preparing,
     Flashing(f32),
