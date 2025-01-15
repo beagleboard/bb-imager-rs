@@ -3,9 +3,15 @@ APPIMAGE_ARCH_x86_64-unknown-linux-gnu = x86_64
 APPIMAGE_ARCH_aarch64-unknown-linux-gnu = aarch64
 APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
 
+RUST_GUI_FEATURE_ARGS = $(RUST_FEATURE_ARGS)
+
+ifdef PB2_MSPM0
+	RUST_GUI_FEATURE_ARGS += -F pb2_mspm0
+endif
+
 build-gui-%:
 	$(info "Building GUI for $*")
-	$(RUST_BUILDER) build --release --target $* -p bb-imager-gui
+	$(RUST_BUILDER) build --release --target $* -p bb-imager-gui $(RUST_GUI_FEATURE_ARGS)
 
 # Special rule for macos universal binary
 build-gui-universal-apple-darwin: build-gui-aarch64-apple-darwin build-gui-x86_64-apple-darwin

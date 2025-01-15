@@ -4,5 +4,5 @@ Description=BeagleBoard Imaging Utility Service
 [Service]
 Type=dbus
 BusName=org.beagleboard.ImagingService
-ExecStart=/home/ayush/Documents/Programming/BeagleBoard/bb-imager-rs/pb2-mspm0/target/release/bb-imager-service
+ExecStart=/usr/bin/bb-imager-service
 User=root

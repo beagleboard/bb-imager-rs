@@ -1,7 +1,7 @@
 RUST_CLI_FEATURE_ARGS = $(RUST_FEATURE_ARGS)
 
 # Enable CLI specific features
-ifeq ($(PB2_MSPM0), 1)
+ifdef PB2_MSPM0
 	RUST_CLI_FEATURE_ARGS += -F pb2_mspm0
 endif
 
