@@ -21,12 +21,11 @@ build-gui-universal-apple-darwin: build-gui-aarch64-apple-darwin build-gui-x86_6
 
 package-gui-linux-appimage-%: build-gui-%
 	$(info "Create GUI Linux Appimage $*")
-	mkdir -p ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin
-	cp ${GUI_ASSETS_LINUX}/appimage/AppRun ${RELEASE_DIR_LINUX}/$*/AppDir/AppRun
-	cp target/$*/release/bb-imager-gui ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
-	cp ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop ${RELEASE_DIR_LINUX}/$*/AppDir/
+	install -D ${GUI_ASSETS_LINUX}/appimage/AppRun -t ${RELEASE_DIR_LINUX}/$*/AppDir/
+	install -D target/$*/release/bb-imager-gui -t ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
+	install -D -m 644 ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop -t ${RELEASE_DIR_LINUX}/$*/AppDir/
 	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${RELEASE_DIR_LINUX}/$*/AppDir/BeagleBoardImager.desktop
-	cp ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
+	install -D -m 644 ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
 	ARCH=${APPIMAGE_ARCH_$*} $(APPIMAGETOOL) --appimage-extract-and-run ${RELEASE_DIR_LINUX}/$*/AppDir ${RELEASE_DIR_LINUX}/$*/BeagleBoardImager.AppImage
 	rm -rf ${RELEASE_DIR_LINUX}/$*/AppDir
 
