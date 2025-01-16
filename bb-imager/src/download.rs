@@ -2,6 +2,7 @@
 
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
+#[cfg(feature = "config")]
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
@@ -87,6 +88,7 @@ impl Downloader {
         }
     }
 
+    #[cfg(feature = "config")]
     pub async fn download_json<T, U>(self, url: U) -> Result<T>
     where
         T: DeserializeOwned,

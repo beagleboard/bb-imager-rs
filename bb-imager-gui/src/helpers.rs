@@ -185,7 +185,7 @@ impl ProgressBarStatus {
 pub struct Device {
     pub description: String,
     pub icon: url::Url,
-    pub flasher: bb_imager::config::Flasher,
+    pub flasher: bb_imager::Flasher,
     pub documentation: url::Url,
 }
 
