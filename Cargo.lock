@@ -539,6 +539,7 @@ dependencies = [
  "iced",
  "iced_aw",
  "image 0.25.4",
+ "localzone",
  "notify-rust",
  "rfd",
  "tokio",
@@ -546,6 +547,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "webbrowser",
+ "whoami",
 ]
 
 [[package]]
@@ -2995,6 +2997,16 @@ name = "litemap"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee93343901ab17bd981295f2cf0026d4ad018c7c31ba84549a4ddbb47a45104"
+
+[[package]]
+name = "localzone"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "718530aa7b3842752f82224791ea1db5e6b7260513b8ab45706937dbf54f7b4d"
+dependencies = [
+ "js-sys",
+ "windows 0.54.0",
+]
 
 [[package]]
 name = "lock_api"
@@ -5938,6 +5950,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
+name = "wasite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8dad83b4f25e74f184f64c43b150b91efe7647395b42289f38e50566d82855b"
+
+[[package]]
 name = "wasm-bindgen"
 version = "0.2.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6293,6 +6311,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "whoami"
+version = "1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "372d5b87f58ec45c384ba03563b03544dc5fadc3983e434b286913f5b4a9bb6d"
+dependencies = [
+ "redox_syscall 0.5.3",
+ "wasite",
+ "web-sys",
+]
+
+[[package]]
 name = "widestring"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6355,6 +6384,16 @@ dependencies = [
 
 [[package]]
 name = "windows"
+version = "0.54.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9252e5725dbed82865af151df558e754e4a3c2c30818359eb17465f1346a1b49"
+dependencies = [
+ "windows-core 0.54.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows"
 version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1de69df01bdf1ead2f4ac895dc77c9351aefff65b2f3db429a343f9cbf05e132"
@@ -6379,6 +6418,16 @@ version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ab640c8d7e35bf8ba19b884ba838ceb4fba93a4e8c65a9059d08afcfc683d9"
 dependencies = [
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.54.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12661b9c89351d684a50a8a643ce5f608e20243b9fb84687800163429f161d65"
+dependencies = [
+ "windows-result 0.1.2",
  "windows-targets 0.52.6",
 ]
 

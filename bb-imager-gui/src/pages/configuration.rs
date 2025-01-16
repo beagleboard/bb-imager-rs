@@ -77,25 +77,6 @@ fn linux_sd_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
     config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Column<'a, BBImagerMessage> {
-    let xc = config.clone();
-    let timezone_box =
-        widget::combo_box(timezones, "Timezone", config.timezone.as_ref(), move |t| {
-            let tz = if t.is_empty() { None } else { Some(t) };
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
-                xc.clone().update_timezone(tz),
-            ))
-        })
-        .width(200);
-
-    let xc = config.clone();
-    let keymap_box = widget::combo_box(keymaps, "Keymap", config.keymap.as_ref(), move |t| {
-        let tz = if t.is_empty() { None } else { Some(t) };
-        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
-            xc.clone().update_keymap(tz),
-        ))
-    })
-    .width(200);
-
     widget::column![
         widget::container(
             widget::toggler(!config.verify)
@@ -109,26 +90,118 @@ fn linux_sd_form<'a>(
         .padding(10)
         .width(iced::Length::Fill)
         .style(widget::container::bordered_box),
-        widget::container(helpers::input_with_label(
-            "Set Hostname",
-            "beagle",
-            config.hostname.as_deref().unwrap_or_default(),
-            |inp| {
-                let h = if inp.is_empty() { None } else { Some(inp) };
-                FlashingCustomization::LinuxSd(config.clone().update_hostname(h))
-            }
-        ))
-        .style(widget::container::bordered_box),
-        widget::container(helpers::element_with_label(
-            "Set Timezone",
-            timezone_box.into()
-        ))
-        .style(widget::container::bordered_box),
-        widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
-            .style(widget::container::bordered_box),
+        hostname_form(config).width(iced::Length::Fill),
+        timezone_form(timezones, config).width(iced::Length::Fill),
+        keymap_form(keymaps, config).width(iced::Length::Fill),
         uname_pass_form(config).width(iced::Length::Fill),
         wifi_form(config).width(iced::Length::Fill)
     ]
+}
+
+fn keymap_form<'a>(
+    keymaps: &'a widget::combo_box::State<String>,
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<'a, BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.keymap.is_some())
+            .label("Set Keymap")
+            .on_toggle(|t| {
+                let keymap = if t { Some(String::from("us")) } else { None };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_keymap(keymap),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(keymap) = &config.keymap {
+        let xc = config.clone();
+
+        let keymap_box = widget::combo_box(keymaps, "Keymap", Some(keymap), move |t| {
+            let tz = if t.is_empty() { None } else { Some(t) };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                xc.clone().update_keymap(tz),
+            ))
+        })
+        .width(200);
+        form = form.push(keymap_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
+}
+
+fn hostname_form(
+    config: &bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.hostname.is_some())
+            .label("Set Hostname")
+            .on_toggle(|t| {
+                let hostname = if t {
+                    whoami::fallible::hostname().ok()
+                } else {
+                    None
+                };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_hostname(hostname),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(hostname) = &config.hostname {
+        let xc = config.clone();
+
+        let hostname_box = widget::text_input("beagle", hostname)
+            .on_input(move |inp| {
+                let h = if inp.is_empty() { None } else { Some(inp) };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    xc.clone().update_hostname(h),
+                ))
+            })
+            .width(200);
+        form = form.push(hostname_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
+}
+
+fn timezone_form<'a>(
+    timezones: &'a widget::combo_box::State<String>,
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<'a, BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.timezone.is_some())
+            .label("Set Timezone")
+            .on_toggle(|t| {
+                let tz = if t { helpers::system_timezone() } else { None };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_timezone(tz.cloned()),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(tz) = &config.timezone {
+        let xc = config.clone();
+
+        let timezone_box = widget::combo_box(timezones, "Timezone", Some(tz), move |t| {
+            let tz = if t.is_empty() { None } else { Some(t) };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                xc.clone().update_timezone(tz),
+            ))
+        })
+        .width(200);
+        form = form.push(timezone_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn uname_pass_form(
@@ -138,7 +211,7 @@ fn uname_pass_form(
         .label("Configure Username and Password")
         .on_toggle(|t| {
             let c = if t {
-                Some((std::env::var("USER").unwrap_or_default(), String::new()))
+                Some((whoami::username(), String::new()))
             } else {
                 None
             };

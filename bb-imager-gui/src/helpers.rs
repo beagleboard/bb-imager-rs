@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    sync::LazyLock,
 };
 
 use bb_imager::DownloadFlashingStatus;
@@ -427,4 +428,11 @@ impl<T> AsRef<T> for Tainted<T> {
     fn as_ref(&self) -> &T {
         &self.inner
     }
+}
+
+pub fn system_timezone() -> Option<&'static String> {
+    static SYSTEM_TIMEZONE: LazyLock<Option<String>> =
+        LazyLock::new(|| localzone::get_local_zone());
+
+    (*SYSTEM_TIMEZONE).as_ref()
 }

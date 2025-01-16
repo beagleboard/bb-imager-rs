@@ -21,6 +21,8 @@ notify-rust = "4.11.3"
 url = { version = "2.5.2" }
 chrono = { version = "0.4.38" }
 futures-util = "0.3.31"
+whoami = "1.5.2"
+localzone = "0.3.1"
 
 [build-dependencies]
 embed-resource = "2.5.0"
