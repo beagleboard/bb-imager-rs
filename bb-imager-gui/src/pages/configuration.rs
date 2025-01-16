@@ -77,15 +77,6 @@ fn linux_sd_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
     config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Column<'a, BBImagerMessage> {
-    let xc = config.clone();
-    let keymap_box = widget::combo_box(keymaps, "Keymap", config.keymap.as_ref(), move |t| {
-        let tz = if t.is_empty() { None } else { Some(t) };
-        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
-            xc.clone().update_keymap(tz),
-        ))
-    })
-    .width(200);
-
     widget::column![
         widget::container(
             widget::toggler(!config.verify)
@@ -101,11 +92,44 @@ fn linux_sd_form<'a>(
         .style(widget::container::bordered_box),
         hostname_form(config).width(iced::Length::Fill),
         timezone_form(timezones, config).width(iced::Length::Fill),
-        widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
-            .style(widget::container::bordered_box),
+        keymap_form(keymaps, config).width(iced::Length::Fill),
         uname_pass_form(config).width(iced::Length::Fill),
         wifi_form(config).width(iced::Length::Fill)
     ]
+}
+
+fn keymap_form<'a>(
+    keymaps: &'a widget::combo_box::State<String>,
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<'a, BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.keymap.is_some())
+            .label("Set Keymap")
+            .on_toggle(|t| {
+                let keymap = if t { Some(String::from("us")) } else { None };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_keymap(keymap),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(keymap) = &config.keymap {
+        let xc = config.clone();
+
+        let keymap_box = widget::combo_box(keymaps, "Keymap", Some(keymap), move |t| {
+            let tz = if t.is_empty() { None } else { Some(t) };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                xc.clone().update_keymap(tz),
+            ))
+        })
+        .width(200);
+        form = form.push(keymap_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn hostname_form(
