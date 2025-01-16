@@ -3,7 +3,7 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use helpers::{ProgressBarState, Tainted};
-use iced::{futures::SinkExt, widget, Element, Task};
+use iced::{futures::SinkExt, widget, Element, Subscription, Task};
 use pages::{configuration::FlashingCustomization, Screen};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -40,6 +40,7 @@ fn main() -> iced::Result {
     };
 
     iced::application(constants::APP_NAME, BBImager::update, BBImager::view)
+        .subscription(BBImager::subscription)
         .theme(BBImager::theme)
         .window(settings)
         .font(constants::FONT_REGULAR_BYTES)
@@ -80,7 +81,6 @@ enum BBImagerMessage {
     SwitchScreen(Screen),
     Search(String),
     Destinations(HashSet<bb_imager::Destination>),
-    RefreshDestinations,
     Reset,
     ResetConfig,
 
@@ -258,9 +258,6 @@ impl BBImager {
                 self.screen = x;
                 match x {
                     Screen::Home => self.back_home(),
-                    Screen::DestinationSelection => {
-                        return self.refresh_destinations();
-                    }
                     Screen::ExtraConfiguration => {
                         if self.customization.is_none() {
                             self.customization = Some(Tainted::new(self.config()))
@@ -322,9 +319,6 @@ impl BBImager {
                     self.selected_dst = Some(temp[0].clone());
                 }
                 self.destinations = x;
-            }
-            BBImagerMessage::RefreshDestinations => {
-                return self.refresh_destinations();
             }
             BBImagerMessage::UpdateFlashConfig(x) => {
                 self.customization = Some(Tainted::new_tainted(x))
@@ -448,10 +442,15 @@ impl BBImager {
 
         self.destination_selectable = flasher.destination_selectable();
 
-        Task::perform(
-            async move { flasher.destinations().await },
-            BBImagerMessage::Destinations,
-        )
+        // Do not use subscription for static destinations
+        if !self.destination_selectable {
+            Task::perform(
+                async move { flasher.destinations().await },
+                BBImagerMessage::Destinations,
+            )
+        } else {
+            Task::none()
+        }
     }
 
     fn config(&self) -> FlashingCustomization {
@@ -564,5 +563,24 @@ impl BBImager {
         self.cancel_flashing = Some(h);
 
         t
+    }
+
+    fn subscription(&self) -> Subscription<BBImagerMessage> {
+        if let Some(board) = self.selected_board.as_ref() {
+            // Do not use subscription for static destinations
+            if self.destination_selectable {
+                let flasher = self.boards.device(board).flasher;
+
+                let stream = futures_util::stream::unfold(flasher, |f| async move {
+                    let dsts = f.destinations().await;
+                    let dsts = BBImagerMessage::Destinations(dsts);
+                    Some((dsts, f))
+                });
+
+                return Subscription::run_with_id(board.to_string(), stream);
+            }
+        }
+
+        Subscription::none()
     }
 }

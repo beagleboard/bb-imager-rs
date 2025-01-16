@@ -535,6 +535,7 @@ dependencies = [
  "bb-imager",
  "chrono",
  "embed-resource",
+ "futures-util",
  "iced",
  "iced_aw",
  "image 0.25.4",

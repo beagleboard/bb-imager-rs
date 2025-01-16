@@ -49,7 +49,7 @@ pub fn view<'a>(
     let items = widget::scrollable(widget::column(items).spacing(10));
 
     widget::column![
-        helpers::search_bar(None, search_bar),
+        helpers::search_bar(search_bar),
         widget::horizontal_rule(2),
         items
     ]

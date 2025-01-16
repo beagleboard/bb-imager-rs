@@ -20,6 +20,7 @@ webbrowser = "1.0.2"
 notify-rust = "4.11.3"
 url = { version = "2.5.2" }
 chrono = { version = "0.4.38" }
+futures-util = "0.3.31"
 
 [build-dependencies]
 embed-resource = "2.5.0"

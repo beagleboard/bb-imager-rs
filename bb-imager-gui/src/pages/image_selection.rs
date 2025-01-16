@@ -84,7 +84,7 @@ where
         .map(Into::into);
 
     widget::column![
-        helpers::search_bar(None, search_bar),
+        helpers::search_bar(search_bar),
         widget::horizontal_rule(2),
         widget::scrollable(widget::column(items).spacing(10))
     ]
