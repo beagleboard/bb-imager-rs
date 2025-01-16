@@ -1,5 +1,6 @@
 [package]
 name = "bb-imager-service"
+description = "BeagleBoard Imaging Service"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
