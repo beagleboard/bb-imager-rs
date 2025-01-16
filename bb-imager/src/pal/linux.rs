@@ -14,7 +14,7 @@ pub enum Error {
     FailedToFormat(String),
     #[error("Zbus Error: {0}")]
     #[cfg(feature = "udisks2")]
-    DbusClientError(#[from] udisks2::zbus::Error),
+    Zbus(#[from] udisks2::zbus::Error),
 }
 
 #[cfg(feature = "udisks2")]

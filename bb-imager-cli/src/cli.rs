@@ -17,7 +17,7 @@ pub enum Commands {
     Flash {
         #[command(subcommand)]
         /// Type of BeagleBoard to flash
-        target: TargetCommands,
+        target: Box<TargetCommands>,
 
         #[arg(long)]
         /// Suppress standard output messages for a quieter experience.

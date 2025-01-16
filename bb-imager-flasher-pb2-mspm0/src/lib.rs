@@ -50,7 +50,7 @@ pub async fn flash(
             .map_err(|_| Error::FailedToRead("EEPROM"))?;
     }
 
-    flash_fw_api(Path::new(PATH), &firmware, chan).await?;
+    flash_fw_api(Path::new(PATH), firmware, chan).await?;
 
     // Write back EEPROM contents
     if persist_eeprom {
@@ -206,8 +206,7 @@ async fn flash_fw_api(
                 return Err(Error::FlashingError {
                     stage: resp[0].to_string(),
                     code: resp[1].to_string(),
-                }
-                .into());
+                });
             }
         }
     }

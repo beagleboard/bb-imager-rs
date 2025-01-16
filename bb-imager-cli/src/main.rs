@@ -1,3 +1,5 @@
+#![allow(clippy::literal_string_with_formatting_args)]
+
 mod cli;
 
 use bb_imager::DownloadFlashingStatus;
@@ -10,7 +12,7 @@ async fn main() {
     let opt = Opt::parse();
 
     match opt.command {
-        Commands::Flash { target, quiet } => flash(target, quiet).await,
+        Commands::Flash { target, quiet } => flash(*target, quiet).await,
         Commands::Format { dst, quiet } => format(dst, quiet).await,
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
