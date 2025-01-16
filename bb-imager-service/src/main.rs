@@ -7,7 +7,7 @@ struct Pb2Mspm0 {
     conn: connection::Connection,
 }
 
-#[interface(name = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0")]
+#[interface(name = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0v1")]
 impl Pb2Mspm0 {
     const AUTH_ACTION_ID: &str = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0.authn";
 
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _conn = connection::Builder::system()?
         .name("org.beagleboard.ImagingService")?
         .serve_at(
-            "/org/beagleboard/ImagingService/Pocketbeagle2Mspm0",
+            "/org/beagleboard/ImagingService/Pocketbeagle2Mspm0v1",
             pb2_mspm0,
         )?
         .build()

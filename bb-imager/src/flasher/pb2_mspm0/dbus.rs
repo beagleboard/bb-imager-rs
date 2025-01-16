@@ -28,9 +28,9 @@ pub enum FlashingStatus {
 }
 
 #[proxy(
-    interface = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0",
+    interface = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0v1",
     default_service = "org.beagleboard.ImagingService",
-    default_path = "/org/beagleboard/ImagingService/Pocketbeagle2Mspm0"
+    default_path = "/org/beagleboard/ImagingService/Pocketbeagle2Mspm0v1"
 )]
 pub trait Pocketbeagle2Mspm0 {
     /// Check method
@@ -70,6 +70,8 @@ pub async fn flash(
     let proxy = Pocketbeagle2Mspm0Proxy::new(&connection)
         .await
         .map_err(Error::from)?;
+
+    proxy.check().await.map_err(Error::from)?;
 
     let (_, _, flash_size) = proxy.device().await.map_err(Error::from)?;
     let firmware = img
