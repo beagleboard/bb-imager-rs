@@ -1,6 +1,17 @@
+# Map Rust targets with Appimage Arch
+APPIMAGE_ARCH_x86_64-unknown-linux-gnu = x86_64
+APPIMAGE_ARCH_aarch64-unknown-linux-gnu = aarch64
+APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
+
+RUST_GUI_FEATURE_ARGS = $(RUST_FEATURE_ARGS)
+
+ifdef PB2_MSPM0
+	RUST_GUI_FEATURE_ARGS += -F pb2_mspm0
+endif
+
 build-gui-%:
 	$(info "Building GUI for $*")
-	$(RUST_BUILDER) build --release --target $* -p bb-imager-gui
+	$(RUST_BUILDER) build --release --target $* -p bb-imager-gui $(RUST_GUI_FEATURE_ARGS)
 
 # Special rule for macos universal binary
 build-gui-universal-apple-darwin: build-gui-aarch64-apple-darwin build-gui-x86_64-apple-darwin
@@ -10,18 +21,21 @@ build-gui-universal-apple-darwin: build-gui-aarch64-apple-darwin build-gui-x86_6
 
 package-gui-linux-appimage-%: build-gui-%
 	$(info "Create GUI Linux Appimage $*")
-	mkdir -p ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin
-	cp ${GUI_ASSETS_LINUX}/appimage/AppRun ${RELEASE_DIR_LINUX}/$*/AppDir/AppRun
-	cp target/$*/release/bb-imager-gui ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
-	cp ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop ${RELEASE_DIR_LINUX}/$*/AppDir/
+	install -D ${GUI_ASSETS_LINUX}/appimage/AppRun -t ${RELEASE_DIR_LINUX}/$*/AppDir/
+	install -D target/$*/release/bb-imager-gui -t ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
+	install -D -m 644 ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop -t ${RELEASE_DIR_LINUX}/$*/AppDir/
 	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${RELEASE_DIR_LINUX}/$*/AppDir/BeagleBoardImager.desktop
-	cp ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
+	install -D -m 644 ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
 	ARCH=${APPIMAGE_ARCH_$*} $(APPIMAGETOOL) --appimage-extract-and-run ${RELEASE_DIR_LINUX}/$*/AppDir ${RELEASE_DIR_LINUX}/$*/BeagleBoardImager.AppImage
 	rm -rf ${RELEASE_DIR_LINUX}/$*/AppDir
 
 package-gui-linux-deb-%: build-gui-%
 	$(info "Create GUI Linux deb $*")
-	cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
+ifeq ($(RUST_BUILDER_NAME), cross)
+	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip"
+else
+	$(RUST_BUILDER) deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
+endif
 
 package-gui-darwin-dmg-%: build-gui-%
 	$(info "Create GUI Darwin dmg $*")

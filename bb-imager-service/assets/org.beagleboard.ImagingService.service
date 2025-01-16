@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.beagleboard.ImagingService
+Exec=/bin/false
+SystemdService=dbus-org.beagleboard.ImagingService.service

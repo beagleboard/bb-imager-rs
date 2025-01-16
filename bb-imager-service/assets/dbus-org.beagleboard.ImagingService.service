@@ -1,0 +1,8 @@
+[Unit]
+Description=BeagleBoard Imaging Utility Service
+
+[Service]
+Type=dbus
+BusName=org.beagleboard.ImagingService
+ExecStart=/usr/bin/bb-imager-service
+User=root

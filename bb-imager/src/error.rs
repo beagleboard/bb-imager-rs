@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::flasher::{bcf, msp430, sd};
 
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
@@ -30,5 +31,8 @@ pub enum Error {
     LinuxError(#[from] crate::pal::linux::Error),
     #[cfg(target_os = "macos")]
     #[error("{0}")]
-    MacosError(#[from] crate::pal::macos::Error)
+    MacosError(#[from] crate::pal::macos::Error),
+    #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
+    #[error("Pb2 MSPM0 Error: {0}")]
+    Pb2Error(#[from] crate::flasher::pb2_mspm0::Error)
 }

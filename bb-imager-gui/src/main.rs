@@ -64,6 +64,9 @@ struct BBImager {
 
     timezones: widget::combo_box::State<String>,
     keymaps: widget::combo_box::State<String>,
+
+    // Flag to indicate if destinations are selectable
+    destination_selectable: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +136,7 @@ impl BBImager {
                     .map(|x| x.to_string())
                     .collect(),
             ),
+            destination_selectable: true,
             ..Default::default()
         };
 
@@ -184,6 +188,8 @@ impl BBImager {
                 self.selected_board = Some(x);
                 self.back_home();
 
+                let refresh_job = self.refresh_destinations();
+
                 let jobs = icons.into_iter().map(|x| {
                     Task::perform(
                         self.downloader.clone().download_without_sha(x.clone()),
@@ -197,7 +203,7 @@ impl BBImager {
                     )
                 });
 
-                return Task::batch(jobs.chain([self.refresh_destinations()]));
+                return Task::batch(jobs.chain([refresh_job]));
             }
             BBImagerMessage::ProgressBar(x) => {
                 if let Some(state) = self.flashing_state.take() {
@@ -310,6 +316,11 @@ impl BBImager {
                 return Task::batch([progress_task, notification_task]);
             }
             BBImagerMessage::Destinations(x) => {
+                if !self.destination_selectable {
+                    assert_eq!(x.len(), 1);
+                    let temp: Vec<&bb_imager::Destination> = x.iter().collect();
+                    self.selected_dst = Some(temp[0].clone());
+                }
                 self.destinations = x;
             }
             BBImagerMessage::RefreshDestinations => {
@@ -337,6 +348,7 @@ impl BBImager {
                 self.selected_board.as_deref(),
                 self.selected_image.as_ref(),
                 self.selected_dst.as_ref(),
+                self.destination_selectable,
             ),
             Screen::BoardSelection => {
                 pages::board_selection::view(&self.boards, &self.search_bar, &self.downloader)
@@ -380,6 +392,7 @@ impl BBImager {
                     self.selected_board.as_deref(),
                     self.selected_image.as_ref(),
                     self.selected_dst.as_ref(),
+                    self.destination_selectable,
                 );
                 let menu = widget::column![
                     widget::text("Would you like to apply customization settings?"),
@@ -427,11 +440,13 @@ impl BBImager {
         self.screen = Screen::Home;
     }
 
-    fn refresh_destinations(&self) -> Task<BBImagerMessage> {
+    fn refresh_destinations(&mut self) -> Task<BBImagerMessage> {
         let flasher = self
             .boards
             .device(self.selected_board.as_ref().expect("Missing board"))
             .flasher;
+
+        self.destination_selectable = flasher.destination_selectable();
 
         Task::perform(
             async move { flasher.destinations().await },
@@ -487,6 +502,15 @@ impl BBImager {
                 FlashingCustomization::Msp430,
                 Some(bb_imager::Destination::HidRaw(port)),
             ) => bb_imager::common::FlashingConfig::Msp430 { img, port },
+            #[cfg(feature = "pb2_mspm0")]
+            (
+                Some(helpers::BoardImage::Image(img)),
+                FlashingCustomization::Pb2Mspm0 { persist_eeprom },
+                _,
+            ) => bb_imager::common::FlashingConfig::Pb2Mspm0 {
+                img,
+                persist_eeprom,
+            },
             _ => unreachable!(),
         }
     }

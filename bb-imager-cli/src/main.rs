@@ -10,25 +10,8 @@ async fn main() {
     let opt = Opt::parse();
 
     match opt.command {
-        Commands::Flash {
-            img,
-            dst,
-            target,
-            image_remote,
-            image_sha256,
-        } => {
-            let img = if let Some(local) = img {
-                bb_imager::SelectedImage::local(local)
-            } else if let (Some(remote), Some(sha)) = (image_remote, image_sha256) {
-                let sha = const_hex::decode_to_array(sha).unwrap();
-                bb_imager::SelectedImage::remote("Remote image".to_string(), remote, sha)
-            } else {
-                unreachable!()
-            };
-
-            flash(img, dst, target, opt.quiet).await
-        }
-        Commands::Format { dst } => format(dst, opt.quiet).await,
+        Commands::Flash { target, quiet } => flash(target, quiet).await,
+        Commands::Format { dst, quiet } => format(dst, quiet).await,
         Commands::ListDestinations { target, no_frills } => {
             list_destinations(target, no_frills).await;
         }
@@ -36,7 +19,7 @@ async fn main() {
     }
 }
 
-async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommands, quite: bool) {
+async fn flash(target: TargetCommands, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
@@ -113,15 +96,20 @@ async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommand
     }
 
     let flashing_config = match target {
-        TargetCommands::Bcf { no_verify } => {
-            let customization = bb_imager::FlashingBcfConfig { verify: !no_verify };
+        TargetCommands::Bcf {
+            img,
+            dst,
+            no_verify,
+        } => {
+            let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
             bb_imager::FlashingConfig::BeagleConnectFreedom {
-                img,
+                img: img.into(),
                 port: dst,
                 customization,
             }
         }
         TargetCommands::Sd {
+            dst,
             no_verify,
             hostname,
             timezone,
@@ -130,11 +118,12 @@ async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommand
             user_password,
             wifi_ssid,
             wifi_password,
+            img,
         } => {
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_imager::FlashingSdLinuxConfig {
+            let customization = bb_imager::flasher::FlashingSdLinuxConfig {
                 verify: !no_verify,
                 hostname,
                 timezone,
@@ -143,14 +132,19 @@ async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommand
                 wifi,
             };
             bb_imager::FlashingConfig::LinuxSd {
-                img,
+                img: img.into(),
                 dst,
                 customization,
             }
         }
-        TargetCommands::Msp430 => bb_imager::FlashingConfig::Msp430 {
-            img,
+        TargetCommands::Msp430 { img, dst } => bb_imager::FlashingConfig::Msp430 {
+            img: img.into(),
             port: CString::new(dst).expect("Failed to parse destination"),
+        },
+        #[cfg(feature = "pb2_mspm0")]
+        TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
+            img: img.into(),
+            persist_eeprom: !no_eeprom,
         },
     };
 
@@ -163,6 +157,7 @@ async fn flash(img: bb_imager::SelectedImage, dst: String, target: TargetCommand
 async fn format(dst: String, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, _) = tokio::sync::mpsc::channel(20);
+    let term = console::Term::stdout();
 
     let config = bb_imager::FlashingConfig::LinuxSdFormat { dst };
     config
@@ -171,7 +166,7 @@ async fn format(dst: String, quite: bool) {
         .unwrap();
 
     if !quite {
-        println!("Formatting successful");
+        term.write_line("Formatting successful").unwrap();
     }
 }
 
@@ -257,7 +252,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
 
             term.write_line(&table_border).unwrap();
         }
-        DestinationsTarget::Bcf | DestinationsTarget::Msp430 => {
+        _ => {
             for d in dsts {
                 term.write_line(d.to_string().as_str()).unwrap();
             }
@@ -294,6 +289,21 @@ impl From<DestinationsTarget> for bb_imager::config::Flasher {
             DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
             DestinationsTarget::Sd => Self::SdCard,
             DestinationsTarget::Msp430 => Self::Msp430Usb,
+            #[cfg(feature = "pb2_mspm0")]
+            DestinationsTarget::Pb2Mspm0 => Self::Pb2Mspm0,
+        }
+    }
+}
+
+impl From<cli::SelectedImage> for bb_imager::SelectedImage {
+    fn from(value: cli::SelectedImage) -> Self {
+        match (value.img.img_local, value.img.img_remote, value.img_sha256) {
+            (Some(p), None, None) => Self::local(p),
+            (None, Some(u), Some(c)) => {
+                let sha = const_hex::decode_to_array(c).expect("Invalid SHA256");
+                Self::remote(String::new(), u, sha)
+            }
+            _ => unreachable!(),
         }
     }
 }

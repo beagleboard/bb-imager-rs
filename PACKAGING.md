@@ -49,6 +49,12 @@ make package-cli-linux-deb-{target}
 make package-gui-linux-deb-{target}
 ```
 
+- Service
+
+```
+make package-service-linux-deb-{target}
+```
+
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
@@ -73,10 +79,18 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## Linux Generic
 
-Just a tarball of everything. Useful for creating packages that need to be maintained out of tree. Only supported for CLI for now.
+Just a tarball of everything. Useful for creating packages that need to be maintained out of tree.
+
+- CLI
 
 ```
 make package-cli-linux-xz-{target}
+```
+
+- Service
+
+```
+make package-service-linux-xz-{target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -137,6 +151,9 @@ MacOS Package cannot be built on a non-MacOS host.
 
 # Cross Compilation
 
-Cross Compilation is not well supported at the moment. I have used [cross](https://github.com/cross-rs/cross) in the past with some success, but since most of Docker-in-Docker requires special runners on [openbeagle](https://openbeagle.org/), I ended up dropping cross.
+Cross Compilation for linux is supported using [cross](https://github.com/cross-rs/cross). It is important to note that the git version of `cross` is required right now.
 
-It is still possible to try building the packages with [cross](https://github.com/cross-rs/cross) by setting the `RUST_BUILDER=cross` environment variable. PRs are welcome.
+```
+cargo install cross --git https://github.com/cross-rs/cross
+RUST_BUILDER=$(which cross) make {target}
+```

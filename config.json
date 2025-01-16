@@ -1,86 +1,107 @@
 {
-    "imager": {
-        "latest_version": "2.0.0",
-        "devices": [
-            {
-                "name": "BeagleConnect Freedom",
-                "description": "BeagleConnect Freedom based on Ti CC1352P7",
-                "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
-                "flasher": "BeagleConnectFreedom",
-                "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
-            },
-            {
-                "name": "BeagleConnect Freedom MSP430",
-                "description": "BeagleConnect Freedom USB to UART bridge based on MSP430F5503",
-                "icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
-                "flasher": "Msp430Usb",
-                "documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
-            },
-            {
-                "name": "BeagleY-AI",
-                "description": "BeagleY-AI based on TI AM67A",
-                "icon": "https://www.beagleboard.org/app/uploads/2024/06/beagley-ai.svg",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/boards/beagley/ai/index.html#beagley-ai-home"
-            },
-            {
-                "name": "BeaglePlay",
-                "description": "BeaglePlay and other boards based on TI AM62",
-                "icon": "https://www.beagleboard.org/app/uploads/2024/03/image6.png",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/boards/beagleplay/index.html#beagleplay-home"
-            },
-            {
-                "name": "BeagleBone AI-64",
-                "description": "BeagleBone AI-64 based on TI TDA4VM",
-                "icon": "https://www.beagleboard.org/app/uploads/2024/06/bbai64-front-a-2.png",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html#bbai64-home"
-            },
-            {
-                "name": "BeagleV-Fire",
-                "description": "BeagleV-Fire based on Microchip PolarFire SoC",
-                "icon": "https://www.beagleboard.org/app/uploads/2023/10/1-102110898-BeagleV-Fire-45-degree-front.jpg",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home"
-            },
-            {
-                "name": "BeagleBone Black",
-                "description": "BeagleBone Black and other boards based on TI AM335",
-                "icon": "https://www.beagleboard.org/app/uploads/2022/10/product_beaglebone_black.jpg",
-                "flasher": "SdCard",
-                "documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home"
-            }
-        ]
-    },
-    "os_list": [
-        {
-            "name": "MicroBlocks",
-            "description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-            "icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-            "url": "https://openbeagle.org/api/v4/projects/809/packages/generic/stable/244/microblocks.bin.xz",
-            "release_date": "2024-07-31",
-            "image_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
-            "devices": [
-                "BeagleConnect Freedom"
-            ],
-            "tags": [
-                "zephyr"
-            ]
-        },
-        {
-            "name": "BeagleConnect Freedom MSP430 USB To UART Bridge",
-            "description": "MSP430 USB to UART firmware with Windows Support",
-            "icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-            "url": "https://openbeagle.org/beagleconnect/msp430/usb_uart_bridge/-/jobs/38525/artifacts/raw/usb_uart_bridge.hex?inline=false",
-            "release_date": "2024-09-19",
-            "image_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
-            "devices": [
-                "BeagleConnect Freedom MSP430"
-            ],
-            "tags": [
-                "freertos"
-            ]
-        }
-    ]
+	"imager": {
+		"latest_version": "2.0.0",
+		"devices": [
+			{
+				"name": "BeagleConnect Freedom",
+				"description": "BeagleConnect Freedom based on Ti CC1352P7",
+				"icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
+				"flasher": "BeagleConnectFreedom",
+				"documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
+			},
+			{
+				"name": "BeagleConnect Freedom MSP430",
+				"description": "BeagleConnect Freedom USB to UART bridge based on MSP430F5503",
+				"icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
+				"flasher": "Msp430Usb",
+				"documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
+			},
+			{
+				"name": "BeagleY-AI",
+				"description": "BeagleY-AI based on TI AM67A",
+				"icon": "https://www.beagleboard.org/app/uploads/2024/06/beagley-ai.svg",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/beagley/ai/index.html#beagley-ai-home"
+			},
+			{
+				"name": "BeaglePlay",
+				"description": "BeaglePlay and other boards based on TI AM62",
+				"icon": "https://www.beagleboard.org/app/uploads/2024/03/image6.png",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/beagleplay/index.html#beagleplay-home"
+			},
+			{
+				"name": "BeagleBone AI-64",
+				"description": "BeagleBone AI-64 based on TI TDA4VM",
+				"icon": "https://www.beagleboard.org/app/uploads/2024/06/bbai64-front-a-2.png",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html#bbai64-home"
+			},
+			{
+				"name": "BeagleV-Fire",
+				"description": "BeagleV-Fire based on Microchip PolarFire SoC",
+				"icon": "https://www.beagleboard.org/app/uploads/2023/10/1-102110898-BeagleV-Fire-45-degree-front.jpg",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home"
+			},
+			{
+				"name": "BeagleBone Black",
+				"description": "BeagleBone Black and other boards based on TI AM335",
+				"icon": "https://www.beagleboard.org/app/uploads/2022/10/product_beaglebone_black.jpg",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home"
+			},
+			{
+				"name": "PocketBeagle2 MSPM0",
+				"description": "",
+				"icon": "https://in.element14.com/productimages/large/en_GB/2806159-40.jpg",
+				"flasher": "Pb2Mspm0",
+				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle/ch01.html"
+			}
+		]
+	},
+	"os_list": [
+		{
+			"name": "MicroBlocks",
+			"description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
+			"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+			"url": "https://openbeagle.org/api/v4/projects/809/packages/generic/stable/244/microblocks.bin.xz",
+			"release_date": "2024-07-31",
+			"image_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
+			"devices": [
+				"BeagleConnect Freedom"
+			],
+			"tags": [
+				"zephyr"
+			]
+		},
+		{
+			"name": "BeagleConnect Freedom MSP430 USB To UART Bridge",
+			"description": "MSP430 USB to UART firmware with Windows Support",
+			"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
+			"url": "https://openbeagle.org/beagleconnect/msp430/usb_uart_bridge/-/jobs/38525/artifacts/raw/usb_uart_bridge.hex?inline=false",
+			"release_date": "2024-09-19",
+			"image_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
+			"devices": [
+				"BeagleConnect Freedom MSP430"
+			],
+			"tags": [
+				"freertos"
+			]
+		},
+		{
+			"name": "MSPM0 ADC EEPROM",
+			"description": "Emulates EEPROM and ADC",
+			"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
+			"url": "http://pocketbeagle.beagleboard.io/-/mspm0-adc-eeprom/-/jobs/42684/artifacts/pcu_pocketbeagle2.txt",
+			"release_date": "2024-11-05",
+			"image_sha256": "f6f85213743371ec52d2631b7eee0294bbd170f36feabb4ca54e801cdcd9f110",
+			"devices": [
+				"PocketBeagle2 MSPM0"
+			],
+			"tags": [
+				"freertos"
+			]
+		}
+	]
 }

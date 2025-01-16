@@ -24,3 +24,7 @@ assets = [
 	["../target/shell-completion/_bb-imager-cli", "/usr/share/zsh/site-functions/", "644"],
 	["../target/shell-completion/bb-imager-cli.bash", "/usr/share/bash-completion/completions/bb-imager-cli", "644"]
 ]
+
+[features]
+default = []
+pb2_mspm0 = [ "bb-imager/pb2_mspm0_raw" ]

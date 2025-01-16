@@ -1,0 +1,26 @@
+[package]
+name = "bb-imager-service"
+description = "BeagleBoard Imaging Service"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+zbus = { version = "5.3.0", default-features = false, features = ["tokio"] }
+zbus_polkit = "5.0.0"
+bb-imager-flasher-pb2-mspm0 = { path = "../bb-imager-flasher-pb2-mspm0" , features = ["serde", "zvariant"] }
+serde_json = "1.0.135"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+[package.metadata.deb]
+assets = [
+	["target/release/bb-imager-service", "/usr/bin/bb-imager-service", "755"],
+	["assets/dbus-org.beagleboard.ImagingService.service", "/usr/lib/systemd/system/dbus-org.beagleboard.ImagingService.service", "644"],
+	["assets/org.beagleboard.ImagingService.conf", "/usr/share/dbus-1/system.d/org.beagleboard.ImagingService.conf", "644"],
+	["assets/org.beagleboard.ImagingService.policy", "/usr/share/polkit-1/actions/org.beagleboard.ImagingService.policy", "644"],
+	["assets/org.beagleboard.ImagingService.service", "/usr/share/dbus-1/system-services/org.beagleboard.ImagingService.service", "644"]
+]

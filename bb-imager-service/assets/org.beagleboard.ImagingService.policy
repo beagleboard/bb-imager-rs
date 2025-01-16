@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>BeagleBoard Imaging Service</vendor>
+  <vendor_url>https://openbeagle.org/ayush1325/bb-imager-rs</vendor_url>
+  <icon_name>bb-imager</icon_name>
+  <action id="org.beagleboard.ImagingService.Pocketbeagle2Mspm0.authn">
+    <description>Autorize Pocketbeagle2 MSPM0 flashing</description>
+    <message>Authentication is required to flash mspm0</message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>
