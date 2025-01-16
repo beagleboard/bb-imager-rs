@@ -214,16 +214,16 @@ pub enum FlashingCustomization {
 }
 
 impl FlashingCustomization {
-    pub fn new(flasher: bb_imager::config::Flasher, img: &helpers::BoardImage) -> Self {
+    pub fn new(flasher: bb_imager::Flasher, img: &helpers::BoardImage) -> Self {
         match flasher {
-            bb_imager::config::Flasher::SdCard if img == &helpers::BoardImage::SdFormat => {
+            bb_imager::Flasher::SdCard if img == &helpers::BoardImage::SdFormat => {
                 Self::LinuxSdFormat
             }
-            bb_imager::config::Flasher::SdCard => Self::LinuxSd(Default::default()),
-            bb_imager::config::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
-            bb_imager::config::Flasher::Msp430Usb => Self::Msp430,
+            bb_imager::Flasher::SdCard => Self::LinuxSd(Default::default()),
+            bb_imager::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
+            bb_imager::Flasher::Msp430Usb => Self::Msp430,
             #[cfg(feature = "pb2_mspm0")]
-            bb_imager::config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0 {
+            bb_imager::Flasher::Pb2Mspm0 => Self::Pb2Mspm0 {
                 persist_eeprom: true,
             },
         }

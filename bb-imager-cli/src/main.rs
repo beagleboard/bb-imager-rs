@@ -173,9 +173,7 @@ async fn format(dst: String, quite: bool) {
 async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
     let term = console::Term::stdout();
 
-    let dsts = bb_imager::config::Flasher::from(target)
-        .destinations()
-        .await;
+    let dsts = bb_imager::Flasher::from(target).destinations().await;
 
     if no_frills {
         for d in dsts {
@@ -283,7 +281,7 @@ fn generate_completion(target: clap_complete::Shell) {
     clap_complete::generate(target, &mut cmd, BIN_NAME, &mut std::io::stdout())
 }
 
-impl From<DestinationsTarget> for bb_imager::config::Flasher {
+impl From<DestinationsTarget> for bb_imager::Flasher {
     fn from(value: DestinationsTarget) -> Self {
         match value {
             DestinationsTarget::Bcf => Self::BeagleConnectFreedom,

@@ -1,4 +1,5 @@
 pub mod common;
+#[cfg(feature = "config")]
 pub mod config;
 pub mod download;
 pub mod error;

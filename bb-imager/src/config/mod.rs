@@ -9,10 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, VecSkipError};
 use url::Url;
 
-use crate::{
-    flasher::{bcf, msp430, sd},
-    Destination,
-};
+use crate::common::Flasher;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct Config {
@@ -50,15 +47,6 @@ pub struct OsList {
     pub tags: HashSet<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
-pub enum Flasher {
-    SdCard,
-    BeagleConnectFreedom,
-    Msp430Usb,
-    #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-    Pb2Mspm0,
-}
-
 impl Config {
     pub fn from_json(data: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(data)
@@ -93,36 +81,6 @@ impl From<compact::Config> for Config {
                 devices,
             },
             os_list,
-        }
-    }
-}
-
-impl Flasher {
-    pub async fn destinations(&self) -> HashSet<Destination> {
-        match self {
-            Flasher::SdCard => tokio::task::block_in_place(sd::destinations),
-            Flasher::BeagleConnectFreedom => tokio::task::block_in_place(bcf::possible_devices),
-            Flasher::Msp430Usb => tokio::task::block_in_place(msp430::possible_devices),
-            #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-            Flasher::Pb2Mspm0 => crate::flasher::pb2_mspm0::possible_devices().await,
-        }
-    }
-
-    pub fn destination_selectable(&self) -> bool {
-        match self {
-            #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-            Self::Pb2Mspm0 => false,
-            _ => true,
-        }
-    }
-
-    pub fn file_filter(&self) -> (&'static str, &'static [&'static str]) {
-        match self {
-            Flasher::SdCard => ("image", &["img", "xz"]),
-            Flasher::BeagleConnectFreedom => ("firmware", &["bin", "hex", "txt", "xz"]),
-            Flasher::Msp430Usb => ("firmware", &["hex", "txt", "xz"]),
-            #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-            Flasher::Pb2Mspm0 => ("firmware", &["hex", "txt", "xz"]),
         }
     }
 }
