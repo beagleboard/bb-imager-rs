@@ -138,7 +138,7 @@ fn uname_pass_form(
         .label("Configure Username and Password")
         .on_toggle(|t| {
             let c = if t {
-                Some((String::new(), String::new()))
+                Some((std::env::var("USER").unwrap_or_default(), String::new()))
             } else {
                 None
             };
