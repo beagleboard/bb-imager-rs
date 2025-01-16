@@ -100,7 +100,7 @@ fn linux_sd_form<'a>(
         .width(iced::Length::Fill)
         .style(widget::container::bordered_box),
         hostname_form(config).width(iced::Length::Fill),
-        timezone_toggle(timezones, config).width(iced::Length::Fill),
+        timezone_form(timezones, config).width(iced::Length::Fill),
         widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
             .style(widget::container::bordered_box),
         uname_pass_form(config).width(iced::Length::Fill),
@@ -108,9 +108,9 @@ fn linux_sd_form<'a>(
     ]
 }
 
-fn hostname_form<'a>(
-    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
-) -> widget::Container<'a, BBImagerMessage> {
+fn hostname_form(
+    config: &bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
@@ -146,7 +146,7 @@ fn hostname_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn timezone_toggle<'a>(
+fn timezone_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Container<'a, BBImagerMessage> {
