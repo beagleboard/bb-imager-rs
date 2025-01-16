@@ -8,6 +8,16 @@ use zbus::proxy;
 pub enum Error {
     #[error("{0}")]
     FlashingError(String),
+    #[error("{0}")]
+    ZbusError(zbus::Error),
+    #[error("Image is not valid")]
+    InvalidImage,
+}
+
+impl From<zbus::Error> for Error {
+    fn from(value: zbus::Error) -> Self {
+        Self::ZbusError(value)
+    }
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -37,13 +47,18 @@ pub trait Pocketbeagle2Mspm0 {
     fn status(&self, message: &str) -> zbus::Result<()>;
 }
 
-pub async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
-    let connection = zbus::Connection::system().await.unwrap();
-    let proxy = Pocketbeagle2Mspm0Proxy::new(&connection).await.unwrap();
+pub async fn possible_devices() -> HashSet<crate::Destination> {
+    if let Ok(connection) = zbus::Connection::system().await {
+        if let Ok(proxy) = Pocketbeagle2Mspm0Proxy::new(&connection).await {
+            if let Ok((name, path, _)) = proxy.device().await {
+                return HashSet::from([crate::Destination::file(name, PathBuf::from(path))]);
+            }
+        }
+    }
 
-    let (name, path, _) = proxy.device().await.unwrap();
+    tracing::error!("Maybe bb-imager-service is not installed");
 
-    HashSet::from([crate::Destination::file(name, PathBuf::from(path))])
+    HashSet::new()
 }
 
 pub async fn flash(
@@ -51,23 +66,32 @@ pub async fn flash(
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
     persist_eeprom: bool,
 ) -> crate::error::Result<()> {
-    let connection = zbus::Connection::system().await.unwrap();
-    let proxy = Pocketbeagle2Mspm0Proxy::new(&connection).await.unwrap();
+    let connection = zbus::Connection::system().await.map_err(Error::from)?;
+    let proxy = Pocketbeagle2Mspm0Proxy::new(&connection)
+        .await
+        .map_err(Error::from)?;
 
-    let (_, _, flash_size) = proxy.device().await.unwrap();
-    let firmware = img.to_bytes(0..(flash_size as usize), None).unwrap();
+    let (_, _, flash_size) = proxy.device().await.map_err(Error::from)?;
+    let firmware = img
+        .to_bytes(0..(flash_size as usize), None)
+        .map_err(|_| Error::InvalidImage)?;
 
-    let mut stream = proxy.receive_status().await.unwrap();
+    let mut stream = proxy.receive_status().await.map_err(Error::from)?;
     let chan_clone = chan.clone();
     let task = tokio::spawn(async move {
         while let Some(v) = stream.next().await {
-            let json = v.message().body().deserialize::<String>().unwrap();
-            let status = serde_json::from_str::<FlashingStatus>(&json).unwrap();
-            let _ = chan_clone.try_send(status.into());
+            if let Ok(json) = v.message().body().deserialize::<String>() {
+                if let Ok(status) = serde_json::from_str::<FlashingStatus>(&json) {
+                    let _ = chan_clone.try_send(status.into());
+                }
+            }
         }
     });
 
-    proxy.flash(&firmware, persist_eeprom).await.unwrap();
+    proxy
+        .flash(&firmware, persist_eeprom)
+        .await
+        .map_err(Error::from)?;
 
     task.abort();
 
