@@ -99,22 +99,51 @@ fn linux_sd_form<'a>(
         .padding(10)
         .width(iced::Length::Fill)
         .style(widget::container::bordered_box),
-        widget::container(helpers::input_with_label(
-            "Set Hostname",
-            "beagle",
-            config.hostname.as_deref().unwrap_or_default(),
-            |inp| {
-                let h = if inp.is_empty() { None } else { Some(inp) };
-                FlashingCustomization::LinuxSd(config.clone().update_hostname(h))
-            }
-        ))
-        .style(widget::container::bordered_box),
+        hostname_form(config).width(iced::Length::Fill),
         timezone_toggle(timezones, config).width(iced::Length::Fill),
         widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
             .style(widget::container::bordered_box),
         uname_pass_form(config).width(iced::Length::Fill),
         wifi_form(config).width(iced::Length::Fill)
     ]
+}
+
+fn hostname_form<'a>(
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<'a, BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.hostname.is_some())
+            .label("Set Hostname")
+            .on_toggle(|t| {
+                let hostname = if t {
+                    whoami::fallible::hostname().ok()
+                } else {
+                    None
+                };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_hostname(hostname),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(hostname) = &config.hostname {
+        let xc = config.clone();
+
+        let hostname_box = widget::text_input("beagle", hostname)
+            .on_input(move |inp| {
+                let h = if inp.is_empty() { None } else { Some(inp) };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    xc.clone().update_hostname(h),
+                ))
+            })
+            .width(200);
+        form = form.push(hostname_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn timezone_toggle<'a>(
