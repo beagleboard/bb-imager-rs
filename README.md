@@ -19,7 +19,7 @@ A Rust rewrite of [bb-imager](https://openbeagle.org/beagleboard/bb-imager) with
 # Run
 
 ```shell
-cargo run --package gui --release
+cargo run --package bb-imager-gui --release
 ```
 
 # Configuration

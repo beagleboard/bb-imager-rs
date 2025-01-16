@@ -49,6 +49,12 @@ make package-cli-linux-deb-{target}
 make package-gui-linux-deb-{target}
 ```
 
+- Service
+
+```
+make package-service-linux-deb-{target}
+```
+
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
@@ -73,10 +79,18 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## Linux Generic
 
-Just a tarball of everything. Useful for creating packages that need to be maintained out of tree. Only supported for CLI for now.
+Just a tarball of everything. Useful for creating packages that need to be maintained out of tree.
+
+- CLI
 
 ```
 make package-cli-linux-xz-{target}
+```
+
+- Service
+
+```
+make package-service-linux-xz-{target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
