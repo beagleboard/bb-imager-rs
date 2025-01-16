@@ -78,16 +78,6 @@ fn linux_sd_form<'a>(
     config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
 ) -> widget::Column<'a, BBImagerMessage> {
     let xc = config.clone();
-    let timezone_box =
-        widget::combo_box(timezones, "Timezone", config.timezone.as_ref(), move |t| {
-            let tz = if t.is_empty() { None } else { Some(t) };
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
-                xc.clone().update_timezone(tz),
-            ))
-        })
-        .width(200);
-
-    let xc = config.clone();
     let keymap_box = widget::combo_box(keymaps, "Keymap", config.keymap.as_ref(), move |t| {
         let tz = if t.is_empty() { None } else { Some(t) };
         BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
@@ -119,16 +109,46 @@ fn linux_sd_form<'a>(
             }
         ))
         .style(widget::container::bordered_box),
-        widget::container(helpers::element_with_label(
-            "Set Timezone",
-            timezone_box.into()
-        ))
-        .style(widget::container::bordered_box),
+        timezone_toggle(timezones, config).width(iced::Length::Fill),
         widget::container(helpers::element_with_label("Set Keymap", keymap_box.into()))
             .style(widget::container::bordered_box),
         uname_pass_form(config).width(iced::Length::Fill),
         wifi_form(config).width(iced::Length::Fill)
     ]
+}
+
+fn timezone_toggle<'a>(
+    timezones: &'a widget::combo_box::State<String>,
+    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+) -> widget::Container<'a, BBImagerMessage> {
+    let mut form = widget::row![
+        widget::toggler(config.timezone.is_some())
+            .label("Set Timezone")
+            .on_toggle(|t| {
+                let tz = if t { helpers::system_timezone() } else { None };
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                    config.clone().update_timezone(tz.cloned()),
+                ))
+            }),
+        widget::horizontal_space()
+    ];
+
+    if let Some(tz) = &config.timezone {
+        let xc = config.clone();
+
+        let timezone_box = widget::combo_box(timezones, "Timezone", Some(tz), move |t| {
+            let tz = if t.is_empty() { None } else { Some(t) };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                xc.clone().update_timezone(tz),
+            ))
+        })
+        .width(200);
+        form = form.push(timezone_box);
+    }
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn uname_pass_form(
