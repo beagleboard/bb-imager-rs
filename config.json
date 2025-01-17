@@ -57,6 +57,13 @@
 				"icon": "https://in.element14.com/productimages/large/en_GB/2806159-40.jpg",
 				"flasher": "Pb2Mspm0",
 				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle/ch01.html"
+			},
+			{
+				"name": "PocketBeagle2",
+				"description": "Upgraded version of the widely popular PocketBeagle, designed as an ultra-compact, low-cost, and powerful single-board computer (SBC)",
+				"icon": "https://openbeagle.org/lorforlinux/docs.beagleboard.io/-/raw/main/boards/pocketbeagle-2/images/product/pocketbeagle-2-45-front.jpg",
+				"flasher": "SdCard",
+				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle/ch01.html"
 			}
 		]
 	},
