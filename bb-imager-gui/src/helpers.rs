@@ -185,16 +185,22 @@ impl ProgressBarStatus {
 #[derive(Debug, Clone)]
 pub struct Device {
     pub description: String,
-    pub icon: url::Url,
+    pub icon: Icon,
     pub flasher: bb_imager::Flasher,
     pub documentation: url::Url,
+}
+
+#[derive(Clone, Debug)]
+pub enum Icon {
+    Remote(url::Url),
+    Memory(&'static [u8]),
 }
 
 impl From<bb_imager::config::Device> for Device {
     fn from(value: bb_imager::config::Device) -> Self {
         Self {
             description: value.description,
-            icon: value.icon,
+            icon: Icon::Remote(value.icon),
             flasher: value.flasher,
             documentation: value.documentation,
         }
@@ -270,6 +276,18 @@ impl From<bb_imager::config::Config> for Boards {
             .devices
             .into_iter()
             .map(|x| (x.name.clone(), (x.into(), Vec::new())))
+            .chain([(
+                "Generic Linux Board".to_string(),
+                (
+                    Device {
+                        description: "Generic Linux Board using SD Card".to_string(),
+                        icon: Icon::Memory(&constants::BOARD_ICON),
+                        flasher: bb_imager::Flasher::SdCard,
+                        documentation: url::Url::parse("https://docs.beagleboard.org/").unwrap(),
+                    },
+                    Vec::new(),
+                ),
+            )])
             .collect();
 
         for image in value.os_list {

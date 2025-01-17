@@ -15,6 +15,7 @@ pub const FILE_ADD_ICON: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub const USB_ICON: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
 pub const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings.svg");
+pub const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
 
 // Font
 pub const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");

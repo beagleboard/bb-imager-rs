@@ -152,7 +152,10 @@ impl BBImager {
         let icons: HashSet<url::Url> = self
             .boards
             .devices()
-            .map(|(_, dev)| dev.icon.clone())
+            .filter_map(|(_, dev)| match &dev.icon {
+                helpers::Icon::Remote(url) => Some(url.clone()),
+                helpers::Icon::Memory(_) => None,
+            })
             .collect();
 
         let tasks = icons.into_iter().map(|icon| {

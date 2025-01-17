@@ -18,13 +18,19 @@ pub fn view<'a>(
         .devices()
         .filter(|(name, _)| name.to_lowercase().contains(&search_bar.to_lowercase()))
         .map(|(name, dev)| {
-            let image: Element<BBImagerMessage> = match downloader.clone().check_image(&dev.icon) {
-                Some(y) => img_or_svg(y, 100),
-                None => widget::svg(widget::svg::Handle::from_memory(
-                    constants::DOWNLOADING_ICON,
-                ))
-                .width(40)
-                .into(),
+            let image: Element<BBImagerMessage> = match &dev.icon {
+                helpers::Icon::Remote(url) => match downloader.clone().check_image(url) {
+                    Some(y) => img_or_svg(y, 100),
+                    None => widget::svg(widget::svg::Handle::from_memory(
+                        constants::DOWNLOADING_ICON,
+                    ))
+                    .width(100)
+                    .into(),
+                },
+                helpers::Icon::Memory(t) => widget::svg(widget::svg::Handle::from_memory(*t))
+                    .width(100)
+                    .height(60)
+                    .into(),
             };
 
             button(
