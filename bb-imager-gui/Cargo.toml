@@ -32,7 +32,8 @@ embed-resource = "2.5.0"
 assets = [
 	["target/release/bb-imager-gui", "/usr/bin/bb-imager-gui", "755"],
 	["assets/packages/linux/BeagleBoardImager.desktop", "/usr/share/applications/org.beagleboard.bb-imager.desktop", "644"],
-	["assets/icons/icon.png", "/usr/share/icons/hicolor/128x128/apps/bb-imager.png", "644"]
+	["assets/icons/icon.png", "/usr/share/icons/hicolor/128x128/apps/bb-imager.png", "644"],
+	["assets/packages/linux/udev/10-beagle.rules", "/etc/udev/rules.d/10-beagle.rules", "644"]
 ]
 
 [features]

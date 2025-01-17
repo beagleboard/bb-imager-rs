@@ -1,0 +1,9 @@
+# Copy this file to /etc/udev/rules.d/
+# If rules fail to reload automatically, you can refresh udev rules
+# with the command "udevadm control --reload"
+
+# BeagleConnect Freedom
+SUBSYSTEM=="tty", ATTRS{product}=="BeagleConnect", ATTRS{manufacturer}=="BeagleBoard.org", MODE="0660", TAG+="uaccess"
+
+# BeagleConnect Freedom MSP430
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2047", ATTRS{idProduct}=="0200", MODE="0660", TAG+="uaccess"
