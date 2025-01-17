@@ -1,26 +1,14 @@
 # BeagleBoard Imager Rust
 
-A Rust rewrite of [bb-imager](https://openbeagle.org/beagleboard/bb-imager) with support for flashing boards not using Linux.
+BeagleBoard Imaging Utility, a streamlined tool for creating, flashing, and managing OS images for BeagleBoard devices.
 
-# Goals
-- [ ] Cross Platform
-    - [x] Linux
-    - [x] Windows
-    - [ ] Macos
-    - [ ] Web
-- [ ] Supported Flashers
-    - [x] Generic Linux (BeaglePlay, Beagle AI64, etc)
-    - [x] BeagleConnect Freedom
-    - [x] BeagleConnect Freedom MSP430
-    - [ ] BeaglePlay CC1352
-- [x] Support flash time configuration (ssh, wifi, etc)
-- [ ] Remote `config.json` file
+# Contributing
 
-# Run
+Please see [Contributing.md](CONTRIBUTING.md)
 
-```shell
-cargo run --package bb-imager-gui --release
-```
+# Packaging
+
+Please see [Packaging.md](PACKAGING.md)
 
 # Configuration
 
