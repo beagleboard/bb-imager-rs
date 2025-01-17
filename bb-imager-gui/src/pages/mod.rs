@@ -5,7 +5,7 @@ pub mod flash;
 pub mod home;
 pub mod image_selection;
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     #[default]
     Home,
