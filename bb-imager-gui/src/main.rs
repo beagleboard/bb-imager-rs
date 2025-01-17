@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, time::Duration};
 
 use helpers::{ProgressBarState, Tainted};
 use iced::{futures::SinkExt, widget, Element, Subscription, Task};
 use pages::{configuration::FlashingCustomization, Screen};
+use tokio_stream::StreamExt;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod constants;
@@ -568,14 +569,16 @@ impl BBImager {
     fn subscription(&self) -> Subscription<BBImagerMessage> {
         if let Some(board) = self.selected_board.as_ref() {
             // Do not use subscription for static destinations
-            if self.destination_selectable {
+            // Also do not use subscription when on other screens. Can cause Udisk2 to crash.
+            if self.destination_selectable && self.screen == Screen::DestinationSelection {
                 let flasher = self.boards.device(board).flasher;
 
                 let stream = futures_util::stream::unfold(flasher, |f| async move {
                     let dsts = f.destinations().await;
                     let dsts = BBImagerMessage::Destinations(dsts);
                     Some((dsts, f))
-                });
+                })
+                .throttle(Duration::from_secs(1));
 
                 return Subscription::run_with_id(board.to_string(), stream);
             }
