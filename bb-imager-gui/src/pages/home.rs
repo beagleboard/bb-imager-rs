@@ -9,32 +9,32 @@ use crate::{
     BBImagerMessage,
 };
 
-use super::Screen;
+use super::{image_selection::ImageSelectionPage, Screen};
 
 pub fn view<'a>(
-    selected_board: Option<&'a str>,
+    selected_board: Option<&'a bb_imager::config::Device>,
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a bb_imager::Destination>,
     destination_selectable: bool,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
         let choose_device_btn = match selected_board {
-            Some(x) => home_btn_text(x, true, iced::Length::Fill),
+            Some(x) => home_btn_text(&x.name, true, iced::Length::Fill),
             None => home_btn_text("CHOOSE DEVICE", true, iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::SwitchScreen(Screen::BoardSelection));
+        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection));
 
         let choose_image_btn = match selected_image {
             Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
             None => home_btn_text("CHOOSE IMAGE", selected_board.is_some(), iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press_maybe(if selected_board.is_none() {
-            None
-        } else {
-            Some(BBImagerMessage::SwitchScreen(Screen::ImageSelection))
-        });
+        .on_press_maybe(selected_board.map(|board| {
+            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionPage::new(
+                board.flasher,
+            )))
+        }));
 
         let choose_dst_btn = match selected_dst {
             Some(x) => home_btn_text(x.to_string(), destination_selectable, iced::Length::Fill),
@@ -48,7 +48,7 @@ pub fn view<'a>(
         .on_press_maybe(if selected_image.is_none() || !destination_selectable {
             None
         } else {
-            Some(BBImagerMessage::SwitchScreen(Screen::DestinationSelection))
+            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection))
         });
 
         let reset_btn = home_btn_text("RESET", true, iced::Length::Fill)
@@ -58,7 +58,7 @@ pub fn view<'a>(
         let config_btn_active = selected_board.is_some() && selected_image.is_some();
         let config_btn = home_btn_svg(constants::SETTINGS_ICON, config_btn_active).on_press_maybe(
             if config_btn_active {
-                Some(BBImagerMessage::SwitchScreen(Screen::ExtraConfiguration))
+                Some(BBImagerMessage::PushScreen(Screen::ExtraConfiguration))
             } else {
                 None
             },
@@ -71,7 +71,7 @@ pub fn view<'a>(
             .on_press_maybe(if next_btn_active {
                 None
             } else {
-                Some(BBImagerMessage::Flash)
+                Some(BBImagerMessage::PushScreen(Screen::FlashingConfirmation))
             });
 
         let choice_btn_row = widget::row![

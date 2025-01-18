@@ -128,9 +128,13 @@ impl std::fmt::Display for SelectedImage {
 }
 
 #[cfg(feature = "config")]
-impl From<&crate::config::OsList> for SelectedImage {
-    fn from(value: &crate::config::OsList) -> Self {
-        Self::remote(value.name.clone(), value.url.clone(), value.image_sha256)
+impl From<&crate::config::OsImage> for SelectedImage {
+    fn from(value: &crate::config::OsImage) -> Self {
+        Self::remote(
+            value.name.clone(),
+            value.url.clone(),
+            value.image_download_sha256,
+        )
     }
 }
 
@@ -235,9 +239,10 @@ impl FlashingConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "config", derive(serde::Deserialize, serde::Serialize))]
 pub enum Flasher {
+    #[default]
     SdCard,
     BeagleConnectFreedom,
     Msp430Usb,

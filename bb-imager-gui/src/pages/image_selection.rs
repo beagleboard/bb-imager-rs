@@ -27,70 +27,142 @@ impl ExtraImageEntry {
     }
 }
 
-pub fn view<'a, I, E>(
-    images: I,
-    search_bar: &'a str,
-    downloader: &'a bb_imager::download::Downloader,
-    // Allow optional format entry
-    extra_entries: E,
-) -> Element<'a, BBImagerMessage>
-where
-    I: Iterator<Item = &'a helpers::Image>,
-    E: Iterator<Item = ExtraImageEntry>,
-{
-    let items = images
-        .filter(|x| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
-        .map(|x| {
-            let row3 = widget::row(
-                [
-                    text(x.release_date.to_string()).into(),
-                    widget::horizontal_space().into(),
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub(crate) struct ImageSelectionPage {
+    pub flasher: bb_imager::Flasher,
+    pub idx: Vec<usize>,
+}
+
+impl ImageSelectionPage {
+    pub fn new(flasher: bb_imager::Flasher) -> Self {
+        Self {
+            flasher,
+            idx: Vec::with_capacity(3),
+        }
+    }
+
+    pub fn view<'a, I, E>(
+        &self,
+        images: I,
+        search_bar: &'a str,
+        downloader: &'a bb_imager::download::Downloader,
+        // Allow optional format entry
+        extra_entries: E,
+    ) -> Element<'a, BBImagerMessage>
+    where
+        I: Iterator<Item = (usize, &'a bb_imager::config::OsListItem)>,
+        E: Iterator<Item = ExtraImageEntry>,
+    {
+        let items = images
+            // TODO: Add search
+            .filter(|(_, x)| {
+                x.search_str()
+                    .to_lowercase()
+                    .contains(&search_bar.to_lowercase())
+            })
+            .map(|(idx, x)| self.entry(x, downloader, idx))
+            .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
+            .map(Into::into);
+
+        widget::column![
+            helpers::search_bar(search_bar),
+            widget::horizontal_rule(2),
+            widget::scrollable(widget::column(items).spacing(10))
+        ]
+        .spacing(10)
+        .padding(10)
+        .into()
+    }
+
+    fn entry_subitem<'a>(
+        &self,
+        image: &'a bb_imager::config::OsImage,
+        downloader: &'a bb_imager::download::Downloader,
+    ) -> widget::Button<'a, BBImagerMessage> {
+        let row3 = widget::row(
+            [
+                text(image.release_date.to_string()).into(),
+                widget::horizontal_space().into(),
+            ]
+            .into_iter()
+            .chain(image.tags.iter().map(|t| iced_aw::badge(t.as_str()).into())),
+        )
+        .align_y(iced::alignment::Vertical::Center)
+        .spacing(5);
+
+        let icon = match downloader.clone().check_image(&image.icon) {
+            Some(y) => img_or_svg(y, ICON_WIDTH),
+            None => widget::svg(widget::svg::Handle::from_memory(
+                constants::DOWNLOADING_ICON,
+            ))
+            .width(ICON_WIDTH)
+            .into(),
+        };
+        button(
+            widget::row![
+                icon,
+                widget::column![
+                    text(image.name.as_str()).size(18),
+                    text(image.description.as_str()),
+                    row3
                 ]
-                .into_iter()
-                .chain(x.tags.iter().map(|t| iced_aw::badge(t.as_str()).into())),
-            )
-            .align_y(iced::alignment::Vertical::Center)
-            .spacing(5);
+                .padding(5)
+            ]
+            .align_y(iced::Alignment::Center)
+            .spacing(10),
+        )
+        .width(iced::Length::Fill)
+        .on_press(BBImagerMessage::SelectImage(helpers::BoardImage::remote(
+            image.clone(),
+            self.flasher,
+        )))
+        .style(widget::button::secondary)
+    }
 
-            let icon = match downloader.clone().check_image(&x.icon) {
-                Some(y) => img_or_svg(y, ICON_WIDTH),
-                None => widget::svg(widget::svg::Handle::from_memory(
-                    constants::DOWNLOADING_ICON,
-                ))
-                .width(ICON_WIDTH)
-                .into(),
-            };
-
-            button(
-                widget::row![
-                    icon,
-                    widget::column![
-                        text(x.name.as_str()).size(18),
-                        text(x.description.as_str()),
-                        row3
+    fn entry<'a>(
+        &self,
+        item: &'a bb_imager::config::OsListItem,
+        downloader: &'a bb_imager::download::Downloader,
+        idx: usize,
+    ) -> widget::Button<'a, BBImagerMessage> {
+        match item {
+            bb_imager::config::OsListItem::Image(image) => self.entry_subitem(image, downloader),
+            bb_imager::config::OsListItem::SubList {
+                name,
+                description,
+                icon,
+                flasher,
+                ..
+            } => {
+                let icon = match downloader.clone().check_image(icon) {
+                    Some(y) => img_or_svg(y, ICON_WIDTH),
+                    None => widget::svg(widget::svg::Handle::from_memory(
+                        constants::DOWNLOADING_ICON,
+                    ))
+                    .width(ICON_WIDTH)
+                    .into(),
+                };
+                button(
+                    widget::row![
+                        icon,
+                        widget::column![text(name.as_str()).size(18), text(description.as_str())]
+                            .padding(5)
                     ]
-                    .padding(5)
-                ]
-                .align_y(iced::Alignment::Center)
-                .spacing(10),
-            )
-            .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::SelectImage(helpers::BoardImage::Image(
-                bb_imager::SelectedImage::from(x),
-            )))
-            .style(widget::button::secondary)
-        })
-        .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
-        .map(Into::into);
+                    .align_y(iced::Alignment::Center)
+                    .spacing(10),
+                )
+                .width(iced::Length::Fill)
+                .on_press(self.push_screen(*flasher, idx))
+                .style(widget::button::secondary)
+            }
+        }
+    }
 
-    widget::column![
-        helpers::search_bar(search_bar),
-        widget::horizontal_rule(2),
-        widget::scrollable(widget::column(items).spacing(10))
-    ]
-    .spacing(10)
-    .padding(10)
-    .into()
+    fn push_screen(&self, flasher: bb_imager::Flasher, id: usize) -> BBImagerMessage {
+        let mut idx = self.idx.clone();
+        idx.push(id);
+        BBImagerMessage::PushScreen(super::Screen::ImageSelection(Self { flasher, idx }))
+    }
 }
 
 fn custom_btn<'a>(

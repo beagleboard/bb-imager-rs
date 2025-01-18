@@ -1,10 +1,6 @@
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::{borrow::Cow, collections::HashSet, path::PathBuf, sync::LazyLock};
 
-use bb_imager::DownloadFlashingStatus;
+use bb_imager::{config::OsListItem, DownloadFlashingStatus};
 use iced::{
     widget::{self, button, text},
     Element,
@@ -182,130 +178,66 @@ impl ProgressBarStatus {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Device {
-    pub description: String,
-    pub icon: Icon,
-    pub flasher: bb_imager::Flasher,
-    pub documentation: url::Url,
-}
-
-#[derive(Clone, Debug)]
-pub enum Icon {
-    Remote(url::Url),
-    Memory(&'static [u8]),
-}
-
-impl From<bb_imager::config::Device> for Device {
-    fn from(value: bb_imager::config::Device) -> Self {
-        Self {
-            description: value.description,
-            icon: Icon::Remote(value.icon),
-            flasher: value.flasher,
-            documentation: value.documentation,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Image {
-    pub name: String,
-    pub description: String,
-    pub icon: url::Url,
-    pub url: url::Url,
-    pub release_date: chrono::NaiveDate,
-    pub image_sha256: [u8; 32],
-    pub tags: HashSet<String>,
-}
-
-impl From<bb_imager::config::OsList> for Image {
-    fn from(value: bb_imager::config::OsList) -> Self {
-        Self {
-            name: value.name,
-            description: value.description,
-            icon: value.icon,
-            url: value.url,
-            release_date: value.release_date,
-            image_sha256: value.image_sha256,
-            tags: value.tags,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default)]
-pub struct Boards(HashMap<String, (Device, Vec<Image>)>);
+pub struct Boards(bb_imager::config::Config);
 
 impl Boards {
     pub fn merge(mut self, config: bb_imager::config::Config) -> Self {
         for dev in config.imager.devices {
-            if !self.0.contains_key(&dev.name) {
-                let temp = self.0.insert(dev.name.clone(), (dev.into(), Vec::new()));
-                assert!(temp.is_none());
+            if !self.0.imager.devices.iter().any(|x| x.name == dev.name) {
+                self.0.imager.devices.push(dev);
             }
         }
 
-        for image in config.os_list {
-            for board in image.devices.iter() {
-                match self.0.get_mut(board) {
-                    Some(val) => val.1.push(Image::from(image.clone())),
-                    None => tracing::warn!("Unknown Board: {}", board),
-                }
-            }
-        }
+        self.0.os_list.extend(config.os_list);
 
         self
     }
 
-    pub fn devices(&self) -> impl Iterator<Item = (&str, &Device)> {
-        self.0.iter().map(|(x, (y, _))| (x.as_str(), y))
+    pub fn devices(&self) -> impl Iterator<Item = (usize, &bb_imager::config::Device)> {
+        self.0.imager.devices.iter().enumerate()
     }
 
-    pub fn images<'a>(&'a self, board: &'a str) -> impl Iterator<Item = &'a Image> {
-        self.0.get(board).expect("Board does not exist").1.iter()
+    pub fn images(
+        &self,
+        board_idx: usize,
+        subitems: &[usize],
+    ) -> impl Iterator<Item = (usize, &OsListItem)> {
+        let dev = self.device(board_idx);
+        let tags = &dev.tags;
+
+        let res = subitems.iter().fold(&self.0.os_list, |acc, idx| {
+            let item = acc.get(*idx).expect("No Subitem");
+            match item {
+                OsListItem::Image(_) => panic!("No subitem"),
+                OsListItem::SubList { subitems, .. } => subitems,
+            }
+        });
+
+        res.iter()
+            .enumerate()
+            .filter(move |(_, x)| check_board(x, tags))
     }
 
-    pub fn device<'a>(&'a self, board: &'a str) -> &'a Device {
-        &self.0.get(board).expect("Board does not exist").0
+    pub fn device(&self, board_idx: usize) -> &bb_imager::config::Device {
+        self.0
+            .imager
+            .devices
+            .get(board_idx)
+            .expect("Board does not exist")
+    }
+}
+
+fn check_board(item: &OsListItem, tags: &HashSet<String>) -> bool {
+    match item {
+        OsListItem::Image(os_image) => !tags.is_disjoint(&os_image.devices),
+        OsListItem::SubList { subitems, .. } => subitems.iter().any(|x| check_board(x, tags)),
     }
 }
 
 impl From<bb_imager::config::Config> for Boards {
     fn from(value: bb_imager::config::Config) -> Self {
-        let mut ans: HashMap<String, (Device, Vec<Image>)> = value
-            .imager
-            .devices
-            .into_iter()
-            .map(|x| (x.name.clone(), (x.into(), Vec::new())))
-            .chain([(
-                "Generic Linux Board".to_string(),
-                (
-                    Device {
-                        description: "Generic Linux Board using SD Card".to_string(),
-                        icon: Icon::Memory(&constants::BOARD_ICON),
-                        flasher: bb_imager::Flasher::SdCard,
-                        documentation: url::Url::parse("https://docs.beagleboard.org/").unwrap(),
-                    },
-                    Vec::new(),
-                ),
-            )])
-            .collect();
-
-        for image in value.os_list {
-            for board in image.devices.iter() {
-                match ans.get_mut(board) {
-                    Some(val) => val.1.push(Image::from(image.clone())),
-                    None => tracing::warn!("Unknown Board: {}", board),
-                }
-            }
-        }
-
-        Self(ans)
-    }
-}
-
-impl From<&Image> for bb_imager::SelectedImage {
-    fn from(value: &Image) -> Self {
-        Self::remote(value.name.clone(), value.url.clone(), value.image_sha256)
+        Self(value)
     }
 }
 
@@ -399,7 +331,7 @@ pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBIma
 pub fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
     widget::row![
         button(widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22))
-            .on_press(BBImagerMessage::SwitchScreen(crate::pages::Screen::Home))
+            .on_press(BBImagerMessage::PopScreen)
             .style(widget::button::secondary),
         widget::text_input("Search", cur_search).on_input(BBImagerMessage::Search)
     ]
@@ -410,14 +342,44 @@ pub fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BoardImage {
     SdFormat,
-    Image(bb_imager::common::SelectedImage),
+    Image {
+        flasher: bb_imager::Flasher,
+        img: bb_imager::SelectedImage,
+    },
+}
+
+impl BoardImage {
+    pub const fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
+        Self::Image {
+            img: bb_imager::SelectedImage::local(path),
+            flasher,
+        }
+    }
+
+    pub fn remote(image: bb_imager::config::OsImage, flasher: bb_imager::Flasher) -> Self {
+        Self::Image {
+            img: bb_imager::SelectedImage::remote(
+                image.name,
+                image.url,
+                image.image_download_sha256,
+            ),
+            flasher,
+        }
+    }
+
+    pub const fn flasher(&self) -> bb_imager::Flasher {
+        match self {
+            BoardImage::SdFormat => bb_imager::Flasher::SdCard,
+            BoardImage::Image { flasher, .. } => *flasher,
+        }
+    }
 }
 
 impl std::fmt::Display for BoardImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BoardImage::SdFormat => write!(f, "Format SD Card"),
-            BoardImage::Image(selected_image) => selected_image.fmt(f),
+            BoardImage::Image { img: image, .. } => image.fmt(f),
         }
     }
 }
@@ -449,8 +411,7 @@ impl<T> AsRef<T> for Tainted<T> {
 }
 
 pub fn system_timezone() -> Option<&'static String> {
-    static SYSTEM_TIMEZONE: LazyLock<Option<String>> =
-        LazyLock::new(|| localzone::get_local_zone());
+    static SYSTEM_TIMEZONE: LazyLock<Option<String>> = LazyLock::new(localzone::get_local_zone);
 
     (*SYSTEM_TIMEZONE).as_ref()
 }

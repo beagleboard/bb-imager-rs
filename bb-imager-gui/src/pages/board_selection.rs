@@ -16,10 +16,10 @@ pub fn view<'a>(
 ) -> Element<'a, BBImagerMessage> {
     let items = boards
         .devices()
-        .filter(|(name, _)| name.to_lowercase().contains(&search_bar.to_lowercase()))
-        .map(|(name, dev)| {
+        .filter(|(_, x)| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
+        .map(|(id, dev)| {
             let image: Element<BBImagerMessage> = match &dev.icon {
-                helpers::Icon::Remote(url) => match downloader.clone().check_image(url) {
+                Some(url) => match downloader.clone().check_image(url) {
                     Some(y) => img_or_svg(y, 100),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,
@@ -27,7 +27,7 @@ pub fn view<'a>(
                     .width(100)
                     .into(),
                 },
-                helpers::Icon::Memory(t) => widget::svg(widget::svg::Handle::from_memory(*t))
+                None => widget::svg(widget::svg::Handle::from_memory(constants::BOARD_ICON))
                     .width(100)
                     .height(60)
                     .into(),
@@ -37,7 +37,7 @@ pub fn view<'a>(
                 widget::row![
                     image,
                     widget::column![
-                        text(name).size(18),
+                        text(&dev.name).size(18),
                         widget::horizontal_space(),
                         text(dev.description.as_str())
                     ]
@@ -47,7 +47,7 @@ pub fn view<'a>(
                 .spacing(10),
             )
             .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::BoardSelected(name.to_string()))
+            .on_press(BBImagerMessage::BoardSelected(id))
             .style(widget::button::secondary)
         })
         .map(Into::into);

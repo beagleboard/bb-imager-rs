@@ -8,8 +8,6 @@ use crate::{
     BBImagerMessage,
 };
 
-use super::Screen;
-
 pub fn view<'a>(
     customization: &'a FlashingCustomization,
     timezones: &'a widget::combo_box::State<String>,
@@ -27,7 +25,7 @@ pub fn view<'a>(
             home_btn_text("SAVE", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::SwitchScreen(Screen::Home)),
+                .on_press(BBImagerMessage::PopScreen),
         ]
         .padding(4)
         .width(iced::Length::Fill);
