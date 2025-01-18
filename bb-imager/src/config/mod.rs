@@ -1,8 +1,6 @@
 //! Configuration for bb-imager to use.
 
-pub mod compact;
-
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -11,40 +9,76 @@ use url::Url;
 
 use crate::common::Flasher;
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[serde_as]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Config {
     pub imager: Imager,
-    pub os_list: Vec<OsList>,
+    #[serde_as(as = "VecSkipError<_>")]
+    pub os_list: Vec<OsListItem>,
 }
 
 #[serde_as]
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Imager {
     pub latest_version: Option<Version>,
     #[serde_as(as = "VecSkipError<_>")]
     pub devices: Vec<Device>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Device {
     pub name: String,
+    pub tags: HashSet<String>,
+    pub icon: Option<Url>,
     pub description: String,
-    pub icon: Url,
     pub flasher: Flasher,
-    pub documentation: Url,
+    pub documentation: Option<Url>,
+}
+
+#[serde_as]
+#[derive(Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum OsListItem {
+    Image(OsImage),
+    SubList {
+        name: String,
+        description: String,
+        icon: Url,
+        #[serde(default)]
+        flasher: Flasher,
+        #[serde_as(as = "VecSkipError<_>")]
+        subitems: Vec<OsListItem>,
+    },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct OsList {
+pub struct OsImage {
     pub name: String,
     pub description: String,
     pub icon: Url,
     pub url: Url,
-    pub release_date: chrono::NaiveDate,
     #[serde(with = "const_hex")]
-    pub image_sha256: [u8; 32],
+    pub image_download_sha256: [u8; 32],
+    pub release_date: chrono::NaiveDate,
     pub devices: HashSet<String>,
+    #[serde(default)]
     pub tags: HashSet<String>,
+}
+
+impl OsListItem {
+    pub fn icon(&self) -> url::Url {
+        match self {
+            OsListItem::Image(image) => image.icon.clone(),
+            OsListItem::SubList { icon, .. } => icon.clone(),
+        }
+    }
+
+    pub fn search_str(&self) -> &str {
+        match self {
+            OsListItem::Image(os_image) => &os_image.name,
+            OsListItem::SubList { name, .. } => name,
+        }
+    }
 }
 
 impl Config {
@@ -53,35 +87,9 @@ impl Config {
     }
 }
 
-impl From<compact::Config> for Config {
-    fn from(value: compact::Config) -> Self {
-        let mut mapper = HashMap::new();
-        let mut devices = Vec::with_capacity(value.imager.devices.len());
-        let mut os_list = Vec::with_capacity(value.os_list.len());
-
-        // Imager
-        for d in value.imager.devices {
-            if d.name == "No filtering" {
-                continue;
-            }
-
-            let temp = d.convert(&mut mapper);
-            devices.push(temp);
-        }
-
-        // OsList
-        for item in value.os_list {
-            let mut temp = item.convert(&mapper);
-            os_list.append(&mut temp);
-        }
-
-        Self {
-            imager: Imager {
-                latest_version: Some(value.imager.latest_version),
-                devices,
-            },
-            os_list,
-        }
+impl From<OsImage> for crate::SelectedImage {
+    fn from(value: OsImage) -> Self {
+        Self::remote(value.name, value.url, value.image_download_sha256)
     }
 }
 

@@ -5,12 +5,12 @@ pub mod flash;
 pub mod home;
 pub mod image_selection;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     #[default]
     Home,
     BoardSelection,
-    ImageSelection,
+    ImageSelection(image_selection::ImageSelectionPage),
     DestinationSelection,
     ExtraConfiguration,
     Flashing,
