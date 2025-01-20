@@ -15,6 +15,12 @@ The following dependencies are required to work with the codebase.
 apt-get install -y --no-install-recommends libudev-dev
 ```
 
+#### Fedora
+
+```shell
+dnf install openssl-devel systemd-devel -y
+```
+
 ## Run
 
 **Note:** When trying to actually flash hardware or doing benchmarking, ensure that you are running a release build (`--release`).
