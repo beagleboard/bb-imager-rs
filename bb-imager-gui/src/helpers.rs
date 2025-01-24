@@ -198,25 +198,47 @@ impl Boards {
         self.0.imager.devices.iter().enumerate()
     }
 
+    pub fn image(&self, target: &[usize]) -> &OsListItem {
+        let mut res = &self.0.os_list;
+        let (last, rest) = target.split_last().unwrap();
+
+        for i in rest {
+            let item = res.get(*i).expect("No Subitem");
+            res = match item {
+                OsListItem::Image(_) => panic!("No subitem"),
+                OsListItem::SubList { subitems, .. } => subitems,
+                OsListItem::RemoteSubList { .. } => panic!("No subitem"),
+            }
+        }
+
+        res.get(*last).unwrap()
+    }
+
     pub fn images(
         &self,
         board_idx: usize,
         subitems: &[usize],
-    ) -> impl Iterator<Item = (usize, &OsListItem)> {
+    ) -> Option<Vec<(usize, &OsListItem)>> {
+        let mut res = &self.0.os_list;
+
+        for i in subitems {
+            let item = res.get(*i).expect("No Subitem");
+            res = match item {
+                OsListItem::Image(_) => panic!("No subitem"),
+                OsListItem::SubList { subitems, .. } => &subitems,
+                OsListItem::RemoteSubList { .. } => return None,
+            }
+        }
+
         let dev = self.device(board_idx);
         let tags = &dev.tags;
 
-        let res = subitems.iter().fold(&self.0.os_list, |acc, idx| {
-            let item = acc.get(*idx).expect("No Subitem");
-            match item {
-                OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList { subitems, .. } => subitems,
-            }
-        });
-
-        res.iter()
-            .enumerate()
-            .filter(move |(_, x)| check_board(x, tags))
+        Some(
+            res.iter()
+                .enumerate()
+                .filter(move |(_, x)| check_board(x, tags))
+                .collect(),
+        )
     }
 
     pub fn device(&self, board_idx: usize) -> &bb_imager::config::Device {
@@ -226,12 +248,49 @@ impl Boards {
             .get(board_idx)
             .expect("Board does not exist")
     }
+
+    pub fn resolve_remote_subitem(&mut self, subitems: Vec<OsListItem>, target: &[usize]) {
+        assert!(!target.is_empty());
+
+        let mut res = &mut self.0.os_list;
+
+        let (last, rest) = target.split_last().unwrap();
+
+        for i in rest {
+            let item = res.get_mut(*i).expect("No Subitem");
+            res = match item {
+                OsListItem::Image(_) => panic!("No subitem"),
+                OsListItem::SubList { subitems, .. } => subitems,
+                OsListItem::RemoteSubList { .. } => panic!("No subitem"),
+            }
+        }
+
+        if let OsListItem::RemoteSubList {
+            name,
+            description,
+            icon,
+            flasher,
+            ..
+        } = res.get(*last).unwrap().clone()
+        {
+            res[*last] = OsListItem::SubList {
+                name,
+                description,
+                icon,
+                flasher,
+                subitems,
+            }
+        } else {
+            tracing::warn!("Unexpected item")
+        }
+    }
 }
 
 fn check_board(item: &OsListItem, tags: &HashSet<String>) -> bool {
     match item {
         OsListItem::Image(os_image) => !tags.is_disjoint(&os_image.devices),
         OsListItem::SubList { subitems, .. } => subitems.iter().any(|x| check_board(x, tags)),
+        OsListItem::RemoteSubList { devices, .. } => !tags.is_disjoint(&devices),
     }
 }
 

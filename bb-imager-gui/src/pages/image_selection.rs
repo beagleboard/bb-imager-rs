@@ -41,33 +41,38 @@ impl ImageSelectionPage {
         }
     }
 
-    pub fn view<'a, I, E>(
+    pub fn view<'a, E>(
         &self,
-        images: I,
+        images: Option<Vec<(usize, &'a bb_imager::config::OsListItem)>>,
         search_bar: &'a str,
         downloader: &'a bb_imager::download::Downloader,
         // Allow optional format entry
         extra_entries: E,
     ) -> Element<'a, BBImagerMessage>
     where
-        I: Iterator<Item = (usize, &'a bb_imager::config::OsListItem)>,
         E: Iterator<Item = ExtraImageEntry>,
     {
-        let items = images
-            // TODO: Add search
-            .filter(|(_, x)| {
-                x.search_str()
-                    .to_lowercase()
-                    .contains(&search_bar.to_lowercase())
-            })
-            .map(|(idx, x)| self.entry(x, downloader, idx))
-            .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
-            .map(Into::into);
+        let row3: Element<_> = if let Some(imgs) = images {
+            let items = imgs
+                .into_iter()
+                .filter(|(_, x)| {
+                    x.search_str()
+                        .to_lowercase()
+                        .contains(&search_bar.to_lowercase())
+                })
+                .map(|(idx, x)| self.entry(x, downloader, idx))
+                .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
+                .map(Into::into);
+
+            widget::scrollable(widget::column(items).spacing(10)).into()
+        } else {
+            widget::center("Loading...").into()
+        };
 
         widget::column![
             helpers::search_bar(search_bar),
             widget::horizontal_rule(2),
-            widget::scrollable(widget::column(items).spacing(10))
+            row3
         ]
         .spacing(10)
         .padding(10)
@@ -128,6 +133,13 @@ impl ImageSelectionPage {
         match item {
             bb_imager::config::OsListItem::Image(image) => self.entry_subitem(image, downloader),
             bb_imager::config::OsListItem::SubList {
+                name,
+                description,
+                icon,
+                flasher,
+                ..
+            }
+            | bb_imager::config::OsListItem::RemoteSubList {
                 name,
                 description,
                 icon,

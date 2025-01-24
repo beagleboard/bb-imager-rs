@@ -49,6 +49,15 @@ pub enum OsListItem {
         #[serde_as(as = "VecSkipError<_>")]
         subitems: Vec<OsListItem>,
     },
+    RemoteSubList {
+        name: String,
+        description: String,
+        icon: Url,
+        #[serde(default)]
+        flasher: Flasher,
+        devices: HashSet<String>,
+        subitems_url: Url,
+    },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -70,6 +79,7 @@ impl OsListItem {
         match self {
             OsListItem::Image(image) => image.icon.clone(),
             OsListItem::SubList { icon, .. } => icon.clone(),
+            OsListItem::RemoteSubList { icon, .. } => icon.clone(),
         }
     }
 
@@ -77,6 +87,7 @@ impl OsListItem {
         match self {
             OsListItem::Image(os_image) => &os_image.name,
             OsListItem::SubList { name, .. } => name,
+            OsListItem::RemoteSubList { name, .. } => name,
         }
     }
 }

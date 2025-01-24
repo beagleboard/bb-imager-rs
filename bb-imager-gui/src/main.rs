@@ -74,6 +74,10 @@ struct BBImager {
 #[derive(Debug, Clone)]
 enum BBImagerMessage {
     UpdateConfig(helpers::Boards),
+    ResolveRemoteSubitemItem {
+        item: Vec<bb_imager::config::OsListItem>,
+        target: Vec<usize>,
+    },
     BoardSelected(usize),
     SelectImage(helpers::BoardImage),
     SelectLocalImage(bb_imager::Flasher),
@@ -185,6 +189,9 @@ impl BBImager {
                 self.boards = c;
                 return self.fetch_board_images();
             }
+            BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
+                self.boards.resolve_remote_subitem(item, &target);
+            }
             BBImagerMessage::BoardSelected(x) => {
                 // Reset any previously selected values
                 self.selected_dst.take();
@@ -192,8 +199,13 @@ impl BBImager {
                 self.destinations.clear();
                 self.customization.take();
 
-                let icons: HashSet<url::Url> =
-                    self.boards.images(x, &[]).map(|(_, x)| x.icon()).collect();
+                let os_images = self
+                    .boards
+                    .images(x, &[])
+                    .expect("Initial image list can never be None");
+
+                let remote_image_jobs = self.fetch_remote_subitems(x, &[]);
+                let icons: HashSet<url::Url> = os_images.iter().map(|(_, x)| x.icon()).collect();
                 self.selected_board = Some(x);
 
                 let jobs = icons.into_iter().map(|x| {
@@ -212,7 +224,7 @@ impl BBImager {
                 // Close Board selection page
                 self.screen.pop();
 
-                return Task::batch(jobs);
+                return Task::batch(jobs.chain([remote_image_jobs]));
             }
             BBImagerMessage::ProgressBar(x) => {
                 if let Some(state) = self.flashing_state.take() {
@@ -261,18 +273,18 @@ impl BBImager {
             }
             BBImagerMessage::SwitchScreen(x) => {
                 self.screen.clear();
-                self.push_page(x);
+                return self.push_page(x);
             }
             BBImagerMessage::ReplaceScreen(x) => {
                 self.screen.pop();
-                self.push_page(x);
+                return self.push_page(x);
             }
             BBImagerMessage::PushScreen(x) => {
-                tracing::info!("Push Page: {:?}", x);
-                self.push_page(x);
+                tracing::debug!("Push Page: {:?}", x);
+                return self.push_page(x);
             }
             BBImagerMessage::PopScreen => {
-                tracing::info!("Pop screen");
+                tracing::debug!("Pop screen");
                 self.screen.pop();
             }
             BBImagerMessage::Search(x) => {
@@ -342,16 +354,89 @@ impl BBImager {
         Task::none()
     }
 
-    fn push_page(&mut self, x: Screen) {
-        if x == Screen::ExtraConfiguration && self.customization.is_none() {
-            self.customization = Some(Tainted::new(self.config()))
-        }
-        self.screen.push(x);
+    fn push_page(&mut self, x: Screen) -> Task<BBImagerMessage> {
         self.search_bar.clear();
+        self.screen.push(x.clone());
+
+        match x {
+            Screen::ExtraConfiguration if self.customization.is_none() => {
+                self.customization = Some(Tainted::new(self.config()))
+            }
+            Screen::ImageSelection(page) => {
+                tracing::info!("Image Selection Screen");
+                let board = self.selected_board.unwrap();
+                return self.fetch_remote_subitems(board, &page.idx);
+            }
+            _ => {}
+        }
+
+        Task::none()
+    }
+
+    fn fetch_remote_subitems(&self, board: usize, target: &[usize]) -> Task<BBImagerMessage> {
+        let Some(os_images) = self.boards.images(board, target) else {
+            // Maybe resolving was missed
+            if let bb_imager::config::OsListItem::RemoteSubList { subitems_url, .. } =
+                self.boards.image(target)
+            {
+                let url = subitems_url.clone();
+                let target_clone: Vec<usize> = target.to_vec();
+
+                return Task::perform(
+                    self.downloader.clone().download_json(url.clone()),
+                    move |x| match x {
+                        Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
+                            item,
+                            target: target_clone.clone(),
+                        },
+                        Err(e) => {
+                            tracing::warn!("Failed to download {:?} subitems with error {e}", url);
+                            BBImagerMessage::Null
+                        }
+                    },
+                );
+            } else {
+                return Task::none();
+            }
+        };
+
+        let remote_image_jobs = os_images
+            .clone()
+            .into_iter()
+            .filter_map(|(idx, x)| {
+                if let bb_imager::config::OsListItem::RemoteSubList { subitems_url, .. } = x {
+                    tracing::info!("Fetch: {:?} at {}", subitems_url, idx);
+                    Some((idx, subitems_url.clone()))
+                } else {
+                    None
+                }
+            })
+            .map(|(idx, url)| {
+                let mut new_target: Vec<usize> = target.to_vec();
+                new_target.push(idx);
+
+                Task::perform(
+                    self.downloader
+                        .clone()
+                        .download_json::<Vec<bb_imager::config::OsListItem>, url::Url>(url.clone()),
+                    move |x| match x {
+                        Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
+                            item,
+                            target: new_target.clone(),
+                        },
+                        Err(e) => {
+                            tracing::warn!("Failed to download subitems {:?} with error {e}", url);
+                            BBImagerMessage::Null
+                        }
+                    },
+                )
+            });
+
+        Task::batch(remote_image_jobs)
     }
 
     fn view(&self) -> Element<BBImagerMessage> {
-        tracing::info!("Page Stack: {:#?}", self.screen);
+        tracing::debug!("Page Stack: {:#?}", self.screen);
 
         match self.screen.last().expect("No Screen") {
             Screen::Home => pages::home::view(
