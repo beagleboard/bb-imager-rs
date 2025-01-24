@@ -86,15 +86,11 @@
 			"name": "MicroBlocks",
 			"description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
 			"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-			"url": "https://openbeagle.org/api/v4/projects/809/packages/generic/stable/244/microblocks.bin.xz",
-			"release_date": "2024-07-31",
-			"image_download_sha256": "81450f550ae6970740b3975686b2247e660695543c40cd9f73f9874eb2a209f8",
 			"devices": [
 				"beagleconnect-freedom"
 			],
-			"tags": [
-				"zephyr"
-			]
+			"flasher": "BeagleConnectFreedom",
+			"subitems_url": "https://openbeagle.org/api/v4/projects/809/packages/generic/os_list/stable/os_list.json"
 		},
 		{
 			"name": "MSP430 Firmware",
