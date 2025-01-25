@@ -3,6 +3,9 @@ APPIMAGE_ARCH_x86_64-unknown-linux-gnu = x86_64
 APPIMAGE_ARCH_aarch64-unknown-linux-gnu = aarch64
 APPIMAGE_ARCH_armv7-unknown-linux-gnueabihf = armhf
 
+PACKAGE_NAME_GUI = bb-imager-gui
+RELEASE_DIR_GUI = ${RELEASE_DIR}/${PACKAGE_NAME_GUI}/${VERSION}
+
 RUST_GUI_FEATURE_ARGS = $(RUST_FEATURE_ARGS)
 
 ifdef PB2_MSPM0
@@ -21,29 +24,29 @@ build-gui-universal-apple-darwin: build-gui-aarch64-apple-darwin build-gui-x86_6
 
 package-gui-linux-appimage-%: build-gui-%
 	$(info "Create GUI Linux Appimage $*")
-	install -D ${GUI_ASSETS_LINUX}/appimage/AppRun -t ${RELEASE_DIR_LINUX}/$*/AppDir/
-	install -D target/$*/release/bb-imager-gui -t ${RELEASE_DIR_LINUX}/$*/AppDir/usr/bin/
-	install -D -m 644 ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop -t ${RELEASE_DIR_LINUX}/$*/AppDir/
-	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${RELEASE_DIR_LINUX}/$*/AppDir/BeagleBoardImager.desktop
-	install -D -m 644 ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_LINUX}/$*/AppDir/bb-imager.png
-	ARCH=${APPIMAGE_ARCH_$*} $(APPIMAGETOOL) --appimage-extract-and-run ${RELEASE_DIR_LINUX}/$*/AppDir ${RELEASE_DIR_LINUX}/$*/BeagleBoardImager.AppImage
-	rm -rf ${RELEASE_DIR_LINUX}/$*/AppDir
+	install -D ${GUI_ASSETS_LINUX}/appimage/AppRun -t ${RELEASE_DIR_GUI}/AppDir/
+	install -D target/$*/release/bb-imager-gui -t ${RELEASE_DIR_GUI}/AppDir/usr/bin/
+	install -D -m 644 ${GUI_ASSETS_LINUX}/BeagleBoardImager.desktop -t ${RELEASE_DIR_GUI}/AppDir/
+	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version=${VERSION}/" ${RELEASE_DIR_GUI}/AppDir/BeagleBoardImager.desktop
+	install -D -m 644 ${GUI_ASSETS}/icons/icon.png ${RELEASE_DIR_GUI}/AppDir/bb-imager.png
+	ARCH=${APPIMAGE_ARCH_$*} $(APPIMAGETOOL) --appimage-extract-and-run ${RELEASE_DIR_GUI}/AppDir ${RELEASE_DIR_GUI}/${PACKAGE_NAME_GUI}-$*.AppImage
+	rm -rf ${RELEASE_DIR_GUI}/AppDir
 
 package-gui-linux-deb-%: build-gui-%
 	$(info "Create GUI Linux deb $*")
 ifeq ($(RUST_BUILDER_NAME), cross)
-	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip"
+	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_GUI}/${PACKAGE_NAME_GUI}-$*.deb --no-strip"
 else
-	$(RUST_BUILDER) deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-gui.deb --no-strip
+	$(RUST_BUILDER) deb --target $* -p bb-imager-gui --no-build -o ${RELEASE_DIR_GUI}/${PACKAGE_NAME_GUI}-$*.deb --no-strip
 endif
 
 package-gui-darwin-dmg-%: build-gui-%
 	$(info "Create GUI Darwin dmg $*")
 	sed -i'.bak' -e "s/0\.0\.0/${CI_COMMIT_TAG}/g" -e "s/fffffff/${CI_COMMIT_SHA:0:7}/g" ${GUI_ASSETS_DARWIN}/Info.plist
-	mkdir -p ${RELEASE_DIR_DARWIN}/$*/AppDir/BeagleBoardImager.app/Contents/{MacOS,Resources}
-	cp ${GUI_ASSETS_DARWIN}/Info.plist ${RELEASE_DIR_DARWIN}/$*/AppDir/BeagleBoardImager.app/Contents/
-	cp ${GUI_ASSETS}/icons/icon.icns ${RELEASE_DIR_DARWIN}/$*/AppDir/BeagleBoardImager.app/Contents/Resources/
-	cp target/$*/release/bb-imager-gui ${RELEASE_DIR_DARWIN}/$*/AppDir/BeagleBoardImager.app/Contents/MacOS/
+	mkdir -p ${RELEASE_DIR_GUI}/AppDir/BeagleBoardImager.app/Contents/{MacOS,Resources}
+	cp ${GUI_ASSETS_DARWIN}/Info.plist ${RELEASE_DIR_GUI}/AppDir/BeagleBoardImager.app/Contents/
+	cp ${GUI_ASSETS}/icons/icon.icns ${RELEASE_DIR_GUI}/AppDir/BeagleBoardImager.app/Contents/Resources/
+	cp target/$*/release/bb-imager-gui ${RELEASE_DIR_GUI}/AppDir/BeagleBoardImager.app/Contents/MacOS/
 	create-dmg \
 		--volname "BeagleBoardImager Installer" \
 		--volicon "${GUI_ASSETS}/icons/icon.icns" \
@@ -55,11 +58,11 @@ package-gui-darwin-dmg-%: build-gui-%
 		--app-drop-link 600 185 \
 		--hdiutil-verbose \
 		--skip-jenkins \
-		"${RELEASE_DIR_DARWIN}/$*/BeagleBoardImager.dmg" \
-		"${RELEASE_DIR_DARWIN}/$*/AppDir/"
-	rm -rf ${RELEASE_DIR_DARWIN}/$*/AppDir/
+		"${RELEASE_DIR_GUI}/${PACKAGE_NAME_GUI}-$*.dmg" \
+		"${RELEASE_DIR_GUI}/AppDir/"
+	rm -rf ${RELEASE_DIR_GUI}/AppDir/
 
 package-gui-windows-zip-%: build-gui-%
 	$(info "Create GUI Windows zip $*")
-	mkdir -p ${RELEASE_DIR_WINDOWS}/$*
-	zip -j ${RELEASE_DIR_WINDOWS}/$*/bb-imager-gui.zip target/$*/release/bb-imager-gui.exe
+	mkdir -p ${RELEASE_DIR_GUI}
+	zip -j ${RELEASE_DIR_GUI}/${PACKAGE_NAME_GUI}-$*.zip target/$*/release/bb-imager-gui.exe
