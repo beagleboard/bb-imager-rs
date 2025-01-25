@@ -225,7 +225,7 @@ impl Boards {
             let item = res.get(*i).expect("No Subitem");
             res = match item {
                 OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList { subitems, .. } => &subitems,
+                OsListItem::SubList { subitems, .. } => subitems,
                 OsListItem::RemoteSubList { .. } => return None,
             }
         }
@@ -290,7 +290,7 @@ fn check_board(item: &OsListItem, tags: &HashSet<String>) -> bool {
     match item {
         OsListItem::Image(os_image) => !tags.is_disjoint(&os_image.devices),
         OsListItem::SubList { subitems, .. } => subitems.iter().any(|x| check_board(x, tags)),
-        OsListItem::RemoteSubList { devices, .. } => !tags.is_disjoint(&devices),
+        OsListItem::RemoteSubList { devices, .. } => !tags.is_disjoint(devices),
     }
 }
 

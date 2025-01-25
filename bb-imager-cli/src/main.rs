@@ -1,5 +1,3 @@
-#![allow(clippy::literal_string_with_formatting_args)]
-
 mod cli;
 
 use bb_imager::DownloadFlashingStatus;
