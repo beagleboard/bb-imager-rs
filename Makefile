@@ -37,8 +37,6 @@ release-darwin-%: package-cli-darwin-zip-% package-gui-darwin-dmg-%;
 
 release-windows-%: package-cli-windows-zip-% package-gui-windows-zip-%;
 
-upload-artifacts: upload-artifact-linux upload-artifact-windows upload-artifact-darwin;
-
 checks-clippy-%:
 	$(info "Running clippy checks for $*")
 	$(CARGO_PATH) clippy -p $* --all-targets --all-features --no-deps

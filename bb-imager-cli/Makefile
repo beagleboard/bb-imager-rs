@@ -1,5 +1,8 @@
 RUST_CLI_FEATURE_ARGS = $(RUST_FEATURE_ARGS)
 
+PACKAGE_NAME_CLI = bb-imager-cli
+RELEASE_DIR_CLI = ${RELEASE_DIR}/${PACKAGE_NAME_CLI}/${VERSION}
+
 # Enable CLI specific features
 ifdef PB2_MSPM0
 	RUST_CLI_FEATURE_ARGS += -F pb2_mspm0
@@ -17,39 +20,39 @@ build-cli-universal-apple-darwin: build-cli-aarch64-apple-darwin build-cli-x86_6
 
 package-cli-linux-xz-%: build-cli-% manpage shell-completion-bash shell-completion-zsh
 	$(info "Create CLI xz $*")
-	install -D target/$*/release/bb-imager-cli -t ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/usr/bin/
-	install -D -m 644 target/man/* -t ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/usr/share/man/man1/
-	install -D -m 644 target/shell-completion/_bb-imager-cli -t ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/usr/share/zsh/site-functions/
-	install -D -m 644 target/shell-completion/bb-imager-cli.bash -t ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir/usr/share/bash-completion/completions/bb-imager-cli
-	cd ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir && tar cfJ ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.tar.xz *
-	rm -rf ${RELEASE_DIR_LINUX}/$*/bb-imager-cli-tempdir
+	install -D target/$*/release/bb-imager-cli -t ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/usr/bin/
+	install -D -m 644 target/man/* -t ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/usr/share/man/man1/
+	install -D -m 644 target/shell-completion/_bb-imager-cli -t ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/usr/share/zsh/site-functions/
+	install -D -m 644 target/shell-completion/bb-imager-cli.bash -t ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/usr/share/bash-completion/completions/bb-imager-cli
+	cd ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir && tar cfJ ${RELEASE_DIR_CLI}/${PACKAGE_NAME_CLI}-$*.tar.xz *
+	rm -rf ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir
 
 package-cli-linux-deb-%: build-cli-% manpage shell-completion-bash shell-completion-zsh
 	$(info "Create CLI Linux deb $*")
 ifeq ($(RUST_BUILDER_NAME), cross)
-	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip"
+	$(CROSS_UTIL) run --target $* -- "cargo deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_CLI}/${PACKAGE_NAME_CLI}-$*.deb --no-strip"
 else
-	$(RUST_BUILDER) deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_LINUX}/$*/bb-imager-cli.deb --no-strip
+	$(RUST_BUILDER) deb --target $* -p bb-imager-cli --no-build -o ${RELEASE_DIR_CLI}/${PACKAGE_NAME_CLI}-$*.deb --no-strip
 endif
 
 package-cli-darwin-zip-%: build-cli-% manpage shell-completion-zsh
 	$(info "Create CLI Darwin zip $*")
-	mkdir -p ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir
-	cp -r target/man ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir/
-	cp -r target/shell-completion ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir/
-	cp target/$*/release/bb-imager-cli ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir/
+	mkdir -p ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir
+	cp -r target/man ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
+	cp -r target/shell-completion ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
+	cp target/$*/release/bb-imager-cli ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
 	# Required to get the desired directory structure
-	cd ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir && zip -r ../bb-imager-cli.zip *
-	rm -rf ${RELEASE_DIR_DARWIN}/$*/bb-imager-cli-tempdir/
+	cd ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir && zip -r ${RELEASE_DIR_CLI}/${PACKAGE_NAME_CLI}-$*.zip *
+	rm -rf ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
 
 package-cli-windows-zip-%: build-cli-% shell-completion-powershell
 	$(info "Create CLI Windows zip $*")
-	mkdir -p ${RELEASE_DIR_WINDOWS}/$*/bb-imager-cli-tempdir
-	cp target/$*/release/bb-imager-cli.exe ${RELEASE_DIR_WINDOWS}/$*/bb-imager-cli-tempdir/
-	cp -r target/shell-completion ${RELEASE_DIR_WINDOWS}/$*/bb-imager-cli-tempdir/
+	mkdir -p ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir
+	cp target/$*/release/bb-imager-cli.exe ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
+	cp -r target/shell-completion ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/
 	# Required to get the desired directory structure
-	cd ${RELEASE_DIR_WINDOWS}/$*/bb-imager-cli-tempdir/ && zip -r ../bb-imager-cli.zip *
-	rm -rf ${RELEASE_DIR_WINDOWS}/$*/bb-imager-cli-tempdir
+	cd ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir/ && zip -r ${RELEASE_DIR_CLI}/${PACKAGE_NAME_CLI}-$*.zip *
+	rm -rf ${RELEASE_DIR_CLI}/bb-imager-cli-tempdir
 
 manpage:
 	$(info "Generate CLI Manpages")
