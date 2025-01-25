@@ -10,7 +10,7 @@ license.workspace = true
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "lazy"] }
 rfd = { version = "0.15.0", default-features = false, features = ["xdg-portal", "tokio"] }
-bb-imager = { path = "../bb-imager", version = "0.0.3", features = ["config"] }
+bb-imager = { path = "../bb-imager", features = ["config"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing = "0.1.40"
 iced_aw = { version = "0.11.0", default-features = false, features = ["badge"] }
@@ -40,7 +40,7 @@ assets = [
 pb2_mspm0 = ["bb-imager/pb2_mspm0_dbus"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-bb-imager = { path = "../bb-imager", version = "0.0.3", features = ["udisks2", "config"] }
+bb-imager = { path = "../bb-imager", features = ["udisks2", "config"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-bb-imager = { path = "../bb-imager", version = "0.0.3", features = ["macos_authopen", "config"] }
+bb-imager = { path = "../bb-imager", features = ["macos_authopen", "config"] }

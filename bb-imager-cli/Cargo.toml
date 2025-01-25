@@ -9,7 +9,7 @@ license.workspace = true
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
-bb-imager = { path = "../bb-imager", version = "0.0.3" }
+bb-imager = { path = "../bb-imager" }
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.17.8"
 console = "0.15.10"

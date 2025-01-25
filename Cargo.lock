@@ -466,7 +466,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bb-imager"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "bb-imager-flasher-pb2-mspm0",
@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "bb-imager",
  "clap",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-flasher-pb2-mspm0"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "serde",
  "thiserror 2.0.11",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "bb-imager",
  "chrono",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-service"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "bb-imager-flasher-pb2-mspm0",
  "serde_json",
@@ -6956,7 +6956,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "cargo_toml",
  "clap",
