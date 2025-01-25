@@ -138,13 +138,17 @@ darwin:
       - release/
 
 include:
-  - component: openbeagle.org/ayush1325/ci-components/package-registry-upload@f978eab991610929089e1f7acc2954723dda9173
+  - component: openbeagle.org/ayush1325/ci-components/package-registry-upload@e35d87728f404b409451702a1f23b92453142812
+    rules:
+      - if: $CI_DEFAULT_BRANCH == $CI_COMMIT_BRANCH
+      - if: $CI_COMMIT_TAG
+    rules:
     inputs:
       job-name: package-registry-upload-job
       job-stage: deploy
       job-needs: ["darwin", "windows", "linux_x86_64", "linux_aarch64", "linux_arm"]
       release_dir: ${CI_PROJECT_DIR}/release
-  - component: openbeagle.org/ayush1325/ci-components/release-from-file@f978eab991610929089e1f7acc2954723dda9173
+  - component: openbeagle.org/ayush1325/ci-components/release-from-file@e35d87728f404b409451702a1f23b92453142812
     rules:
       - if: $CI_COMMIT_TAG
     inputs:

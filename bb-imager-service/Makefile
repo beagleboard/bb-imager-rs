@@ -1,5 +1,5 @@
 PACKAGE_NAME_SERVICE = bb-imager-service
-RELEASE_DIR_SERVICE = ${RELEASE_DIR}/${PACKAGE_NAME_SERVICE}/${PACKAGE_VERSION}
+RELEASE_DIR_SERVICE = ${RELEASE_DIR}/${PACKAGE_NAME_SERVICE}/${VERSION}
 
 build-service-%:
 	$(info "Building D-Bus Service for $*")

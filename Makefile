@@ -25,7 +25,6 @@ SERVICE_ASSETS = $(CURDIR)/bb-imager-service/assets
 include bb-imager-gui/Makefile
 include bb-imager-cli/Makefile
 include bb-imager-service/Makefile
-include scripts/*.mk
 
 clean:
 	$(CARGO_PATH) clean
