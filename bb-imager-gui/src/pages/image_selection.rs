@@ -154,11 +154,17 @@ impl ImageSelectionPage {
                     .width(ICON_WIDTH)
                     .into(),
                 };
+                let tail = widget::svg(widget::svg::Handle::from_memory(
+                    constants::ARROW_FORWARD_IOS_ICON,
+                ))
+                .width(20);
                 button(
                     widget::row![
                         icon,
                         widget::column![text(name.as_str()).size(18), text(description.as_str())]
-                            .padding(5)
+                            .padding(5),
+                        widget::horizontal_space(),
+                        tail
                     ]
                     .align_y(iced::Alignment::Center)
                     .spacing(10),
