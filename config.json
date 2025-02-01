@@ -70,14 +70,14 @@
 				"documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home"
 			},
 			{
-				"name": "PocketBeagle2",
+				"name": "PocketBeagle 2",
 				"tags": [
-					"beagle-pb2"
+					"pocketbeagle2-am62"
 				],
-				"description": "Upgraded version of the widely popular PocketBeagle, designed as an ultra-compact, low-cost, and powerful single-board computer (SBC)",
+				"description": "PocketBeagle 2 and other boards based on TI AM62",
 				"icon": "https://openbeagle.org/lorforlinux/docs.beagleboard.io/-/raw/main/boards/pocketbeagle-2/images/product/pocketbeagle-2-45-front.jpg",
 				"flasher": "SdCard",
-				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle/ch01.html"
+				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle-2/index.html"
 			}
 		]
 	},
@@ -134,20 +134,6 @@
 						"freertos"
 					]
 				}
-			]
-		},
-		{
-			"name": "BeagleY-AI Debian v6.1.x Minimal",
-			"description": "Debian Bookworm with no desktop environment for Pocketbeagle2",
-			"icon": "https://www.beagleboard.org/app/uploads/2022/10/debian.png",
-			"url": "https://files.beagle.cc/file/beagleboard-public-2021/images/pocketbeagle2-debian-12.9-minimal-arm64-2025-01-15-8gb.img.xz",
-			"image_download_sha256": "0f66ac85435517855031acdf127ef937404aaa2d547a6fa11f91312ffe3bbdc7",
-			"release_date": "2025-01-15",
-			"devices": [
-				"beagle-pb2"
-			],
-			"tags": [
-				"linux"
 			]
 		}
 	]
