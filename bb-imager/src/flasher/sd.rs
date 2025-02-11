@@ -125,11 +125,6 @@ impl FlashingSdLinuxConfig {
         &self,
         dst: &mut D,
     ) -> crate::error::Result<()> {
-        // Check if any customization needs to be applied
-        if !self.has_customization() {
-            return Ok(());
-        }
-
         let boot_partition = {
             let mbr = mbrman::MBR::read_from(dst, 512)
                 .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
@@ -252,7 +247,7 @@ impl FlashingSdLinuxConfig {
         self
     }
 
-    const fn has_customization(&self) -> bool {
+    pub(crate) const fn has_customization(&self) -> bool {
         self.hostname.is_some()
             || self.timezone.is_some()
             || self.keymap.is_some()

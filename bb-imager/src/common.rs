@@ -181,14 +181,18 @@ impl FlashingConfig {
 
                 sd::flash(img, &mut disk, &chan, customization.verify).await?;
 
-                let _ = chan.try_send(DownloadFlashingStatus::Customizing);
-                disk.seek(SeekFrom::Start(0)).await?;
+                // Performing check inside customize seems to cause weird behaviour. Maybe
+                // spawn_blocking overhead is substantial
+                if customization.has_customization() {
+                    let _ = chan.try_send(DownloadFlashingStatus::Customizing);
+                    disk.seek(SeekFrom::Start(0)).await?;
+                    let mut std_disk = disk.into_std().await;
+                    tokio::task::spawn_blocking(move || customization.customize(&mut std_disk))
+                        .await
+                        .expect("Tokio runtime failed to spawn blocking task")?;
+                }
 
-                let mut std_disk = disk.into_std().await;
-
-                tokio::task::spawn_blocking(move || customization.customize(&mut std_disk))
-                    .await
-                    .expect("Tokio runtime failed to spawn blocking task")
+                Ok(())
             }
             FlashingConfig::BeagleConnectFreedom {
                 img,

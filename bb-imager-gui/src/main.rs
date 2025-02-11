@@ -643,17 +643,20 @@ impl BBImager {
                 .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
                 .await;
 
-            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
+            let (tx, mut rx) = tokio::sync::mpsc::channel(19);
 
             let flash_task = tokio::spawn(config.download_flash_customize(downloader, tx));
-
-            while let Some(progress) = rx.recv().await {
-                let _ = chan.try_send(BBImagerMessage::ProgressBar(progress.into()));
-            }
+            let mut chan_clone = chan.clone();
+            let progress_task = tokio::spawn(async move {
+                while let Some(progress) = rx.recv().await {
+                    let _ = chan_clone.try_send(BBImagerMessage::ProgressBar(progress.into()));
+                }
+            });
 
             let res = flash_task
                 .await
                 .expect("Tokio runtime failed to spawn task");
+
             let res = match res {
                 Ok(_) => BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS),
                 Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
@@ -662,6 +665,7 @@ impl BBImager {
             };
 
             let _ = chan.send(res).await;
+            progress_task.abort();
         });
 
         let (t, h) = Task::stream(s).abortable();
