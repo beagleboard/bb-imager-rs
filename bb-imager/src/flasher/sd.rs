@@ -71,6 +71,8 @@ where
         ));
     }
 
+    sd.flush().await.expect("Failed to flush image");
+
     if verify {
         let sha256 = img.sha256();
         let _ = chan.try_send(DownloadFlashingStatus::VerifyingProgress(0.0));
