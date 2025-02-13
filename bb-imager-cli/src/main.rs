@@ -92,6 +92,10 @@ async fn flash(target: TargetCommands, quite: bool) {
 
                 last_state = progress;
             }
+
+            if let Some(b) = last_bar.take() {
+                b.finish();
+            }
         });
     }
 
