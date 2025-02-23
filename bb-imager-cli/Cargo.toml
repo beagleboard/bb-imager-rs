@@ -8,14 +8,14 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.20", features = ["derive"] }
+clap = { version = "4.5.30", features = ["derive"] }
 bb-imager = { path = "../bb-imager" }
-tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
-indicatif = "0.17.8"
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+indicatif = "0.17.11"
 console = "0.15.10"
 url = "2.5.4"
 const-hex = "1.14.0"
-clap_complete = "4.5.40"
+clap_complete = "4.5.45"
 
 [package.metadata.deb]
 assets = [

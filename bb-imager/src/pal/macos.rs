@@ -75,7 +75,7 @@ pub(crate) async fn open_sd(dst: &str) -> crate::error::Result<File> {
         drop(stdin);
 
         const IOV_BUF_SIZE: usize =
-            unsafe { libc::CMSG_SPACE(std::mem::size_of::<std::ffi::c_int>() as u32) } as usize;
+            unsafe { nix::libc::CMSG_SPACE(std::mem::size_of::<std::ffi::c_int>() as u32) } as usize;
         let mut iov_buf = [0u8; IOV_BUF_SIZE];
         let mut iov = [IoSliceMut::new(&mut iov_buf)];
 
