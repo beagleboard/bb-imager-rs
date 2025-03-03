@@ -1,10 +1,13 @@
 [package]
 name = "bb-flasher-pb2-mspm0"
-version.workspace = true
+version = "0.1.0"
+description = "A library to flash MSPM0 co-processor in PocketBeagle 2"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+readme = "README.md"
+keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
 
 [dependencies]
 serde = { version = "1.0.218", optional = true, features = ["derive"] }
