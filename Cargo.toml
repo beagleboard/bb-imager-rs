@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Mazter Irwan <ir1keren@gmail.com>", "Ayush Singh <ayush@beagleboard.org>"]
 description = "This is basically a Rust implementation of [Balena's drivelist](https://github.com/balena-io-modules/drivelist)"
 keywords = ["drivelist", "balena", "drive", "list", "filesystem"]
-repository = "https://github.com/Ayush1325/rs-drivelist"
+repository = "https://github.com/Ayush1325/bb-drivelist"
 license = "MIT OR Apache-2.0"
 categories = ["api-bindings","filesystem","os::windows-apis","os::linux-apis"]
 
