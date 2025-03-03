@@ -77,20 +77,20 @@ impl From<Device> for DeviceDescriptor {
 
         Self {
             enumerator: "lsblk:json".to_string(),
-            busType: Some(value.tran.as_deref().unwrap_or("UNKNOWN").to_uppercase()),
+            bus_type: Some(value.tran.as_deref().unwrap_or("UNKNOWN").to_uppercase()),
             device: value.name,
             raw: value.kname,
-            isVirtual: is_virtual,
-            isSCSI: is_scsi,
-            isUSB: value.subsystems.contains("usb"),
-            isReadOnly: value.ro,
+            is_virtual,
+            is_scsi,
+            is_usb: value.subsystems.contains("usb"),
+            is_readonly: value.ro,
             description,
             size: value.size,
-            blockSize: value.phy_sec,
-            logicalBlockSize: value.log_sec,
-            isRemovable: is_removable,
-            isSystem: is_system,
-            partitionTableType: value.ptype,
+            block_size: value.phy_sec,
+            logical_block_size: value.log_sec,
+            is_removable,
+            is_system,
+            partition_table_type: value.ptype,
             mountpoints: value.children.into_iter().map(Into::into).collect(),
             ..Default::default()
         }
@@ -115,9 +115,8 @@ impl From<Child> for MountPoint {
             } else {
                 value.partlabel
             },
-            totalBytes: value.fssize,
-            availableBytes: value.fsavail,
-            ..Default::default()
+            total_bytes: value.fssize,
+            available_bytes: value.fsavail,
         }
     }
 }
@@ -127,17 +126,8 @@ pub(crate) fn lsblk() -> anyhow::Result<Vec<DeviceDescriptor>> {
         .args(["--bytes", "--all", "--json", "--paths", "--output-all"])
         .output()?;
 
-    if let Some(code) = output.status.code() {
-        if code != 0 {
-            return Err(anyhow::Error::msg(format!("lsblk ExitCode: {}", code)));
-        }
-    }
-
-    if output.stderr.len() > 0 {
-        return Err(anyhow::Error::msg(format!(
-            "lsblk stderr: {}",
-            std::str::from_utf8(&output.stderr).unwrap()
-        )));
+    if !output.status.success() {
+        return Err(anyhow::Error::msg("lsblk fail"));
     }
 
     let res: Devices = serde_json::from_slice(&output.stdout).unwrap();

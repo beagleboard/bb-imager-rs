@@ -1,9 +1,10 @@
 #[derive(Debug, Default, Clone)]
+/// Mountpoints of a drive
 pub struct MountPoint {
     pub path: String,
     pub label: Option<String>,
-    pub totalBytes: Option<u64>,
-    pub availableBytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+    pub available_bytes: Option<u64>,
 }
 
 impl MountPoint {
@@ -11,72 +12,72 @@ impl MountPoint {
         Self {
             path: path.to_string(),
             label: None,
-            totalBytes: None,
-            availableBytes: None,
+            total_bytes: None,
+            available_bytes: None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-#[allow(non_snake_case)]
+/// Device Description
 pub struct DeviceDescriptor {
     pub enumerator: String,
-    pub busType: Option<String>,
-    pub busVersion: Option<String>,
+    pub bus_type: Option<String>,
+    pub bus_version: Option<String>,
     pub device: String,
-    pub devicePath: Option<String>,
+    pub device_path: Option<String>,
     pub raw: String,
     pub description: String,
     pub error: Option<String>,
-    pub partitionTableType: Option<String>,
+    pub partition_table_type: Option<String>,
     pub size: u64,
-    pub blockSize: u32,
-    pub logicalBlockSize: u32,
+    pub block_size: u32,
+    pub logical_block_size: u32,
     pub mountpoints: Vec<MountPoint>,
-    pub mountpointLabels: Vec<String>,
+    pub mountpoint_labels: Vec<String>,
     /// Device is read-only
-    pub isReadOnly: bool,
+    pub is_readonly: bool,
     /// Device is a system drive
-    pub isSystem: bool,
+    pub is_system: bool,
     /// Device is an SD-card
-    pub isCard: bool,
+    pub is_card: bool,
     /// Connected via the Small Computer System Interface (SCSI)
-    pub isSCSI: bool,
+    pub is_scsi: bool,
     /// Connected via Universal Serial Bus (USB)
-    pub isUSB: bool,
+    pub is_usb: bool,
     /// Device is a virtual storage device
-    pub isVirtual: bool,
+    pub is_virtual: bool,
     /// Device is removable from the running system
-    pub isRemovable: bool,
+    pub is_removable: bool,
     /// Connected via the USB Attached SCSI (UAS)
-    pub isUAS: Option<bool>,
+    pub is_uas: Option<bool>,
 }
 
 impl Default for DeviceDescriptor {
     fn default() -> Self {
         Self {
-            blockSize: 512,
-            logicalBlockSize: 512,
+            block_size: 512,
+            logical_block_size: 512,
             enumerator: Default::default(),
-            busType: Default::default(),
-            busVersion: Default::default(),
+            bus_type: Default::default(),
+            bus_version: Default::default(),
             device: Default::default(),
-            devicePath: Default::default(),
+            device_path: Default::default(),
             raw: Default::default(),
             description: Default::default(),
             error: Default::default(),
-            partitionTableType: Default::default(),
+            partition_table_type: Default::default(),
             size: Default::default(),
             mountpoints: Default::default(),
-            mountpointLabels: Default::default(),
-            isReadOnly: Default::default(),
-            isSystem: Default::default(),
-            isCard: Default::default(),
-            isSCSI: Default::default(),
-            isUSB: Default::default(),
-            isVirtual: Default::default(),
-            isRemovable: Default::default(),
-            isUAS: Default::default(),
+            mountpoint_labels: Default::default(),
+            is_readonly: Default::default(),
+            is_system: Default::default(),
+            is_card: Default::default(),
+            is_scsi: Default::default(),
+            is_usb: Default::default(),
+            is_virtual: Default::default(),
+            is_removable: Default::default(),
+            is_uas: Default::default(),
         }
     }
 }

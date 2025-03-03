@@ -43,8 +43,8 @@ impl From<Disk> for DeviceDescriptor {
             mountpoints: value.partitions.into_iter().map(MountPoint::from).collect(),
             device: format!("/dev/{}", value.device_identifier),
             raw: format!("/dev/r{}", value.device_identifier),
-            isSystem: value.os_internal,
-            isRemovable: !value.os_internal,
+            is_system: value.os_internal,
+            is_removable: !value.os_internal,
             ..Default::default()
         }
     }
@@ -55,8 +55,8 @@ impl From<Partition> for MountPoint {
         MountPoint {
             path: value.mount_point.unwrap_or_default(),
             label: Some(value.content),
-            totalBytes: Some(value.size),
-            availableBytes: None,
+            total_bytes: Some(value.size),
+            available_bytes: None,
         }
     }
 }
@@ -64,17 +64,8 @@ impl From<Partition> for MountPoint {
 pub(crate) fn diskutil() -> anyhow::Result<Vec<DeviceDescriptor>> {
     let output = Command::new("diskutil").args(["list", "-plist"]).output()?;
 
-    if let Some(code) = output.status.code() {
-        if code != 0 {
-            return Err(anyhow::Error::msg(format!("lsblk ExitCode: {}", code)));
-        }
-    }
-
-    if output.stderr.len() > 0 {
-        return Err(anyhow::Error::msg(format!(
-            "lsblk stderr: {}",
-            std::str::from_utf8(&output.stderr).unwrap()
-        )));
+    if !output.status.success() {
+        return Err(anyhow::Error::msg("diskutil fail"));
     }
 
     let parsed: Disks = plist::from_bytes(&output.stdout).unwrap();
