@@ -14,7 +14,7 @@ lto = "thin"
 
 [workspace.package]
 version = "0.0.4"
-edition = "2021"
+edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
 license = "MIT"

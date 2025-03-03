@@ -8,48 +8,44 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-liblzma = { version = "0.3.5", features = ["static", "parallel"] }
-chrono = { version = "0.4.38", optional = true }
-const-hex = { version = "1.13.1" }
+liblzma = { version = "0.3.6", features = ["static", "parallel"] }
+chrono = { version = "0.4.39", optional = true , default-features = false }
+const-hex = { version = "1.14.0" }
 crc32fast = "1.4.2"
-directories = "5.0.1"
-reqwest = { version = "0.12.9", features = ["stream"] }
-semver = { version = "1.0.23", optional = true }
-serde = { version = "1.0.214", features = ["derive"], optional = true }
-serde_json = { version = "1.0.132", optional = true }
-tokio-serial = "5.4.4"
+directories = "6.0.0"
+reqwest = { version = "0.12.12", features = ["stream"] }
+semver = { version = "1.0.25", optional = true }
+serde = { version = "1.0.218", features = ["derive"], optional = true }
+serde_json = { version = "1.0.139", optional = true }
+tokio-serial = "5.4.5"
 sha2 = "0.10.8"
-thiserror = "1.0.65"
-tokio = { version = "1.41.0", default-features = false, features = ["rt-multi-thread", "process", "fs", "time", "sync"] }
-tracing = "0.1.40"
-url = "2.5.2"
-rs-drivelist = "0.9.4"
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "process", "fs", "time", "sync"] }
+tracing = "0.1.41"
+url = "2.5.4"
+bb-drivelist = "0.1.0"
 fatfs = "0.3.6"
 fscommon = "0.1.1"
-mbrman = "0.5.2"
+mbrman = "0.5.4"
 hidapi = "2.6.3"
 bin_file = "0.1.1"
 futures = "0.3.31"
-tempfile = "3.14.0"
+tempfile = "3.17.1"
 cfg-if = "1.0.0"
 bb-imager-flasher-pb2-mspm0 = { path = "../bb-imager-flasher-pb2-mspm0", optional = true }
-zbus = { version = "5.3.0", default-features = false, features = ["tokio"], optional = true}
+zbus = { version = "5.5.0", default-features = false, features = ["tokio"], optional = true}
 serde_with = { version = "3.12.0", optional = true }
-udisks2 = { version = "0.1.0", optional = true }
+udisks2 = { version = "0.3.1", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-serial = { version = "5.4.4", features = ["libudev"] }
+tokio-serial = { version = "5.4.5", features = ["libudev"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58.0", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
+windows = { version = "0.60.0", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = { version = "3.0.0", optional = true }
-plist = "1.7.0"
-anyhow = "1.0.91"
+security-framework = { version = "3.2.0", optional = true }
 nix = { version = "0.29.0", features = ["socket", "uio"], optional = true }
-libc = { version = "0.2.161", optional = true }
-serde = { version = "1.0.214", features = ["derive"] }
 
 [features]
 default = []
@@ -57,4 +53,4 @@ pb2_mspm0_raw = ["bb-imager-flasher-pb2-mspm0"]
 pb2_mspm0_dbus = ["dep:zbus", "dep:serde"]
 serde = ["dep:serde"]
 config = ["dep:serde_json", "serde", "dep:serde_with", "const-hex/serde", "semver/serde", "url/serde", "chrono/serde", "reqwest/json"]
-macos_authopen = ["dep:security-framework", "dep:nix", "dep:libc"]
+macos_authopen = ["dep:security-framework", "dep:nix"]

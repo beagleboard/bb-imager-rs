@@ -7,9 +7,9 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.23", features = ["derive"] }
-clap_mangen = "0.2.24"
-clap_complete = "4.5.40"
+clap = { version = "4.5.30", features = ["derive"] }
+clap_mangen = "0.2.26"
+clap_complete = "4.5.45"
 url = "2.5.4"
 cargo_toml = "0.21.0"
 

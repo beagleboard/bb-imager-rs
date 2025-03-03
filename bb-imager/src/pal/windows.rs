@@ -13,8 +13,8 @@ use tokio::{
 };
 use windows::Win32::{
     Foundation::HANDLE,
-    System::Ioctl::{FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME, FSCTL_UNLOCK_VOLUME},
     System::IO::DeviceIoControl,
+    System::Ioctl::{FSCTL_ALLOW_EXTENDED_DASD_IO, FSCTL_LOCK_VOLUME, FSCTL_UNLOCK_VOLUME},
 };
 
 #[derive(Error, Debug)]
@@ -117,7 +117,7 @@ async fn open_and_lock_volume(path: &str) -> crate::error::Result<File> {
 }
 
 fn physical_drive_to_volume(drive: &str) -> crate::error::Result<String> {
-    let desc = rs_drivelist::drive_list()
+    let desc = bb_drivelist::drive_list()
         .expect("Unexpected error")
         .into_iter()
         .find(|x| x.device == drive)

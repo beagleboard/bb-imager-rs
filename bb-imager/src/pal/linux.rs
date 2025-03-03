@@ -12,9 +12,9 @@ pub enum Error {
     FailedToOpenDestionation(String),
     #[error("Formatting failed: {0}")]
     FailedToFormat(String),
-    #[error("Zbus Error: {0}")]
+    #[error("Udisks2 Error: {0}")]
     #[cfg(feature = "udisks2")]
-    Zbus(#[from] udisks2::zbus::Error),
+    Udisks(#[from] udisks2::Error),
 }
 
 #[cfg(feature = "udisks2")]

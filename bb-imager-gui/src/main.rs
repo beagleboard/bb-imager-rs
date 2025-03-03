@@ -682,7 +682,7 @@ impl BBImager {
             if self.destination_selectable
                 && self.screen.last().expect("No screen") == &Screen::DestinationSelection
             {
-                let stream = futures_util::stream::unfold(flasher, |f| async move {
+                let stream = iced::futures::stream::unfold(flasher, |f| async move {
                     let dsts = f.destinations().await;
                     let dsts = BBImagerMessage::Destinations(dsts);
                     Some((dsts, f))

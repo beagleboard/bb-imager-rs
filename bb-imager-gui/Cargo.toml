@@ -9,18 +9,16 @@ license.workspace = true
 
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "lazy"] }
-rfd = { version = "0.15.0", default-features = false, features = ["xdg-portal", "tokio"] }
+rfd = { version = "0.15.2", default-features = false, features = ["xdg-portal", "tokio"] }
 bb-imager = { path = "../bb-imager", features = ["config"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tracing = "0.1.40"
-iced_aw = { version = "0.11.0", default-features = false, features = ["badge"] }
-image = "0.25.4"
-tokio = { version = "1.41.0", default-features = false, features = ["macros"] }
-webbrowser = "1.0.2"
-notify-rust = "4.11.3"
-url = { version = "2.5.2" }
-chrono = { version = "0.4.38" }
-futures-util = "0.3.31"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing = "0.1.41"
+iced_aw = { version = "0.12.0", default-features = false, features = ["badge"] }
+image = "0.25.5"
+tokio = { version = "1.43.0", default-features = false, features = ["macros"] }
+webbrowser = "1.0.3"
+notify-rust = "4.11.5"
+url = { version = "2.5.4" }
 whoami = "1.5.2"
 localzone = "0.3.1"
 tokio-stream = "0.1.17"
