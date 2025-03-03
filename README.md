@@ -105,4 +105,4 @@ Already added support for 32 bit OSes.
 
 # Acknowledgement
 
-This is a fork of [rs-drivelist](https://github.com/ir1keren/rs-drivelist) which I am maintaing since the original author does not seem to have the resources anymore.
+This is a fork of [rs-drivelist](https://github.com/ir1keren/rs-drivelist) which I am maintaing since the original author does not seem to have the resources anymore. You can support the original author through their [ko-fi](https://ko-fi.com/ir1keren).
