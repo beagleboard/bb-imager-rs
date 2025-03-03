@@ -1,3 +1,9 @@
+//! A library to flash MSPM0 co-processor in [PocketBeagle 2]. It uses the kernel driver which support
+//! [Linux Firmware Upload API].
+//!
+//! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
+//! [Linux Firmware Upload API]: https://docs.kernel.org/driver-api/firmware/fw_upload.html
+
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::{
@@ -11,23 +17,36 @@ const EEPROM: &str = "/sys/bus/i2c/devices/0-0050/eeprom";
 const FIRMWARE_SIZE: usize = 32 * 1024;
 
 #[derive(Error, Debug)]
+/// Errors for this crate
 pub enum Error {
+    /// Failed to open a sysfs entry.
     #[error("Failed to open {0}")]
     FailedToOpen(&'static str),
+    /// Failed to read sysfs entry
     #[error("Failed to read {0}")]
     FailedToRead(&'static str),
+    /// Failed to write to a sysfs entry
     #[error("Failed to write to {0}")]
     FailedToWrite(&'static str),
+    /// Failed to Seek to start for a sysfs entry
     #[error("Failed to seek {0}")]
     FailedToSeek(&'static str),
+    /// Flashing failed
     #[error("Failed to flash at {stage} due to {code}")]
     FlashingError { stage: String, code: String },
+    /// Invalid firmware
     #[error("Invalid firmware")]
     InvalidFirmware,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// Flash firmware to MSPM0. Also provides live [`Status`] using a channel.
+///
+/// [PocketBeagle 2] also uses MSPM0 as an EEPROM. Hence provide optional persistance support for
+/// EEPROM contents.
+///
+/// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 pub async fn flash(
     firmware: &[u8],
     chan: &tokio::sync::mpsc::Sender<Status>,
@@ -214,6 +233,9 @@ async fn flash_fw_api(
     Ok(())
 }
 
+/// Get PocketBeagle 2 MSPM0 [`Device`] information.
+///
+/// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 pub fn device() -> Device {
     Device {
         name: DEVICE.to_string(),
@@ -223,12 +245,14 @@ pub fn device() -> Device {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Flashing status
 pub enum Status {
     Preparing,
     Flashing(f32),
     Verifying,
 }
 
+/// PocketBeagle 2 MSPM0 information.
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "zvariant", derive(zvariant::Type))]
 pub struct Device {
