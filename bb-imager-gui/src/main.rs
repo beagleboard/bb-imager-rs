@@ -1,15 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{borrow::Cow, collections::HashSet, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
 use helpers::{ProgressBarState, Tainted};
-use iced::{futures::SinkExt, widget, Element, Subscription, Task};
-use pages::{configuration::FlashingCustomization, Screen};
+use iced::{Element, Subscription, Task, futures::SinkExt, widget};
+use message::BBImagerMessage;
+use pages::{Screen, configuration::FlashingCustomization};
 use tokio_stream::StreamExt;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod constants;
 mod helpers;
+mod message;
 mod pages;
 
 fn main() -> iced::Result {
@@ -69,42 +71,6 @@ struct BBImager {
 
     // Flag to indicate if destinations are selectable
     destination_selectable: bool,
-}
-
-#[derive(Debug, Clone)]
-enum BBImagerMessage {
-    UpdateConfig(helpers::Boards),
-    ResolveRemoteSubitemItem {
-        item: Vec<bb_imager::config::OsListItem>,
-        target: Vec<usize>,
-    },
-    BoardSelected(usize),
-    SelectImage(helpers::BoardImage),
-    SelectLocalImage(bb_imager::Flasher),
-    SelectPort(bb_imager::Destination),
-    ProgressBar(ProgressBarState),
-    /// Clear page stack and switch to new page
-    SwitchScreen(Screen),
-    /// Replace current page with new page
-    ReplaceScreen(Screen),
-    /// Push new page to the stack
-    PushScreen(Screen),
-    /// Pop page from stack
-    PopScreen,
-    Search(String),
-    Destinations(HashSet<bb_imager::Destination>),
-    Reset,
-    ResetConfig,
-
-    StartFlashing,
-    StartFlashingWithoutConfiguraton,
-    CancelFlashing,
-    StopFlashing(ProgressBarState),
-    UpdateFlashConfig(FlashingCustomization),
-
-    OpenUrl(Cow<'static, str>),
-
-    Null,
 }
 
 impl BBImager {
