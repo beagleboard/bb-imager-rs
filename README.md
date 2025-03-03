@@ -1,24 +1,15 @@
-# Readme
+# bb-drivelist
+
 This is basically a Rust implementation of [Balena's drivelist](https://github.com/balena-io-modules/drivelist).
 At the moment, I don't own a Mac machine, so it only supports:
 
- - Windows
- - Linux
-
-[![crates.io](https://img.shields.io/crates/v/rs-drivelist?label=latest)](https://crates.io/crates/rs-drivelist) ![MSRV](https://img.shields.io/badge/rustc-1.59+-ab6000.svg) ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/actix-web.svg)
-
-# Preparing
-
-Issue command at your root project directory:
-
-    cargo add "rs-drivelist"
-  Or edit your `Cargo.toml` file, and add this line:
-
-    rs-drivelist = "0.9.0"
+- Windows
+- Linux
+- Macos
 
 ## Usage
 
-This library exports one function: rs_drivelist::drive_list() which returns a `Result` of `Vec<DeviceDescriptor>`
+This library exports one function: bb_drivelist::drive_list() which returns a `Result` of `Vec<DeviceDescriptor>`
 
 ## Windows Output
 
@@ -112,7 +103,6 @@ This library exports one function: rs_drivelist::drive_list() which returns a `R
 
 Already added support for 32 bit OSes.
 
-## Donation
-My main laptop I used to start this project is broken, and I'm using a Celeron N2840 with unupgradable soldered 2GB RAM.
-Your donation will be very much appreciated, as my bank account couldn't bought me a proper machine.
-Visit me on my [Ko-fi account](https://ko-fi.com/ir1keren)
+# Acknowledgement
+
+This is a fork of [rs-drivelist](https://github.com/ir1keren/rs-drivelist) which I am maintaing since the original author does not seem to have the resources anymore.
