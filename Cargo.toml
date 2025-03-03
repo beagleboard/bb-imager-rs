@@ -1,7 +1,27 @@
-[workspace]
-members = ["rs-drivelist", "sample"]
-default-members=["rs-drivelist"]
-resolver = "2"
+[package]
+name = "bb-drivelist"
+version = "0.1.0"
+edition = "2021"
+authors = ["Mazter Irwan <ir1keren@gmail.com>", "Ayush Singh <ayush@beagleboard.org>"]
+description = "This is basically a Rust implementation of [Balena's drivelist](https://github.com/balena-io-modules/drivelist)"
+keywords = ["drivelist", "balena", "drive", "list", "filesystem"]
+repository = "https://github.com/Ayush1325/rs-drivelist"
+license = "MIT OR Apache-2.0"
+categories = ["api-bindings","filesystem","os::windows-apis","os::linux-apis"]
 
-[patch.crates-io]
-rs-drivelist={path="rs-drivelist"}
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version= "0.3", features=["setupapi","winioctl","windef","handleapi","errhandlingapi","winerror","cfgmgr32","handleapi","fileapi","ioapiset","winbase","processenv"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1.7"
+serde = { version = "1.0", features = ["derive"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
