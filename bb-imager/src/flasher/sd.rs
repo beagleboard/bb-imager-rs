@@ -2,8 +2,8 @@
 
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use crate::error::Result;
 use crate::DownloadFlashingStatus;
+use crate::error::Result;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -90,24 +90,12 @@ where
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
 pub fn destinations() -> std::collections::HashSet<crate::Destination> {
-    rs_drivelist::drive_list()
+    bb_drivelist::drive_list()
         .expect("Unsupported OS for Sd Card")
         .into_iter()
-        .filter(|x| x.isRemovable)
-        .filter(|x| !x.isVirtual)
-        .map(|x| crate::Destination::sd_card(x.description, x.size, x.raw))
-        .collect()
-}
-
-#[cfg(target_os = "macos")]
-pub fn destinations() -> std::collections::HashSet<crate::Destination> {
-    crate::pal::macos::rs_drivelist::diskutil()
-        .expect("Unsupported OS for Sd Card")
-        .into_iter()
-        .filter(|x| x.isRemovable)
-        .filter(|x| !x.isVirtual)
+        .filter(|x| x.is_removable)
+        .filter(|x| !x.is_virtual)
         .map(|x| crate::Destination::sd_card(x.description, x.size, x.raw))
         .collect()
 }
