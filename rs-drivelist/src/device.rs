@@ -1,5 +1,3 @@
-use derivative::Derivative;
-
 #[derive(Debug, Default, Clone)]
 pub struct MountPoint {
     pub path: String,
@@ -19,8 +17,7 @@ impl MountPoint {
     }
 }
 
-#[derive(Debug, Derivative, Clone)]
-#[derivative(Default)]
+#[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 pub struct DeviceDescriptor {
     pub enumerator: String,
@@ -33,9 +30,7 @@ pub struct DeviceDescriptor {
     pub error: Option<String>,
     pub partitionTableType: Option<String>,
     pub size: u64,
-    #[derivative(Default(value = "512"))]
     pub blockSize: u32,
-    #[derivative(Default(value = "512"))]
     pub logicalBlockSize: u32,
     pub mountpoints: Vec<MountPoint>,
     pub mountpointLabels: Vec<String>,
@@ -55,4 +50,33 @@ pub struct DeviceDescriptor {
     pub isRemovable: bool,
     /// Connected via the USB Attached SCSI (UAS)
     pub isUAS: Option<bool>,
+}
+
+impl Default for DeviceDescriptor {
+    fn default() -> Self {
+        Self {
+            blockSize: 512,
+            logicalBlockSize: 512,
+            enumerator: Default::default(),
+            busType: Default::default(),
+            busVersion: Default::default(),
+            device: Default::default(),
+            devicePath: Default::default(),
+            raw: Default::default(),
+            description: Default::default(),
+            error: Default::default(),
+            partitionTableType: Default::default(),
+            size: Default::default(),
+            mountpoints: Default::default(),
+            mountpointLabels: Default::default(),
+            isReadOnly: Default::default(),
+            isSystem: Default::default(),
+            isCard: Default::default(),
+            isSCSI: Default::default(),
+            isUSB: Default::default(),
+            isVirtual: Default::default(),
+            isRemovable: Default::default(),
+            isUAS: Default::default(),
+        }
+    }
 }

@@ -15,7 +15,6 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1"
-derivative = "2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version= "0.3", features=["setupapi","winioctl","windef","handleapi","errhandlingapi","winerror","cfgmgr32","handleapi","fileapi","ioapiset","winbase","processenv"] }
