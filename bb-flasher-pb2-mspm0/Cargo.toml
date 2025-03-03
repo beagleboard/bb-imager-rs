@@ -1,5 +1,5 @@
 [package]
-name = "bb-imager-flasher-pb2-mspm0"
+name = "bb-flasher-pb2-mspm0"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

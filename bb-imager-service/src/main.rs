@@ -11,15 +11,15 @@ struct Pb2Mspm0 {
 impl Pb2Mspm0 {
     const AUTH_ACTION_ID: &str = "org.beagleboard.ImagingService.Pocketbeagle2Mspm0.authn";
 
-    async fn device(&self) -> bb_imager_flasher_pb2_mspm0::Device {
-        bb_imager_flasher_pb2_mspm0::device()
+    async fn device(&self) -> bb_flasher_pb2_mspm0::Device {
+        bb_flasher_pb2_mspm0::device()
     }
 
     /// Check if the sysfs entries are in order. Also useful for escalating privileges early.
     async fn check(&self, #[zbus(header)] hdr: Header<'_>) -> fdo::Result<()> {
         check_authorization(&self.conn, hdr).await?;
 
-        bb_imager_flasher_pb2_mspm0::check()
+        bb_flasher_pb2_mspm0::check()
             .await
             .map_err(|_| fdo::Error::Failed("Cannot find mspm0".to_string()))
     }
@@ -34,10 +34,10 @@ impl Pb2Mspm0 {
     ) -> fdo::Result<()> {
         check_authorization(&self.conn, hdr).await?;
 
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_imager_flasher_pb2_mspm0::Status>(20);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_pb2_mspm0::Status>(20);
 
         let task = tokio::spawn(async move {
-            bb_imager_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom).await
+            bb_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom).await
         });
 
         while let Some(s) = rx.recv().await {
