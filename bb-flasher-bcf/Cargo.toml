@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 readme = "README.md"
-keywords = ["beagleconnect-freedom", "flasher", "beagle"]
+keywords = ["beagleconnect", "flasher", "beagle"]
 
 [dependencies]
 crc32fast = "1.4.2"
