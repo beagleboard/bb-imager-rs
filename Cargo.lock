@@ -478,6 +478,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-flasher-bcf"
+version = "0.1.0"
+dependencies = [
+ "crc32fast",
+ "futures",
+ "serialport",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "bb-flasher-pb2-mspm0"
 version = "0.1.0"
 dependencies = [
@@ -492,6 +503,7 @@ name = "bb-imager"
 version = "0.0.4"
 dependencies = [
  "bb-drivelist",
+ "bb-flasher-bcf",
  "bb-flasher-pb2-mspm0",
  "bin_file",
  "cfg-if",
@@ -516,7 +528,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
- "tokio-serial",
  "tracing",
  "udisks2",
  "url",
@@ -3213,22 +3224,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2886843bf800fba2e3377cff24abf6379b4c4d5c6681eaf9ea5b0d15090450bd"
 dependencies = [
  "libc",
- "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "mio-serial"
-version = "5.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "029e1f407e261176a983a6599c084efd322d9301028055c87174beac71397ba3"
-dependencies = [
- "log",
- "mio",
- "nix 0.29.0",
- "serialport",
- "winapi",
 ]
 
 [[package]]
@@ -5531,20 +5528,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e727b36a1a0e8b74c376ac2211e40c2c8af09fb4013c60d910495810f008e9b"
 dependencies = [
  "rustls",
- "tokio",
-]
-
-[[package]]
-name = "tokio-serial"
-version = "5.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa1d5427f11ba7c5e6384521cfd76f2d64572ff29f3f4f7aa0f496282923fdc8"
-dependencies = [
- "cfg-if",
- "futures",
- "log",
- "mio-serial",
- "serialport",
  "tokio",
 ]
 
