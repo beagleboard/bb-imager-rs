@@ -7,7 +7,7 @@ use crate::error::Result;
 pub use bb_flasher_bcf::msp430::Error;
 
 pub(crate) async fn flash(
-    img: bin_file::BinFile,
+    img: Vec<u8>,
     dst: &std::ffi::CStr,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
 ) -> Result<()> {
@@ -15,7 +15,7 @@ pub(crate) async fn flash(
 
     let dst_owned = dst.to_owned();
     let flasher_task = tokio::task::spawn_blocking(move || {
-        bb_flasher_bcf::msp430::flash(img, &dst_owned, Some(tx))
+        bb_flasher_bcf::msp430::flash(&img, &dst_owned, Some(tx))
     });
 
     // Should run until tx is dropped, i.e. flasher task is done.

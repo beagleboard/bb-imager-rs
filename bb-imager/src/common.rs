@@ -9,10 +9,7 @@ use std::{
 use thiserror::Error;
 use tokio::io::AsyncSeekExt;
 
-use crate::{
-    flasher::{bcf, msp430, sd},
-    util,
-};
+use crate::flasher::{bcf, msp430, sd};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -210,14 +207,11 @@ impl FlashingConfig {
                     crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
                 tracing::info!("Image opened");
 
-                let mut data = String::new();
-                img.read_to_string(&mut data)
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)
                     .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-                let bin = util::bin_file_from_str(data).map_err(|e| {
-                    crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
-                })?;
 
-                msp430::flash(bin, &port, &chan).await
+                msp430::flash(data, &port, &chan).await
             }
             #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
             FlashingConfig::Pb2Mspm0 {

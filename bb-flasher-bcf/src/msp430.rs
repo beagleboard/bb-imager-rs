@@ -15,7 +15,10 @@ use std::{ffi::CString, time::Duration};
 use futures::channel::mpsc;
 use thiserror::Error;
 
-use crate::{Status, helpers::chan_send};
+use crate::{
+    Status,
+    helpers::{bin_file_from_str, chan_send, parse_bin},
+};
 
 const VID: u16 = 0x2047;
 const PID: u16 = 0x0200;
@@ -49,6 +52,8 @@ pub enum Error {
     FailedToRead(String),
     #[error("Failed to open MSP430: {0}")]
     FailedToOpenDestination(String),
+    #[error("Firmware is not valid")]
+    InvalidFirmware,
 }
 
 struct MSP430(hidapi::HidDevice);
@@ -143,14 +148,9 @@ impl MSP430 {
     }
 
     fn load_binfile(&self, bin: &bin_file::BinFile) -> Result<()> {
-        for (start_address, mut data) in bin.segments_list() {
+        for (start_address, data) in bin.segments_list() {
             let mut offset = 0;
-
-            // Pad
-            if data.len() & 1 != 0 {
-                data.push(0xff);
-            }
-
+            assert!(data.len() % 2 == 0);
             while offset < data.len() {
                 offset += self.rx_data_block_fast(start_address + offset, &data[offset..])?;
             }
@@ -185,13 +185,23 @@ fn load_bsl(dst: &std::ffi::CStr) -> Result<()> {
 
 /// Flash MSP430 in BeagleConnect Freedom. Provides optional progress.
 ///
+/// # Firmware
+///
+/// Firmware type is auto detected. Supported firmwares:
+///
+/// - Raw binary
+/// - Ti-TXT
+/// - iHex
+///
 /// No abort mechanism is provided here since the time taken to flash is ~2 secs. So aborting is
 /// not much useful other than stress tests.
 pub fn flash(
-    img: bin_file::BinFile,
+    firmware: &[u8],
     dst: &std::ffi::CStr,
     mut chan: Option<mpsc::Sender<Status>>,
 ) -> Result<()> {
+    let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidFirmware)?;
+
     chan_send(chan.as_mut(), Status::Preparing);
 
     load_bsl(dst)?;
@@ -205,7 +215,7 @@ pub fn flash(
     tracing::info!("Get BSL Version");
     msp430.bsl_version()?;
     tracing::info!("Flashing");
-    msp430.load_binfile(&img)?;
+    msp430.load_binfile(&firmware_bin)?;
 
     Ok(())
 }
@@ -226,16 +236,4 @@ fn open_hidraw(dst: &std::ffi::CStr) -> Result<hidapi::HidDevice> {
         .open_path(dst)
         .map_err(|e| Error::FailedToOpenDestination(e.to_string()))
         .map_err(Into::into)
-}
-
-/// TODO: Remove this once https://gitlab.com/robert.ernst.paf/bin_file/-/merge_requests/2 is
-/// merged
-fn bin_file_from_str<S>(contents: S) -> Result<bin_file::BinFile, bin_file::Error>
-where
-    S: AsRef<str>,
-{
-    let mut binfile = bin_file::BinFile::new();
-    let lines: Vec<&str> = contents.as_ref().lines().collect();
-    binfile.add_strings(lines, false)?;
-    Ok(binfile)
 }
