@@ -197,10 +197,14 @@ impl FlashingConfig {
                 customization,
             } => {
                 tracing::info!("Port opened");
-                let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
-                tracing::info!("Image opened");
+                let mut img =
+                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-                bcf::flash(img, &port, &chan, customization.verify).await
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)
+                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
+
+                bcf::flash(data, &port, &chan, customization.verify).await
             }
             FlashingConfig::Msp430 { img, port } => {
                 let mut img =

@@ -14,7 +14,10 @@ use serialport::SerialPort;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
-use crate::{Status, helpers::chan_send};
+use crate::{
+    Status,
+    helpers::{chan_send, parse_bin},
+};
 
 const ACK: u8 = 0xcc;
 const NACK: u8 = 0x33;
@@ -256,7 +259,7 @@ where
     }
 }
 
-const fn progress(off: u32) -> f32 {
+const fn progress(off: usize) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
@@ -268,6 +271,14 @@ fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
 }
 
 /// Flash BeagleConnect Freedom. Also provides optional progress and abort mechanism.
+///
+/// # Firmware
+///
+/// Firmware type is auto detected. Supported firmwares:
+///
+/// - Raw binary
+/// - Ti-TXT
+/// - iHex
 ///
 /// # Aborting
 ///
@@ -283,9 +294,7 @@ pub fn flash(
     mut chan: Option<mpsc::Sender<Status>>,
     cancel: Option<std::sync::Weak<()>>,
 ) -> Result<()> {
-    if firmware.len() != FIRMWARE_SIZE as usize {
-        return Err(Error::InvalidImage);
-    }
+    let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidImage)?;
 
     chan_send(chan.as_mut(), Status::Preparing);
 
@@ -297,10 +306,13 @@ pub fn flash(
     info!("BeagleConnectFreedom Connected");
 
     let _ = check_arc(cancel.as_ref())?;
-    let img_crc32 = crc32fast::hash(firmware);
-
-    let _ = check_arc(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
+
+    let img_crc32 = crc32fast::hash(
+        &firmware_bin
+            .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xff))
+            .unwrap(),
+    );
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
         return Ok(());
@@ -312,24 +324,24 @@ pub fn flash(
 
     info!("Start Flashing");
 
-    let mut image_offset = 0;
-    let mut reset_download = true;
-
     let _ = check_arc(cancel.as_ref())?;
-    while image_offset < FIRMWARE_SIZE {
-        while firmware[image_offset as usize] == 0xff {
-            image_offset += 1;
-            reset_download = true;
-        }
+    for (start_address, data) in firmware_bin.segments_list() {
+        let mut offset = 0;
+        assert!(data.len() % 2 == 0);
 
-        if reset_download {
-            bcf.send_download(image_offset, FIRMWARE_SIZE - image_offset)?;
-            reset_download = false;
-        }
+        bcf.send_download(
+            start_address.try_into().unwrap(),
+            data.len().try_into().unwrap(),
+        )?;
+        while offset < data.len() {
+            offset += bcf.send_data(&data[offset..])?;
 
-        image_offset += bcf.send_data(&firmware[(image_offset as usize)..])? as u32;
-        chan_send(chan.as_mut(), Status::Flashing(progress(image_offset)));
-        let _ = check_arc(cancel.as_ref())?;
+            chan_send(
+                chan.as_mut(),
+                Status::Flashing(progress(start_address + offset)),
+            );
+            let _ = check_arc(cancel.as_ref())?;
+        }
     }
 
     let res = if verify {

@@ -507,7 +507,6 @@ dependencies = [
  "bb-drivelist",
  "bb-flasher-bcf",
  "bb-flasher-pb2-mspm0",
- "bin_file",
  "cfg-if",
  "chrono",
  "const-hex",
