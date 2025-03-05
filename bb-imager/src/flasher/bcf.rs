@@ -1,42 +1,17 @@
 //! Helpers to enable flashing BeagleConnect Freedom firmware
 
-use std::{io::Read, sync::Arc};
+use std::sync::Arc;
 
-use crate::{error::Result, util};
-pub use bb_flasher_bcf::Error;
+use crate::error::Result;
+pub use bb_flasher_bcf::cc1352p7::Error;
 use futures::StreamExt;
 
-const FIRMWARE_SIZE: u32 = 704 * 1024;
-
-fn open_firmware(mut img: crate::img::OsImage) -> Result<Vec<u8>> {
-    let mut img_data = Vec::with_capacity(FIRMWARE_SIZE as usize);
-    img.read_to_end(&mut img_data)
-        .map_err(|_| Error::InvalidImage)?;
-
-    match String::from_utf8(img_data) {
-        Ok(x) => util::bin_file_from_str(x)
-            .map_err(|_| Error::InvalidImage)?
-            .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xFF))
-            .map_err(|_| Error::InvalidImage.into())
-            .map(|x| x.to_vec()),
-        Err(e) => {
-            let img_data = e.into_bytes();
-            if img_data.len() != FIRMWARE_SIZE as usize {
-                Err(Error::InvalidImage.into())
-            } else {
-                Ok(img_data)
-            }
-        }
-    }
-}
-
 pub async fn flash(
-    img: crate::img::OsImage,
+    img: Vec<u8>,
     port: &str,
     chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
     verify: bool,
 ) -> Result<()> {
-    let firmware = open_firmware(img)?;
     let cancle = Arc::new(());
 
     let (tx, rx) = futures::channel::mpsc::channel(20);
@@ -44,7 +19,7 @@ pub async fn flash(
     let cancel_weak = Arc::downgrade(&cancle);
     let port_clone = port.to_string();
     let flasher_task = tokio::task::spawn_blocking(move || {
-        bb_flasher_bcf::flash(&firmware, &port_clone, verify, Some(tx), Some(cancel_weak))
+        bb_flasher_bcf::cc1352p7::flash(&img, &port_clone, verify, Some(tx), Some(cancel_weak))
     });
 
     // Should run until tx is dropped, i.e. flasher task is done.
@@ -59,7 +34,7 @@ pub async fn flash(
 }
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
-    bb_flasher_bcf::ports()
+    bb_flasher_bcf::cc1352p7::ports()
         .into_iter()
         .map(crate::Destination::port)
         .collect()

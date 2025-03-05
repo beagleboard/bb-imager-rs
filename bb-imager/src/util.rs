@@ -51,6 +51,7 @@ pub(crate) async fn sha256_reader_progress<R: tokio::io::AsyncReadExt + Unpin>(
 
 /// TODO: Remove this once https://gitlab.com/robert.ernst.paf/bin_file/-/merge_requests/2 is
 /// merged
+#[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
 pub(crate) fn bin_file_from_str<S>(contents: S) -> Result<bin_file::BinFile, bin_file::Error>
 where
     S: AsRef<str>,

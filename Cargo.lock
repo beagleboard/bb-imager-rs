@@ -479,10 +479,12 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-bcf"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
+ "bin_file",
  "crc32fast",
  "futures",
+ "hidapi",
  "serialport",
  "thiserror 2.0.12",
  "tracing",
@@ -514,7 +516,6 @@ dependencies = [
  "fatfs",
  "fscommon",
  "futures",
- "hidapi",
  "liblzma",
  "mbrman",
  "nix 0.29.0",

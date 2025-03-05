@@ -9,10 +9,7 @@ use std::{
 use thiserror::Error;
 use tokio::io::AsyncSeekExt;
 
-use crate::{
-    flasher::{bcf, msp430, sd},
-    util,
-};
+use crate::flasher::{bcf, msp430, sd};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -200,26 +197,25 @@ impl FlashingConfig {
                 customization,
             } => {
                 tracing::info!("Port opened");
-                let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
-                tracing::info!("Image opened");
+                let mut img =
+                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
 
-                bcf::flash(img, &port, &chan, customization.verify).await
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)
+                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
+
+                bcf::flash(data, &port, &chan, customization.verify).await
             }
             FlashingConfig::Msp430 { img, port } => {
                 let mut img =
                     crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
                 tracing::info!("Image opened");
 
-                let mut data = String::new();
-                img.read_to_string(&mut data)
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)
                     .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-                let bin = util::bin_file_from_str(data).map_err(|e| {
-                    crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
-                })?;
 
-                tokio::task::spawn_blocking(move || msp430::flash(bin, &port, &chan))
-                    .await
-                    .expect("Tokio runtime failed to spawn blocking task")
+                msp430::flash(data, &port, &chan).await
             }
             #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
             FlashingConfig::Pb2Mspm0 {
@@ -233,7 +229,7 @@ impl FlashingConfig {
                 let mut data = String::new();
                 img.read_to_string(&mut data)
                     .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-                let bin = util::bin_file_from_str(data).map_err(|e| {
+                let bin = crate::util::bin_file_from_str(data).map_err(|e| {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
