@@ -3,7 +3,7 @@
 use std::{io::Read, sync::Arc};
 
 use crate::{error::Result, util};
-pub use bb_flasher_bcf::Error;
+pub use bb_flasher_bcf::cc1352p7::Error;
 use futures::StreamExt;
 
 const FIRMWARE_SIZE: u32 = 704 * 1024;
@@ -44,7 +44,7 @@ pub async fn flash(
     let cancel_weak = Arc::downgrade(&cancle);
     let port_clone = port.to_string();
     let flasher_task = tokio::task::spawn_blocking(move || {
-        bb_flasher_bcf::flash(&firmware, &port_clone, verify, Some(tx), Some(cancel_weak))
+        bb_flasher_bcf::cc1352p7::flash(&firmware, &port_clone, verify, Some(tx), Some(cancel_weak))
     });
 
     // Should run until tx is dropped, i.e. flasher task is done.
@@ -59,7 +59,7 @@ pub async fn flash(
 }
 
 pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
-    bb_flasher_bcf::ports()
+    bb_flasher_bcf::cc1352p7::ports()
         .into_iter()
         .map(crate::Destination::port)
         .collect()

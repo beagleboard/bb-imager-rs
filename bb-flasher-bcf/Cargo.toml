@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-bcf"
-version = "0.1.0"
+version = "1.0.0"
 description = "A library to flash BeagleConnect Freedom"
 edition.workspace = true
 authors.workspace = true
@@ -9,9 +9,18 @@ license.workspace = true
 readme = "README.md"
 keywords = ["beagleconnect", "flasher", "beagle"]
 
+[lib]
+
 [dependencies]
-crc32fast = "1.4.2"
-futures = "0.3.31"
-serialport = "4.7.0"
-thiserror = "2.0.12"
-tracing = "0.1.41"
+crc32fast = "1.4"
+futures = "0.3"
+thiserror = "2.0"
+tracing = "0.1"
+bin_file = "0.1"
+serialport = { version = "4.7", optional = true }
+hidapi = { version = "2.6", optional = true }
+
+[features]
+default = ["cc1352p7"]
+cc1352p7 = ["dep:serialport"]
+msp430 = ["dep:hidapi"]

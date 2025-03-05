@@ -217,9 +217,7 @@ impl FlashingConfig {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
-                tokio::task::spawn_blocking(move || msp430::flash(bin, &port, &chan))
-                    .await
-                    .expect("Tokio runtime failed to spawn blocking task")
+                msp430::flash(bin, &port, &chan).await
             }
             #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
             FlashingConfig::Pb2Mspm0 {
