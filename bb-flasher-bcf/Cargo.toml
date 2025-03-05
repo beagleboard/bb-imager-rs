@@ -8,6 +8,7 @@ repository.workspace = true
 license.workspace = true
 readme = "README.md"
 keywords = ["beagleconnect", "flasher", "beagle"]
+categories = ["development-tools", "embedded", "hardware-support"]
 
 [lib]
 
