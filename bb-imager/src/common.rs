@@ -229,7 +229,7 @@ impl FlashingConfig {
                 let mut data = String::new();
                 img.read_to_string(&mut data)
                     .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-                let bin = util::bin_file_from_str(data).map_err(|e| {
+                let bin = crate::util::bin_file_from_str(data).map_err(|e| {
                     crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
                 })?;
 
