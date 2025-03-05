@@ -73,7 +73,6 @@ impl MSP430 {
             .write(&req)
             .map(|_| ())
             .map_err(|e| Error::FailedToWrite(e.to_string()))
-            .map_err(Into::into)
     }
 
     fn cmd(&self, cmd: u8, data: &[u8]) -> Result<Vec<u8>> {
@@ -191,7 +190,7 @@ fn load_bsl(dst: &std::ffi::CStr) -> Result<()> {
 ///
 /// - Raw binary
 /// - Ti-TXT
-/// - iHex
+/// - Intel Hex
 ///
 /// No abort mechanism is provided here since the time taken to flash is ~2 secs. So aborting is
 /// not much useful other than stress tests.
@@ -235,5 +234,4 @@ fn open_hidraw(dst: &std::ffi::CStr) -> Result<hidapi::HidDevice> {
         .map_err(|e| Error::FailedToOpenDestination(e.to_string()))?
         .open_path(dst)
         .map_err(|e| Error::FailedToOpenDestination(e.to_string()))
-        .map_err(Into::into)
 }

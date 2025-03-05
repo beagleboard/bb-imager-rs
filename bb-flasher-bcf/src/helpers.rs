@@ -36,12 +36,9 @@ fn bin_file_from_binary(
     assert!(threshold > 0);
 
     while offset < data.len() {
-        let sendable = data[offset..]
-            .into_iter()
-            .take_while(|x| **x != 0xff)
-            .count();
+        let sendable = data[offset..].iter().take_while(|x| **x != 0xff).count();
         let skippable = data[offset + sendable..]
-            .into_iter()
+            .iter()
             .take_while(|x| **x == 0xff)
             .count();
 

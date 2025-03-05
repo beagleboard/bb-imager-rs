@@ -103,17 +103,15 @@ where
     fn invoke_bootloader(&mut self) -> Result<()> {
         info!("Invoke Bootloader");
 
-        let _ = self
-            .port
+        self.port
             .set_break()
             .map_err(|_| Error::FailedToStartBootloader)?;
-        let _ = std::thread::sleep(Duration::from_secs(2));
-        let _ = self
-            .port
+        std::thread::sleep(Duration::from_secs(2));
+        self.port
             .clear_break()
             .map_err(|_| Error::FailedToStartBootloader)?;
 
-        let _ = std::thread::sleep(Duration::from_millis(500));
+        std::thread::sleep(Duration::from_millis(500));
         Ok(())
     }
 
@@ -184,11 +182,11 @@ where
         self.wait_for_ack()?;
 
         while resp[0] == 0x00 {
-            self.port.read(&mut resp)?;
+            self.port.read_exact(&mut resp)?;
         }
 
-        self.port.read(&mut resp)?;
-        self.port.read(&mut resp)?;
+        self.port.read_exact(&mut resp)?;
+        self.port.read_exact(&mut resp)?;
 
         self.send_ack()?;
 
@@ -278,7 +276,7 @@ fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
 ///
 /// - Raw binary
 /// - Ti-TXT
-/// - iHex
+/// - Intel Hex
 ///
 /// # Aborting
 ///
@@ -305,7 +303,7 @@ pub fn flash(
     let mut bcf = BeagleConnectFreedom::new(port)?;
     info!("BeagleConnectFreedom Connected");
 
-    let _ = check_arc(cancel.as_ref())?;
+    check_arc(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
 
     let img_crc32 = crc32fast::hash(
@@ -318,13 +316,13 @@ pub fn flash(
         return Ok(());
     }
 
-    let _ = check_arc(cancel.as_ref())?;
+    check_arc(cancel.as_ref())?;
     info!("Erase Flash");
     bcf.send_bank_erase()?;
 
     info!("Start Flashing");
 
-    let _ = check_arc(cancel.as_ref())?;
+    check_arc(cancel.as_ref())?;
     for (start_address, data) in firmware_bin.segments_list() {
         let mut offset = 0;
         assert!(data.len() % 2 == 0);
@@ -340,7 +338,7 @@ pub fn flash(
                 chan.as_mut(),
                 Status::Flashing(progress(start_address + offset)),
             );
-            let _ = check_arc(cancel.as_ref())?;
+            check_arc(cancel.as_ref())?;
         }
     }
 
@@ -351,7 +349,7 @@ pub fn flash(
             Ok(())
         } else {
             error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-            Err(Error::InvalidImage.into())
+            Err(Error::InvalidImage)
         }
     } else {
         Ok(())
