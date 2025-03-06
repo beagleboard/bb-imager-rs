@@ -25,3 +25,6 @@ hidapi = { version = "2.6", optional = true }
 default = ["cc1352p7"]
 cc1352p7 = ["dep:serialport"]
 msp430 = ["dep:hidapi"]
+
+[package.metadata.docs.rs]
+all-features = true
