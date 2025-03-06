@@ -1,13 +1,7 @@
 //! Stuff common to all the flashers
 
-use std::{
-    collections::HashSet,
-    ffi::CString,
-    io::{Read, SeekFrom},
-    path::PathBuf,
-};
+use std::{collections::HashSet, ffi::CString, io::Read, path::PathBuf};
 use thiserror::Error;
-use tokio::io::AsyncSeekExt;
 
 use crate::flasher::{bcf, msp430, sd};
 
@@ -32,7 +26,7 @@ pub enum Destination {
     Port(String),
     SdCard {
         name: String,
-        path: String,
+        path: PathBuf,
         size: u64,
     },
     HidRaw(std::ffi::CString),
@@ -52,7 +46,7 @@ impl Destination {
         }
     }
 
-    pub const fn sd_card(name: String, size: u64, path: String) -> Self {
+    pub const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
         Self::SdCard { name, path, size }
     }
 
@@ -107,6 +101,26 @@ impl SelectedImage {
             extract_sha256: download_sha256,
         }
     }
+
+    /// Download image if not local
+    pub async fn resolve_img(
+        self,
+        downloader: crate::download::Downloader,
+        chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    ) -> crate::error::Result<std::path::PathBuf> {
+        match self {
+            crate::SelectedImage::Local(x) => Ok(x),
+            crate::SelectedImage::Remote {
+                url,
+                extract_sha256,
+                ..
+            } => {
+                downloader
+                    .download_progress(url, extract_sha256, chan)
+                    .await
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for SelectedImage {
@@ -137,11 +151,11 @@ impl From<&crate::config::OsImage> for SelectedImage {
 
 pub enum FlashingConfig {
     LinuxSdFormat {
-        dst: String,
+        dst: PathBuf,
     },
     LinuxSd {
         img: SelectedImage,
-        dst: String,
+        dst: PathBuf,
         customization: sd::FlashingSdLinuxConfig,
     },
     BeagleConnectFreedom {
@@ -167,29 +181,46 @@ impl FlashingConfig {
         chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     ) -> crate::error::Result<()> {
         match self {
-            FlashingConfig::LinuxSdFormat { dst } => sd::format(&dst).await,
+            FlashingConfig::LinuxSdFormat { dst } => sd::format(dst).await,
             FlashingConfig::LinuxSd {
                 img,
                 dst,
                 customization,
             } => {
-                let mut disk = sd::open(&dst).await?;
-                let img = crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+                let chan_clone = chan.clone();
+                sd::flash(
+                    move || {
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_time()
+                            .enable_io()
+                            .build()
+                            .unwrap();
+                        let img_path = rt
+                            .block_on(async move { img.resolve_img(downloader, &chan).await })
+                            .map_err(|e| {
+                                if let crate::error::Error::IoError(x) = e {
+                                    x
+                                } else {
+                                    std::io::Error::other(format!("Failed to download image: {e}"))
+                                }
+                            })?;
 
-                sd::flash(img, &mut disk, &chan, customization.verify).await?;
+                        let img = crate::img::OsImage::from_path(&img_path).map_err(|e| {
+                            if let crate::error::Error::IoError(x) = e {
+                                x
+                            } else {
+                                std::io::Error::other(format!("Failed to open image: {e}"))
+                            }
+                        })?;
+                        let img_size = img.size();
 
-                // Performing check inside customize seems to cause weird behaviour. Maybe
-                // spawn_blocking overhead is substantial
-                if customization.has_customization() {
-                    let _ = chan.try_send(DownloadFlashingStatus::Customizing);
-                    disk.seek(SeekFrom::Start(0)).await?;
-                    let mut std_disk = disk.into_std().await;
-                    tokio::task::spawn_blocking(move || customization.customize(&mut std_disk))
-                        .await
-                        .expect("Tokio runtime failed to spawn blocking task")?;
-                }
-
-                Ok(())
+                        Ok((img, img_size))
+                    },
+                    dst,
+                    chan_clone,
+                    customization,
+                )
+                .await
             }
             FlashingConfig::BeagleConnectFreedom {
                 img,
@@ -197,8 +228,11 @@ impl FlashingConfig {
                 customization,
             } => {
                 tracing::info!("Port opened");
+                let img_path = img.resolve_img(downloader, &chan).await?;
                 let mut img =
-                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
+                        .await
+                        .unwrap()?;
 
                 let mut data = Vec::new();
                 img.read_to_end(&mut data)
@@ -207,8 +241,11 @@ impl FlashingConfig {
                 bcf::flash(data, &port, &chan, customization.verify).await
             }
             FlashingConfig::Msp430 { img, port } => {
+                let img_path = img.resolve_img(downloader, &chan).await?;
                 let mut img =
-                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
+                        .await
+                        .unwrap()?;
                 tracing::info!("Image opened");
 
                 let mut data = Vec::new();
@@ -222,8 +259,11 @@ impl FlashingConfig {
                 img,
                 persist_eeprom,
             } => {
+                let img_path = img.resolve_img(downloader, &chan).await?;
                 let mut img =
-                    crate::img::OsImage::from_selected_image(img, &downloader, &chan).await?;
+                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
+                        .await
+                        .unwrap()?;
                 tracing::info!("Image opened");
 
                 let mut data = String::new();

@@ -37,7 +37,7 @@ pub enum Commands {
     /// Command to format SD Card
     Format {
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
-        dst: String,
+        dst: PathBuf,
 
         #[arg(long)]
         /// Suppress standard output messages for a quieter experience.
@@ -71,7 +71,7 @@ pub enum TargetCommands {
         img: SelectedImage,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
-        dst: String,
+        dst: PathBuf,
 
         /// Disable checksum verification post-flash
         #[arg(long)]
