@@ -14,6 +14,39 @@
 //! - `udev`: Dynamic permissions on Linux. Mostly useful for GUI and flatpaks
 //! - `macos_authopen`: Dynamic permissions on MacOS.
 //!
+//! # Usage
+//!
+//! ```no_run
+//! use std::path::Path;
+//! use std::fs::File;
+//!
+//! fn main() {
+//!     let dst = Path::new("/tmp/dummy");
+//!     let img = || {
+//!         Ok((File::open("/tmp/image")?, 1024))
+//!     };
+//!     let (tx, rx) = futures::channel::mpsc::channel(20);
+//!
+//!     let flash_thread = std::thread::spawn(move || {
+//!         bb_flasher_sd::flash(
+//!             img,
+//!             dst,
+//!             true,
+//!             Some(tx),
+//!             None,
+//!             None
+//!         )
+//!     });
+//!
+//!     let msgs = futures::executor::block_on_stream(rx);
+//!     for m in msgs {
+//!         println!("{:?}", m);
+//!     }
+//!
+//!     flash_thread.join().unwrap().unwrap()
+//! }
+//! ```
+//!
 //! [BeagleBoard Imager]: https://openbeagle.org/ayush1325/bb-imager-rs
 
 use std::{io, path::PathBuf};
@@ -99,6 +132,7 @@ pub fn format(dst: &std::path::Path) -> Result<()> {
 }
 
 /// Flashing status
+#[derive(Clone, Debug)]
 pub enum Status {
     Preparing,
     Flashing(f32),
