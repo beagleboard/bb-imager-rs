@@ -501,26 +501,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-flasher-sd"
+version = "0.1.0"
+dependencies = [
+ "bb-drivelist",
+ "fatfs",
+ "fscommon",
+ "futures",
+ "mbrman",
+ "nix 0.29.0",
+ "security-framework 3.2.0",
+ "sha2",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "udisks2",
+ "windows 0.60.0",
+]
+
+[[package]]
 name = "bb-imager"
 version = "0.0.4"
 dependencies = [
- "bb-drivelist",
  "bb-flasher-bcf",
  "bb-flasher-pb2-mspm0",
+ "bb-flasher-sd",
  "bin_file",
- "cfg-if",
  "chrono",
  "const-hex",
  "crc32fast",
  "directories",
- "fatfs",
- "fscommon",
  "futures",
  "liblzma",
- "mbrman",
- "nix 0.29.0",
  "reqwest",
- "security-framework 3.2.0",
  "semver",
  "serde",
  "serde_json",
@@ -530,9 +543,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
- "udisks2",
  "url",
- "windows 0.60.0",
  "zbus 5.5.0",
 ]
 

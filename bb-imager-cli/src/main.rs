@@ -3,7 +3,7 @@ mod cli;
 use bb_imager::DownloadFlashingStatus;
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
-use std::ffi::CString;
+use std::{ffi::CString, path::PathBuf};
 
 #[tokio::main]
 async fn main() {
@@ -127,14 +127,14 @@ async fn flash(target: TargetCommands, quite: bool) {
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_imager::flasher::FlashingSdLinuxConfig {
-                verify: !no_verify,
-                hostname,
-                timezone,
-                keymap,
-                user,
-                wifi,
-            };
+            let customization = bb_imager::flasher::FlashingSdLinuxConfig::default()
+                .update_verify(!no_verify)
+                .update_hostname(hostname)
+                .update_timezone(timezone)
+                .update_keymap(keymap)
+                .update_user(user)
+                .update_wifi(wifi);
+
             bb_imager::FlashingConfig::LinuxSd {
                 img: img.into(),
                 dst,
@@ -158,7 +158,7 @@ async fn flash(target: TargetCommands, quite: bool) {
         .expect("Failed to flash");
 }
 
-async fn format(dst: String, quite: bool) {
+async fn format(dst: PathBuf, quite: bool) {
     let downloader = bb_imager::download::Downloader::new();
     let (tx, _) = tokio::sync::mpsc::channel(20);
     let term = console::Term::stdout();

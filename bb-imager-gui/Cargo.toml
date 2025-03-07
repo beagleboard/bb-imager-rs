@@ -38,7 +38,7 @@ assets = [
 pb2_mspm0 = ["bb-imager/pb2_mspm0_dbus"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-bb-imager = { path = "../bb-imager", features = ["udisks2", "config"] }
+bb-imager = { path = "../bb-imager", features = ["udev", "config"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 bb-imager = { path = "../bb-imager", features = ["macos_authopen", "config"] }
