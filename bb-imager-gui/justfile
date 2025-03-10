@@ -1,0 +1,84 @@
+_RUST_GUI_FEATURE_ARGS := if PB2_MSPM0 == '1' { '-F pb2_mspm0' } else { '' }
+
+_PACKAGE_NAME_GUI := 'bb-imager-gui'
+
+_GUI_ASSETS := source_directory() / 'assets'
+_GUI_ASSETS_LINUX := _GUI_ASSETS / 'packages' / 'linux'
+_GUI_ASSETS_DARWIN := _GUI_ASSETS / 'packages' / 'darwin'
+
+_RELEASE_DIR_GUI := _RELEASE_DIR / _PACKAGE_NAME_GUI / VERSION
+
+
+# Build universal macos GUI binary
+_build-gui-universal-apple-darwin: (build-gui 'aarch64-apple-darwin') (build-gui 'x86_64-apple-darwin')
+	mkdir -p target/universal-apple-darwin/release
+	lipo -create target/x86_64-apple-darwin/release/bb-imager-gui target/aarch64-apple-darwin/release/bb-imager-gui -output target/universal-apple-darwin/release/bb-imager-gui
+
+# Release build for Beagle Board Imager GUI. Should be used for final testing
+[group('build')]
+build-gui TARGET=_HOST_TARGET:
+	@echo "Build Beagle Board Imager GUI for {{TARGET}}"
+	{{ if TARGET == 'universal-apple-darwin' { \
+	   	'just _build-gui-universal-apple-darwin' \
+	   } else { \
+	   	RUST_BUILDER + ' build --release --target ' + TARGET + ' -p bb-imager-gui ' + _RUST_GUI_FEATURE_ARGS \
+	   } }}
+
+
+# Run GUI for quick testing on host. Flags can be used to modify the build
+[group('run')]
+run-gui FLAGS='':
+	@echo "Run GUI on host for quick testing"
+	{{RUST_BUILDER}} run -p bb-imager-gui {{_RUST_GUI_FEATURE_ARGS}} {{FLAGS}}
+
+
+# Create Appimage package for GUI
+[group('packaging')]
+package-gui-linux-appimage TARGET=_HOST_TARGET: (_appimage_prechecks TARGET) (build-gui TARGET)
+	@echo "Create GUI Linux Appimage for {{TARGET}}"
+	install -D {{_GUI_ASSETS_LINUX}}/appimage/AppRun -t {{_RELEASE_DIR_GUI}}/AppDir/
+	install -D target/{{TARGET}}/release/bb-imager-gui -t {{_RELEASE_DIR_GUI}}/AppDir/usr/bin/
+	install -D -m 644 {{_GUI_ASSETS_LINUX}}/BeagleBoardImager.desktop -t {{_RELEASE_DIR_GUI}}/AppDir/
+	sed -i "s/^X-AppImage-Version=0.0.0/X-AppImage-Version={{VERSION}}/" {{_RELEASE_DIR_GUI}}/AppDir/BeagleBoardImager.desktop
+	install -D -m 644 {{_GUI_ASSETS}}/icons/icon.png {{_RELEASE_DIR_GUI}}/AppDir/bb-imager.png
+	ARCH={{ if TARGET == "x86_64-unknown-linux-gnu" { "x86_64" } else if TARGET == "aarch64-unknown-linux-gnu" { "aarch64" } else if TARGET == "armv7-unknown-linux-gnueabihf" { "armhf" } else { error("Unsupported target for appimages") } }} \
+	{{APPIMAGETOOL}} --appimage-extract-and-run {{_RELEASE_DIR_GUI}}/AppDir {{_RELEASE_DIR_GUI}}/{{_PACKAGE_NAME_GUI}}-{{TARGET}}.AppImage
+	rm -rf {{_RELEASE_DIR_GUI}}/AppDir
+
+
+# Create debian package for GUI
+[group('packaging')]
+package-gui-linux-deb TARGET=_HOST_TARGET: (build-gui TARGET) (_package-linux-deb 'bb-imager-gui' TARGET _RELEASE_DIR_GUI / _PACKAGE_NAME_GUI + '-' + TARGET + '.deb')
+
+
+# Create macOS dmg package
+[group('packaging')]
+package-gui-darwin-dmg TARGET=_HOST_TARGET: (build-gui TARGET)
+	@echo "Create GUI macOS dmg for {{TARGET}}"
+	sed -i'.bak' -e "s/0\.0\.0/{{VERSION}}/g" -e "s/fffffff/{{_COMMIT_HASH}}/g" {{_GUI_ASSETS_DARWIN}}/Info.plist
+	mkdir -p {{_RELEASE_DIR_GUI}}/AppDir/BeagleBoardImager.app/Contents/{MacOS,Resources}
+	cp {{_GUI_ASSETS_DARWIN}}/Info.plist {{_RELEASE_DIR_GUI}}/AppDir/BeagleBoardImager.app/Contents/
+	cp {{_GUI_ASSETS}}/icons/icon.icns {{_RELEASE_DIR_GUI}}/AppDir/BeagleBoardImager.app/Contents/Resources/
+	cp target/{{TARGET}}/release/bb-imager-gui {{_RELEASE_DIR_GUI}}/AppDir/BeagleBoardImager.app/Contents/MacOS/
+	create-dmg \
+		--volname "BeagleBoardImager Installer" \
+		--volicon "{{_GUI_ASSETS}}/icons/icon.icns" \
+		--window-pos 200 120 \
+		--window-size 800 400 \
+		--icon-size 100 \
+		--icon "BeagleBoardImager.app" 200 190 \
+		--hide-extension "BeagleBoardImager.app" \
+		--app-drop-link 600 185 \
+		--hdiutil-verbose \
+		--skip-jenkins \
+		"{{_RELEASE_DIR_GUI}}/{{_PACKAGE_NAME_GUI}}-{{TARGET}}.dmg" \
+		"{{_RELEASE_DIR_GUI}}/AppDir/"
+	rm -rf {{_RELEASE_DIR_GUI}}/AppDir/
+
+
+# Create Windows portable zip package
+[group('packaging')]
+package-gui-windows-zip TARGET=_HOST_TARGET: (build-gui TARGET)
+	@echo "Create GUI Portable Windows zip for {{TARGET}}"
+	mkdir -p {{_RELEASE_DIR_GUI}}
+	zip -j {{_RELEASE_DIR_GUI}}/{{_PACKAGE_NAME_GUI}}-{{TARGET}}.zip target/{{TARGET}}/release/bb-imager-gui.exe
