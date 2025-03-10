@@ -10,10 +10,11 @@ clippy:
   tags:
     - docker-amd64
   before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - apt-get update && apt-get install -y --no-install-recommends libudev-dev
     - rustup component add clippy
   script:
-    - make checks
+    - just check
 
 test:
   image: "rust:latest"
@@ -21,10 +22,11 @@ test:
   tags:
     - docker-amd64
   before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - apt-get update && apt-get install -y --no-install-recommends libudev-dev
   script:
     - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --workspace --verbose
+    - just test
 
 windows:
   image: "rust:latest"
@@ -34,11 +36,11 @@ windows:
     RUST_BUILDER: cargo
   stage: build
   before_script:
-    - echo "Download dependencies"
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - apt-get update && apt-get --assume-yes install gcc-mingw-w64 zip
     - rustup target add x86_64-pc-windows-gnu
   script:
-    - make release-windows-x86_64-pc-windows-gnu
+    - just release x86_64-pc-windows-gnu
   artifacts:
     paths:
       - release/
@@ -51,15 +53,13 @@ linux_x86_64:
     RUST_BUILDER: cargo
   stage: build
   before_script:
-    - echo "Download dependencies"
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - apt-get update && apt-get --assume-yes install libssl-dev libudev-dev desktop-file-utils
-    - echo "Setup appimagetool"
-    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
-    - chmod +x /usr/local/bin/appimagetool
     - rustup target add x86_64-unknown-linux-gnu
     - cargo install cargo-deb
+    - just setup-appimage /usr/local/bin
   script:
-    - make release-linux-x86_64-unknown-linux-gnu
+    - just release x86_64-unknown-linux-gnu
   artifacts:
     paths:
       - release/
@@ -76,16 +76,14 @@ linux_aarch64:
     PB2_MSPM0: 1
   stage: build
   before_script:
-    - echo "Download dependencies"
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - dpkg --add-architecture ${CROSS_ARCH}
     - apt-get update && apt-get --assume-yes install libssl-dev:${CROSS_ARCH} libudev-dev:${CROSS_ARCH} desktop-file-utils gcc-aarch64-linux-gnu
-    - echo "Setup appimagetool"
-    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
-    - chmod +x /usr/local/bin/appimagetool
     - rustup target add aarch64-unknown-linux-gnu
     - cargo install cargo-deb
+    - just setup-appimage /usr/local/bin
   script:
-    - PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-aarch64-unknown-linux-gnu
+    - PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig/:${PKG_CONFIG_PATH}" just release aarch64-unknown-linux-gnu
   artifacts:
     paths:
       - release/
@@ -101,16 +99,14 @@ linux_arm:
     CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
   stage: build
   before_script:
-    - echo "Download dependencies"
+    - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
     - dpkg --add-architecture ${CROSS_ARCH}
     - apt-get update && apt-get --assume-yes install libssl-dev:${CROSS_ARCH} libudev-dev:${CROSS_ARCH} desktop-file-utils gcc-arm-linux-gnueabihf
-    - echo "Setup appimagetool"
-    - wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
-    - chmod +x /usr/local/bin/appimagetool
     - rustup target add armv7-unknown-linux-gnueabihf
     - cargo install cargo-deb
+    - just setup-appimage /usr/local/bin
   script:
-    - PKG_CONFIG_PATH="/usr/lib/arm-linux-gnueabihf/pkgconfig/:${PKG_CONFIG_PATH}" make release-linux-armv7-unknown-linux-gnueabihf
+    - PKG_CONFIG_PATH="/usr/lib/arm-linux-gnueabihf/pkgconfig/:${PKG_CONFIG_PATH}" just release armv7-unknown-linux-gnueabihf
   artifacts:
     paths:
       - release/
@@ -123,7 +119,7 @@ darwin:
   variables:
     RUST_BUILDER: cargo
   before_script:
-    - brew install create-dmg rustup git-lfs
+    - brew install create-dmg rustup git-lfs just
     - git lfs install
     - git lfs fetch
     - git lfs checkout
@@ -131,9 +127,9 @@ darwin:
     - rustup target add x86_64-apple-darwin aarch64-apple-darwin
   script:
     - rustc --version
-    - make release-darwin-x86_64-apple-darwin
-    - make release-darwin-aarch64-apple-darwin
-    - make release-darwin-universal-apple-darwin
+    - just release x86_64-apple-darwin
+    - just release aarch64-apple-darwin
+    - just release universal-apple-darwin
   artifacts:
     paths:
       - release/
