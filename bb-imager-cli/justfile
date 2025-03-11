@@ -1,0 +1,81 @@
+_RUST_CLI_FEATURE_ARGS := if PB2_MSPM0 == '1' { '-F pb2_mspm0' } else { '' }
+
+_PACKAGE_NAME_CLI := 'bb-imager-cli'
+
+_RELEASE_DIR_CLI := _RELEASE_DIR / _PACKAGE_NAME_CLI / VERSION
+
+# Build universal macos GUI binary
+_build-cli-universal-apple-darwin: (build-cli 'aarch64-apple-darwin') (build-cli 'x86_64-apple-darwin')
+	mkdir -p target/universal-apple-darwin/release
+	lipo -create target/x86_64-apple-darwin/release/bb-imager-cli target/aarch64-apple-darwin/release/bb-imager-cli -output target/universal-apple-darwin/release/bb-imager-cli
+
+
+# Release build for Beagle Board Imager CLI. Should be used for final testing
+[group('build')]
+build-cli TARGET=_HOST_TARGET:
+	@echo "Build Beagle Board Imager CLI for {{TARGET}}"
+	{{ if TARGET == 'universal-apple-darwin' { \
+		'just _build-cli-universal-apple-darwin' \
+	} else { \
+		RUST_BUILDER + ' build --release --target ' + TARGET + ' -p bb-imager-cli ' + _RUST_GUI_FEATURE_ARGS \
+	} }}
+
+
+# Run CLI for quick testing on host. Flags can be used to modify the build
+[group('run')]
+run-cli FLAGS='':
+	@echo "Run CLI on host for quick testing"
+	{{RUST_BUILDER}} run -p bb-imager-cli {{_RUST_CLI_FEATURE_ARGS}} {{FLAGS}}
+
+
+# Generate Manpage for CLI
+generate-cli-manpage:
+	@echo "Generate CLI Manpage"
+	rm -rf target/man
+	mkdir -p target/man
+	{{_CARGO_PATH}} xtask {{_RUST_CLI_FEATURE_ARGS}} cli-man target/man
+	gzip target/man/*
+
+
+# Generate Shell completion for CLI
+generate-shell-completion SHELL:
+	@echo "Generate {{SHELL}} completion for CLI"
+	mkdir -p target/shell-completion
+	{{_CARGO_PATH}} xtask {{_RUST_CLI_FEATURE_ARGS}} cli-shell-complete {{SHELL}} target/shell-completion
+
+
+# Create compressed CLI package for Linux
+[group('packaging')]
+package-cli-linux-xz TARGET=_HOST_TARGET: (build-cli TARGET) generate-cli-manpage (generate-shell-completion 'bash') (generate-shell-completion 'zsh')
+	@echo "Create compressed CLI Package for Linux"
+	install -D target/{{TARGET}}/release/bb-imager-cli -t {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/usr/bin/
+	install -D -m 644 target/man/* -t {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/usr/share/man/man1/
+	install -D -m 644 target/shell-completion/_bb-imager-cli -t {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/usr/share/zsh/site-functions/
+	install -D -m 644 target/shell-completion/bb-imager-cli.bash -t {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/usr/share/bash-completion/completions/bb-imager-cli
+	cd {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir && tar cfJ {{_RELEASE_DIR_CLI}}/{{_PACKAGE_NAME_CLI}}-{{TARGET}}.tar.xz *
+	rm -rf {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir
+
+
+# Create compressed CLI package for macOS
+[group('packaging')]
+package-cli-darwin-zip TARGET=_HOST_TARGET: (build-cli TARGET) generate-cli-manpage (generate-shell-completion 'zsh')
+	@echo "Create compressed CLI Package for macOS"
+	mkdir -p {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir
+	cp -r target/man {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+	cp -r target/shell-completion {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+	cp target/{{TARGET}}/release/bb-imager-cli {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+	# Required to get the desired directory structure
+	cd {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir && zip -r {{_RELEASE_DIR_CLI}}/{{_PACKAGE_NAME_CLI}}-{{TARGET}}.zip *
+	rm -rf {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+
+
+# Create compressed CLI package for Windows
+[group('packaging')]
+package-cli-windows-zip TARGET=_HOST_TARGET: (build-cli TARGET) (generate-shell-completion 'powershell')
+	@echo "Create compressed CLI Windows zip {{TARGET}}"
+	mkdir -p {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir
+	cp target/{{TARGET}}/release/bb-imager-cli.exe {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+	cp -r target/shell-completion {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/
+	# Required to get the desired directory structure
+	cd {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir/ && zip -r {{_RELEASE_DIR_CLI}}/{{_PACKAGE_NAME_CLI}}-{{TARGET}}.zip *
+	rm -rf {{_RELEASE_DIR_CLI}}/bb-imager-cli-tempdir
