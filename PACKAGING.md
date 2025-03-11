@@ -1,33 +1,8 @@
 # Packaging
 
-## Dependencies
+## Task system
 
-The following dependencies are only required to build a package locally. It can be skipped during general development.
-
-### Deb Packaging
-
-The project uses [cargo-deb](https://crates.io/crates/cargo-deb) to build the Debian package.
-
-```
-cargo install cargo-deb
-```
-
-### AppImage Packaging
-
-- The project uses [appimagetool](https://github.com/AppImage/appimagetool) for building the AppImage.
-
-```
-wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage -O $HOME/.local/bin/appimagetool
-chmod +x $HOME/.local/bin/appimagetool
-```
-
-### DMG Packaging
-
-- The project uses [create-dmg](https://github.com/create-dmg/create-dmg) to build DMG package for MacOS
-
-```
-brew install create-dmg
-```
+- This project uses [just](https://just.systems/) as the task runner. For most people, running `just` should be enough get a grasp regarding how to build and run the project.
 
 ## Building
 
@@ -35,24 +10,30 @@ The repo contains a `Makefile` to help create the different supported packages.
 
 ## Deb Package
 
-Ensure [dependencies](#deb-packaging) are installed.
+1. The project uses [cargo-deb](https://crates.io/crates/cargo-deb) to build the Debian package. It can be installed with a just recipe
+
+```
+just setup-deb
+```
+
+2. Build the packages
 
 - CLI
 
 ```
-make package-cli-linux-deb-{target}
+just package-cli-linux-deb {target}
 ```
 
 - GUI
 
 ```
-make package-gui-linux-deb-{target}
+just package-gui-linux-deb {target}
 ```
 
 - Service
 
 ```
-make package-service-linux-deb-{target}
+just package-service-linux-deb {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -64,10 +45,16 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## AppImage
 
-Ensure [dependencies](#appimage-dependencies) are installed. AppImage is only supported for the GUI.
+1. The project uses [appimagetool](https://github.com/AppImage/appimagetool) for building the AppImage.
 
 ```
-make package-gui-linux-appimage-{target}
+just setup-appimage
+```
+
+2. Build the package
+
+```
+just package-gui-linux-appimage {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -84,13 +71,13 @@ Just a tarball of everything. Useful for creating packages that need to be maint
 - CLI
 
 ```
-make package-cli-linux-xz-{target}
+just package-cli-linux-xz {target}
 ```
 
 - Service
 
 ```
-make package-service-linux-xz-{target}
+just package-service-linux-xz {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -105,13 +92,13 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 - CLI
 
 ```
-make package-cli-windows-zip-{target}
+just package-cli-windows-zip {target}
 ```
 
 - GUI
 
 ```
-make package-gui-windows-zip-{target}
+just package-gui-windows-zip {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -121,10 +108,16 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## MacOS DMG
 
-Ensure [dependencies](#dmg-dependencies) are installed. DMG is only supported for the GUI.
+1. The project uses [create-dmg](https://github.com/create-dmg/create-dmg) to build DMG package for MacOS
 
 ```
-make package-gui-darwin-dmg-{target}
+just setup-dmg
+```
+
+2. Build the package.
+
+```
+just package-gui-darwin-dmg {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -139,7 +132,7 @@ MacOS Package cannot be built on a non-MacOS host.
 Zipped package for CLI. Useful for creating out of tree packages. Only supported for CLI.
 
 ```
-make package-cli-darwin-zip-{target}
+just package-cli-darwin-zip {target}
 ```
 
 Where `target` is the platform you are building for. Currently, the following targets have been tested:
@@ -155,5 +148,5 @@ Cross Compilation for linux is supported using [cross](https://github.com/cross-
 
 ```
 cargo install cross --git https://github.com/cross-rs/cross
-RUST_BUILDER=$(which cross) make {target}
+RUST_BUILDER=$(which cross) just {recipe} {target}
 ```
