@@ -1,9 +1,9 @@
 use iced::{
-    widget::{self, button, text},
     Element,
+    widget::{self, button, text},
 };
 
-use crate::{constants, helpers, BBImagerMessage};
+use crate::{BBImagerMessage, constants, helpers};
 
 pub fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, BBImagerMessage>
 where
@@ -37,10 +37,20 @@ where
         })
         .map(Into::into);
 
+    let row3: iced::Element<_> = if items.size_hint() == (0, Some(0)) {
+        text("No destinations found")
+            .width(iced::Length::Fill)
+            .size(20)
+            .color([0.8, 0.8, 0.8])
+            .into()
+    } else {
+        widget::scrollable(widget::column(items).spacing(10)).into()
+    };
+
     widget::column![
         helpers::search_bar(search_bar),
         widget::horizontal_rule(2),
-        widget::scrollable(widget::column(items).spacing(10))
+        row3
     ]
     .spacing(10)
     .padding(10)
