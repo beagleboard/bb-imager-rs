@@ -1,12 +1,13 @@
+use std::time::Duration;
+
 use iced::{
-    widget::{self, button, text},
     Element,
+    widget::{self, button, text},
 };
 
 use crate::{
-    constants,
+    BBImagerMessage, constants,
     helpers::{self, img_or_svg},
-    BBImagerMessage,
 };
 
 const ICON_WIDTH: u16 = 60;
@@ -66,7 +67,14 @@ impl ImageSelectionPage {
 
             widget::scrollable(widget::column(items).spacing(10)).into()
         } else {
-            widget::center("Loading...").into()
+            widget::center(
+                iced_loading::circular::Circular::new()
+                    .size(80.0)
+                    .bar_height(6.0)
+                    .easing(&iced_loading::easing::STANDARD)
+                    .cycle_duration(Duration::from_secs(2)),
+            )
+            .into()
         };
 
         widget::column![
