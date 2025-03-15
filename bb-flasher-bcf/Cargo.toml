@@ -18,7 +18,7 @@ futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
 bin_file = "0.1"
-serialport = { version = "4.7", optional = true }
+serialport = { version = "4.7", optional = true, default-features = false }
 hidapi = { version = "2.6", optional = true }
 
 [features]

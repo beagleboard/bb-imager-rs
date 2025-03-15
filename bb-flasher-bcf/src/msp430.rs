@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     Status,
-    helpers::{bin_file_from_str, chan_send, parse_bin},
+    helpers::{chan_send, parse_bin},
 };
 
 const VID: u16 = 0x2047;
@@ -170,7 +170,7 @@ fn load_bsl(dst: &std::ffi::CStr) -> Result<()> {
     tracing::info!("Unlock");
     msp430.unlock()?;
 
-    let bin = bin_file_from_str(BSL).expect("Failed to parse MSP430 BSL");
+    let bin = BSL.parse().expect("Failed to parse MSP430 BSL");
     tracing::info!("BSL: {}", bin);
 
     tracing::info!("Load BSL");
