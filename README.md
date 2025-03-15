@@ -50,15 +50,13 @@ Options:
 ❯ bb-imager-cli flash sd --help
 Flash an SD card with customizable settings for BeagleBoard devices
 
-Usage: bb-imager-cli flash sd [OPTIONS] <--img-local <IMG_LOCAL>|--img-remote <IMG_REMOTE>> <DST>
+Usage: bb-imager-cli flash sd [OPTIONS] <IMG> <DST>
 
 Arguments:
+  <IMG>  Local path to image file. Can be compressed (xz) or extracted file
   <DST>  The destination device (e.g., `/dev/sdX` or specific device identifiers)
 
 Options:
-      --img-local <IMG_LOCAL>          Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats
-      --img-remote <IMG_REMOTE>        URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats
-      --img-sha256 <IMG_SHA256>        Checksum for remote image
       --no-verify                      Disable checksum verification post-flash
       --hostname <HOSTNAME>            Set a custom hostname for the device (e.g., "beaglebone")
       --timezone <TIMEZONE>            Set the timezone for the device (e.g., "America/New_York")
@@ -72,18 +70,8 @@ Options:
   -h, --help                           Print help
 ```
 
-## Flashing Remote image
+## Flashing image
 
 ```shell
-❯ bb-imager-cli flash bcf --image-remote $IMG_URL --image-sha256 $IMG_SHA256 /dev/ttyACM0
-[1] Preparing
-[2] Verifying    [█████████████████████████████████████████████████████████████████████████████████████████████████████████████] [100 %]
-[3] Flashing     [█████████████████████████████████████████████████████████████████████████████████████████████████████████████] [100 %]
-[4] Verifying
-```
-
-## Flashing Local image
-
-```shell
-❯ bb-imager-cli flash --quiet bcf $DESTINATION --img-local $IMG_PATH /dev/ttyACM0
+❯ bb-imager-cli flash --quiet bcf $IMG_PATH /dev/ttyACM0
 ```

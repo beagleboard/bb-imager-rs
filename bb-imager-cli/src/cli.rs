@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
-use url::Url;
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -55,8 +54,8 @@ pub enum Commands {
 pub enum TargetCommands {
     /// Flash BeagleConnect Freedom.
     Bcf {
-        #[command(flatten)]
-        img: SelectedImage,
+        /// Local path to image file. Can be compressed (xz) or extracted file
+        img: PathBuf,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
@@ -67,8 +66,8 @@ pub enum TargetCommands {
     },
     /// Flash an SD card with customizable settings for BeagleBoard devices.
     Sd {
-        #[command(flatten)]
-        img: SelectedImage,
+        /// Local path to image file. Can be compressed (xz) or extracted file
+        img: PathBuf,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: PathBuf,
@@ -109,8 +108,8 @@ pub enum TargetCommands {
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     Msp430 {
-        #[command(flatten)]
-        img: SelectedImage,
+        /// Local path to image file. Can be compressed (xz) or extracted file
+        img: PathBuf,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
@@ -118,8 +117,8 @@ pub enum TargetCommands {
     /// Flash MSPM0 on Pocketbeagle2.
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0 {
-        #[command(flatten)]
-        img: SelectedImage,
+        /// Local path to image file. Can be compressed (xz) or extracted file
+        img: PathBuf,
 
         /// Do not persist EEPROM contents
         #[arg(long)]
@@ -138,24 +137,4 @@ pub enum DestinationsTarget {
     /// Pocketbeagle2 MSPM0
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0,
-}
-
-#[derive(Args, Debug)]
-pub struct SelectedImage {
-    #[command(flatten)]
-    pub img: OsImage,
-    #[arg(long, requires = "img_remote")]
-    /// Checksum for remote image.
-    pub img_sha256: Option<String>,
-}
-
-#[derive(Args, Debug)]
-#[group(required = true, multiple = false)]
-pub struct OsImage {
-    #[arg(long)]
-    /// Path to the image file to flash. Supports both raw and compressed (e.g., xz) formats.
-    pub img_local: Option<PathBuf>,
-    #[arg(long, requires = "img_sha256")]
-    /// URL to remote image file to flash. Supports both raw and compressed (e.g., xz) formats.
-    pub img_remote: Option<Url>,
 }
