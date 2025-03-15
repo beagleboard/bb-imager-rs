@@ -12,18 +12,9 @@ pub(crate) fn parse_bin(data: &[u8]) -> Result<bin_file::BinFile, bin_file::Erro
     const THRESHOLD: usize = 20;
 
     match std::str::from_utf8(data) {
-        Ok(s) => bin_file_from_str(s),
+        Ok(s) => s.parse(),
         _ => bin_file_from_binary(data, THRESHOLD),
     }
-}
-
-/// TODO: Remove this once https://gitlab.com/robert.ernst.paf/bin_file/-/merge_requests/2 is
-/// merged
-pub(crate) fn bin_file_from_str(contents: &str) -> Result<bin_file::BinFile, bin_file::Error> {
-    let mut binfile = bin_file::BinFile::new();
-    let lines: Vec<&str> = contents.lines().collect();
-    binfile.add_strings(lines, false)?;
-    Ok(binfile)
 }
 
 fn bin_file_from_binary(
