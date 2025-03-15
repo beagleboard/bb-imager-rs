@@ -1,6 +1,6 @@
 mod cli;
 
-use bb_imager::DownloadFlashingStatus;
+use bb_imager::{DownloadFlashingStatus, SelectedImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use std::{ffi::CString, path::PathBuf};
@@ -107,7 +107,7 @@ async fn flash(target: TargetCommands, quite: bool) {
         } => {
             let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
             bb_imager::FlashingConfig::BeagleConnectFreedom {
-                img: img.into(),
+                img: SelectedImage::Local(img),
                 port: dst,
                 customization,
             }
@@ -136,18 +136,18 @@ async fn flash(target: TargetCommands, quite: bool) {
                 .update_wifi(wifi);
 
             bb_imager::FlashingConfig::LinuxSd {
-                img: img.into(),
+                img: SelectedImage::Local(img),
                 dst,
                 customization,
             }
         }
         TargetCommands::Msp430 { img, dst } => bb_imager::FlashingConfig::Msp430 {
-            img: img.into(),
+            img: SelectedImage::Local(img),
             port: CString::new(dst).expect("Failed to parse destination"),
         },
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
-            img: img.into(),
+            img: SelectedImage::Local(img),
             persist_eeprom: !no_eeprom,
         },
     };
@@ -293,19 +293,6 @@ impl From<DestinationsTarget> for bb_imager::Flasher {
             DestinationsTarget::Msp430 => Self::Msp430Usb,
             #[cfg(feature = "pb2_mspm0")]
             DestinationsTarget::Pb2Mspm0 => Self::Pb2Mspm0,
-        }
-    }
-}
-
-impl From<cli::SelectedImage> for bb_imager::SelectedImage {
-    fn from(value: cli::SelectedImage) -> Self {
-        match (value.img.img_local, value.img.img_remote, value.img_sha256) {
-            (Some(p), None, None) => Self::local(p),
-            (None, Some(u), Some(c)) => {
-                let sha = const_hex::decode_to_array(c).expect("Invalid SHA256");
-                Self::remote(String::new(), u, sha)
-            }
-            _ => unreachable!(),
         }
     }
 }
