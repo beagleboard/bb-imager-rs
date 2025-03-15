@@ -566,6 +566,7 @@ name = "bb-imager-gui"
 version = "0.0.4"
 dependencies = [
  "bb-imager",
+ "directories",
  "embed-resource",
  "iced",
  "iced-loading",
@@ -574,6 +575,8 @@ dependencies = [
  "localzone",
  "notify-rust",
  "rfd",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-stream",
  "tracing",

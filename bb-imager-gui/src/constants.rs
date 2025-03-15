@@ -1,5 +1,7 @@
 use iced::color;
 
+pub const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
+
 pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
 pub const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);

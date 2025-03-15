@@ -2,7 +2,7 @@
 
 use std::{collections::HashSet, time::Duration};
 
-use helpers::{ProgressBarState, Tainted};
+use helpers::ProgressBarState;
 use iced::{Element, Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
 use pages::{Screen, configuration::FlashingCustomization};
@@ -32,6 +32,8 @@ fn main() -> iced::Result {
     // HACK: mac_notification_sys set application name (not an option in notify-rust)
     let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
+    let app_config = helpers::GuiConfiguration::load().unwrap_or_default();
+
     let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)
         .expect("Failed to parse config");
     let boards = helpers::Boards::from(config);
@@ -49,11 +51,12 @@ fn main() -> iced::Result {
         .font(constants::FONT_REGULAR_BYTES)
         .font(constants::FONT_BOLD_BYTES)
         .default_font(constants::FONT_REGULAR)
-        .run_with(move || BBImager::new(boards))
+        .run_with(move || BBImager::new(boards, app_config))
 }
 
 #[derive(Default, Debug)]
 struct BBImager {
+    app_config: helpers::GuiConfiguration,
     boards: helpers::Boards,
     downloader: bb_imager::download::Downloader,
     screen: Vec<Screen>,
@@ -63,7 +66,7 @@ struct BBImager {
     destinations: HashSet<bb_imager::Destination>,
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
-    customization: Option<Tainted<FlashingCustomization>>,
+    customization: Option<FlashingCustomization>,
     flashing_state: Option<pages::flash::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
@@ -74,7 +77,10 @@ struct BBImager {
 }
 
 impl BBImager {
-    fn new(boards: helpers::Boards) -> (Self, Task<BBImagerMessage>) {
+    fn new(
+        boards: helpers::Boards,
+        app_config: helpers::GuiConfiguration,
+    ) -> (Self, Task<BBImagerMessage>) {
         let downloader = bb_imager::download::Downloader::default();
 
         // Fetch old config
@@ -102,6 +108,7 @@ impl BBImager {
         );
 
         let mut ans = Self {
+            app_config,
             boards,
             downloader: downloader.clone(),
             timezones: widget::combo_box::State::new(
@@ -234,9 +241,6 @@ impl BBImager {
                 self.search_bar.clear();
                 self.destinations.clear();
             }
-            BBImagerMessage::ResetConfig => {
-                self.customization = Some(Tainted::new(self.config()));
-            }
             BBImagerMessage::SwitchScreen(x) => {
                 self.screen.clear();
                 return self.push_page(x);
@@ -268,8 +272,7 @@ impl BBImager {
                 }
             }
             BBImagerMessage::StartFlashing => {
-                return self
-                    .start_flashing(Some(self.customization.as_ref().unwrap().as_ref().clone()));
+                return self.start_flashing(Some(self.customization.as_ref().unwrap().clone()));
             }
             BBImagerMessage::StartFlashingWithoutConfiguraton => {
                 return self.start_flashing(None);
@@ -304,15 +307,39 @@ impl BBImager {
                 }
                 self.destinations = x;
             }
-            BBImagerMessage::UpdateFlashConfig(x) => {
-                self.customization = Some(Tainted::new_tainted(x))
-            }
+            BBImagerMessage::UpdateFlashConfig(x) => self.customization = Some(x),
             BBImagerMessage::OpenUrl(x) => {
                 return Task::future(async move {
                     let res = webbrowser::open(&x);
                     tracing::info!("Open Url Resp {res:?}");
                     BBImagerMessage::Null
                 });
+            }
+            BBImagerMessage::SaveCustomization => {
+                match self.customization.clone().unwrap() {
+                    FlashingCustomization::LinuxSd(c) => self.app_config.update_sd_customization(c),
+                    FlashingCustomization::Bcf(c) => self.app_config.update_bcf_customization(c),
+                    _ => {}
+                }
+
+                let config = self.app_config.clone();
+
+                // Since we have a cache of config, no need to wait for disk persistance.
+                self.screen.pop();
+
+                return Task::future(async move {
+                    if let Err(e) = config.save().await {
+                        tracing::error!("Failed to save config: {e}");
+                    }
+                    BBImagerMessage::Null
+                });
+            }
+            BBImagerMessage::ResetCustomization => {
+                self.customization = Some(self.customization.clone().unwrap().reset());
+            }
+            BBImagerMessage::CancelCustomization => {
+                self.screen.pop();
+                self.customization = Some(self.config());
             }
             BBImagerMessage::Null => {}
         };
@@ -326,7 +353,7 @@ impl BBImager {
 
         match x {
             Screen::ExtraConfiguration if self.customization.is_none() => {
-                self.customization = Some(Tainted::new(self.config()))
+                self.customization = Some(self.config())
             }
             Screen::ImageSelection(page) => {
                 tracing::info!("Image Selection Screen");
@@ -457,7 +484,7 @@ impl BBImager {
                 pages::destination_selection::view(self.destinations.iter(), &self.search_bar)
             }
             Screen::ExtraConfiguration => pages::configuration::view(
-                self.customization.as_ref().unwrap().as_ref(),
+                self.customization.as_ref().unwrap(),
                 &self.timezones,
                 &self.keymaps,
             ),
@@ -477,13 +504,7 @@ impl BBImager {
                     widget::row![
                         widget::button("Edit Settings")
                             .on_press(BBImagerMessage::ReplaceScreen(Screen::ExtraConfiguration)),
-                        widget::button("Yes").on_press_maybe(
-                            if self.customization.as_ref().map(|x| x.is_tainted()) == Some(true) {
-                                Some(BBImagerMessage::StartFlashing)
-                            } else {
-                                None
-                            }
-                        ),
+                        widget::button("Yes").on_press(BBImagerMessage::StartFlashing),
                         widget::button("No")
                             .on_press(BBImagerMessage::StartFlashingWithoutConfiguraton),
                         widget::button("Abort")
@@ -534,6 +555,7 @@ impl BBImager {
         FlashingCustomization::new(
             flasher,
             self.selected_image.as_ref().expect("Missing os image"),
+            &self.app_config,
         )
     }
 
@@ -558,7 +580,7 @@ impl BBImager {
             ) => bb_imager::common::FlashingConfig::LinuxSd {
                 img,
                 dst: path,
-                customization,
+                customization: customization.into(),
             },
             (
                 Some(helpers::BoardImage::Image { img, .. }),
@@ -567,7 +589,7 @@ impl BBImager {
             ) => bb_imager::common::FlashingConfig::BeagleConnectFreedom {
                 img,
                 port,
-                customization,
+                customization: customization.into(),
             },
             (
                 Some(helpers::BoardImage::Image { img, .. }),
@@ -577,11 +599,11 @@ impl BBImager {
             #[cfg(feature = "pb2_mspm0")]
             (
                 Some(helpers::BoardImage::Image { img, .. }),
-                FlashingCustomization::Pb2Mspm0 { persist_eeprom },
+                FlashingCustomization::Pb2Mspm0(x),
                 _,
             ) => bb_imager::common::FlashingConfig::Pb2Mspm0 {
                 img,
-                persist_eeprom,
+                persist_eeprom: x.persist_eeprom,
             },
             _ => unreachable!(),
         }

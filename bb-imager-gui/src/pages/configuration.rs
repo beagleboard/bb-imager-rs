@@ -20,12 +20,17 @@ pub fn view<'a>(
             home_btn_text("RESET", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::ResetConfig),
-            widget::horizontal_space().width(iced::Length::FillPortion(5)),
+                .on_press(BBImagerMessage::ResetCustomization),
+            widget::horizontal_space().width(iced::Length::FillPortion(3)),
+            home_btn_text("ABORT", true, iced::Length::Fill)
+                .style(widget::button::secondary)
+                .width(iced::Length::FillPortion(1))
+                .on_press(BBImagerMessage::CancelCustomization),
+            widget::horizontal_space().width(iced::Length::FillPortion(3)),
             home_btn_text("SAVE", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::PopScreen),
+                .on_press(BBImagerMessage::SaveCustomization),
         ]
         .padding(4)
         .width(iced::Length::Fill);
@@ -42,14 +47,14 @@ pub fn view<'a>(
                     })
             ],
             #[cfg(feature = "pb2_mspm0")]
-            FlashingCustomization::Pb2Mspm0 { persist_eeprom } => {
+            FlashingCustomization::Pb2Mspm0(x) => {
                 widget::column![
-                    widget::toggler(*persist_eeprom)
+                    widget::toggler(x.persist_eeprom)
                         .label("Persist EEPROM")
                         .on_toggle(move |y| {
-                            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0 {
-                                persist_eeprom: y,
-                            })
+                            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0(
+                                x.clone().update_persist_eeprom(y),
+                            ))
                         })
                 ]
             }
@@ -77,11 +82,11 @@ pub fn view<'a>(
 fn linux_sd_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+    config: &'a helpers::SdCustomization,
 ) -> widget::Column<'a, BBImagerMessage> {
     widget::column![
         widget::container(
-            widget::toggler(!config.verify())
+            widget::toggler(!config.verify)
                 .label("Skip Verification")
                 .on_toggle(|y| {
                     BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
@@ -102,10 +107,10 @@ fn linux_sd_form<'a>(
 
 fn keymap_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+    config: &'a helpers::SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
-        widget::toggler(config.keymap().is_some())
+        widget::toggler(config.keymap.is_some())
             .label("Set Keymap")
             .on_toggle(|t| {
                 let keymap = if t { Some(String::from("us")) } else { None };
@@ -116,7 +121,7 @@ fn keymap_form<'a>(
         widget::horizontal_space()
     ];
 
-    if let Some(keymap) = config.keymap() {
+    if let Some(keymap) = &config.keymap {
         let xc = config.clone();
 
         let keymap_box = widget::combo_box(keymaps, "Keymap", Some(&keymap.to_owned()), move |t| {
@@ -133,11 +138,9 @@ fn keymap_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn hostname_form(
-    config: &bb_imager::flasher::FlashingSdLinuxConfig,
-) -> widget::Container<BBImagerMessage> {
+fn hostname_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::row![
-        widget::toggler(config.hostname().is_some())
+        widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
             .on_toggle(|t| {
                 let hostname = if t {
@@ -152,7 +155,7 @@ fn hostname_form(
         widget::horizontal_space()
     ];
 
-    if let Some(hostname) = config.hostname() {
+    if let Some(hostname) = config.hostname.as_ref() {
         let xc = config.clone();
 
         let hostname_box = widget::text_input("beagle", hostname)
@@ -172,10 +175,10 @@ fn hostname_form(
 
 fn timezone_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
-    config: &'a bb_imager::flasher::FlashingSdLinuxConfig,
+    config: &'a helpers::SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
-        widget::toggler(config.timezone().is_some())
+        widget::toggler(config.timezone.is_some())
             .label("Set Timezone")
             .on_toggle(|t| {
                 let tz = if t { helpers::system_timezone() } else { None };
@@ -186,7 +189,7 @@ fn timezone_form<'a>(
         widget::horizontal_space()
     ];
 
-    if let Some(tz) = config.timezone() {
+    if let Some(tz) = config.timezone.as_ref() {
         let xc = config.clone();
 
         let timezone_box =
@@ -204,35 +207,33 @@ fn timezone_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn uname_pass_form(
-    config: &bb_imager::flasher::FlashingSdLinuxConfig,
-) -> widget::Container<BBImagerMessage> {
+fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
-        widget::toggler(config.user().is_some())
+        widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
             .on_toggle(|t| {
-                let c = if t {
-                    Some((whoami::username(), String::new()))
-                } else {
-                    None
-                };
+                let c = if t { Some(Default::default()) } else { None };
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
                     config.clone().update_user(c),
                 ))
             })
     ];
 
-    if let Some((u, p)) = config.user() {
+    if let Some(usr) = config.user.as_ref() {
         form = form.extend([
-            helpers::input_with_label("Username", "username", u, |inp| {
+            helpers::input_with_label("Username", "username", &usr.username, |inp| {
                 FlashingCustomization::LinuxSd(
-                    config.clone().update_user(Some((inp, p.to_owned()))),
+                    config
+                        .clone()
+                        .update_user(Some(usr.clone().update_username(inp))),
                 )
             })
             .into(),
-            helpers::input_with_label("Password", "password", p, |inp| {
+            helpers::input_with_label("Password", "password", &usr.password, |inp| {
                 FlashingCustomization::LinuxSd(
-                    config.clone().update_user(Some((u.to_owned(), inp))),
+                    config
+                        .clone()
+                        .update_user(Some(usr.clone().update_password(inp))),
                 )
             })
             .into(),
@@ -244,35 +245,33 @@ fn uname_pass_form(
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(
-    config: &bb_imager::flasher::FlashingSdLinuxConfig,
-) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
-        widget::toggler(config.wifi().is_some())
+        widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")
             .on_toggle(|t| {
-                let c = if t {
-                    Some((String::new(), String::new()))
-                } else {
-                    None
-                };
+                let c = if t { Some(Default::default()) } else { None };
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
                     config.clone().update_wifi(c),
                 ))
             })
     ];
 
-    if let Some((ssid, psk)) = config.wifi() {
+    if let Some(wifi) = config.wifi.as_ref() {
         form = form.extend([
-            helpers::input_with_label("SSID", "SSID", ssid, |inp| {
+            helpers::input_with_label("SSID", "SSID", &wifi.ssid, |inp| {
                 FlashingCustomization::LinuxSd(
-                    config.clone().update_wifi(Some((inp, psk.to_owned()))),
+                    config
+                        .clone()
+                        .update_wifi(Some(wifi.clone().update_ssid(inp))),
                 )
             })
             .into(),
-            helpers::input_with_label("Password", "password", psk, |inp| {
+            helpers::input_with_label("Password", "password", &wifi.password, |inp| {
                 FlashingCustomization::LinuxSd(
-                    config.clone().update_wifi(Some((ssid.to_owned(), inp))),
+                    config
+                        .clone()
+                        .update_wifi(Some(wifi.clone().update_password(inp))),
                 )
             })
             .into(),
@@ -285,30 +284,49 @@ fn wifi_form(
 }
 
 #[derive(Clone, Debug)]
-pub enum FlashingCustomization {
+pub(crate) enum FlashingCustomization {
     LinuxSdFormat,
-    LinuxSd(bb_imager::flasher::FlashingSdLinuxConfig),
-    Bcf(bb_imager::flasher::FlashingBcfConfig),
+    LinuxSd(helpers::SdCustomization),
+    Bcf(helpers::BcfCustomization),
     Msp430,
     #[cfg(feature = "pb2_mspm0")]
-    Pb2Mspm0 {
-        persist_eeprom: bool,
-    },
+    Pb2Mspm0(helpers::Pb2Mspm0Customization),
 }
 
 impl FlashingCustomization {
-    pub fn new(flasher: bb_imager::Flasher, img: &helpers::BoardImage) -> Self {
+    pub(crate) fn new(
+        flasher: bb_imager::Flasher,
+        img: &helpers::BoardImage,
+        app_config: &helpers::GuiConfiguration,
+    ) -> Self {
         match flasher {
             bb_imager::Flasher::SdCard if img == &helpers::BoardImage::SdFormat => {
                 Self::LinuxSdFormat
             }
-            bb_imager::Flasher::SdCard => Self::LinuxSd(Default::default()),
-            bb_imager::Flasher::BeagleConnectFreedom => Self::Bcf(Default::default()),
+            bb_imager::Flasher::SdCard => {
+                Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
+            }
+            bb_imager::Flasher::BeagleConnectFreedom => {
+                Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
+            }
             bb_imager::Flasher::Msp430Usb => Self::Msp430,
             #[cfg(feature = "pb2_mspm0")]
-            bb_imager::Flasher::Pb2Mspm0 => Self::Pb2Mspm0 {
-                persist_eeprom: true,
-            },
+            bb_imager::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
+                app_config
+                    .pb2_mspm0_customization()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
+        }
+    }
+
+    pub(crate) fn reset(self) -> Self {
+        match self {
+            Self::LinuxSd(_) => Self::LinuxSd(Default::default()),
+            Self::Bcf(_) => Self::Bcf(Default::default()),
+            #[cfg(feature = "pb2_mspm0")]
+            Self::Pb2Mspm0(_) => Self::Pb2Mspm0(Default::default()),
+            _ => self,
         }
     }
 }

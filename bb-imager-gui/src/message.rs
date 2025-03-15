@@ -22,7 +22,6 @@ pub(crate) enum BBImagerMessage {
     Search(String),
     Destinations(HashSet<bb_imager::Destination>),
     Reset,
-    ResetConfig,
 
     StartFlashing,
     StartFlashingWithoutConfiguraton,
@@ -44,4 +43,13 @@ pub(crate) enum BBImagerMessage {
     PushScreen(Screen),
     /// Pop page from stack
     PopScreen,
+
+    /// Customization
+    ///
+    /// Save customization to disk
+    SaveCustomization,
+    /// Drop any customization changes that have not been saved
+    CancelCustomization,
+    /// Reset customization to default state
+    ResetCustomization,
 }
