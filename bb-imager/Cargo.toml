@@ -13,7 +13,7 @@ chrono = { version = "0.4.39", optional = true , default-features = false }
 const-hex = { version = "1.14.0" }
 crc32fast = "1.4.2"
 directories = "6.0.0"
-reqwest = { version = "0.12.12", features = ["stream"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["stream", "rustls-tls"] }
 semver = { version = "1.0.25", optional = true }
 serde = { version = "1.0.218", features = ["derive"], optional = true }
 serde_json = { version = "1.0.139", optional = true }
