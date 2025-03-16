@@ -30,6 +30,7 @@ _check-rust:
 
 
 # Setup rust toolcahin
+[group('setup')]
 setup-rust: _check-rust
 	@echo "Setting up rust using rustup"
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
