@@ -1,6 +1,6 @@
 mod cli;
 
-use bb_imager::{DownloadFlashingStatus, SelectedImage};
+use bb_imager::{DownloadFlashingStatus, img::LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use std::{ffi::CString, path::PathBuf};
@@ -20,7 +20,6 @@ async fn main() {
 }
 
 async fn flash(target: TargetCommands, quite: bool) {
-    let downloader = bb_imager::download::Downloader::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 
     if !quite {
@@ -107,7 +106,7 @@ async fn flash(target: TargetCommands, quite: bool) {
         } => {
             let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
             bb_imager::FlashingConfig::BeagleConnectFreedom {
-                img: SelectedImage::Local(img),
+                img: LocalImage::new(img),
                 port: dst,
                 customization,
             }
@@ -136,38 +135,35 @@ async fn flash(target: TargetCommands, quite: bool) {
                 .update_wifi(wifi);
 
             bb_imager::FlashingConfig::LinuxSd {
-                img: SelectedImage::Local(img),
+                img: LocalImage::new(img),
                 dst,
                 customization,
             }
         }
         TargetCommands::Msp430 { img, dst } => bb_imager::FlashingConfig::Msp430 {
-            img: SelectedImage::Local(img),
+            img: LocalImage::new(img),
             port: CString::new(dst).expect("Failed to parse destination"),
         },
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
-            img: SelectedImage::Local(img),
+            img: LocalImage::new(img),
             persist_eeprom: !no_eeprom,
         },
     };
 
     flashing_config
-        .download_flash_customize(downloader, tx)
+        .download_flash_customize(tx)
         .await
         .expect("Failed to flash");
 }
 
 async fn format(dst: PathBuf, quite: bool) {
-    let downloader = bb_imager::download::Downloader::new();
     let (tx, _) = tokio::sync::mpsc::channel(20);
     let term = console::Term::stdout();
 
-    let config = bb_imager::FlashingConfig::LinuxSdFormat { dst };
-    config
-        .download_flash_customize(downloader, tx)
-        .await
-        .unwrap();
+    let config: bb_imager::FlashingConfig<LocalImage> =
+        bb_imager::FlashingConfig::LinuxSdFormat { dst };
+    config.download_flash_customize(tx).await.unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();

@@ -79,105 +79,37 @@ impl std::fmt::Display for Destination {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum SelectedImage {
-    Local(PathBuf),
-    Remote {
-        name: String,
-        url: url::Url,
-        extract_sha256: [u8; 32],
-    },
-}
-
-impl SelectedImage {
-    pub const fn local(name: PathBuf) -> Self {
-        Self::Local(name)
-    }
-
-    pub const fn remote(name: String, url: url::Url, download_sha256: [u8; 32]) -> Self {
-        Self::Remote {
-            name,
-            url,
-            extract_sha256: download_sha256,
-        }
-    }
-
-    /// Download image if not local
-    pub async fn resolve_img(
-        self,
-        downloader: crate::download::Downloader,
-        chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
-    ) -> crate::error::Result<std::path::PathBuf> {
-        match self {
-            crate::SelectedImage::Local(x) => Ok(x),
-            crate::SelectedImage::Remote {
-                url,
-                extract_sha256,
-                ..
-            } => {
-                downloader
-                    .download_progress(url, extract_sha256, chan)
-                    .await
-            }
-        }
-    }
-}
-
-impl std::fmt::Display for SelectedImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SelectedImage::Local(p) => write!(
-                f,
-                "{}",
-                p.file_name()
-                    .expect("image cannot be a directory")
-                    .to_string_lossy()
-            ),
-            SelectedImage::Remote { name, .. } => write!(f, "{}", name),
-        }
-    }
-}
-
-#[cfg(feature = "config")]
-impl From<&crate::config::OsImage> for SelectedImage {
-    fn from(value: &crate::config::OsImage) -> Self {
-        Self::remote(
-            value.name.clone(),
-            value.url.clone(),
-            value.image_download_sha256,
-        )
-    }
-}
-
-pub enum FlashingConfig {
+pub enum FlashingConfig<I: crate::img::ImageFile> {
     LinuxSdFormat {
         dst: PathBuf,
     },
     LinuxSd {
-        img: SelectedImage,
+        img: I,
         dst: PathBuf,
         customization: sd::FlashingSdLinuxConfig,
     },
     BeagleConnectFreedom {
-        img: SelectedImage,
+        img: I,
         port: String,
         customization: bcf::FlashingBcfConfig,
     },
     Msp430 {
-        img: SelectedImage,
+        img: I,
         port: std::ffi::CString,
     },
     #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
     Pb2Mspm0 {
-        img: SelectedImage,
+        img: I,
         persist_eeprom: bool,
     },
 }
 
-impl FlashingConfig {
+impl<I> FlashingConfig<I>
+where
+    I: crate::img::ImageFile + Send + 'static,
+{
     pub async fn download_flash_customize(
         self,
-        downloader: crate::download::Downloader,
         chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
     ) -> crate::error::Result<()> {
         match self {
@@ -195,22 +127,8 @@ impl FlashingConfig {
                             .enable_io()
                             .build()
                             .unwrap();
-                        let img_path = rt
-                            .block_on(async move { img.resolve_img(downloader, &chan).await })
-                            .map_err(|e| {
-                                if let crate::error::Error::IoError(x) = e {
-                                    x
-                                } else {
-                                    std::io::Error::other(format!("Failed to download image: {e}"))
-                                }
-                            })?;
-
-                        let img = crate::img::OsImage::from_path(&img_path).map_err(|e| {
-                            if let crate::error::Error::IoError(x) = e {
-                                x
-                            } else {
-                                std::io::Error::other(format!("Failed to open image: {e}"))
-                            }
+                        let img = rt.block_on(async move {
+                            crate::img::OsImage::open(img, chan.clone()).await
                         })?;
                         let img_size = img.size();
 
@@ -228,11 +146,7 @@ impl FlashingConfig {
                 customization,
             } => {
                 tracing::info!("Port opened");
-                let img_path = img.resolve_img(downloader, &chan).await?;
-                let mut img =
-                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
-                        .await
-                        .unwrap()?;
+                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
 
                 let mut data = Vec::new();
                 img.read_to_end(&mut data)
@@ -241,11 +155,7 @@ impl FlashingConfig {
                 bcf::flash(data, &port, &chan, customization.verify).await
             }
             FlashingConfig::Msp430 { img, port } => {
-                let img_path = img.resolve_img(downloader, &chan).await?;
-                let mut img =
-                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
-                        .await
-                        .unwrap()?;
+                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
                 tracing::info!("Image opened");
 
                 let mut data = Vec::new();
@@ -259,11 +169,7 @@ impl FlashingConfig {
                 img,
                 persist_eeprom,
             } => {
-                let img_path = img.resolve_img(downloader, &chan).await?;
-                let mut img =
-                    tokio::task::spawn_blocking(move || crate::img::OsImage::from_path(&img_path))
-                        .await
-                        .unwrap()?;
+                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
                 tracing::info!("Image opened");
 
                 let mut data = String::new();

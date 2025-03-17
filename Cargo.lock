@@ -462,6 +462,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "bb-downloader"
+version = "0.1.0"
+dependencies = [
+ "const-hex",
+ "futures",
+ "reqwest",
+ "serde",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "bb-drivelist"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -526,17 +542,13 @@ dependencies = [
  "bin_file",
  "chrono",
  "const-hex",
- "crc32fast",
  "directories",
  "futures",
  "liblzma",
- "reqwest",
  "semver",
  "serde",
  "serde_json",
  "serde_with",
- "sha2",
- "tempfile",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
@@ -562,6 +574,7 @@ dependencies = [
 name = "bb-imager-gui"
 version = "0.0.4"
 dependencies = [
+ "bb-downloader",
  "bb-imager",
  "directories",
  "embed-resource",

@@ -1,25 +1,24 @@
 use iced::{
-    widget::{self, button, text},
     Element,
+    widget::{self, button, text},
 };
 
 use crate::{
-    constants,
+    BBImagerMessage, constants,
     helpers::{self, img_or_svg},
-    BBImagerMessage,
 };
 
 pub fn view<'a>(
     boards: &'a helpers::Boards,
     search_bar: &'a str,
-    downloader: &'a bb_imager::download::Downloader,
+    downloader: &'a bb_downloader::Downloader,
 ) -> Element<'a, BBImagerMessage> {
     let items = boards
         .devices()
         .filter(|(_, x)| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
         .map(|(id, dev)| {
             let image: Element<BBImagerMessage> = match &dev.icon {
-                Some(url) => match downloader.clone().check_image(url) {
+                Some(url) => match downloader.clone().check_cache_from_url(url) {
                     Some(y) => img_or_svg(y, 100),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,

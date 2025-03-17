@@ -300,9 +300,7 @@ impl FlashingCustomization {
         app_config: &helpers::GuiConfiguration,
     ) -> Self {
         match flasher {
-            bb_imager::Flasher::SdCard if img == &helpers::BoardImage::SdFormat => {
-                Self::LinuxSdFormat
-            }
+            bb_imager::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
             bb_imager::Flasher::SdCard => {
                 Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
             }

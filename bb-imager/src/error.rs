@@ -12,8 +12,6 @@ pub enum Error {
     BeagleConnectFreedomError(#[from] bcf::Error),
     #[error("MSP430 Error: {0}")]
     MSP430Error(#[from] msp430::Error),
-    #[error("Download Error: {0}")]
-    DownloadError(#[from] crate::download::Error),
     #[error("Io Error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Image Error: {0}")]

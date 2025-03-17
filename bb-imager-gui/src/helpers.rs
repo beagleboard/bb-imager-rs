@@ -1,8 +1,9 @@
 use std::{borrow::Cow, collections::HashSet, io::Read, path::PathBuf, sync::LazyLock};
 
 use bb_imager::{DownloadFlashingStatus, config::OsListItem};
+use futures::StreamExt;
 use iced::{
-    Element,
+    Element, futures,
     widget::{self, button, text},
 };
 use serde::{Deserialize, Serialize};
@@ -400,30 +401,36 @@ pub fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
     .into()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum BoardImage {
     SdFormat,
     Image {
         flasher: bb_imager::Flasher,
-        img: bb_imager::SelectedImage,
+        img: SelectedImage,
     },
 }
 
 impl BoardImage {
-    pub const fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
+    pub fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
         Self::Image {
-            img: bb_imager::SelectedImage::local(path),
+            img: bb_imager::img::LocalImage::new(path).into(),
             flasher,
         }
     }
 
-    pub fn remote(image: bb_imager::config::OsImage, flasher: bb_imager::Flasher) -> Self {
+    pub fn remote(
+        image: bb_imager::config::OsImage,
+        flasher: bb_imager::Flasher,
+        downloader: bb_downloader::Downloader,
+    ) -> Self {
         Self::Image {
-            img: bb_imager::SelectedImage::remote(
+            img: RemoteImage::new(
                 image.name,
                 image.url,
                 image.image_download_sha256,
-            ),
+                downloader,
+            )
+            .into(),
             flasher,
         }
     }
@@ -432,6 +439,13 @@ impl BoardImage {
         match self {
             BoardImage::SdFormat => bb_imager::Flasher::SdCard,
             BoardImage::Image { flasher, .. } => *flasher,
+        }
+    }
+
+    pub(crate) fn is_sd_format(&self) -> bool {
+        match self {
+            BoardImage::SdFormat => true,
+            _ => false,
         }
     }
 }
@@ -688,5 +702,105 @@ impl Default for Pb2Mspm0Customization {
         Self {
             persist_eeprom: true,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RemoteImage {
+    name: String,
+    url: url::Url,
+    extract_sha256: [u8; 32],
+    downloader: bb_downloader::Downloader,
+}
+
+impl RemoteImage {
+    pub(crate) const fn new(
+        name: String,
+        url: url::Url,
+        extract_sha256: [u8; 32],
+        downloader: bb_downloader::Downloader,
+    ) -> Self {
+        Self {
+            name,
+            url,
+            extract_sha256,
+            downloader,
+        }
+    }
+}
+
+impl bb_imager::img::ImageFile for RemoteImage {
+    async fn resolve(
+        &self,
+        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+    ) -> std::io::Result<PathBuf> {
+        let (tx, rx) = futures::channel::mpsc::channel(20);
+
+        if let Some(chan) = chan {
+            tokio::spawn(async move {
+                let chan_ref = &chan;
+                rx.map(DownloadFlashingStatus::DownloadingProgress)
+                    .for_each(|m| async move {
+                        let _ = chan_ref.try_send(m);
+                    })
+                    .await
+            });
+        }
+
+        self.downloader
+            .download_with_sha(self.url.clone(), self.extract_sha256, Some(tx))
+            .await
+            .map_err(|e| {
+                if let bb_downloader::Error::IoError(x) = e {
+                    x
+                } else {
+                    std::io::Error::other(format!("Failed to open image: {e}"))
+                }
+            })
+    }
+}
+
+impl std::fmt::Display for RemoteImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum SelectedImage {
+    LocalImage(bb_imager::img::LocalImage),
+    RemoteImage(RemoteImage),
+}
+
+impl bb_imager::img::ImageFile for SelectedImage {
+    async fn resolve(
+        &self,
+        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+    ) -> std::io::Result<PathBuf> {
+        match self {
+            SelectedImage::LocalImage(x) => x.resolve(chan).await,
+            SelectedImage::RemoteImage(x) => x.resolve(chan).await,
+        }
+    }
+}
+
+impl std::fmt::Display for SelectedImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SelectedImage::LocalImage(x) => x.fmt(f),
+            SelectedImage::RemoteImage(x) => x.fmt(f),
+        }
+    }
+}
+
+impl From<RemoteImage> for SelectedImage {
+    fn from(value: RemoteImage) -> Self {
+        Self::RemoteImage(value)
+    }
+}
+
+impl From<bb_imager::img::LocalImage> for SelectedImage {
+    fn from(value: bb_imager::img::LocalImage) -> Self {
+        Self::LocalImage(value)
     }
 }

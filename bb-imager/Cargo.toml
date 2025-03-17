@@ -11,19 +11,15 @@ license.workspace = true
 liblzma = { version = "0.3.6", features = ["static", "parallel"] }
 chrono = { version = "0.4.39", optional = true , default-features = false }
 const-hex = { version = "1.14.0" }
-crc32fast = "1.4.2"
 directories = "6.0.0"
-reqwest = { version = "0.12.12", default-features = false, features = ["stream", "rustls-tls"] }
 semver = { version = "1.0.25", optional = true }
 serde = { version = "1.0.218", features = ["derive"], optional = true }
 serde_json = { version = "1.0.139", optional = true }
-sha2 = "0.10.8"
 thiserror = "2.0.11"
-tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "process", "fs", "time"] }
+tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
 tracing = "0.1.41"
 url = "2.5.4"
 futures = "0.3.31"
-tempfile = "3.17.1"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", features = ["msp430", "cc1352p7"] }
 bb-flasher-sd = { path = "../bb-flasher-sd" }
@@ -36,5 +32,5 @@ default = []
 udev = ["bb-flasher-sd/udev"]
 pb2_mspm0_raw = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
 pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file"]
-config = ["dep:serde_json", "dep:serde", "dep:serde_with", "const-hex/serde", "semver/serde", "url/serde", "chrono/serde", "reqwest/json"]
+config = ["dep:serde_json", "dep:serde", "dep:serde_with", "const-hex/serde", "semver/serde", "url/serde", "chrono/serde"]
 macos_authopen = ["bb-flasher-sd/macos_authopen"]
