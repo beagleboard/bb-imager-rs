@@ -3,10 +3,10 @@
 use std::{io::Read, sync::Arc};
 
 use crate::BBFlasher;
-pub use bb_flasher_bcf::cc1352p7::Error;
+use bb_flasher_bcf::cc1352p7::Error;
 use futures::StreamExt;
 
-pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub(crate) fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     bb_flasher_bcf::cc1352p7::ports()
         .into_iter()
         .map(crate::Destination::port)

@@ -217,7 +217,7 @@ impl Downloader {
 
             if hash != sha256 {
                 tracing::warn!("{hash:?} != {sha256:?}");
-                return Err(Error::Sha256Error.into());
+                return Err(Error::Sha256Error);
             }
         }
 

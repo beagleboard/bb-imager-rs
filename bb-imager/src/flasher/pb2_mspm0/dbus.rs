@@ -5,7 +5,7 @@ use thiserror::Error;
 use zbus::proxy;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub(crate) enum Error {
     #[error("{0}")]
     ZbusError(zbus::Error),
     #[error("Image is not valid")]
@@ -19,7 +19,7 @@ impl From<zbus::Error> for Error {
 }
 
 #[derive(serde::Deserialize, Debug)]
-pub enum FlashingStatus {
+pub(crate) enum FlashingStatus {
     Preparing,
     Flashing(f32),
     Verifying,
@@ -30,7 +30,7 @@ pub enum FlashingStatus {
     default_service = "org.beagleboard.ImagingService",
     default_path = "/org/beagleboard/ImagingService/Pocketbeagle2Mspm0v1"
 )]
-pub trait Pocketbeagle2Mspm0 {
+pub(crate) trait Pocketbeagle2Mspm0 {
     /// Check method
     fn check(&self) -> zbus::Result<()>;
 
@@ -45,7 +45,7 @@ pub trait Pocketbeagle2Mspm0 {
     fn status(&self, message: &str) -> zbus::Result<()>;
 }
 
-pub async fn possible_devices() -> HashSet<crate::Destination> {
+pub(crate) async fn possible_devices() -> HashSet<crate::Destination> {
     if let Ok(connection) = zbus::Connection::system().await {
         if let Ok(proxy) = Pocketbeagle2Mspm0Proxy::new(&connection).await {
             if let Ok((name, path, _)) = proxy.device().await {
@@ -59,7 +59,7 @@ pub async fn possible_devices() -> HashSet<crate::Destination> {
     HashSet::new()
 }
 
-pub async fn flash(
+pub(crate) async fn flash(
     img: bin_file::BinFile,
     chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     persist_eeprom: bool,

@@ -20,31 +20,29 @@
 //! use std::path::Path;
 //! use std::fs::File;
 //!
-//! fn main() {
-//!     let dst = Path::new("/tmp/dummy");
-//!     let img = || {
-//!         Ok((File::open("/tmp/image")?, 1024))
-//!     };
-//!     let (tx, rx) = futures::channel::mpsc::channel(20);
+//! let dst = Path::new("/tmp/dummy");
+//! let img = || {
+//!     Ok((File::open("/tmp/image")?, 1024))
+//! };
+//! let (tx, rx) = futures::channel::mpsc::channel(20);
 //!
-//!     let flash_thread = std::thread::spawn(move || {
-//!         bb_flasher_sd::flash(
-//!             img,
-//!             dst,
-//!             true,
-//!             Some(tx),
-//!             None,
-//!             None
-//!         )
-//!     });
+//! let flash_thread = std::thread::spawn(move || {
+//!     bb_flasher_sd::flash(
+//!         img,
+//!         dst,
+//!         true,
+//!         Some(tx),
+//!         None,
+//!         None
+//!     )
+//! });
 //!
-//!     let msgs = futures::executor::block_on_stream(rx);
-//!     for m in msgs {
-//!         println!("{:?}", m);
-//!     }
-//!
-//!     flash_thread.join().unwrap().unwrap()
+//! let msgs = futures::executor::block_on_stream(rx);
+//! for m in msgs {
+//!     println!("{:?}", m);
 //! }
+//!
+//! flash_thread.join().unwrap().unwrap()
 //! ```
 //!
 //! [BeagleBoard Imager]: https://openbeagle.org/ayush1325/bb-imager-rs

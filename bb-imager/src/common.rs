@@ -1,15 +1,8 @@
 //! Stuff common to all the flashers
 
 use std::{collections::HashSet, ffi::CString, path::PathBuf};
-use thiserror::Error;
 
 use crate::flasher::{bcf, msp430, sd};
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Failed to Open Destination: {0}")]
-    FailedToOpenDestination(String),
-}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DownloadFlashingStatus {
@@ -34,7 +27,7 @@ pub enum Destination {
 }
 
 impl Destination {
-    pub const fn port(name: String) -> Self {
+    pub(crate) const fn port(name: String) -> Self {
         Self::Port(name)
     }
 
@@ -46,16 +39,12 @@ impl Destination {
         }
     }
 
-    pub const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
+    pub(crate) const fn sd_card(name: String, size: u64, path: PathBuf) -> Self {
         Self::SdCard { name, path, size }
     }
 
-    pub const fn hidraw(path: CString) -> Self {
+    pub(crate) const fn hidraw(path: CString) -> Self {
         Self::HidRaw(path)
-    }
-
-    pub const fn file(name: String, path: PathBuf) -> Self {
-        Self::File(name, path)
     }
 
     pub fn path(&self) -> PathBuf {

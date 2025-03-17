@@ -5,14 +5,14 @@ use std::io::Read;
 #[cfg(feature = "pb2_mspm0_raw")]
 use raw::flash;
 #[cfg(feature = "pb2_mspm0_raw")]
-pub use raw::possible_devices;
+pub(crate) use raw::possible_devices;
 
 #[cfg(all(feature = "pb2_mspm0_dbus", not(feature = "pb2_mspm0_raw")))]
 mod dbus;
 #[cfg(all(feature = "pb2_mspm0_dbus", not(feature = "pb2_mspm0_raw")))]
 use dbus::flash;
 #[cfg(all(feature = "pb2_mspm0_dbus", not(feature = "pb2_mspm0_raw")))]
-pub use dbus::possible_devices;
+pub(crate) use dbus::possible_devices;
 
 use crate::BBFlasher;
 

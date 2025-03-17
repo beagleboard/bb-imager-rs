@@ -1,14 +1,14 @@
 use futures::channel::mpsc;
 use std::collections::HashSet;
 
-pub use bb_flasher_pb2_mspm0::Error;
+use bb_flasher_pb2_mspm0::Error;
 
-pub async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub(crate) async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     let d = bb_flasher_pb2_mspm0::device();
-    HashSet::from([crate::Destination::file(d.name, d.path)])
+    HashSet::from([crate::Destination::File(d.name, d.path)])
 }
 
-pub async fn flash(
+pub(crate) async fn flash(
     img: bin_file::BinFile,
     chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     persist_eeprom: bool,

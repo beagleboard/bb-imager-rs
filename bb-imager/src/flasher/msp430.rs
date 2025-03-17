@@ -6,9 +6,7 @@ use futures::StreamExt;
 
 use crate::BBFlasher;
 
-pub use bb_flasher_bcf::msp430::Error;
-
-pub fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub(crate) fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     bb_flasher_bcf::msp430::devices()
         .into_iter()
         .map(crate::Destination::hidraw)

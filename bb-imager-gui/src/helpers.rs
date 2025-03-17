@@ -443,10 +443,7 @@ impl BoardImage {
     }
 
     pub(crate) fn is_sd_format(&self) -> bool {
-        match self {
-            BoardImage::SdFormat => true,
-            _ => false,
-        }
+        matches!(self, BoardImage::SdFormat)
     }
 }
 
@@ -599,14 +596,16 @@ impl SdCustomization {
     }
 }
 
-impl From<SdCustomization> for bb_imager::flasher::FlashingSdLinuxConfig {
+impl From<SdCustomization> for bb_imager::flasher::sd::FlashingSdLinuxConfig {
     fn from(value: SdCustomization) -> Self {
-        Self::default()
-            .update_verify(value.verify)
-            .update_hostname(value.hostname)
-            .update_timezone(value.timezone)
-            .update_user(value.user.map(|x| (x.username, x.password)))
-            .update_wifi(value.wifi.map(|x| (x.ssid, x.password)))
+        Self::new(
+            value.verify,
+            value.hostname,
+            value.timezone,
+            value.keymap,
+            value.user.map(|x| (x.username, x.password)),
+            value.wifi.map(|x| (x.ssid, x.password)),
+        )
     }
 }
 
@@ -668,7 +667,7 @@ impl BcfCustomization {
     }
 }
 
-impl From<BcfCustomization> for bb_imager::flasher::FlashingBcfConfig {
+impl From<BcfCustomization> for bb_imager::flasher::bcf::FlashingBcfConfig {
     fn from(value: BcfCustomization) -> Self {
         Self {
             verify: value.verify,

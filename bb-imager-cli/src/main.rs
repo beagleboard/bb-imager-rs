@@ -114,7 +114,7 @@ async fn flash_internal(
             dst,
             no_verify,
         } => {
-            let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
+            let customization = bb_imager::flasher::bcf::FlashingBcfConfig { verify: !no_verify };
             bb_imager::flasher::bcf::BeagleConnectFreedom::new(
                 LocalImage::new(img),
                 dst,
@@ -138,13 +138,9 @@ async fn flash_internal(
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_imager::flasher::FlashingSdLinuxConfig::default()
-                .update_verify(!no_verify)
-                .update_hostname(hostname)
-                .update_timezone(timezone)
-                .update_keymap(keymap)
-                .update_user(user)
-                .update_wifi(wifi);
+            let customization = bb_imager::flasher::sd::FlashingSdLinuxConfig::new(
+                !no_verify, hostname, timezone, keymap, user, wifi,
+            );
 
             bb_imager::flasher::sd::LinuxSd::new(LocalImage::new(img), dst, customization)
                 .flash(chan)

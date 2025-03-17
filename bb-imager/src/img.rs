@@ -1,28 +1,20 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use crate::{DownloadFlashingStatus, error::Result};
+use crate::DownloadFlashingStatus;
 use futures::channel::mpsc;
 use std::{
     io::{Read, Seek},
     path::{Path, PathBuf},
 };
-use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Failed to read image {0}")]
-    FailedToReadImage(String),
-}
-
-pub struct OsImage {
+pub(crate) struct OsImage {
     size: u64,
     img: OsImageReader,
 }
 
-pub enum OsImageReader {
+pub(crate) enum OsImageReader {
     Xz(liblzma::read::XzDecoder<std::fs::File>),
     Uncompressed(std::io::BufReader<std::fs::File>),
-    Memory(std::io::Cursor<Vec<u8>>),
 }
 
 impl OsImage {
@@ -31,17 +23,10 @@ impl OsImage {
         chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<Self> {
         let img_path = img.resolve(chan).await?;
-
-        Self::from_path(&img_path).map_err(|e| {
-            if let crate::error::Error::IoError(x) = e {
-                x
-            } else {
-                std::io::Error::other(format!("Failed to open image: {e}"))
-            }
-        })
+        Self::from_path(&img_path)
     }
 
-    pub fn from_path(path: &Path) -> Result<Self> {
+    pub(crate) fn from_path(path: &Path) -> std::io::Result<Self> {
         let mut file = std::fs::File::open(path)?;
 
         let mut magic = [0u8; 6];
@@ -72,7 +57,7 @@ impl OsImage {
         }
     }
 
-    pub const fn size(&self) -> u64 {
+    pub(crate) const fn size(&self) -> u64 {
         self.size
     }
 }
@@ -82,7 +67,6 @@ impl std::io::Read for OsImage {
         match &mut self.img {
             OsImageReader::Xz(x) => x.read(buf),
             OsImageReader::Uncompressed(x) => x.read(buf),
-            OsImageReader::Memory(x) => std::io::Read::read(x, buf),
         }
     }
 }

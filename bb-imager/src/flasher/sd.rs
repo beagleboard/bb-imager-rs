@@ -5,9 +5,9 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{BBFlasher, DownloadFlashingStatus};
 use futures::StreamExt;
 
-pub(crate) use bb_flasher_sd::Error;
+use bb_flasher_sd::Error;
 
-pub fn destinations() -> std::collections::HashSet<crate::Destination> {
+pub(crate) fn destinations() -> std::collections::HashSet<crate::Destination> {
     bb_flasher_sd::devices()
         .into_iter()
         .map(|x| crate::Destination::sd_card(x.name, x.size, x.path))
@@ -21,72 +21,23 @@ pub struct FlashingSdLinuxConfig {
 }
 
 impl FlashingSdLinuxConfig {
-    pub const fn update_verify(mut self, verify: bool) -> Self {
-        self.verify = verify;
-        self
-    }
-
-    pub const fn verify(&self) -> bool {
-        self.verify
-    }
-
-    pub fn update_hostname(mut self, hostname: Option<String>) -> Self {
-        self.customization.hostname = hostname;
-        self
-    }
-
-    pub fn hostname(&self) -> Option<&str> {
-        self.customization.hostname.as_deref()
-    }
-
-    pub fn update_timezone(mut self, timezone: Option<String>) -> Self {
-        self.customization.timezone = timezone;
-        self
-    }
-
-    pub fn timezone(&self) -> Option<&str> {
-        self.customization.timezone.as_deref()
-    }
-
-    pub fn update_keymap(mut self, k: Option<String>) -> Self {
-        self.customization.keymap = k;
-        self
-    }
-
-    pub fn keymap(&self) -> Option<&str> {
-        self.customization.keymap.as_deref()
-    }
-
-    pub fn update_user(mut self, v: Option<(String, String)>) -> Self {
-        self.customization.user = v;
-        self
-    }
-
-    pub fn user(&self) -> Option<(&str, &str)> {
-        self.customization
-            .user
-            .as_ref()
-            .map(|(x, y)| (x.as_str(), y.as_str()))
-    }
-
-    pub fn update_wifi(mut self, v: Option<(String, String)>) -> Self {
-        self.customization.wifi = v;
-        self
-    }
-
-    pub fn wifi(&self) -> Option<(&str, &str)> {
-        self.customization
-            .wifi
-            .as_ref()
-            .map(|(x, y)| (x.as_str(), y.as_str()))
-    }
-}
-
-impl Default for FlashingSdLinuxConfig {
-    fn default() -> Self {
+    pub const fn new(
+        verify: bool,
+        hostname: Option<String>,
+        timezone: Option<String>,
+        keymap: Option<String>,
+        user: Option<(String, String)>,
+        wifi: Option<(String, String)>,
+    ) -> Self {
         Self {
-            verify: true,
-            customization: Default::default(),
+            verify,
+            customization: bb_flasher_sd::Customization {
+                hostname,
+                timezone,
+                keymap,
+                user,
+                wifi,
+            },
         }
     }
 }
