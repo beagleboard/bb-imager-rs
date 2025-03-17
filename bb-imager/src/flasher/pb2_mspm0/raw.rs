@@ -1,32 +1,35 @@
+use futures::channel::mpsc;
 use std::collections::HashSet;
 
-pub use bb_flasher_pb2_mspm0::Error;
+use bb_flasher_pb2_mspm0::Error;
 
-pub async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub(crate) async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
     let d = bb_flasher_pb2_mspm0::device();
-    HashSet::from([crate::Destination::file(d.name, d.path)])
+    HashSet::from([crate::Destination::File(d.name, d.path)])
 }
 
-pub async fn flash(
+pub(crate) async fn flash(
     img: bin_file::BinFile,
-    chan: &tokio::sync::mpsc::Sender<crate::DownloadFlashingStatus>,
+    chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     persist_eeprom: bool,
-) -> crate::error::Result<()> {
+) -> Result<(), Error> {
     let d = bb_flasher_pb2_mspm0::device();
     let firmware = img.to_bytes(0..d.flash_size, None).unwrap();
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_pb2_mspm0::Status>(20);
 
-    let res = tokio::spawn(async move {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_pb2_mspm0::Status>(20);
+    let task = tokio::spawn(async move {
         bb_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom)
             .await
-            .map_err(Into::into)
+            .map(Into::into)
     });
 
-    while let Some(s) = rx.recv().await {
-        let _ = chan.try_send(s.into());
+    if let Some(mut chan) = chan {
+        while let Some(s) = rx.recv().await {
+            let _ = chan.try_send(s.into());
+        }
     }
 
-    res.await.unwrap()
+    task.await.unwrap()
 }
 
 impl From<bb_flasher_pb2_mspm0::Status> for crate::DownloadFlashingStatus {

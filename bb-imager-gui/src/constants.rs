@@ -1,40 +1,41 @@
 use iced::color;
 
-pub const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
+pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
-pub const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
-pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
-pub const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
-pub const APP_NAME: &str = "BeagleBoard Imager";
-pub const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
+pub(crate) const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
+pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
+pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
+pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
+pub(crate) const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
 
 // Icons
-pub const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
-pub const BB_BANNER: &[u8] = include_bytes!("../assets/icons/bb-banner.png");
-pub const ARROW_BACK_ICON: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
-pub const DOWNLOADING_ICON: &[u8] = include_bytes!("../assets/icons/downloading.svg");
-pub const FILE_ADD_ICON: &[u8] = include_bytes!("../assets/icons/file-add.svg");
-pub const USB_ICON: &[u8] = include_bytes!("../assets/icons/usb.svg");
-pub const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
-pub const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings.svg");
-pub const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
-pub const ARROW_FORWARD_IOS_ICON: &[u8] = include_bytes!("../assets/icons/arrow-forward-ios.svg");
+pub(crate) const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
+pub(crate) const BB_BANNER: &[u8] = include_bytes!("../assets/icons/bb-banner.png");
+pub(crate) const ARROW_BACK_ICON: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
+pub(crate) const DOWNLOADING_ICON: &[u8] = include_bytes!("../assets/icons/downloading.svg");
+pub(crate) const FILE_ADD_ICON: &[u8] = include_bytes!("../assets/icons/file-add.svg");
+pub(crate) const USB_ICON: &[u8] = include_bytes!("../assets/icons/usb.svg");
+pub(crate) const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
+pub(crate) const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings.svg");
+pub(crate) const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
+pub(crate) const ARROW_FORWARD_IOS_ICON: &[u8] =
+    include_bytes!("../assets/icons/arrow-forward-ios.svg");
 
 // Font
-pub const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");
-pub const FONT_BOLD: iced::Font = {
+pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");
+pub(crate) const FONT_BOLD: iced::Font = {
     let mut font = FONT_REGULAR;
     font.weight = iced::font::Weight::Bold;
 
     font
 };
-pub const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
-pub const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
+pub(crate) const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
+pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
 
 // Theme
-pub const BEAGLE_BRAND_COLOR: iced::Color = color!(170, 81, 55);
+pub(crate) const BEAGLE_BRAND_COLOR: iced::Color = color!(170, 81, 55);
 
-pub const KEYMAP_LAYOUTS: &[&str] = &[
+pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",
     "by", "ca", "cd", "ch", "cm", "cn", "cz", "de", "dk", "dz", "ee", "epo", "es", "et", "fi",
     "fo", "fr", "gb", "ge", "gh", "gn", "gr", "hr", "hu", "id", "ie", "il", "in", "iq", "ir", "is",
@@ -44,7 +45,7 @@ pub const KEYMAP_LAYOUTS: &[&str] = &[
     "ua", "us", "uz", "vn", "za",
 ];
 
-pub const TIMEZONES: &[&str] = &[
+pub(crate) const TIMEZONES: &[&str] = &[
     "Africa/Abidjan",
     "Africa/Accra",
     "Africa/Addis_Ababa",

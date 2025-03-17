@@ -1,26 +1,25 @@
-use iced::{widget, Element};
+use iced::{Element, widget};
 
 use crate::{
-    constants,
-    helpers::{home_btn_text, ProgressBarState},
-    BBImagerMessage, Screen,
+    BBImagerMessage, Screen, constants,
+    helpers::{ProgressBarState, home_btn_text},
 };
 
 #[derive(Debug, Clone)]
-pub struct FlashingState {
+pub(crate) struct FlashingState {
     pub(crate) progress: ProgressBarState,
     documentation: String,
 }
 
 impl FlashingState {
-    pub fn new(progress: ProgressBarState, documentation: String) -> Self {
+    pub(crate) fn new(progress: ProgressBarState, documentation: String) -> Self {
         Self {
             documentation,
             progress,
         }
     }
 
-    pub fn update(mut self, progress: ProgressBarState) -> Self {
+    pub(crate) fn update(mut self, progress: ProgressBarState) -> Self {
         self.progress = progress;
         self
     }
@@ -40,7 +39,7 @@ impl FlashingState {
     }
 }
 
-pub fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
+pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
     widget::responsive(move |size| {
         const FOOTER_HEIGHT: f32 = 150.0;
         let banner_height = size.height / 4.0;

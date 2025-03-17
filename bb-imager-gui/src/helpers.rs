@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashSet, io::Read, path::PathBuf, sync::LazyLock};
 
-use bb_imager::{DownloadFlashingStatus, config::OsListItem};
+use bb_imager::{BBFlasher, DownloadFlashingStatus, config::OsListItem};
 use futures::StreamExt;
 use iced::{
     Element, futures,
@@ -9,20 +9,20 @@ use iced::{
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 
-use crate::{BBImagerMessage, constants};
+use crate::{BBImagerMessage, constants, pages::configuration::FlashingCustomization};
 
 const ICON_SIZE: u16 = 32;
 const PADDING: u16 = 4;
 const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
 
-pub fn input_with_label<'a, F>(
+pub(crate) fn input_with_label<'a, F>(
     label: &'static str,
     placeholder: &'static str,
     val: &'a str,
     func: F,
 ) -> widget::Row<'a, BBImagerMessage>
 where
-    F: 'a + Fn(String) -> crate::pages::configuration::FlashingCustomization,
+    F: 'a + Fn(String) -> FlashingCustomization,
 {
     element_with_label(
         label,
@@ -33,7 +33,7 @@ where
     )
 }
 
-pub fn element_with_label<'a>(
+pub(crate) fn element_with_label<'a>(
     label: &'static str,
     el: Element<'a, BBImagerMessage>,
 ) -> widget::Row<'a, BBImagerMessage> {
@@ -44,7 +44,7 @@ pub fn element_with_label<'a>(
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct ProgressBarState {
+pub(crate) struct ProgressBarState {
     label: Cow<'static, str>,
     progress: f32,
     state: ProgressBarStatus,
@@ -52,11 +52,13 @@ pub struct ProgressBarState {
 }
 
 impl ProgressBarState {
-    pub const FLASHING_SUCCESS: Self =
+    pub(crate) const FLASHING_SUCCESS: Self =
         Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success, None);
-    pub const PREPARING: Self = Self::loading("Preparing...", DownloadFlashingStatus::Preparing);
-    pub const VERIFYING: Self = Self::loading("Verifying...", DownloadFlashingStatus::Verifying);
-    pub const CUSTOMIZING: Self =
+    pub(crate) const PREPARING: Self =
+        Self::loading("Preparing...", DownloadFlashingStatus::Preparing);
+    pub(crate) const VERIFYING: Self =
+        Self::loading("Verifying...", DownloadFlashingStatus::Verifying);
+    pub(crate) const CUSTOMIZING: Self =
         Self::loading("Customizing...", DownloadFlashingStatus::Customizing);
 
     const fn const_new(
@@ -73,7 +75,7 @@ impl ProgressBarState {
         }
     }
 
-    pub fn content(&self) -> String {
+    pub(crate) fn content(&self) -> String {
         self.label.to_string()
     }
 
@@ -105,11 +107,11 @@ impl ProgressBarState {
         Self::const_new(label, 0.5, ProgressBarStatus::Loading, Some(inner_state))
     }
 
-    pub fn fail(label: impl Into<Cow<'static, str>>) -> Self {
+    pub(crate) fn fail(label: impl Into<Cow<'static, str>>) -> Self {
         Self::new(label, 1.0, ProgressBarStatus::Fail, None)
     }
 
-    pub fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
+    pub(crate) fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
         use std::ops::RangeInclusive;
         use widget::progress_bar;
 
@@ -124,7 +126,7 @@ impl ProgressBarState {
         .align_x(iced::Alignment::Center)
     }
 
-    pub fn cancel(&self) -> Option<Self> {
+    pub(crate) fn cancel(&self) -> Option<Self> {
         let x = match self.inner_state? {
             DownloadFlashingStatus::Preparing => Self::fail("Preparation cancelled by user"),
             DownloadFlashingStatus::DownloadingProgress(_) => {
@@ -162,7 +164,7 @@ impl From<DownloadFlashingStatus> for ProgressBarState {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ProgressBarStatus {
+pub(crate) enum ProgressBarStatus {
     #[default]
     Normal,
     Success,
@@ -182,10 +184,10 @@ impl ProgressBarStatus {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Boards(bb_imager::config::Config);
+pub(crate) struct Boards(bb_imager::config::Config);
 
 impl Boards {
-    pub fn merge(mut self, config: bb_imager::config::Config) -> Self {
+    pub(crate) fn merge(mut self, config: bb_imager::config::Config) -> Self {
         for dev in config.imager.devices {
             if !self.0.imager.devices.iter().any(|x| x.name == dev.name) {
                 self.0.imager.devices.push(dev);
@@ -197,11 +199,11 @@ impl Boards {
         self
     }
 
-    pub fn devices(&self) -> impl Iterator<Item = (usize, &bb_imager::config::Device)> {
+    pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &bb_imager::config::Device)> {
         self.0.imager.devices.iter().enumerate()
     }
 
-    pub fn image(&self, target: &[usize]) -> &OsListItem {
+    pub(crate) fn image(&self, target: &[usize]) -> &OsListItem {
         let mut res = &self.0.os_list;
         let (last, rest) = target.split_last().unwrap();
 
@@ -217,7 +219,7 @@ impl Boards {
         res.get(*last).unwrap()
     }
 
-    pub fn images(
+    pub(crate) fn images(
         &self,
         board_idx: usize,
         subitems: &[usize],
@@ -244,7 +246,7 @@ impl Boards {
         )
     }
 
-    pub fn device(&self, board_idx: usize) -> &bb_imager::config::Device {
+    pub(crate) fn device(&self, board_idx: usize) -> &bb_imager::config::Device {
         self.0
             .imager
             .devices
@@ -252,7 +254,7 @@ impl Boards {
             .expect("Board does not exist")
     }
 
-    pub fn resolve_remote_subitem(&mut self, subitems: Vec<OsListItem>, target: &[usize]) {
+    pub(crate) fn resolve_remote_subitem(&mut self, subitems: Vec<OsListItem>, target: &[usize]) {
         assert!(!target.is_empty());
 
         let mut res = &mut self.0.os_list;
@@ -303,7 +305,7 @@ impl From<bb_imager::config::Config> for Boards {
     }
 }
 
-pub fn home_btn_text<'a>(
+pub(crate) fn home_btn_text<'a>(
     txt: impl text::IntoFragment<'a>,
     active: bool,
     text_width: iced::Length,
@@ -337,7 +339,10 @@ pub fn home_btn_text<'a>(
     .style(move |_, _| style(active))
 }
 
-pub fn home_btn_svg<'a>(icon: &'static [u8], active: bool) -> widget::Button<'a, BBImagerMessage> {
+pub(crate) fn home_btn_svg<'a>(
+    icon: &'static [u8],
+    active: bool,
+) -> widget::Button<'a, BBImagerMessage> {
     fn svg_style(active: bool) -> widget::svg::Style {
         if active {
             Default::default()
@@ -374,7 +379,7 @@ pub fn home_btn_svg<'a>(icon: &'static [u8], active: bool) -> widget::Button<'a,
     .padding(PADDING)
 }
 
-pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
+pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
     let img = std::fs::read(path).expect("Failed to open image");
 
     match image::guess_format(&img) {
@@ -390,7 +395,7 @@ pub fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBIma
     }
 }
 
-pub fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
+pub(crate) fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
     widget::row![
         button(widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22))
             .on_press(BBImagerMessage::PopScreen)
@@ -402,7 +407,7 @@ pub fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
 }
 
 #[derive(Debug, Clone)]
-pub enum BoardImage {
+pub(crate) enum BoardImage {
     SdFormat,
     Image {
         flasher: bb_imager::Flasher,
@@ -411,14 +416,14 @@ pub enum BoardImage {
 }
 
 impl BoardImage {
-    pub fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
+    pub(crate) fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
         Self::Image {
             img: bb_imager::img::LocalImage::new(path).into(),
             flasher,
         }
     }
 
-    pub fn remote(
+    pub(crate) fn remote(
         image: bb_imager::config::OsImage,
         flasher: bb_imager::Flasher,
         downloader: bb_downloader::Downloader,
@@ -435,7 +440,7 @@ impl BoardImage {
         }
     }
 
-    pub const fn flasher(&self) -> bb_imager::Flasher {
+    pub(crate) const fn flasher(&self) -> bb_imager::Flasher {
         match self {
             BoardImage::SdFormat => bb_imager::Flasher::SdCard,
             BoardImage::Image { flasher, .. } => *flasher,
@@ -443,10 +448,7 @@ impl BoardImage {
     }
 
     pub(crate) fn is_sd_format(&self) -> bool {
-        match self {
-            BoardImage::SdFormat => true,
-            _ => false,
-        }
+        matches!(self, BoardImage::SdFormat)
     }
 }
 
@@ -459,7 +461,7 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
-pub fn system_timezone() -> Option<&'static String> {
+pub(crate) fn system_timezone() -> Option<&'static String> {
     static SYSTEM_TIMEZONE: LazyLock<Option<String>> = LazyLock::new(localzone::get_local_zone);
 
     (*SYSTEM_TIMEZONE).as_ref()
@@ -517,24 +519,24 @@ impl GuiConfiguration {
         Some(dirs.config_local_dir().join("config.json").to_owned())
     }
 
-    pub const fn sd_customization(&self) -> Option<&SdCustomization> {
+    pub(crate) const fn sd_customization(&self) -> Option<&SdCustomization> {
         self.sd_customization.as_ref()
     }
 
-    pub const fn bcf_customization(&self) -> Option<&BcfCustomization> {
+    pub(crate) const fn bcf_customization(&self) -> Option<&BcfCustomization> {
         self.bcf_customization.as_ref()
     }
 
     #[cfg(feature = "pb2_mspm0")]
-    pub const fn pb2_mspm0_customization(&self) -> Option<&Pb2Mspm0Customization> {
+    pub(crate) const fn pb2_mspm0_customization(&self) -> Option<&Pb2Mspm0Customization> {
         self.pb2_mspm0_customization.as_ref()
     }
 
-    pub fn update_sd_customization(&mut self, t: SdCustomization) {
+    pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
         self.sd_customization = Some(t);
     }
 
-    pub fn update_bcf_customization(&mut self, t: BcfCustomization) {
+    pub(crate) fn update_bcf_customization(&mut self, t: BcfCustomization) {
         self.bcf_customization = Some(t)
     }
 }
@@ -599,14 +601,16 @@ impl SdCustomization {
     }
 }
 
-impl From<SdCustomization> for bb_imager::flasher::FlashingSdLinuxConfig {
+impl From<SdCustomization> for bb_imager::flasher::sd::FlashingSdLinuxConfig {
     fn from(value: SdCustomization) -> Self {
-        Self::default()
-            .update_verify(value.verify)
-            .update_hostname(value.hostname)
-            .update_timezone(value.timezone)
-            .update_user(value.user.map(|x| (x.username, x.password)))
-            .update_wifi(value.wifi.map(|x| (x.ssid, x.password)))
+        Self::new(
+            value.verify,
+            value.hostname,
+            value.timezone,
+            value.keymap,
+            value.user.map(|x| (x.username, x.password)),
+            value.wifi.map(|x| (x.ssid, x.password)),
+        )
     }
 }
 
@@ -668,7 +672,7 @@ impl BcfCustomization {
     }
 }
 
-impl From<BcfCustomization> for bb_imager::flasher::FlashingBcfConfig {
+impl From<BcfCustomization> for bb_imager::flasher::bcf::FlashingBcfConfig {
     fn from(value: BcfCustomization) -> Self {
         Self {
             verify: value.verify,
@@ -732,17 +736,15 @@ impl RemoteImage {
 impl bb_imager::img::ImageFile for RemoteImage {
     async fn resolve(
         &self,
-        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<PathBuf> {
         let (tx, rx) = futures::channel::mpsc::channel(20);
 
         if let Some(chan) = chan {
             tokio::spawn(async move {
-                let chan_ref = &chan;
                 rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .for_each(|m| async move {
-                        let _ = chan_ref.try_send(m);
-                    })
+                    .map(Ok)
+                    .forward(chan)
                     .await
             });
         }
@@ -775,7 +777,7 @@ pub(crate) enum SelectedImage {
 impl bb_imager::img::ImageFile for SelectedImage {
     async fn resolve(
         &self,
-        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<PathBuf> {
         match self {
             SelectedImage::LocalImage(x) => x.resolve(chan).await,
@@ -802,5 +804,58 @@ impl From<RemoteImage> for SelectedImage {
 impl From<bb_imager::img::LocalImage> for SelectedImage {
     fn from(value: bb_imager::img::LocalImage) -> Self {
         Self::LocalImage(value)
+    }
+}
+
+pub(crate) async fn flash(
+    img: Option<BoardImage>,
+    customization: FlashingCustomization,
+    dst: Option<bb_imager::Destination>,
+    chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+) -> std::io::Result<()> {
+    match (img, customization, dst) {
+        (
+            Some(BoardImage::SdFormat),
+            FlashingCustomization::LinuxSdFormat,
+            Some(bb_imager::Destination::SdCard { path, .. }),
+        ) => {
+            bb_imager::flasher::sd::LinuxSdFormat::new(path)
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::LinuxSd(customization),
+            Some(bb_imager::Destination::SdCard { path, .. }),
+        ) => {
+            bb_imager::flasher::sd::LinuxSd::new(img, path, customization.into())
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::Bcf(customization),
+            Some(bb_imager::Destination::Port(port)),
+        ) => {
+            bb_imager::flasher::bcf::BeagleConnectFreedom::new(img, port, customization.into())
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::Msp430,
+            Some(bb_imager::Destination::HidRaw(port)),
+        ) => {
+            bb_imager::flasher::msp430::Msp430::new(img, port)
+                .flash(Some(chan))
+                .await
+        }
+        #[cfg(feature = "pb2_mspm0")]
+        (Some(BoardImage::Image { img, .. }), FlashingCustomization::Pb2Mspm0(x), _) => {
+            bb_imager::flasher::pb2_mspm0::Pb2Mspm0::new(img, x.persist_eeprom)
+                .flash(Some(chan))
+                .await
+        }
+        _ => unreachable!(),
     }
 }

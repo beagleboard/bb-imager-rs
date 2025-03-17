@@ -31,6 +31,6 @@ bin_file = { version = "0.1", optional = true }
 default = []
 udev = ["bb-flasher-sd/udev"]
 pb2_mspm0_raw = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
-pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file"]
+pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json"]
 config = ["dep:serde_json", "dep:serde", "dep:serde_with", "const-hex/serde", "semver/serde", "url/serde", "chrono/serde"]
 macos_authopen = ["bb-flasher-sd/macos_authopen"]
