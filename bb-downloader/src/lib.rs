@@ -2,7 +2,7 @@
 //! downloaded assets.
 //!
 //! # Features
-//! 
+//!
 //! - Async
 //! - Cache downloaded file in a directory in filesystem.
 //! - Check if a file is available in cache.
@@ -49,7 +49,7 @@ pub struct Downloader {
 impl Downloader {
     /// Create a new downloader that uses a directory for storing cached files.
     pub fn new(cache_dir: PathBuf) -> Self {
-        assert!(!cache_dir.is_dir());
+        let _ = std::fs::create_dir_all(&cache_dir);
 
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
@@ -164,6 +164,11 @@ impl Downloader {
         sha256: [u8; 32],
         mut chan: Option<mpsc::Sender<f32>>,
     ) -> Result<PathBuf> {
+        tracing::info!(
+            "Download {:?} with sha256: {:?}",
+            url,
+            const_hex::encode(sha256)
+        );
         let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {

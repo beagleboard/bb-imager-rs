@@ -565,6 +565,7 @@ dependencies = [
  "clap_complete",
  "console",
  "const-hex",
+ "futures",
  "indicatif",
  "tokio",
  "url",

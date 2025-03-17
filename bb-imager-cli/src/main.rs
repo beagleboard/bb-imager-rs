@@ -1,8 +1,9 @@
 mod cli;
 
-use bb_imager::{DownloadFlashingStatus, img::LocalImage};
+use bb_imager::{BBFlasher, DownloadFlashingStatus, img::LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
+use futures::StreamExt;
 use std::{ffi::CString, path::PathBuf};
 
 #[tokio::main]
@@ -20,9 +21,10 @@ async fn main() {
 }
 
 async fn flash(target: TargetCommands, quite: bool) {
-    let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-
-    if !quite {
+    if quite {
+        flash_internal(target, None).await
+    } else {
+        let (tx, mut rx) = futures::channel::mpsc::channel(20);
         tokio::task::spawn(async move {
             let term = console::Term::stdout();
             let bar_style =
@@ -38,7 +40,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
                 .unwrap();
 
-            while let Some(progress) = rx.recv().await {
+            while let Some(progress) = rx.next().await {
                 // Skip if no change in stage
                 if progress == last_state {
                     continue;
@@ -96,20 +98,30 @@ async fn flash(target: TargetCommands, quite: bool) {
                 b.finish();
             }
         });
-    }
 
-    let flashing_config = match target {
+        flash_internal(target, Some(tx)).await
+    }
+    .expect("Filed to flash")
+}
+
+async fn flash_internal(
+    target: TargetCommands,
+    chan: Option<futures::channel::mpsc::Sender<bb_imager::DownloadFlashingStatus>>,
+) -> std::io::Result<()> {
+    match target {
         TargetCommands::Bcf {
             img,
             dst,
             no_verify,
         } => {
             let customization = bb_imager::flasher::FlashingBcfConfig { verify: !no_verify };
-            bb_imager::FlashingConfig::BeagleConnectFreedom {
-                img: LocalImage::new(img),
-                port: dst,
+            bb_imager::flasher::bcf::BeagleConnectFreedom::new(
+                LocalImage::new(img),
+                dst,
                 customization,
-            }
+            )
+            .flash(chan)
+            .await
         }
         TargetCommands::Sd {
             dst,
@@ -134,36 +146,33 @@ async fn flash(target: TargetCommands, quite: bool) {
                 .update_user(user)
                 .update_wifi(wifi);
 
-            bb_imager::FlashingConfig::LinuxSd {
-                img: LocalImage::new(img),
-                dst,
-                customization,
-            }
+            bb_imager::flasher::sd::LinuxSd::new(LocalImage::new(img), dst, customization)
+                .flash(chan)
+                .await
         }
-        TargetCommands::Msp430 { img, dst } => bb_imager::FlashingConfig::Msp430 {
-            img: LocalImage::new(img),
-            port: CString::new(dst).expect("Failed to parse destination"),
-        },
+        TargetCommands::Msp430 { img, dst } => {
+            bb_imager::flasher::msp430::Msp430::new(
+                LocalImage::new(img),
+                CString::new(dst).expect("Failed to parse destination"),
+            )
+            .flash(chan)
+            .await
+        }
         #[cfg(feature = "pb2_mspm0")]
-        TargetCommands::Pb2Mspm0 { no_eeprom, img } => bb_imager::FlashingConfig::Pb2Mspm0 {
-            img: LocalImage::new(img),
-            persist_eeprom: !no_eeprom,
-        },
-    };
-
-    flashing_config
-        .download_flash_customize(tx)
-        .await
-        .expect("Failed to flash");
+        TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
+            bb_imager::flasher::pb2_mspm0::Pb2Mspm0::new(LocalImage::new(img), !no_eeprom)
+                .flash(chan)
+                .await
+        }
+    }
 }
 
 async fn format(dst: PathBuf, quite: bool) {
-    let (tx, _) = tokio::sync::mpsc::channel(20);
+    let (tx, _) = futures::channel::mpsc::channel(20);
     let term = console::Term::stdout();
 
-    let config: bb_imager::FlashingConfig<LocalImage> =
-        bb_imager::FlashingConfig::LinuxSdFormat { dst };
-    config.download_flash_customize(tx).await.unwrap();
+    let config = bb_imager::flasher::sd::LinuxSdFormat::new(dst);
+    config.flash(Some(tx)).await.unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();

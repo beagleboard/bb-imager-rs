@@ -1,6 +1,6 @@
 //! Stuff common to all the flashers
 
-use std::{collections::HashSet, ffi::CString, io::Read, path::PathBuf};
+use std::{collections::HashSet, ffi::CString, path::PathBuf};
 use thiserror::Error;
 
 use crate::flasher::{bcf, msp430, sd};
@@ -79,110 +79,11 @@ impl std::fmt::Display for Destination {
     }
 }
 
-pub enum FlashingConfig<I: crate::img::ImageFile> {
-    LinuxSdFormat {
-        dst: PathBuf,
-    },
-    LinuxSd {
-        img: I,
-        dst: PathBuf,
-        customization: sd::FlashingSdLinuxConfig,
-    },
-    BeagleConnectFreedom {
-        img: I,
-        port: String,
-        customization: bcf::FlashingBcfConfig,
-    },
-    Msp430 {
-        img: I,
-        port: std::ffi::CString,
-    },
-    #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-    Pb2Mspm0 {
-        img: I,
-        persist_eeprom: bool,
-    },
-}
-
-impl<I> FlashingConfig<I>
-where
-    I: crate::img::ImageFile + Send + 'static,
-{
-    pub async fn download_flash_customize(
+pub trait BBFlasher {
+    fn flash(
         self,
-        chan: tokio::sync::mpsc::Sender<DownloadFlashingStatus>,
-    ) -> crate::error::Result<()> {
-        match self {
-            FlashingConfig::LinuxSdFormat { dst } => sd::format(dst).await,
-            FlashingConfig::LinuxSd {
-                img,
-                dst,
-                customization,
-            } => {
-                let chan_clone = chan.clone();
-                sd::flash(
-                    move || {
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_time()
-                            .enable_io()
-                            .build()
-                            .unwrap();
-                        let img = rt.block_on(async move {
-                            crate::img::OsImage::open(img, chan.clone()).await
-                        })?;
-                        let img_size = img.size();
-
-                        Ok((img, img_size))
-                    },
-                    dst,
-                    chan_clone,
-                    customization,
-                )
-                .await
-            }
-            FlashingConfig::BeagleConnectFreedom {
-                img,
-                port,
-                customization,
-            } => {
-                tracing::info!("Port opened");
-                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
-
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)
-                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-
-                bcf::flash(data, &port, &chan, customization.verify).await
-            }
-            FlashingConfig::Msp430 { img, port } => {
-                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
-                tracing::info!("Image opened");
-
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)
-                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-
-                msp430::flash(data, &port, &chan).await
-            }
-            #[cfg(any(feature = "pb2_mspm0_raw", feature = "pb2_mspm0_dbus"))]
-            FlashingConfig::Pb2Mspm0 {
-                img,
-                persist_eeprom,
-            } => {
-                let mut img = crate::img::OsImage::open(img, chan.clone()).await?;
-                tracing::info!("Image opened");
-
-                let mut data = String::new();
-                img.read_to_string(&mut data)
-                    .map_err(|e| crate::img::Error::FailedToReadImage(e.to_string()))?;
-                let bin = data.parse().map_err(|e| {
-                    crate::img::Error::FailedToReadImage(format!("Invalid image format: {e}"))
-                })?;
-
-                crate::flasher::pb2_mspm0::flash(bin, &chan, persist_eeprom).await
-            }
-        }
-    }
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
+    ) -> impl Future<Output = std::io::Result<()>>;
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

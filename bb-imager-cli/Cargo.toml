@@ -16,6 +16,7 @@ console = "0.15.10"
 url = "2.5.4"
 const-hex = "1.14.0"
 clap_complete = "4.5.45"
+futures = "0.3"
 
 [package.metadata.deb]
 assets = [

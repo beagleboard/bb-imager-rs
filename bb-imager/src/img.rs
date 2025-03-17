@@ -1,12 +1,12 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
 use crate::{DownloadFlashingStatus, error::Result};
+use futures::channel::mpsc;
 use std::{
     io::{Read, Seek},
     path::{Path, PathBuf},
 };
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -28,9 +28,9 @@ pub enum OsImageReader {
 impl OsImage {
     pub(crate) async fn open(
         img: impl ImageFile,
-        chan: mpsc::Sender<DownloadFlashingStatus>,
+        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<Self> {
-        let img_path = img.resolve(Some(chan)).await?;
+        let img_path = img.resolve(chan).await?;
 
         Self::from_path(&img_path).map_err(|e| {
             if let crate::error::Error::IoError(x) = e {

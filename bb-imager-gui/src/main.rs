@@ -176,6 +176,7 @@ impl BBImager {
     fn update(&mut self, message: BBImagerMessage) -> Task<BBImagerMessage> {
         match message {
             BBImagerMessage::UpdateConfig(c) => {
+                tracing::info!("Config: {:#?}", c);
                 self.boards = c;
                 return self.fetch_board_images();
             }
@@ -289,7 +290,7 @@ impl BBImager {
                 }
             }
             BBImagerMessage::StartFlashing => {
-                return self.start_flashing(Some(self.customization.as_ref().unwrap().clone()));
+                return self.start_flashing(self.customization.clone());
             }
             BBImagerMessage::StartFlashingWithoutConfiguraton => {
                 return self.start_flashing(None);
@@ -578,56 +579,6 @@ impl BBImager {
         )
     }
 
-    fn flashing_config(
-        &self,
-        customization: FlashingCustomization,
-    ) -> bb_imager::common::FlashingConfig<helpers::SelectedImage> {
-        match (
-            self.selected_image.clone(),
-            customization,
-            self.selected_dst.clone(),
-        ) {
-            (
-                Some(helpers::BoardImage::SdFormat),
-                FlashingCustomization::LinuxSdFormat,
-                Some(bb_imager::Destination::SdCard { path, .. }),
-            ) => bb_imager::common::FlashingConfig::LinuxSdFormat { dst: path },
-            (
-                Some(helpers::BoardImage::Image { img, .. }),
-                FlashingCustomization::LinuxSd(customization),
-                Some(bb_imager::Destination::SdCard { path, .. }),
-            ) => bb_imager::common::FlashingConfig::LinuxSd {
-                img,
-                dst: path,
-                customization: customization.into(),
-            },
-            (
-                Some(helpers::BoardImage::Image { img, .. }),
-                FlashingCustomization::Bcf(customization),
-                Some(bb_imager::Destination::Port(port)),
-            ) => bb_imager::common::FlashingConfig::BeagleConnectFreedom {
-                img,
-                port,
-                customization: customization.into(),
-            },
-            (
-                Some(helpers::BoardImage::Image { img, .. }),
-                FlashingCustomization::Msp430,
-                Some(bb_imager::Destination::HidRaw(port)),
-            ) => bb_imager::common::FlashingConfig::Msp430 { img, port },
-            #[cfg(feature = "pb2_mspm0")]
-            (
-                Some(helpers::BoardImage::Image { img, .. }),
-                FlashingCustomization::Pb2Mspm0(x),
-                _,
-            ) => bb_imager::common::FlashingConfig::Pb2Mspm0 {
-                img,
-                persist_eeprom: x.persist_eeprom,
-            },
-            _ => unreachable!(),
-        }
-    }
-
     fn start_flashing(
         &mut self,
         customization: Option<FlashingCustomization>,
@@ -641,19 +592,22 @@ impl BBImager {
             docs_url.as_ref().map(|x| x.to_string()).unwrap_or_default(),
         ));
 
-        let config = self.flashing_config(customization.unwrap_or(self.config()));
+        let customization = customization.unwrap_or(self.config());
+        let img = self.selected_image.clone();
+        let dst = self.selected_dst.clone();
 
         let s = iced::stream::channel(20, move |mut chan| async move {
             let _ = chan
                 .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
                 .await;
 
-            let (tx, mut rx) = tokio::sync::mpsc::channel(19);
+            let (tx, mut rx) = iced::futures::channel::mpsc::channel(19);
 
-            let flash_task = tokio::spawn(config.download_flash_customize(tx));
+            let flash_task =
+                tokio::spawn(async move { helpers::flash(img, customization, dst, tx).await });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::spawn(async move {
-                while let Some(progress) = rx.recv().await {
+                while let Some(progress) = rx.next().await {
                     let _ = chan_clone.try_send(BBImagerMessage::ProgressBar(progress.into()));
                 }
             });

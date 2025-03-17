@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashSet, io::Read, path::PathBuf, sync::LazyLock};
 
-use bb_imager::{DownloadFlashingStatus, config::OsListItem};
+use bb_imager::{BBFlasher, DownloadFlashingStatus, config::OsListItem};
 use futures::StreamExt;
 use iced::{
     Element, futures,
@@ -9,7 +9,7 @@ use iced::{
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 
-use crate::{BBImagerMessage, constants};
+use crate::{BBImagerMessage, constants, pages::configuration::FlashingCustomization};
 
 const ICON_SIZE: u16 = 32;
 const PADDING: u16 = 4;
@@ -22,7 +22,7 @@ pub fn input_with_label<'a, F>(
     func: F,
 ) -> widget::Row<'a, BBImagerMessage>
 where
-    F: 'a + Fn(String) -> crate::pages::configuration::FlashingCustomization,
+    F: 'a + Fn(String) -> FlashingCustomization,
 {
     element_with_label(
         label,
@@ -732,17 +732,15 @@ impl RemoteImage {
 impl bb_imager::img::ImageFile for RemoteImage {
     async fn resolve(
         &self,
-        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<PathBuf> {
         let (tx, rx) = futures::channel::mpsc::channel(20);
 
         if let Some(chan) = chan {
             tokio::spawn(async move {
-                let chan_ref = &chan;
                 rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .for_each(|m| async move {
-                        let _ = chan_ref.try_send(m);
-                    })
+                    .map(Ok)
+                    .forward(chan)
                     .await
             });
         }
@@ -775,7 +773,7 @@ pub(crate) enum SelectedImage {
 impl bb_imager::img::ImageFile for SelectedImage {
     async fn resolve(
         &self,
-        chan: Option<tokio::sync::mpsc::Sender<DownloadFlashingStatus>>,
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<PathBuf> {
         match self {
             SelectedImage::LocalImage(x) => x.resolve(chan).await,
@@ -802,5 +800,58 @@ impl From<RemoteImage> for SelectedImage {
 impl From<bb_imager::img::LocalImage> for SelectedImage {
     fn from(value: bb_imager::img::LocalImage) -> Self {
         Self::LocalImage(value)
+    }
+}
+
+pub(crate) async fn flash(
+    img: Option<BoardImage>,
+    customization: FlashingCustomization,
+    dst: Option<bb_imager::Destination>,
+    chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+) -> std::io::Result<()> {
+    match (img, customization, dst) {
+        (
+            Some(BoardImage::SdFormat),
+            FlashingCustomization::LinuxSdFormat,
+            Some(bb_imager::Destination::SdCard { path, .. }),
+        ) => {
+            bb_imager::flasher::sd::LinuxSdFormat::new(path)
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::LinuxSd(customization),
+            Some(bb_imager::Destination::SdCard { path, .. }),
+        ) => {
+            bb_imager::flasher::sd::LinuxSd::new(img, path, customization.into())
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::Bcf(customization),
+            Some(bb_imager::Destination::Port(port)),
+        ) => {
+            bb_imager::flasher::bcf::BeagleConnectFreedom::new(img, port, customization.into())
+                .flash(Some(chan))
+                .await
+        }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::Msp430,
+            Some(bb_imager::Destination::HidRaw(port)),
+        ) => {
+            bb_imager::flasher::msp430::Msp430::new(img, port)
+                .flash(Some(chan))
+                .await
+        }
+        #[cfg(feature = "pb2_mspm0")]
+        (Some(BoardImage::Image { img, .. }), FlashingCustomization::Pb2Mspm0(x), _) => {
+            bb_imager::flasher::pb2_mspm0::Pb2Mspm0::new(img, x.persist_eeprom)
+                .flash(Some(chan))
+                .await
+        }
+        _ => unreachable!(),
     }
 }
