@@ -2,6 +2,7 @@
 
 use std::{collections::HashSet, time::Duration};
 
+use constants::PACKAGE_QUALIFIER;
 use helpers::ProgressBarState;
 use iced::{Element, Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
@@ -54,11 +55,11 @@ fn main() -> iced::Result {
         .run_with(move || BBImager::new(boards, app_config))
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct BBImager {
     app_config: helpers::GuiConfiguration,
     boards: helpers::Boards,
-    downloader: bb_imager::download::Downloader,
+    downloader: bb_downloader::Downloader,
     screen: Vec<Screen>,
     selected_board: Option<usize>,
     selected_image: Option<helpers::BoardImage>,
@@ -81,7 +82,16 @@ impl BBImager {
         boards: helpers::Boards,
         app_config: helpers::GuiConfiguration,
     ) -> (Self, Task<BBImagerMessage>) {
-        let downloader = bb_imager::download::Downloader::default();
+        let downloader = bb_downloader::Downloader::new(
+            directories::ProjectDirs::from(
+                PACKAGE_QUALIFIER.0,
+                PACKAGE_QUALIFIER.1,
+                PACKAGE_QUALIFIER.2,
+            )
+            .unwrap()
+            .cache_dir()
+            .to_path_buf(),
+        );
 
         // Fetch old config
         let client = downloader.clone();
@@ -89,7 +99,7 @@ impl BBImager {
         let config_task = Task::perform(
             async move {
                 let data: bb_imager::config::Config = client
-                    .download_json(constants::BB_IMAGER_ORIGINAL_CONFIG)
+                    .download_json_no_cache(constants::BB_IMAGER_ORIGINAL_CONFIG)
                     .await
                     .map_err(|e| format!("Config parsing failed: {e}"))?;
 
@@ -122,7 +132,14 @@ impl BBImager {
             ),
             destination_selectable: true,
             screen: Vec::with_capacity(3),
-            ..Default::default()
+            selected_board: Default::default(),
+            selected_image: Default::default(),
+            selected_dst: Default::default(),
+            destinations: Default::default(),
+            search_bar: Default::default(),
+            cancel_flashing: Default::default(),
+            customization: Default::default(),
+            flashing_state: Default::default(),
         };
 
         ans.screen.push(Screen::Home);
@@ -143,7 +160,7 @@ impl BBImager {
 
         let tasks = icons.into_iter().map(|icon| {
             Task::perform(
-                self.downloader.clone().download_without_sha(icon.clone()),
+                self.downloader.clone().download(icon.clone(), None),
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -183,7 +200,7 @@ impl BBImager {
 
                 let jobs = icons.into_iter().map(|x| {
                     Task::perform(
-                        self.downloader.clone().download_without_sha(x.clone()),
+                        self.downloader.clone().download(x.clone(), None),
                         move |p| match p {
                             Ok(_path) => BBImagerMessage::Null,
                             Err(e) => {
@@ -376,7 +393,7 @@ impl BBImager {
                 let target_clone: Vec<usize> = target.to_vec();
 
                 return Task::perform(
-                    self.downloader.clone().download_json(url.clone()),
+                    self.downloader.clone().download_json_no_cache(url.clone()),
                     move |x| match x {
                         Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
                             item,
@@ -411,7 +428,9 @@ impl BBImager {
                 Task::perform(
                     self.downloader
                         .clone()
-                        .download_json::<Vec<bb_imager::config::OsListItem>, url::Url>(url.clone()),
+                        .download_json_no_cache::<Vec<bb_imager::config::OsListItem>, url::Url>(
+                            url.clone(),
+                        ),
                     move |x| match x {
                         Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
                             item,
@@ -562,7 +581,7 @@ impl BBImager {
     fn flashing_config(
         &self,
         customization: FlashingCustomization,
-    ) -> bb_imager::common::FlashingConfig {
+    ) -> bb_imager::common::FlashingConfig<helpers::SelectedImage> {
         match (
             self.selected_image.clone(),
             customization,
@@ -622,8 +641,6 @@ impl BBImager {
             docs_url.as_ref().map(|x| x.to_string()).unwrap_or_default(),
         ));
 
-        let downloader = self.downloader.clone();
-
         let config = self.flashing_config(customization.unwrap_or(self.config()));
 
         let s = iced::stream::channel(20, move |mut chan| async move {
@@ -633,7 +650,7 @@ impl BBImager {
 
             let (tx, mut rx) = tokio::sync::mpsc::channel(19);
 
-            let flash_task = tokio::spawn(config.download_flash_customize(downloader, tx));
+            let flash_task = tokio::spawn(config.download_flash_customize(tx));
             let mut chan_clone = chan.clone();
             let progress_task = tokio::spawn(async move {
                 while let Some(progress) = rx.recv().await {

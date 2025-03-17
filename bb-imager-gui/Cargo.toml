@@ -26,6 +26,7 @@ iced-loading = { path = "../iced-loading" }
 serde = { version = "1.0.218", features = ["derive"] }
 serde_json = { version = "1.0.139" }
 directories = "6.0.0"
+bb-downloader = { path = "../bb-downloader", features = ["json"] }
 
 [build-dependencies]
 embed-resource = "2.5.0"

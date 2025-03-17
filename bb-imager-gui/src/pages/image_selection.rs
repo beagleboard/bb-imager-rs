@@ -46,7 +46,7 @@ impl ImageSelectionPage {
         &self,
         images: Option<Vec<(usize, &'a bb_imager::config::OsListItem)>>,
         search_bar: &'a str,
-        downloader: &'a bb_imager::download::Downloader,
+        downloader: &'a bb_downloader::Downloader,
         // Allow optional format entry
         extra_entries: E,
     ) -> Element<'a, BBImagerMessage>
@@ -90,7 +90,7 @@ impl ImageSelectionPage {
     fn entry_subitem<'a>(
         &self,
         image: &'a bb_imager::config::OsImage,
-        downloader: &'a bb_imager::download::Downloader,
+        downloader: &'a bb_downloader::Downloader,
     ) -> widget::Button<'a, BBImagerMessage> {
         let row3 = widget::row(
             [
@@ -103,7 +103,7 @@ impl ImageSelectionPage {
         .align_y(iced::alignment::Vertical::Center)
         .spacing(5);
 
-        let icon = match downloader.clone().check_image(&image.icon) {
+        let icon = match downloader.clone().check_cache_from_url(&image.icon) {
             Some(y) => img_or_svg(y, ICON_WIDTH),
             None => widget::svg(widget::svg::Handle::from_memory(
                 constants::DOWNLOADING_ICON,
@@ -128,6 +128,7 @@ impl ImageSelectionPage {
         .on_press(BBImagerMessage::SelectImage(helpers::BoardImage::remote(
             image.clone(),
             self.flasher,
+            downloader.clone(),
         )))
         .style(widget::button::secondary)
     }
@@ -135,7 +136,7 @@ impl ImageSelectionPage {
     fn entry<'a>(
         &self,
         item: &'a bb_imager::config::OsListItem,
-        downloader: &'a bb_imager::download::Downloader,
+        downloader: &'a bb_downloader::Downloader,
         idx: usize,
     ) -> widget::Button<'a, BBImagerMessage> {
         match item {
@@ -154,7 +155,7 @@ impl ImageSelectionPage {
                 flasher,
                 ..
             } => {
-                let icon = match downloader.clone().check_image(icon) {
+                let icon = match downloader.clone().check_cache_from_url(icon) {
                     Some(y) => img_or_svg(y, ICON_WIDTH),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,

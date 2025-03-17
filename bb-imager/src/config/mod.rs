@@ -98,12 +98,6 @@ impl Config {
     }
 }
 
-impl From<OsImage> for crate::SelectedImage {
-    fn from(value: OsImage) -> Self {
-        Self::remote(value.name, value.url, value.image_download_sha256)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
