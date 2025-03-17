@@ -8,7 +8,7 @@ use crate::{
     helpers::{self, home_btn_text},
 };
 
-pub fn view<'a>(
+pub(crate) fn view<'a>(
     customization: &'a FlashingCustomization,
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,

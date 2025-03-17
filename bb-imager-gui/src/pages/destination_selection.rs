@@ -5,7 +5,7 @@ use iced::{
 
 use crate::{BBImagerMessage, constants, helpers};
 
-pub fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, BBImagerMessage>
+pub(crate) fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, BBImagerMessage>
 where
     D: Iterator<Item = &'a bb_imager::Destination>,
 {

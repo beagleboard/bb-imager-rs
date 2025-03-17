@@ -1,17 +1,16 @@
 use iced::{
-    widget::{self, text},
     Element,
+    widget::{self, text},
 };
 
 use crate::{
-    constants,
+    BBImagerMessage, constants,
     helpers::{self, home_btn_svg, home_btn_text},
-    BBImagerMessage,
 };
 
-use super::{image_selection::ImageSelectionPage, Screen};
+use super::{Screen, image_selection::ImageSelectionPage};
 
-pub fn view<'a>(
+pub(crate) fn view<'a>(
     selected_board: Option<&'a bb_imager::config::Device>,
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a bb_imager::Destination>,

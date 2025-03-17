@@ -49,7 +49,7 @@ pub(crate) async fn possible_devices() -> HashSet<crate::Destination> {
     if let Ok(connection) = zbus::Connection::system().await {
         if let Ok(proxy) = Pocketbeagle2Mspm0Proxy::new(&connection).await {
             if let Ok((name, path, _)) = proxy.device().await {
-                return HashSet::from([crate::Destination::file(name, PathBuf::from(path))]);
+                return HashSet::from([crate::Destination::File(name, PathBuf::from(path))]);
             }
         }
     }

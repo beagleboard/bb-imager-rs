@@ -8,7 +8,7 @@ use crate::{
     helpers::{self, img_or_svg},
 };
 
-pub fn view<'a>(
+pub(crate) fn view<'a>(
     boards: &'a helpers::Boards,
     search_bar: &'a str,
     downloader: &'a bb_downloader::Downloader,

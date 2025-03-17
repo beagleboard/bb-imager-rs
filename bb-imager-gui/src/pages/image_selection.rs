@@ -30,19 +30,19 @@ impl ExtraImageEntry {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct ImageSelectionPage {
-    pub flasher: bb_imager::Flasher,
-    pub idx: Vec<usize>,
+    pub(crate) flasher: bb_imager::Flasher,
+    pub(crate) idx: Vec<usize>,
 }
 
 impl ImageSelectionPage {
-    pub fn new(flasher: bb_imager::Flasher) -> Self {
+    pub(crate) fn new(flasher: bb_imager::Flasher) -> Self {
         Self {
             flasher,
             idx: Vec::with_capacity(3),
         }
     }
 
-    pub fn view<'a, E>(
+    pub(crate) fn view<'a, E>(
         &self,
         images: Option<Vec<(usize, &'a bb_imager::config::OsListItem)>>,
         search_bar: &'a str,
