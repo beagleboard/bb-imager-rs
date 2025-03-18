@@ -752,13 +752,6 @@ impl bb_imager::img::ImageFile for RemoteImage {
         self.downloader
             .download_with_sha(self.url.clone(), self.extract_sha256, Some(tx))
             .await
-            .map_err(|e| {
-                if let bb_downloader::Error::IoError(x) = e {
-                    x
-                } else {
-                    std::io::Error::other(format!("Failed to open image: {e}"))
-                }
-            })
     }
 }
 

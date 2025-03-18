@@ -91,7 +91,8 @@ impl BBImager {
             .unwrap()
             .cache_dir()
             .to_path_buf(),
-        );
+        )
+        .unwrap();
 
         // Fetch old config
         let client = downloader.clone();
@@ -159,8 +160,10 @@ impl BBImager {
             .collect();
 
         let tasks = icons.into_iter().map(|icon| {
+            let downloader = self.downloader.clone();
+            let icon_clone = icon.clone();
             Task::perform(
-                self.downloader.clone().download(icon.clone(), None),
+                async move { downloader.download(icon_clone, None).await },
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -200,8 +203,10 @@ impl BBImager {
                 self.selected_board = Some(x);
 
                 let jobs = icons.into_iter().map(|x| {
+                    let downloader = self.downloader.clone();
+                    let x_clone = x.clone();
                     Task::perform(
-                        self.downloader.clone().download(x.clone(), None),
+                        async move { downloader.download(x_clone, None).await },
                         move |p| match p {
                             Ok(_path) => BBImagerMessage::Null,
                             Err(e) => {
@@ -391,17 +396,20 @@ impl BBImager {
                 self.boards.image(target)
             {
                 let url = subitems_url.clone();
+                tracing::info!("Downloading subites from {:?}", url);
+
                 let target_clone: Vec<usize> = target.to_vec();
+                let downloader = self.downloader.clone();
 
                 return Task::perform(
-                    self.downloader.clone().download_json_no_cache(url.clone()),
+                    async move { downloader.download_json_no_cache(url).await },
                     move |x| match x {
                         Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
                             item,
                             target: target_clone.clone(),
                         },
                         Err(e) => {
-                            tracing::warn!("Failed to download {:?} subitems with error {e}", url);
+                            tracing::warn!("Failed to download subitems with error {e}");
                             BBImagerMessage::Null
                         }
                     },
@@ -426,12 +434,16 @@ impl BBImager {
                 let mut new_target: Vec<usize> = target.to_vec();
                 new_target.push(idx);
 
+                let downloader = self.downloader.clone();
+                let url_clone = url.clone();
                 Task::perform(
-                    self.downloader
-                        .clone()
-                        .download_json_no_cache::<Vec<bb_imager::config::OsListItem>, url::Url>(
-                            url.clone(),
-                        ),
+                    async move {
+                        downloader
+                            .download_json_no_cache::<Vec<bb_imager::config::OsListItem>, url::Url>(
+                                url_clone,
+                            )
+                            .await
+                    },
                     move |x| match x {
                         Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem {
                             item,
