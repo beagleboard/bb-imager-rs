@@ -18,7 +18,7 @@ pub(crate) fn view<'a>(
         .filter(|(_, x)| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
         .map(|(id, dev)| {
             let image: Element<BBImagerMessage> = match &dev.icon {
-                Some(url) => match downloader.clone().check_cache_from_url(url) {
+                Some(url) => match downloader.clone().check_cache_from_url(url.clone()) {
                     Some(y) => img_or_svg(y, 100),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,

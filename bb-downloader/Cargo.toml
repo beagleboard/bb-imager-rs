@@ -13,11 +13,9 @@ categories = ["Asynchronous", "filesystem", "Caching", "Network programming"]
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
 sha2 = "0.10"
-thiserror = "2.0"
 futures = "0.3"
 tempfile = "3.17"
 tracing = "0.1"
-url = "2.5"
 serde = { version = "1.0", optional = true }
 tokio = { version = "1.43", default-features = false, features = ["fs"] }
 const-hex = "1.14"
@@ -25,3 +23,6 @@ const-hex = "1.14"
 [features]
 default = []
 json = ["reqwest/json", "dep:serde"]
+
+[dev-dependencies]
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }

@@ -103,7 +103,7 @@ impl ImageSelectionPage {
         .align_y(iced::alignment::Vertical::Center)
         .spacing(5);
 
-        let icon = match downloader.clone().check_cache_from_url(&image.icon) {
+        let icon = match downloader.clone().check_cache_from_url(image.icon.clone()) {
             Some(y) => img_or_svg(y, ICON_WIDTH),
             None => widget::svg(widget::svg::Handle::from_memory(
                 constants::DOWNLOADING_ICON,
@@ -155,7 +155,7 @@ impl ImageSelectionPage {
                 flasher,
                 ..
             } => {
-                let icon = match downloader.clone().check_cache_from_url(icon) {
+                let icon = match downloader.clone().check_cache_from_url(icon.clone()) {
                     Some(y) => img_or_svg(y, ICON_WIDTH),
                     None => widget::svg(widget::svg::Handle::from_memory(
                         constants::DOWNLOADING_ICON,

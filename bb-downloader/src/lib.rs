@@ -8,6 +8,35 @@
 //! - Check if a file is available in cache.
 //! - Uses SHA256 for verifying cached files.
 //! - Optional support to download files without caching.
+//!
+//! # Sample Usage
+//!
+//! ```no_run
+//! #[tokio::main]
+//! async fn main() {
+//!     let downloader = bb_downloader::Downloader::new("/tmp").unwrap();
+//!
+//!     let sha = [0u8; 32];
+//!     let url = "https://example.com/img.jpg";
+//!
+//!     // Download with just URL
+//!     downloader.download(url, None).await.unwrap();
+//!
+//!     // Check if the file is in cache
+//!     assert!(downloader.check_cache_from_url(url).is_some());
+//!
+//!     // Will fetch directly from cache instead of re-downloading
+//!     downloader.download(url, None).await.unwrap();
+//!
+//!     // Will fetch directly from cache instead of re-downloading
+//!     assert!(!downloader.check_cache_from_sha(sha).await.is_some());
+//!
+//!     // Will re-download the file
+//!     downloader.download_with_sha(url, sha, None).await.unwrap();
+//!
+//!     assert!(downloader.check_cache_from_sha(sha).await.is_some());
+//! }
+//! ```
 
 use futures::{Stream, StreamExt, channel::mpsc};
 #[cfg(feature = "json")]
@@ -18,25 +47,26 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Error, Debug)]
-/// Errors for this crate
-pub enum Error {
-    /// Incorrect Sha256. File might be corrupted
-    #[error("Incorrect Sha256. File might be corrupted")]
-    Sha256Error,
-    #[error("Reqwest Error: {0}")]
-    ReqwestError(#[from] reqwest::Error),
-    #[error("IO Error: {0}")]
-    IoError(#[from] std::io::Error),
-}
+pub use reqwest::IntoUrl;
 
 /// Simple downloader that caches files in the provided directory. Uses SHA256 to determine if the
 /// file is already downloaded.
+///
+/// Either SHA256 or URL can be used for caching files. However, both are not interchangable. If
+/// SHA256 cannot be used to check files that were downloaded with just URL, and vice versa.
+///
+/// # Invalidate Cache
+///
+/// Using SHA256 should be prefered when it is known in advance since it allows performing SHA256
+/// verficiation on the downloaded file. Additionally, it also adds capability to invalidate cached
+/// file.
+///
+/// Files downloaded with just URL cannot be invalidated without changing the URL, or deleting the
+/// file manually.
+///
+/// # Thread Safety
 ///
 /// You do not have to wrap the Client in an Rc or Arc to reuse it, because it already uses an Arc
 /// internally.
@@ -48,35 +78,53 @@ pub struct Downloader {
 
 impl Downloader {
     /// Create a new downloader that uses a directory for storing cached files.
-    pub fn new(cache_dir: PathBuf) -> Self {
-        let _ = std::fs::create_dir_all(&cache_dir);
+    pub fn new<P: Into<PathBuf>>(cache_dir: P) -> io::Result<Self> {
+        let cache_dir = cache_dir.into();
+
+        if !cache_dir.exists() {
+            let _ = std::fs::create_dir_all(&cache_dir);
+        }
+
+        if cache_dir.exists() && !cache_dir.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotADirectory,
+                "cache_dir should be a directory",
+            ));
+        }
 
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .build()
             .expect("Unsupported OS");
 
-        Self { client, cache_dir }
+        Ok(Self { client, cache_dir })
     }
 
     /// Check if a downloaded file with a particular SHA256 is already in cache.
-    pub fn check_cache_from_sha(self, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub async fn check_cache_from_sha(&self, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {
-            Some(file_path)
-        } else {
-            None
+            if let Ok(hash) = sha256_from_path(&file_path).await {
+                if hash == sha256 {
+                    return Some(file_path);
+                }
+            }
+
+            // Delete old file
+            let _ = tokio::fs::remove_file(&file_path).await;
         }
+
+        None
     }
 
     /// Check if a downloaded file is already in cache.
     ///
     /// [`check_cache_from_sha`](Self::check_cache_from_sha) should be prefered in cases when SHA256
     /// of the file to download is already known.
-    pub fn check_cache_from_url(self, url: &url::Url) -> Option<PathBuf> {
+    pub fn check_cache_from_url<U: reqwest::IntoUrl>(&self, url: U) -> Option<PathBuf> {
         // Use hash of url for file name
-        let file_path = self.path_from_url(url);
+        let file_path = self.path_from_url(url.as_str());
         if file_path.exists() {
             Some(file_path)
         } else {
@@ -87,7 +135,7 @@ impl Downloader {
     /// Download a JSON file without caching the contents. Should be used when there is no point in
     /// caching the file.
     #[cfg(feature = "json")]
-    pub async fn download_json_no_cache<T, U>(self, url: U) -> Result<T>
+    pub async fn download_json_no_cache<T, U>(&self, url: U) -> io::Result<T>
     where
         T: DeserializeOwned,
         U: reqwest::IntoUrl,
@@ -96,10 +144,10 @@ impl Downloader {
             .get(url)
             .send()
             .await
-            .map_err(Error::from)?
+            .map_err(io::Error::other)?
             .json()
             .await
-            .map_err(Error::from)
+            .map_err(io::Error::other)
     }
 
     /// Checks if the file is present in cache. If the file is present, returns path to it. Else
@@ -111,17 +159,19 @@ impl Downloader {
     /// # Progress
     ///
     /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
-    pub async fn download(
-        self,
-        url: url::Url,
+    pub async fn download<U: reqwest::IntoUrl>(
+        &self,
+        url: U,
         mut chan: Option<mpsc::Sender<f32>>,
-    ) -> Result<PathBuf> {
-        // Use hash of url for file name
-        let file_path = self.path_from_url(&url);
+    ) -> io::Result<PathBuf> {
+        let url = url.into_url().map_err(io::Error::other)?;
 
-        if file_path.exists() {
-            return Ok(file_path);
+        // Check cache
+        if let Some(p) = self.check_cache_from_url(url.clone()) {
+            return Ok(p);
         }
+
+        let file_path = self.path_from_url(url.as_str());
         chan_send(chan.as_mut(), 0.0);
 
         let mut cur_pos = 0;
@@ -129,7 +179,12 @@ impl Downloader {
         {
             let mut tmp_file = tokio::io::BufWriter::new(tmp_file.as_mut());
 
-            let response = self.client.get(url).send().await.map_err(Error::from)?;
+            let response = self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(io::Error::other)?;
             let response_size = response.content_length();
             let mut response_stream = response.bytes_stream();
 
@@ -139,7 +194,7 @@ impl Downloader {
             };
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(Error::from)?;
+                let mut data = x.map_err(io::Error::other)?;
                 cur_pos += data.len();
                 tmp_file.write_all_buf(&mut data).await?;
                 chan_send(chan.as_mut(), (cur_pos as f32) / (response_size as f32));
@@ -158,35 +213,36 @@ impl Downloader {
     /// # Progress
     ///
     /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
-    pub async fn download_with_sha(
+    pub async fn download_with_sha<U: reqwest::IntoUrl>(
         &self,
-        url: url::Url,
+        url: U,
         sha256: [u8; 32],
         mut chan: Option<mpsc::Sender<f32>>,
-    ) -> Result<PathBuf> {
+    ) -> io::Result<PathBuf> {
+        let url = url.into_url().map_err(io::Error::other)?;
         tracing::info!(
             "Download {:?} with sha256: {:?}",
             url,
             const_hex::encode(sha256)
         );
-        let file_path = self.path_from_sha(sha256);
 
-        if file_path.exists() {
-            let hash = sha256_from_path(&file_path).await?;
-            if hash == sha256 {
-                return Ok(file_path);
-            }
-
-            // Delete old file
-            let _ = tokio::fs::remove_file(&file_path).await;
+        if let Some(p) = self.check_cache_from_sha(sha256).await {
+            return Ok(p);
         }
+
+        let file_path = self.path_from_sha(sha256);
         chan_send(chan.as_mut(), 0.0);
 
         let mut tmp_file = AsyncTempFile::new()?;
         {
             let mut tmp_file = tokio::io::BufWriter::new(tmp_file.as_mut());
 
-            let response = self.client.get(url).send().await.map_err(Error::from)?;
+            let response = self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(io::Error::other)?;
 
             let mut cur_pos = 0;
             let response_size = response.content_length();
@@ -201,7 +257,7 @@ impl Downloader {
             let mut hasher = Sha256::new();
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(Error::from)?;
+                let mut data = x.map_err(io::Error::other)?;
                 cur_pos += data.len();
                 hasher.update(&data);
                 tmp_file.write_all_buf(&mut data).await?;
@@ -217,7 +273,10 @@ impl Downloader {
 
             if hash != sha256 {
                 tracing::warn!("{hash:?} != {sha256:?}");
-                return Err(Error::Sha256Error);
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Invalid SHA256",
+                ));
             }
         }
 
@@ -226,9 +285,9 @@ impl Downloader {
         Ok(file_path)
     }
 
-    fn path_from_url(&self, url: &url::Url) -> PathBuf {
+    fn path_from_url(&self, url: &str) -> PathBuf {
         let file_name: [u8; 32] = Sha256::new()
-            .chain_update(url.as_str())
+            .chain_update(url)
             .finalize()
             .as_slice()
             .try_into()
@@ -245,12 +304,12 @@ impl Downloader {
 struct AsyncTempFile(tokio::fs::File);
 
 impl AsyncTempFile {
-    fn new() -> std::io::Result<Self> {
+    fn new() -> io::Result<Self> {
         let f = tempfile::tempfile()?;
         Ok(Self(tokio::fs::File::from_std(f)))
     }
 
-    async fn persist(&mut self, path: &Path) -> std::io::Result<()> {
+    async fn persist(&mut self, path: &Path) -> io::Result<()> {
         let mut f = tokio::fs::File::create_new(path).await?;
         self.0.seek(io::SeekFrom::Start(0)).await?;
         tokio::io::copy(&mut self.0, &mut f).await?;
@@ -264,7 +323,7 @@ impl AsMut<tokio::fs::File> for AsyncTempFile {
     }
 }
 
-async fn sha256_from_path(p: &Path) -> std::io::Result<[u8; 32]> {
+async fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
     let file = tokio::fs::File::open(p).await?;
     let mut reader = tokio::io::BufReader::new(file);
     let mut hasher = Sha256::new();
