@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bb_config::config;
 use iced::{
     Element,
     widget::{self, button, text},
@@ -44,7 +45,7 @@ impl ImageSelectionPage {
 
     pub(crate) fn view<'a, E>(
         &self,
-        images: Option<Vec<(usize, &'a bb_imager::config::OsListItem)>>,
+        images: Option<Vec<(usize, &'a config::OsListItem)>>,
         search_bar: &'a str,
         downloader: &'a bb_downloader::Downloader,
         // Allow optional format entry
@@ -56,11 +57,7 @@ impl ImageSelectionPage {
         let row3: Element<_> = if let Some(imgs) = images {
             let items = imgs
                 .into_iter()
-                .filter(|(_, x)| {
-                    x.search_str()
-                        .to_lowercase()
-                        .contains(&search_bar.to_lowercase())
-                })
+                .filter(|(_, x)| x.name().to_lowercase().contains(&search_bar.to_lowercase()))
                 .map(|(idx, x)| self.entry(x, downloader, idx))
                 .chain(extra_entries.map(|x| custom_btn(x.label, x.icon, x.msg)))
                 .map(Into::into);
@@ -89,7 +86,7 @@ impl ImageSelectionPage {
 
     fn entry_subitem<'a>(
         &self,
-        image: &'a bb_imager::config::OsImage,
+        image: &'a config::OsImage,
         downloader: &'a bb_downloader::Downloader,
     ) -> widget::Button<'a, BBImagerMessage> {
         let row3 = widget::row(
@@ -135,53 +132,60 @@ impl ImageSelectionPage {
 
     fn entry<'a>(
         &self,
-        item: &'a bb_imager::config::OsListItem,
+        item: &'a config::OsListItem,
         downloader: &'a bb_downloader::Downloader,
         idx: usize,
     ) -> widget::Button<'a, BBImagerMessage> {
-        match item {
-            bb_imager::config::OsListItem::Image(image) => self.entry_subitem(image, downloader),
-            bb_imager::config::OsListItem::SubList {
-                name,
-                description,
-                icon,
-                flasher,
-                ..
-            }
-            | bb_imager::config::OsListItem::RemoteSubList {
-                name,
-                description,
-                icon,
-                flasher,
-                ..
-            } => {
-                let icon = match downloader.clone().check_cache_from_url(icon.clone()) {
-                    Some(y) => img_or_svg(y, ICON_WIDTH),
-                    None => widget::svg(widget::svg::Handle::from_memory(
-                        constants::DOWNLOADING_ICON,
-                    ))
-                    .width(ICON_WIDTH)
-                    .into(),
-                };
-                let tail = widget::svg(widget::svg::Handle::from_memory(
-                    constants::ARROW_FORWARD_IOS_ICON,
+        fn internal<'a>(
+            downloader: &'a bb_downloader::Downloader,
+            icon: url::Url,
+            name: &'a str,
+            description: &'a str,
+            msg: BBImagerMessage,
+        ) -> widget::Button<'a, BBImagerMessage> {
+            let icon = match downloader.clone().check_cache_from_url(icon) {
+                Some(y) => img_or_svg(y, ICON_WIDTH),
+                None => widget::svg(widget::svg::Handle::from_memory(
+                    constants::DOWNLOADING_ICON,
                 ))
-                .width(20);
-                button(
-                    widget::row![
-                        icon,
-                        widget::column![text(name.as_str()).size(18), text(description.as_str())]
-                            .padding(5),
-                        widget::horizontal_space(),
-                        tail
-                    ]
-                    .align_y(iced::Alignment::Center)
-                    .spacing(10),
-                )
-                .width(iced::Length::Fill)
-                .on_press(self.push_screen(*flasher, idx))
-                .style(widget::button::secondary)
-            }
+                .width(ICON_WIDTH)
+                .into(),
+            };
+            let tail = widget::svg(widget::svg::Handle::from_memory(
+                constants::ARROW_FORWARD_IOS_ICON,
+            ))
+            .width(20);
+            button(
+                widget::row![
+                    icon,
+                    widget::column![text(name).size(18), text(description)].padding(5),
+                    widget::horizontal_space(),
+                    tail
+                ]
+                .align_y(iced::Alignment::Center)
+                .spacing(10),
+            )
+            .width(iced::Length::Fill)
+            .on_press(msg)
+            .style(widget::button::secondary)
+        }
+
+        match item {
+            config::OsListItem::Image(image) => self.entry_subitem(image, downloader),
+            config::OsListItem::SubList(item) => internal(
+                downloader,
+                item.icon.clone(),
+                &item.name,
+                &item.description,
+                self.push_screen(helpers::flasher_into(item.flasher), idx),
+            ),
+            config::OsListItem::RemoteSubList(item) => internal(
+                downloader,
+                item.icon.clone(),
+                &item.name,
+                &item.description,
+                self.push_screen(helpers::flasher_into(item.flasher), idx),
+            ),
         }
     }
 

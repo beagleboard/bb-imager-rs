@@ -76,7 +76,6 @@ pub trait BBFlasher {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "config", derive(serde::Deserialize, serde::Serialize))]
 pub enum Flasher {
     #[default]
     SdCard,

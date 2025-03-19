@@ -11,7 +11,7 @@ use crate::{
 pub(crate) enum BBImagerMessage {
     UpdateConfig(Boards),
     ResolveRemoteSubitemItem {
-        item: Vec<bb_imager::config::OsListItem>,
+        item: Vec<bb_config::config::OsListItem>,
         target: Vec<usize>,
     },
     BoardSelected(usize),
