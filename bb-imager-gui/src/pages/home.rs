@@ -11,7 +11,7 @@ use crate::{
 use super::{Screen, image_selection::ImageSelectionPage};
 
 pub(crate) fn view<'a>(
-    selected_board: Option<&'a bb_imager::config::Device>,
+    selected_board: Option<&'a bb_config::config::Device>,
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a bb_imager::Destination>,
     destination_selectable: bool,
@@ -31,7 +31,7 @@ pub(crate) fn view<'a>(
         .width(iced::Length::Fill)
         .on_press_maybe(selected_board.map(|board| {
             BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionPage::new(
-                board.flasher,
+                helpers::flasher_into(board.flasher),
             )))
         }));
 

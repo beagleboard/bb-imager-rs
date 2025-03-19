@@ -2,6 +2,7 @@
 
 use std::{collections::HashSet, time::Duration};
 
+use bb_config::config;
 use constants::PACKAGE_QUALIFIER;
 use helpers::ProgressBarState;
 use iced::{Element, Subscription, Task, futures::SinkExt, widget};
@@ -35,8 +36,8 @@ fn main() -> iced::Result {
 
     let app_config = helpers::GuiConfiguration::load().unwrap_or_default();
 
-    let config = bb_imager::config::Config::from_json(constants::DEFAULT_CONFIG)
-        .expect("Failed to parse config");
+    let config: config::Config =
+        serde_json::from_slice(constants::DEFAULT_CONFIG).expect("Failed to parse config");
     let boards = helpers::Boards::from(config);
 
     let settings = iced::window::Settings {
@@ -99,8 +100,8 @@ impl BBImager {
         let boards_clone = boards.clone();
         let config_task = Task::perform(
             async move {
-                let data: bb_imager::config::Config = client
-                    .download_json_no_cache(constants::BB_IMAGER_ORIGINAL_CONFIG)
+                let data: config::Config = client
+                    .download_json_no_cache(bb_config::DISTROS_URL)
                     .await
                     .map_err(|e| format!("Config parsing failed: {e}"))?;
 
@@ -392,10 +393,8 @@ impl BBImager {
     fn fetch_remote_subitems(&self, board: usize, target: &[usize]) -> Task<BBImagerMessage> {
         let Some(os_images) = self.boards.images(board, target) else {
             // Maybe resolving was missed
-            if let bb_imager::config::OsListItem::RemoteSubList { subitems_url, .. } =
-                self.boards.image(target)
-            {
-                let url = subitems_url.clone();
+            if let config::OsListItem::RemoteSubList(item) = self.boards.image(target) {
+                let url = item.subitems_url.clone();
                 tracing::info!("Downloading subites from {:?}", url);
 
                 let target_clone: Vec<usize> = target.to_vec();
@@ -423,9 +422,9 @@ impl BBImager {
             .clone()
             .into_iter()
             .filter_map(|(idx, x)| {
-                if let bb_imager::config::OsListItem::RemoteSubList { subitems_url, .. } = x {
-                    tracing::info!("Fetch: {:?} at {}", subitems_url, idx);
-                    Some((idx, subitems_url.clone()))
+                if let config::OsListItem::RemoteSubList(item) = x {
+                    tracing::info!("Fetch: {:?} at {}", item.subitems_url, idx);
+                    Some((idx, item.subitems_url.clone()))
                 } else {
                     None
                 }
@@ -439,9 +438,7 @@ impl BBImager {
                 Task::perform(
                     async move {
                         downloader
-                            .download_json_no_cache::<Vec<bb_imager::config::OsListItem>, url::Url>(
-                                url_clone,
-                            )
+                            .download_json_no_cache::<Vec<config::OsListItem>, url::Url>(url_clone)
                             .await
                     },
                     move |x| match x {
@@ -672,6 +669,6 @@ impl BBImager {
             return Some(x.flasher());
         }
         let dev = self.boards.device(self.selected_board?);
-        Some(dev.flasher)
+        Some(helpers::flasher_into(dev.flasher))
     }
 }

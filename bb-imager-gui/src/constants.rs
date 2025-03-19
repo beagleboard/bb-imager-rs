@@ -2,7 +2,6 @@ use iced::color;
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
-pub(crate) const BB_IMAGER_ORIGINAL_CONFIG: &str = "https://www.beagleboard.org/distros.json";
 pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";

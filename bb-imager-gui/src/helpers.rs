@@ -1,6 +1,7 @@
-use std::{borrow::Cow, collections::HashSet, io::Read, path::PathBuf, sync::LazyLock};
+use std::{borrow::Cow, io::Read, path::PathBuf, sync::LazyLock};
 
-use bb_imager::{BBFlasher, DownloadFlashingStatus, config::OsListItem};
+use bb_config::config::{self, OsListItem};
+use bb_imager::{BBFlasher, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
     Element, futures,
@@ -184,22 +185,15 @@ impl ProgressBarStatus {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Boards(bb_imager::config::Config);
+pub(crate) struct Boards(config::Config);
 
 impl Boards {
-    pub(crate) fn merge(mut self, config: bb_imager::config::Config) -> Self {
-        for dev in config.imager.devices {
-            if !self.0.imager.devices.iter().any(|x| x.name == dev.name) {
-                self.0.imager.devices.push(dev);
-            }
-        }
-
-        self.0.os_list.extend(config.os_list);
-
+    pub(crate) fn merge(mut self, config: config::Config) -> Self {
+        self.0.extend([config]);
         self
     }
 
-    pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &bb_imager::config::Device)> {
+    pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &config::Device)> {
         self.0.imager.devices.iter().enumerate()
     }
 
@@ -211,7 +205,7 @@ impl Boards {
             let item = res.get(*i).expect("No Subitem");
             res = match item {
                 OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList { subitems, .. } => subitems,
+                OsListItem::SubList(item) => &item.subitems,
                 OsListItem::RemoteSubList { .. } => panic!("No subitem"),
             }
         }
@@ -230,7 +224,7 @@ impl Boards {
             let item = res.get(*i).expect("No Subitem");
             res = match item {
                 OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList { subitems, .. } => subitems,
+                OsListItem::SubList(item) => &item.subitems,
                 OsListItem::RemoteSubList { .. } => return None,
             }
         }
@@ -241,12 +235,12 @@ impl Boards {
         Some(
             res.iter()
                 .enumerate()
-                .filter(move |(_, x)| check_board(x, tags))
+                .filter(move |(_, x)| x.has_board_image(tags))
                 .collect(),
         )
     }
 
-    pub(crate) fn device(&self, board_idx: usize) -> &bb_imager::config::Device {
+    pub(crate) fn device(&self, board_idx: usize) -> &config::Device {
         self.0
             .imager
             .devices
@@ -265,42 +259,21 @@ impl Boards {
             let item = res.get_mut(*i).expect("No Subitem");
             res = match item {
                 OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList { subitems, .. } => subitems,
+                OsListItem::SubList(item) => &mut item.subitems,
                 OsListItem::RemoteSubList { .. } => panic!("No subitem"),
             }
         }
 
-        if let OsListItem::RemoteSubList {
-            name,
-            description,
-            icon,
-            flasher,
-            ..
-        } = res.get(*last).unwrap().clone()
-        {
-            res[*last] = OsListItem::SubList {
-                name,
-                description,
-                icon,
-                flasher,
-                subitems,
-            }
+        if let OsListItem::RemoteSubList(item) = res.get(*last).unwrap().clone() {
+            res[*last] = OsListItem::SubList(item.resolve(subitems))
         } else {
             tracing::warn!("Unexpected item")
         }
     }
 }
 
-fn check_board(item: &OsListItem, tags: &HashSet<String>) -> bool {
-    match item {
-        OsListItem::Image(os_image) => !tags.is_disjoint(&os_image.devices),
-        OsListItem::SubList { subitems, .. } => subitems.iter().any(|x| check_board(x, tags)),
-        OsListItem::RemoteSubList { devices, .. } => !tags.is_disjoint(devices),
-    }
-}
-
-impl From<bb_imager::config::Config> for Boards {
-    fn from(value: bb_imager::config::Config) -> Self {
+impl From<config::Config> for Boards {
+    fn from(value: config::Config) -> Self {
         Self(value)
     }
 }
@@ -424,7 +397,7 @@ impl BoardImage {
     }
 
     pub(crate) fn remote(
-        image: bb_imager::config::OsImage,
+        image: config::OsImage,
         flasher: bb_imager::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
@@ -849,6 +822,17 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
+        _ => unreachable!(),
+    }
+}
+
+pub(crate) fn flasher_into(f: config::Flasher) -> bb_imager::Flasher {
+    match f {
+        config::Flasher::SdCard => bb_imager::Flasher::SdCard,
+        config::Flasher::BeagleConnectFreedom => bb_imager::Flasher::BeagleConnectFreedom,
+        config::Flasher::Msp430Usb => bb_imager::Flasher::Msp430Usb,
+        #[cfg(feature = "pb2_mspm0")]
+        config::Flasher::Pb2Mspm0 => bb_imager::Flasher::Pb2Mspm0,
         _ => unreachable!(),
     }
 }
