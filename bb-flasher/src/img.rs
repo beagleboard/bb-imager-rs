@@ -1,10 +1,10 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use crate::DownloadFlashingStatus;
+use crate::{DownloadFlashingStatus, ImageFile};
 use futures::channel::mpsc;
 use std::{
     io::{Read, Seek},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 pub(crate) struct OsImage {
@@ -81,42 +81,4 @@ fn size(file: &std::fs::Metadata) -> u64 {
 fn size(file: &std::fs::Metadata) -> u64 {
     use std::os::windows::fs::MetadataExt;
     file.file_size()
-}
-
-pub trait ImageFile {
-    fn resolve(
-        &self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<PathBuf>>;
-}
-
-#[derive(Debug, Clone)]
-pub struct LocalImage(PathBuf);
-
-impl LocalImage {
-    pub const fn new(path: PathBuf) -> Self {
-        Self(path)
-    }
-}
-
-impl ImageFile for LocalImage {
-    fn resolve(
-        &self,
-        _: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<PathBuf>> {
-        std::future::ready(Ok(self.0.clone()))
-    }
-}
-
-impl std::fmt::Display for LocalImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .file_name()
-                .expect("image cannot be a directory")
-                .to_string_lossy()
-        )
-    }
 }

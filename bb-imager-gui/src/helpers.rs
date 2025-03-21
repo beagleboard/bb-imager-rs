@@ -1,7 +1,9 @@
-use std::{borrow::Cow, io::Read, path::PathBuf, sync::LazyLock};
+use std::{
+    borrow::Cow, collections::HashSet, fmt::Display, io::Read, path::PathBuf, sync::LazyLock,
+};
 
 use bb_config::config::{self, OsListItem};
-use bb_imager::{BBFlasher, DownloadFlashingStatus};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
     Element, futures,
@@ -188,8 +190,8 @@ impl ProgressBarStatus {
 pub(crate) struct Boards(config::Config);
 
 impl Boards {
-    pub(crate) fn merge(mut self, config: config::Config) -> Self {
-        self.0.extend([config]);
+    pub(crate) fn merge(mut self, config: Self) -> Self {
+        self.0.extend([config.0]);
         self
     }
 
@@ -236,6 +238,11 @@ impl Boards {
             res.iter()
                 .enumerate()
                 .filter(move |(_, x)| x.has_board_image(tags))
+                .filter(|(_, x)| match x {
+                    OsListItem::RemoteSubList(item) => flasher_supported(item.flasher),
+                    OsListItem::SubList(item) => flasher_supported(item.flasher),
+                    _ => true,
+                })
                 .collect(),
         )
     }
@@ -274,7 +281,19 @@ impl Boards {
 
 impl From<config::Config> for Boards {
     fn from(value: config::Config) -> Self {
-        Self(value)
+        let filtered = config::Config {
+            imager: config::Imager {
+                latest_version: value.imager.latest_version,
+                devices: value
+                    .imager
+                    .devices
+                    .into_iter()
+                    .filter(|x| flasher_supported(x.flasher))
+                    .collect(),
+            },
+            os_list: value.os_list,
+        };
+        Self(filtered)
     }
 }
 
@@ -383,22 +402,22 @@ pub(crate) fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
 pub(crate) enum BoardImage {
     SdFormat,
     Image {
-        flasher: bb_imager::Flasher,
+        flasher: config::Flasher,
         img: SelectedImage,
     },
 }
 
 impl BoardImage {
-    pub(crate) fn local(path: PathBuf, flasher: bb_imager::Flasher) -> Self {
+    pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
         Self::Image {
-            img: bb_imager::img::LocalImage::new(path).into(),
+            img: bb_flasher::LocalImage::new(path).into(),
             flasher,
         }
     }
 
     pub(crate) fn remote(
         image: config::OsImage,
-        flasher: bb_imager::Flasher,
+        flasher: config::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
         Self::Image {
@@ -413,9 +432,9 @@ impl BoardImage {
         }
     }
 
-    pub(crate) const fn flasher(&self) -> bb_imager::Flasher {
+    pub(crate) const fn flasher(&self) -> config::Flasher {
         match self {
-            BoardImage::SdFormat => bb_imager::Flasher::SdCard,
+            BoardImage::SdFormat => config::Flasher::SdCard,
             BoardImage::Image { flasher, .. } => *flasher,
         }
     }
@@ -574,7 +593,7 @@ impl SdCustomization {
     }
 }
 
-impl From<SdCustomization> for bb_imager::flasher::sd::FlashingSdLinuxConfig {
+impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
     fn from(value: SdCustomization) -> Self {
         Self::new(
             value.verify,
@@ -645,14 +664,6 @@ impl BcfCustomization {
     }
 }
 
-impl From<BcfCustomization> for bb_imager::flasher::bcf::FlashingBcfConfig {
-    fn from(value: BcfCustomization) -> Self {
-        Self {
-            verify: value.verify,
-        }
-    }
-}
-
 impl Default for BcfCustomization {
     fn default() -> Self {
         Self { verify: true }
@@ -706,7 +717,7 @@ impl RemoteImage {
     }
 }
 
-impl bb_imager::img::ImageFile for RemoteImage {
+impl bb_flasher::ImageFile for RemoteImage {
     async fn resolve(
         &self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
@@ -736,11 +747,11 @@ impl std::fmt::Display for RemoteImage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum SelectedImage {
-    LocalImage(bb_imager::img::LocalImage),
+    LocalImage(bb_flasher::LocalImage),
     RemoteImage(RemoteImage),
 }
 
-impl bb_imager::img::ImageFile for SelectedImage {
+impl bb_flasher::ImageFile for SelectedImage {
     async fn resolve(
         &self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
@@ -767,8 +778,8 @@ impl From<RemoteImage> for SelectedImage {
     }
 }
 
-impl From<bb_imager::img::LocalImage> for SelectedImage {
-    fn from(value: bb_imager::img::LocalImage) -> Self {
+impl From<bb_flasher::LocalImage> for SelectedImage {
+    fn from(value: bb_flasher::LocalImage) -> Self {
         Self::LocalImage(value)
     }
 }
@@ -776,49 +787,51 @@ impl From<bb_imager::img::LocalImage> for SelectedImage {
 pub(crate) async fn flash(
     img: Option<BoardImage>,
     customization: FlashingCustomization,
-    dst: Option<bb_imager::Destination>,
+    dst: Option<Destination>,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
         (
             Some(BoardImage::SdFormat),
             FlashingCustomization::LinuxSdFormat,
-            Some(bb_imager::Destination::SdCard { path, .. }),
+            Some(Destination::SdCard(t)),
         ) => {
-            bb_imager::flasher::sd::LinuxSdFormat::new(path)
+            bb_flasher::sd::FormatFlasher::new(t)
                 .flash(Some(chan))
                 .await
         }
         (
             Some(BoardImage::Image { img, .. }),
             FlashingCustomization::LinuxSd(customization),
-            Some(bb_imager::Destination::SdCard { path, .. }),
+            Some(Destination::SdCard(t)),
         ) => {
-            bb_imager::flasher::sd::LinuxSd::new(img, path, customization.into())
+            bb_flasher::sd::Flasher::new(img, t, customization.into())
                 .flash(Some(chan))
                 .await
         }
+        #[cfg(feature = "bcf_cc1352p7")]
         (
             Some(BoardImage::Image { img, .. }),
             FlashingCustomization::Bcf(customization),
-            Some(bb_imager::Destination::Port(port)),
+            Some(Destination::BeagleConnectFreedom(t)),
         ) => {
-            bb_imager::flasher::bcf::BeagleConnectFreedom::new(img, port, customization.into())
+            bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify)
                 .flash(Some(chan))
                 .await
         }
+        #[cfg(feature = "bcf_msp430")]
         (
             Some(BoardImage::Image { img, .. }),
             FlashingCustomization::Msp430,
-            Some(bb_imager::Destination::HidRaw(port)),
+            Some(Destination::Msp430(t)),
         ) => {
-            bb_imager::flasher::msp430::Msp430::new(img, port)
+            bb_flasher::bcf::msp430::Flasher::new(img, t)
                 .flash(Some(chan))
                 .await
         }
         #[cfg(feature = "pb2_mspm0")]
         (Some(BoardImage::Image { img, .. }), FlashingCustomization::Pb2Mspm0(x), _) => {
-            bb_imager::flasher::pb2_mspm0::Pb2Mspm0::new(img, x.persist_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(img, x.persist_eeprom)
                 .flash(Some(chan))
                 .await
         }
@@ -826,13 +839,108 @@ pub(crate) async fn flash(
     }
 }
 
-pub(crate) fn flasher_into(f: config::Flasher) -> bb_imager::Flasher {
-    match f {
-        config::Flasher::SdCard => bb_imager::Flasher::SdCard,
-        config::Flasher::BeagleConnectFreedom => bb_imager::Flasher::BeagleConnectFreedom,
-        config::Flasher::Msp430Usb => bb_imager::Flasher::Msp430Usb,
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub(crate) enum Destination {
+    SdCard(bb_flasher::sd::Target),
+    #[cfg(feature = "bcf_cc1352p7")]
+    BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
+    #[cfg(feature = "bcf_msp430")]
+    Msp430(bb_flasher::bcf::msp430::Target),
+    #[cfg(feature = "pb2_mspm0")]
+    Pb2Mspm0(bb_flasher::pb2::mspm0::Target),
+}
+
+impl Display for Destination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Destination::SdCard(target) => target.fmt(f),
+            #[cfg(feature = "bcf_cc1352p7")]
+            Destination::BeagleConnectFreedom(target) => target.fmt(f),
+            #[cfg(feature = "bcf_msp430")]
+            Destination::Msp430(target) => target.fmt(f),
+            #[cfg(feature = "pb2_mspm0")]
+            Destination::Pb2Mspm0(target) => target.fmt(f),
+        }
+    }
+}
+
+impl Destination {
+    #[allow(irrefutable_let_patterns)]
+    pub(crate) fn size(&self) -> Option<u64> {
+        if let Destination::SdCard(item) = self {
+            Some(item.size())
+        } else {
+            None
+        }
+    }
+}
+
+pub(crate) async fn destinations(flasher: config::Flasher) -> HashSet<Destination> {
+    match flasher {
+        config::Flasher::SdCard => bb_flasher::sd::Target::destinations()
+            .await
+            .into_iter()
+            .map(Destination::SdCard)
+            .collect(),
+        #[cfg(feature = "bcf_cc1352p7")]
+        config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::destinations()
+            .await
+            .into_iter()
+            .map(Destination::BeagleConnectFreedom)
+            .collect(),
+        #[cfg(feature = "bcf_msp430")]
+        config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::destinations()
+            .await
+            .into_iter()
+            .map(Destination::Msp430)
+            .collect(),
         #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => bb_imager::Flasher::Pb2Mspm0,
-        _ => unreachable!(),
+        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::destinations()
+            .await
+            .into_iter()
+            .map(Destination::Pb2Mspm0)
+            .collect(),
+        _ => unimplemented!(),
+    }
+}
+
+pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
+    match flasher {
+        config::Flasher::SdCard => bb_flasher::sd::Target::is_destination_selectable(),
+        #[cfg(feature = "bcf_cc1352p7")]
+        config::Flasher::BeagleConnectFreedom => {
+            bb_flasher::bcf::cc1352p7::Target::is_destination_selectable()
+        }
+        #[cfg(feature = "bcf_msp430")]
+        config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::is_destination_selectable(),
+        #[cfg(feature = "pb2_mspm0")]
+        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::is_destination_selectable(),
+        _ => unimplemented!(),
+    }
+}
+
+pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
+    match flasher {
+        config::Flasher::SdCard => bb_flasher::sd::Target::FILE_TYPES,
+        #[cfg(feature = "bcf_cc1352p7")]
+        config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
+        #[cfg(feature = "bcf_msp430")]
+        config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::FILE_TYPES,
+        #[cfg(feature = "pb2_mspm0")]
+        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::FILE_TYPES,
+        _ => unimplemented!(),
+    }
+}
+
+const fn flasher_supported(flasher: config::Flasher) -> bool {
+    match flasher {
+        config::Flasher::SdCard => true,
+        #[cfg(feature = "bcf_cc1352p7")]
+        config::Flasher::BeagleConnectFreedom => true,
+        #[cfg(feature = "bcf_msp430")]
+        config::Flasher::Msp430Usb => true,
+        #[cfg(feature = "pb2_mspm0")]
+        config::Flasher::Pb2Mspm0 => true,
+        _ => false,
     }
 }

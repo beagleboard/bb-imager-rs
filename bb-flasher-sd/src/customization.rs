@@ -2,7 +2,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use crate::{Error, Result};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 /// Post install customization options
 pub struct Customization {
     pub hostname: Option<String>,

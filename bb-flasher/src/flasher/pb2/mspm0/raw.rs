@@ -1,11 +1,11 @@
 use futures::channel::mpsc;
-use std::collections::HashSet;
+use std::path::PathBuf;
 
 use bb_flasher_pb2_mspm0::Error;
 
-pub(crate) async fn possible_devices() -> std::collections::HashSet<crate::Destination> {
+pub(crate) async fn destinations() -> (String, PathBuf) {
     let d = bb_flasher_pb2_mspm0::device();
-    HashSet::from([crate::Destination::File(d.name, d.path)])
+    (d.name, d.path)
 }
 
 pub(crate) async fn flash(

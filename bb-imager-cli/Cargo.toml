@@ -9,7 +9,7 @@ license.workspace = true
 
 [dependencies]
 clap = { version = "4.5.30", features = ["derive"] }
-bb-imager = { path = "../bb-imager" }
+bb-flasher = { path = "../bb-flasher" }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.17.11"
 console = "0.15.10"
@@ -28,4 +28,6 @@ assets = [
 
 [features]
 default = []
-pb2_mspm0 = [ "bb-imager/pb2_mspm0_raw" ]
+pb2_mspm0 = [ "bb-flasher/pb2_mspm0" ]
+bcf_cc1352p7 = ["bb-flasher/bcf"]
+bcf_msp430 = ["bb-flasher/bcf_msp430"]

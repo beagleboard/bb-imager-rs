@@ -1,4 +1,8 @@
-_RUST_CLI_FEATURE_ARGS := if PB2_MSPM0 == '1' { '-F pb2_mspm0' } else { '' }
+_RUST_CLI_FEATURE_PB2_MSPM0 := if PB2_MSPM0 == '1' { '-F pb2_mspm0 ' } else { '' }
+_RUST_CLI_FEATURE_BCF_CC1352 := if BCF_CC1352 == '1' { '-F bcf_cc1352p7 ' } else { '' }
+_RUST_CLI_FEATURE_BCF_MSP430 := if BCF_MSP430 == '1' { '-F bcf_msp430 ' } else { '' }
+
+_RUST_CLI_FEATURE_ARGS := _RUST_CLI_FEATURE_PB2_MSPM0 + _RUST_CLI_FEATURE_BCF_CC1352 + _RUST_CLI_FEATURE_BCF_MSP430
 
 _PACKAGE_NAME_CLI := 'bb-imager-cli'
 

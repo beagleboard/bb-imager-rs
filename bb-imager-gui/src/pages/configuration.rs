@@ -1,3 +1,4 @@
+use bb_config::config;
 use iced::{
     Element,
     widget::{self, text},
@@ -295,26 +296,27 @@ pub(crate) enum FlashingCustomization {
 
 impl FlashingCustomization {
     pub(crate) fn new(
-        flasher: bb_imager::Flasher,
+        flasher: config::Flasher,
         img: &helpers::BoardImage,
         app_config: &helpers::GuiConfiguration,
     ) -> Self {
         match flasher {
-            bb_imager::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
-            bb_imager::Flasher::SdCard => {
+            config::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
+            config::Flasher::SdCard => {
                 Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
             }
-            bb_imager::Flasher::BeagleConnectFreedom => {
+            config::Flasher::BeagleConnectFreedom => {
                 Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
             }
-            bb_imager::Flasher::Msp430Usb => Self::Msp430,
+            config::Flasher::Msp430Usb => Self::Msp430,
             #[cfg(feature = "pb2_mspm0")]
-            bb_imager::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
+            config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
                 app_config
                     .pb2_mspm0_customization()
                     .cloned()
                     .unwrap_or_default(),
             ),
+            _ => unimplemented!(),
         }
     }
 

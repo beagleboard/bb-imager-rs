@@ -1,0 +1,42 @@
+[package]
+name = "bb-flasher"
+description = "Library providing flashing capabilities for BeagleBoard.org boards"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["beagle", "flasher"]
+categories = ["development-tools", "embedded", "hardware-support"]
+
+[dependencies]
+liblzma = { version = "0.3.6", features = ["static", "parallel"] }
+serde = { version = "1.0.218", features = ["derive"], optional = true }
+serde_json = { version = "1.0.139", optional = true }
+thiserror = { version = "2.0.11", optional = true }
+tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
+tracing = "0.1.41"
+futures = "0.3.31"
+bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
+bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
+bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
+zbus = { version = "5.5.0", default-features = false, features = ["tokio"], optional = true}
+bin_file = { version = "0.1", optional = true }
+cfg-if = "1.0.0"
+
+[dev-dependencies]
+tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
+
+[features]
+default = ["sd"]
+sd = ["bb-flasher-sd"]
+sd_linux_udev = ["bb-flasher-sd/udev"]
+sd_macos_authopen = ["bb-flasher-sd/macos_authopen"]
+bcf = ["bb-flasher-bcf/cc1352p7"]
+bcf_msp430 = ["bb-flasher-bcf/msp430"]
+pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
+pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json", "dep:thiserror"]
+
+[package.metadata.docs.rs]
+all-features = true

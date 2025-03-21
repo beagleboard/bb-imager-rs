@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-	"bb-imager",
+	"bb-flasher",
 	"bb-imager-cli", "bb-flasher-pb2-mspm0",
 	"bb-imager-gui", "bb-imager-service",
 	"xtask", "bb-flasher-bcf", "bb-flasher-sd", "iced-loading", "bb-downloader", "bb-config",

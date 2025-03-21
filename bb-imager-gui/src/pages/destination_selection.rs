@@ -7,7 +7,7 @@ use crate::{BBImagerMessage, constants, helpers};
 
 pub(crate) fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, BBImagerMessage>
 where
-    D: Iterator<Item = &'a bb_imager::Destination>,
+    D: Iterator<Item = &'a helpers::Destination>,
 {
     let items = destinations
         .filter(|x| {
@@ -18,8 +18,8 @@ where
         .map(|x| {
             let mut row2 = widget::column![text(x.to_string())];
 
-            if let bb_imager::Destination::SdCard { size, .. } = x {
-                let s = (*size as f32) / (1024.0 * 1024.0 * 1024.0);
+            if let Some(size) = x.size() {
+                let s = (size as f32) / (1024.0 * 1024.0 * 1024.0);
                 row2 = row2.push(text(format!("{:.2} GB", s)));
             }
 

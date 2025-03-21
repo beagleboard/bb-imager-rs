@@ -16,3 +16,5 @@ cargo_toml = "0.21.0"
 [features]
 default = []
 pb2_mspm0 = []
+bcf_cc1352p7 = []
+bcf_msp430 = []

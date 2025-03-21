@@ -64,8 +64,8 @@ struct BBImager {
     screen: Vec<Screen>,
     selected_board: Option<usize>,
     selected_image: Option<helpers::BoardImage>,
-    selected_dst: Option<bb_imager::Destination>,
-    destinations: HashSet<bb_imager::Destination>,
+    selected_dst: Option<helpers::Destination>,
+    destinations: HashSet<helpers::Destination>,
     search_bar: String,
     cancel_flashing: Option<iced::task::Handle>,
     customization: Option<FlashingCustomization>,
@@ -106,7 +106,7 @@ impl BBImager {
                     .map_err(|e| format!("Config parsing failed: {e}"))?;
 
                 // If spawn_blocking fails, there is a problem with the underlying runtime
-                tokio::task::spawn_blocking(|| Ok(boards_clone.merge(data)))
+                tokio::task::spawn_blocking(|| Ok(boards_clone.merge(data.into())))
                     .await
                     .expect("Tokio runtime failed to spawn blocking task")
             },
@@ -237,11 +237,11 @@ impl BBImager {
                 return self.refresh_destinations();
             }
             BBImagerMessage::SelectLocalImage(flasher) => {
-                let (name, extensions) = flasher.file_filter();
+                let extensions = helpers::file_filter(flasher);
                 return Task::perform(
                     async move {
                         rfd::AsyncFileDialog::new()
-                            .add_filter(name, extensions)
+                            .add_filter("image", extensions)
                             .pick_file()
                             .await
                             .map(|x| x.path().to_path_buf())
@@ -326,7 +326,7 @@ impl BBImager {
             BBImagerMessage::Destinations(x) => {
                 if !self.destination_selectable {
                     assert_eq!(x.len(), 1);
-                    let temp: Vec<&bb_imager::Destination> = x.iter().collect();
+                    let temp: Vec<&helpers::Destination> = x.iter().collect();
                     self.selected_dst = Some(temp[0].clone());
                 }
                 self.destinations = x;
@@ -470,7 +470,7 @@ impl BBImager {
             Screen::BoardSelection => {
                 pages::board_selection::view(&self.boards, &self.search_bar, &self.downloader)
             }
-            Screen::ImageSelection(page) if page.flasher == bb_imager::Flasher::SdCard => {
+            Screen::ImageSelection(page) if page.flasher == config::Flasher::SdCard => {
                 let board = self.selected_board.expect("Missing Board");
                 let flasher = page.flasher;
 
@@ -565,12 +565,12 @@ impl BBImager {
 
     fn refresh_destinations(&mut self) -> Task<BBImagerMessage> {
         if let Some(flasher) = self.flasher() {
-            self.destination_selectable = flasher.destination_selectable();
+            self.destination_selectable = helpers::is_destination_selectable(flasher);
 
             // Do not use subscription for static destinations
             if !self.destination_selectable {
                 return Task::perform(
-                    async move { flasher.destinations().await },
+                    async move { helpers::destinations(flasher).await },
                     BBImagerMessage::Destinations,
                 );
             }
@@ -650,8 +650,8 @@ impl BBImager {
             if self.destination_selectable
                 && self.screen.last().expect("No screen") == &Screen::DestinationSelection
             {
-                let stream = iced::futures::stream::unfold(flasher, |f| async move {
-                    let dsts = f.destinations().await;
+                let stream = iced::futures::stream::unfold(flasher, move |f| async move {
+                    let dsts = helpers::destinations(flasher).await;
                     let dsts = BBImagerMessage::Destinations(dsts);
                     Some((dsts, f))
                 })
@@ -664,11 +664,11 @@ impl BBImager {
         Subscription::none()
     }
 
-    fn flasher(&self) -> Option<bb_imager::Flasher> {
+    fn flasher(&self) -> Option<config::Flasher> {
         if let Some(x) = &self.selected_image {
             return Some(x.flasher());
         }
         let dev = self.boards.device(self.selected_board?);
-        Some(helpers::flasher_into(dev.flasher))
+        Some(dev.flasher)
     }
 }

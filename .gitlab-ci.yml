@@ -34,6 +34,8 @@ windows:
     - docker-amd64
   variables:
     RUST_BUILDER: cargo
+    BCF_CC1352: 1
+    BCF_MSP430: 1
   stage: build
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
@@ -51,6 +53,8 @@ linux_x86_64:
     - docker-amd64
   variables:
     RUST_BUILDER: cargo
+    BCF_CC1352: 1
+    BCF_MSP430: 1
   stage: build
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
@@ -74,6 +78,8 @@ linux_aarch64:
     PKG_CONFIG_ALLOW_CROSS: 1
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
     PB2_MSPM0: 1
+    BCF_CC1352: 1
+    BCF_MSP430: 1
   stage: build
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/
@@ -97,6 +103,8 @@ linux_arm:
     CROSS_ARCH: armhf
     PKG_CONFIG_ALLOW_CROSS: 1
     CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+    BCF_CC1352: 1
+    BCF_MSP430: 1
   stage: build
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin/

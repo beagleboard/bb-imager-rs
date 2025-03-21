@@ -503,6 +503,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-flasher"
+version = "0.1.0"
+dependencies = [
+ "bb-flasher-bcf",
+ "bb-flasher-pb2-mspm0",
+ "bb-flasher-sd",
+ "bin_file",
+ "cfg-if",
+ "futures",
+ "liblzma",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "zbus 5.5.0",
+]
+
+[[package]]
 name = "bb-flasher-bcf"
 version = "1.0.0"
 dependencies = [
@@ -545,29 +564,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bb-imager"
-version = "0.0.4"
-dependencies = [
- "bb-flasher-bcf",
- "bb-flasher-pb2-mspm0",
- "bb-flasher-sd",
- "bin_file",
- "directories",
- "futures",
- "liblzma",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "zbus 5.5.0",
-]
-
-[[package]]
 name = "bb-imager-cli"
 version = "0.0.4"
 dependencies = [
- "bb-imager",
+ "bb-flasher",
  "clap",
  "clap_complete",
  "console",
@@ -584,7 +584,7 @@ version = "0.0.4"
 dependencies = [
  "bb-config",
  "bb-downloader",
- "bb-imager",
+ "bb-flasher",
  "directories",
  "embed-resource",
  "iced",
