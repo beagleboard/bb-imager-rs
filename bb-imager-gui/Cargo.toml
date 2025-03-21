@@ -32,14 +32,6 @@ bb-config = { path = "../bb-config" }
 [build-dependencies]
 embed-resource = "2.5.0"
 
-[package.metadata.deb]
-assets = [
-	["target/release/bb-imager-gui", "/usr/bin/bb-imager-gui", "755"],
-	["assets/packages/linux/BeagleBoardImager.desktop", "/usr/share/applications/org.beagleboard.bb-imager.desktop", "644"],
-	["assets/icons/icon.png", "/usr/share/icons/hicolor/128x128/apps/bb-imager.png", "644"],
-	["assets/packages/linux/udev/10-beagle.rules", "/etc/udev/rules.d/10-beagle.rules", "644"]
-]
-
 [target.'cfg(target_os = "linux")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
 
@@ -51,3 +43,14 @@ pb2_mspm0 = ["bb-flasher/pb2_mspm0_dbus"]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 # GUI requires the base board support for any sub soc firmware
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
+
+[package.metadata.packager]
+icons = ["assets/icons/icon.*"]
+category = "DeveloperTool"
+identifier = "org.beagleboard.imagingutility"
+
+[package.metadata.packager.deb]
+files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-beagle.rules" }
+
+[package.metadata.packager.pacman]
+files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-beagle.rules" }
