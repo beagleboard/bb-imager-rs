@@ -10,7 +10,7 @@ license.workspace = true
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "lazy"] }
 rfd = { version = "0.15.2", default-features = false, features = ["xdg-portal", "tokio"] }
-bb-imager = { path = "../bb-imager" }
+bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing = "0.1.41"
 iced_aw = { version = "0.12.0", default-features = false, features = ["badge"] }
@@ -40,11 +40,14 @@ assets = [
 	["assets/packages/linux/udev/10-beagle.rules", "/etc/udev/rules.d/10-beagle.rules", "644"]
 ]
 
-[features]
-pb2_mspm0 = ["bb-imager/pb2_mspm0_dbus"]
-
 [target.'cfg(target_os = "linux")'.dependencies]
-bb-imager = { path = "../bb-imager", features = ["udev"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-bb-imager = { path = "../bb-imager", features = ["macos_authopen"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
+
+[features]
+pb2_mspm0 = ["bb-flasher/pb2_mspm0_dbus"]
+bcf_cc1352p7 = ["bb-flasher/bcf"]
+# GUI requires the base board support for any sub soc firmware
+bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]

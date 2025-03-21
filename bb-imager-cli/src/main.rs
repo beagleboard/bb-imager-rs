@@ -1,10 +1,10 @@
 mod cli;
 
-use bb_imager::{BBFlasher, DownloadFlashingStatus, img::LocalImage};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use futures::StreamExt;
-use std::{ffi::CString, path::PathBuf};
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
@@ -106,23 +106,9 @@ async fn flash(target: TargetCommands, quite: bool) {
 
 async fn flash_internal(
     target: TargetCommands,
-    chan: Option<futures::channel::mpsc::Sender<bb_imager::DownloadFlashingStatus>>,
+    chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
 ) -> std::io::Result<()> {
     match target {
-        TargetCommands::Bcf {
-            img,
-            dst,
-            no_verify,
-        } => {
-            let customization = bb_imager::flasher::bcf::FlashingBcfConfig { verify: !no_verify };
-            bb_imager::flasher::bcf::BeagleConnectFreedom::new(
-                LocalImage::new(img),
-                dst,
-                customization,
-            )
-            .flash(chan)
-            .await
-        }
         TargetCommands::Sd {
             dst,
             no_verify,
@@ -138,25 +124,37 @@ async fn flash_internal(
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_imager::flasher::sd::FlashingSdLinuxConfig::new(
+            let customization = bb_flasher::sd::FlashingSdLinuxConfig::new(
                 !no_verify, hostname, timezone, keymap, user, wifi,
             );
 
-            bb_imager::flasher::sd::LinuxSd::new(LocalImage::new(img), dst, customization)
-                .flash(chan)
-                .await
-        }
-        TargetCommands::Msp430 { img, dst } => {
-            bb_imager::flasher::msp430::Msp430::new(
+            bb_flasher::sd::Flasher::new(
                 LocalImage::new(img),
-                CString::new(dst).expect("Failed to parse destination"),
+                dst.try_into().unwrap(),
+                customization,
             )
             .flash(chan)
             .await
         }
+        #[cfg(feature = "bcf_cc1352p7")]
+        TargetCommands::Bcf {
+            img,
+            dst,
+            no_verify,
+        } => {
+            bb_flasher::bcf::cc1352p7::Flasher::new(LocalImage::new(img), dst.into(), !no_verify)
+                .flash(chan)
+                .await
+        }
+        #[cfg(feature = "bcf_msp430")]
+        TargetCommands::Msp430 { img, dst } => {
+            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img), dst.into())
+                .flash(chan)
+                .await
+        }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            bb_imager::flasher::pb2_mspm0::Pb2Mspm0::new(LocalImage::new(img), !no_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img), !no_eeprom)
                 .flash(chan)
                 .await
         }
@@ -167,7 +165,7 @@ async fn format(dst: PathBuf, quite: bool) {
     let (tx, _) = futures::channel::mpsc::channel(20);
     let term = console::Term::stdout();
 
-    let config = bb_imager::flasher::sd::LinuxSdFormat::new(dst);
+    let config = bb_flasher::sd::FormatFlasher::new(dst.try_into().unwrap());
     config.flash(Some(tx)).await.unwrap();
 
     if !quite {
@@ -175,17 +173,36 @@ async fn format(dst: PathBuf, quite: bool) {
     }
 }
 
-async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
+async fn no_frills_list_destinations<T: BBFlasherTarget>() {
     let term = console::Term::stdout();
+    let dsts = T::destinations().await;
 
-    let dsts = bb_imager::Flasher::from(target).destinations().await;
+    for d in dsts {
+        term.write_line(&d.path().to_string_lossy()).unwrap();
+    }
+}
 
+async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
     if no_frills {
-        for d in dsts {
-            term.write_line(&d.path().to_string_lossy()).unwrap();
+        match target {
+            DestinationsTarget::Sd => no_frills_list_destinations::<bb_flasher::sd::Target>().await,
+            #[cfg(feature = "bcf_cc1352p7")]
+            DestinationsTarget::Bcf => {
+                no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>().await
+            }
+            #[cfg(feature = "bcf_msp430")]
+            DestinationsTarget::Msp430 => {
+                no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>().await
+            }
+            #[cfg(feature = "pb2_mspm0")]
+            DestinationsTarget::Pb2Mspm0 => {
+                no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>().await
+            }
         }
         return;
     }
+
+    let term = console::Term::stdout();
 
     match target {
         DestinationsTarget::Sd => {
@@ -194,7 +211,8 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
             const SIZE_HEADER: &str = "Size (in G)";
             const BYTES_IN_GB: u64 = 1024 * 1024 * 1024;
 
-            let dsts_str: Vec<_> = dsts
+            let dsts_str: Vec<_> = bb_flasher::sd::Target::destinations()
+                .await
                 .into_iter()
                 .map(|x| {
                     (
@@ -255,10 +273,17 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
 
             term.write_line(&table_border).unwrap();
         }
-        _ => {
-            for d in dsts {
-                term.write_line(d.to_string().as_str()).unwrap();
-            }
+        #[cfg(feature = "bcf_msp430")]
+        DestinationsTarget::Msp430 => {
+            no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>().await
+        }
+        #[cfg(feature = "bcf_cc1352p7")]
+        DestinationsTarget::Bcf => {
+            no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>().await
+        }
+        #[cfg(feature = "pb2_mspm0")]
+        DestinationsTarget::Pb2Mspm0 => {
+            no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>().await
         }
     }
 }
@@ -284,16 +309,4 @@ fn generate_completion(target: clap_complete::Shell) {
     const BIN_NAME: &str = env!("CARGO_PKG_NAME");
 
     clap_complete::generate(target, &mut cmd, BIN_NAME, &mut std::io::stdout())
-}
-
-impl From<DestinationsTarget> for bb_imager::Flasher {
-    fn from(value: DestinationsTarget) -> Self {
-        match value {
-            DestinationsTarget::Bcf => Self::BeagleConnectFreedom,
-            DestinationsTarget::Sd => Self::SdCard,
-            DestinationsTarget::Msp430 => Self::Msp430Usb,
-            #[cfg(feature = "pb2_mspm0")]
-            DestinationsTarget::Pb2Mspm0 => Self::Pb2Mspm0,
-        }
-    }
 }

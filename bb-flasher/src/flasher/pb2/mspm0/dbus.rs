@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
 use futures::{StreamExt, channel::mpsc};
 use thiserror::Error;
@@ -45,18 +45,16 @@ pub(crate) trait Pocketbeagle2Mspm0 {
     fn status(&self, message: &str) -> zbus::Result<()>;
 }
 
-pub(crate) async fn possible_devices() -> HashSet<crate::Destination> {
+pub(crate) async fn destinations() -> (String, PathBuf) {
     if let Ok(connection) = zbus::Connection::system().await {
         if let Ok(proxy) = Pocketbeagle2Mspm0Proxy::new(&connection).await {
             if let Ok((name, path, _)) = proxy.device().await {
-                return HashSet::from([crate::Destination::File(name, PathBuf::from(path))]);
+                return (name, PathBuf::from(path));
             }
         }
     }
 
-    tracing::error!("Maybe bb-imager-service is not installed");
-
-    HashSet::new()
+    panic!("Maybe bb-imager-service is not installed");
 }
 
 pub(crate) async fn flash(

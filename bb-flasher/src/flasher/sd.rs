@@ -1,20 +1,69 @@
-//! Provide functionality to flash images to sd card
+//! Flash Linux Os Images to SD Cards with optioinal post-install customization.
+//!
+//! Post-install customization is only available for [BeagleBoard.org] images
+//!
+//! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
-use crate::{BBFlasher, DownloadFlashingStatus};
+use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, ImageFile};
 use futures::StreamExt;
 
 use bb_flasher_sd::Error;
 
-pub(crate) fn destinations() -> std::collections::HashSet<crate::Destination> {
-    bb_flasher_sd::devices()
-        .into_iter()
-        .map(|x| crate::Destination::sd_card(x.name, x.size, x.path))
-        .collect()
+/// SD Card
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct Target(bb_flasher_sd::Device);
+
+impl Target {
+    fn destinations_internal() -> std::collections::HashSet<Self> {
+        bb_flasher_sd::devices().into_iter().map(Self).collect()
+    }
+
+    /// SD Card size in bytes
+    pub const fn size(&self) -> u64 {
+        self.0.size
+    }
 }
 
-#[derive(Clone, Debug)]
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.name.fmt(f)
+    }
+}
+
+impl TryFrom<PathBuf> for Target {
+    type Error = std::io::Error;
+
+    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
+        Self::destinations_internal()
+            .into_iter()
+            .find(|x| x.0.path == value)
+            .ok_or(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "SD Card target not found",
+            ))
+    }
+}
+
+impl BBFlasherTarget for Target {
+    const FILE_TYPES: &[&str] = &["img", "xz"];
+
+    async fn destinations() -> std::collections::HashSet<Self> {
+        Self::destinations_internal()
+    }
+
+    fn is_destination_selectable() -> bool {
+        true
+    }
+
+    fn path(&self) -> &std::path::Path {
+        &self.0.path
+    }
+}
+
+/// Linux Image post-install customization options. Only work on BeagleBoard.org images.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FlashingSdLinuxConfig {
     verify: bool,
     customization: bb_flasher_sd::Customization,
@@ -52,15 +101,17 @@ impl From<bb_flasher_sd::Status> for crate::DownloadFlashingStatus {
     }
 }
 
-pub struct LinuxSdFormat(PathBuf);
+/// Flasher to format SD Cards
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FormatFlasher(PathBuf);
 
-impl LinuxSdFormat {
-    pub const fn new(p: PathBuf) -> Self {
-        Self(p)
+impl FormatFlasher {
+    pub fn new(p: Target) -> Self {
+        Self(p.0.path)
     }
 }
 
-impl BBFlasher for LinuxSdFormat {
+impl BBFlasher for FormatFlasher {
     async fn flash(
         self,
         _: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
@@ -76,28 +127,35 @@ impl BBFlasher for LinuxSdFormat {
     }
 }
 
-pub struct LinuxSd<I: crate::img::ImageFile> {
+/// Flasher of flashing Os Images to SD Card
+///
+/// # Supported Images
+///
+/// - img: Raw images
+/// - xz: Xz compressed raw images
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Flasher<I: ImageFile> {
     img: I,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<I> LinuxSd<I>
+impl<I> Flasher<I>
 where
-    I: crate::img::ImageFile,
+    I: ImageFile,
 {
-    pub const fn new(img: I, dst: PathBuf, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(img: I, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
             img,
-            dst,
+            dst: dst.0.path,
             customization,
         }
     }
 }
 
-impl<I> BBFlasher for LinuxSd<I>
+impl<I> BBFlasher for Flasher<I>
 where
-    I: crate::img::ImageFile + Send + 'static,
+    I: ImageFile + Send + 'static,
 {
     async fn flash(
         self,

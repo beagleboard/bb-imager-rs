@@ -31,12 +31,12 @@ impl ExtraImageEntry {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct ImageSelectionPage {
-    pub(crate) flasher: bb_imager::Flasher,
+    pub(crate) flasher: config::Flasher,
     pub(crate) idx: Vec<usize>,
 }
 
 impl ImageSelectionPage {
-    pub(crate) fn new(flasher: bb_imager::Flasher) -> Self {
+    pub(crate) fn new(flasher: config::Flasher) -> Self {
         Self {
             flasher,
             idx: Vec::with_capacity(3),
@@ -177,19 +177,19 @@ impl ImageSelectionPage {
                 item.icon.clone(),
                 &item.name,
                 &item.description,
-                self.push_screen(helpers::flasher_into(item.flasher), idx),
+                self.push_screen(item.flasher, idx),
             ),
             config::OsListItem::RemoteSubList(item) => internal(
                 downloader,
                 item.icon.clone(),
                 &item.name,
                 &item.description,
-                self.push_screen(helpers::flasher_into(item.flasher), idx),
+                self.push_screen(item.flasher, idx),
             ),
         }
     }
 
-    fn push_screen(&self, flasher: bb_imager::Flasher, id: usize) -> BBImagerMessage {
+    fn push_screen(&self, flasher: config::Flasher, id: usize) -> BBImagerMessage {
         let mut idx = self.idx.clone();
         idx.push(id);
         BBImagerMessage::PushScreen(super::Screen::ImageSelection(Self { flasher, idx }))

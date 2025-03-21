@@ -3,7 +3,7 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use crate::{
-    helpers::{BoardImage, Boards, ProgressBarState},
+    helpers::{BoardImage, Boards, Destination, ProgressBarState},
     pages::{Screen, configuration::FlashingCustomization},
 };
 
@@ -16,11 +16,11 @@ pub(crate) enum BBImagerMessage {
     },
     BoardSelected(usize),
     SelectImage(BoardImage),
-    SelectLocalImage(bb_imager::Flasher),
-    SelectPort(bb_imager::Destination),
+    SelectLocalImage(bb_config::config::Flasher),
+    SelectPort(Destination),
     ProgressBar(ProgressBarState),
     Search(String),
-    Destinations(HashSet<bb_imager::Destination>),
+    Destinations(HashSet<Destination>),
     Reset,
 
     StartFlashing,

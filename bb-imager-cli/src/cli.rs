@@ -53,6 +53,7 @@ pub enum Commands {
 #[derive(Subcommand, Debug)]
 pub enum TargetCommands {
     /// Flash BeagleConnect Freedom.
+    #[cfg(feature = "bcf_cc1352p7")]
     Bcf {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: PathBuf,
@@ -107,6 +108,7 @@ pub enum TargetCommands {
         wifi_password: Option<String>,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
+    #[cfg(feature = "bcf_msp430")]
     Msp430 {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: PathBuf,
@@ -129,10 +131,12 @@ pub enum TargetCommands {
 #[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum DestinationsTarget {
     /// BeagleConnect Freedom targets.
+    #[cfg(feature = "bcf_cc1352p7")]
     Bcf,
     /// SD card targets for BeagleBoard devices.
     Sd,
     /// MSP430 targets
+    #[cfg(feature = "bcf_msp430")]
     Msp430,
     /// Pocketbeagle2 MSPM0
     #[cfg(feature = "pb2_mspm0")]

@@ -25,6 +25,8 @@ _EXE_DIR := if os() == 'linux' { executable_directory() } else { '' }
 
 RUST_BUILDER := env("RUST_BUILDER", _CARGO_PATH)
 PB2_MSPM0 := env("PB2_MSPM0", '0')
+BCF_CC1352 := env("BCF_CC1352", '0')
+BCF_MSP430 := env("BCF_MSP430", '0')
 APPIMAGETOOL := env("APPIMAGETOOL", which('appimagetool'))
 VERSION := env('VERSION', shell('grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/"'))
 

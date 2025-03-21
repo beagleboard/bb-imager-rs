@@ -110,7 +110,7 @@ pub fn devices() -> std::collections::HashSet<Device> {
         .collect()
 }
 
-#[derive(Hash, Debug, PartialEq, Eq)]
+#[derive(Hash, Debug, PartialEq, Eq, Clone)]
 /// SD Card
 pub struct Device {
     pub name: String,
