@@ -12,5 +12,5 @@ _deb_prechecks:
 [group('housekeeping')]
 check:
     @echo "Run clippy checks"
-    {{ RUST_BUILDER }} clippy --all-targets --all-features --no-deps --workspace
+    {{ RUST_BUILDER }} clippy --all-targets --all-features --no-deps --workspace {{ _RUST_FLAGS }}
 

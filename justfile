@@ -2,14 +2,6 @@
 
 set unstable := true
 
-import 'scripts/checks.just'
-import 'scripts/setup.just'
-import 'scripts/packaging.just'
-import 'scripts/release.just'
-import 'bb-imager-gui/justfile'
-import 'bb-imager-cli/justfile'
-import 'bb-imager-service/justfile'
-
 [private]
 _CARGO_PATH := which("cargo")
 [private]
@@ -29,6 +21,17 @@ BCF_CC1352 := env("BCF_CC1352", '0')
 BCF_MSP430 := env("BCF_MSP430", '0')
 APPIMAGETOOL := env("APPIMAGETOOL", which('appimagetool'))
 VERSION := env('VERSION', shell('grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/"'))
+VERBOSE := env('VERBOSE', '0')
+_RUST_FLAGS := if VERBOSE == '1' { '--verbose' } else { '' }
+
+import 'scripts/checks.just'
+import 'scripts/setup.just'
+import 'scripts/packaging.just'
+import 'scripts/release.just'
+import 'bb-imager-gui/justfile'
+import 'bb-imager-cli/justfile'
+import 'bb-imager-service/justfile'
+
 
 # default recipe to display help information
 default:
@@ -38,7 +41,7 @@ default:
 [group('housekeeping')]
 test:
     @echo "Run workspace tests"
-    {{ RUST_BUILDER }} test --workspace
+    {{ RUST_BUILDER }} test --workspace {{ _RUST_FLAGS }}
 
 # Clean Artifacts
 [group('housekeeping')]

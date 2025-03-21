@@ -1,0 +1,27 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      VERBOSE: 1
+    steps:
+    - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v3
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends libudev-dev
+    - name: Run clippy
+      run: just check
+    - name: Run tests
+      run: just test
