@@ -48,6 +48,8 @@ bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 icons = ["assets/icons/icon.*"]
 category = "DeveloperTool"
 identifier = "org.beagleboard.imagingutility"
+out_dir = "dist"
+product_name = "BeagleBoard Imaging Utility"
 
 [package.metadata.packager.deb]
 files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-beagle.rules" }
