@@ -1,0 +1,25 @@
+name: Run PR Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends libudev-dev
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features --no-deps --workspace --verbose
+    - name: Run tests
+      run: cargo test --all-targets --all-features --workspace --verbose
