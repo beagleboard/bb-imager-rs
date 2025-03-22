@@ -63,7 +63,7 @@ jobs:
             # cargo packager does not seem to work with appimage on arm32 right now
             formats: -f deb
             features: -F bcf_msp430 -F bcf_cc1352p7
-    name: Release - ${{ matrix.platform.os-name }}
+    name: Build Artifacts - ${{ matrix.platform.os-name }}
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
     - name: Checkout
@@ -110,7 +110,7 @@ jobs:
     - name: Create Portable Executable
       run: |
         VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
-        cp target/x86_64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_{{VERSION}}_x86_64.exe
+        cp target/x86_64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_x86_64.exe
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
@@ -139,7 +139,8 @@ jobs:
     - name: Create Portable Executable
       run: |
         VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
-        cp target/aarch64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_{{VERSION}}_aarch64.exe
+        mkdir -p bb-imager-gui/dist
+        cp target/aarch64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_aarch64.exe
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
