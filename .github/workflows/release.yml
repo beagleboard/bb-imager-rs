@@ -1,0 +1,49 @@
+name: Create Release artifacts
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-packages:
+    name: Build Artifacts - ${{ matrix.platform.os-name }}
+    strategy:
+      matrix:
+        platform:
+          - os-name: Linux-x86_64
+            runs-on: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+
+          - os-name: Linux-aarch64
+            runs-on: ubuntu-24.04
+            target: aarch64-unknown-linux-gnu
+
+          - os-name: Linux-arm
+            runs-on: ubuntu-24.04
+            target: armv7-unknown-linux-gnueabihf
+
+    runs-on: ${{ matrix.platform.runs-on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430"
+          strip: true
+      - name: Install Cargo packager
+        run: cargo install cargo-packager --locked
+      - name: Create packages
+        run: cargo packager -p bb-imager-gui -f appimage -f deb -f pacman -r
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: Continuous Release
+          tag_name: continuous-release
+          files: bb-imager-gui/dist/*
