@@ -51,6 +51,10 @@ identifier = "org.beagleboard.imagingutility"
 out_dir = "dist"
 product_name = "BeagleBoard Imaging Utility"
 
+[package.metadata.packager.wix]
+banner_path = "assets/icons/installer_banner.png"
+dialog_image_path = "assets/icons/dialog_image.png"
+
 [package.metadata.packager.deb]
 files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-beagle.rules" }
 

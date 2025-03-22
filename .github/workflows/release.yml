@@ -7,13 +7,25 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linux-native:
     strategy:
       matrix:
-        os: [ ubuntu-24.04, ubuntu-24.04-arm ]
-    name: Build Artifacts - ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+        platform:
+          - os-name: Linux aarch64
+            runs-on: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+
+          - os-name: Linux x86_64
+            runs-on: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+
+    name: Build Artifacts - ${{ matrix.platform.os-name }}
+    runs-on: ${{ matrix.platform.runs-on }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -30,9 +42,9 @@ jobs:
     - name: Install Cargo packager
       run: cargo install cargo-packager --locked
     - name: Build GUI Binary
-      run: cargo build --locked --release -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430
+      run: cargo build --locked --release -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430 --target ${{ matrix.platform.target }}
     - name: Create packages
-      run: cargo packager -p bb-imager-gui -r -f appimage -f deb
+      run: cargo packager -p bb-imager-gui -r -f appimage -f deb --target ${{ matrix.platform.target }}
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
@@ -51,7 +63,6 @@ jobs:
             # cargo packager does not seem to work with appimage on arm32 right now
             formats: -f deb
             features: -F bcf_msp430 -F bcf_cc1352p7
-
     name: Release - ${{ matrix.platform.os-name }}
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
@@ -70,6 +81,36 @@ jobs:
       run: cargo install cargo-packager --locked
     - name: Create packages
       run: cargo packager -p bb-imager-gui -r ${{ matrix.platform.formats }} --target ${{ matrix.platform.target }}
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        prerelease: true
+        name: Continuous Release
+        tag_name: continuous-release
+        files: bb-imager-gui/dist/*
+
+  windows-x86_64:
+    name: Build Artifacts - Windows
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Install Cargo packager
+      run: cargo install cargo-packager --locked
+    - name: Build GUI Binary
+      run: cargo build --locked --release -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430 --target x86_64-pc-windows-msvc
+    - name: Create Installer
+      run: cargo packager -p bb-imager-gui -r -f wix --target x86_64-pc-windows-msvc
+    - name: Create Portable Executable
+      run: |
+        VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
+        cp target/x86_64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_{{VERSION}}_x86_64.exe
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
