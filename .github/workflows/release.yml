@@ -147,3 +147,34 @@ jobs:
         name: Continuous Release
         tag_name: continuous-release
         files: bb-imager-gui/dist/*
+
+  macos:
+    strategy:
+      matrix:
+        arch: [aarch64, x86_64]
+    name: Build Artifacts - MacOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+    - name: Add ${{ matrix.arch }} target
+      run:  rustup target add ${{ matrix.arch }}-apple-darwin
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Install Cargo packager
+      run: cargo install cargo-packager --locked
+    - name: Build GUI Binary
+      run: cargo build --locked -r -p bb-imager-gui --target ${{ matrix.arch }}-apple-darwin
+    - name: Create dmg
+      run: cargo packager -p bb-imager-gui -r -f dmg --target ${{ matrix.arch }}-apple-darwin
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        prerelease: true
+        name: Continuous Release
+        tag_name: continuous-release
+        files: bb-imager-gui/dist/*
