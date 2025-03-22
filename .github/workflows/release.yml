@@ -90,7 +90,7 @@ jobs:
         files: bb-imager-gui/dist/*
 
   windows-x86_64:
-    name: Build Artifacts - Windows
+    name: Build Artifacts - Windows x86_64
     runs-on: windows-latest
     steps:
     - name: Checkout
@@ -111,6 +111,35 @@ jobs:
       run: |
         VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
         cp target/x86_64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_{{VERSION}}_x86_64.exe
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        prerelease: true
+        name: Continuous Release
+        tag_name: continuous-release
+        files: bb-imager-gui/dist/*
+
+  # Building installer does not work for aarch64 right now. So only portable exe for now
+  windows-aarch64:
+    name: Build Artifacts - Windows aarch64
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+    - name: Add aarch64 target
+      run:  rustup target add aarch64-pc-windows-msvc
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Build GUI Binary
+      run: cargo build --locked -r -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430 --target aarch64-pc-windows-msvc
+    - name: Create Portable Executable
+      run: |
+        VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
+        cp target/aarch64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_{{VERSION}}_aarch64.exe
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
