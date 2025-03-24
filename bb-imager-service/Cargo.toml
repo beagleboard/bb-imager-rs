@@ -16,11 +16,21 @@ serde_json = "1.0.139"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
-[package.metadata.deb]
-assets = [
-	["target/release/bb-imager-service", "/usr/bin/bb-imager-service", "755"],
-	["assets/dbus-org.beagleboard.ImagingService.service", "/usr/lib/systemd/system/dbus-org.beagleboard.ImagingService.service", "644"],
-	["assets/org.beagleboard.ImagingService.conf", "/usr/share/dbus-1/system.d/org.beagleboard.ImagingService.conf", "644"],
-	["assets/org.beagleboard.ImagingService.policy", "/usr/share/polkit-1/actions/org.beagleboard.ImagingService.policy", "644"],
-	["assets/org.beagleboard.ImagingService.service", "/usr/share/dbus-1/system-services/org.beagleboard.ImagingService.service", "644"]
-]
+[package.metadata.packager]
+category = "DeveloperTool"
+out_dir = "dist"
+
+[package.metadata.packager.linux]
+generate_desktop_entry = false
+
+[package.metadata.packager.deb.files]
+"assets/dbus-org.beagleboard.ImagingService.service" = "/usr/lib/systemd/system/dbus-org.beagleboard.ImagingService.service"
+"assets/org.beagleboard.ImagingService.conf" = "/usr/share/dbus-1/system.d/org.beagleboard.ImagingService.conf"
+"assets/org.beagleboard.ImagingService.policy" = "/usr/share/polkit-1/actions/org.beagleboard.ImagingService.policy"
+"assets/org.beagleboard.ImagingService.service" = "/usr/share/dbus-1/system-services/org.beagleboard.ImagingService.service"
+
+[package.metadata.packager.pacman.files]
+"assets/dbus-org.beagleboard.ImagingService.service" = "/usr/lib/systemd/system/dbus-org.beagleboard.ImagingService.service"
+"assets/org.beagleboard.ImagingService.conf" = "/usr/share/dbus-1/system.d/org.beagleboard.ImagingService.conf"
+"assets/org.beagleboard.ImagingService.policy" = "/usr/share/polkit-1/actions/org.beagleboard.ImagingService.policy"
+"assets/org.beagleboard.ImagingService.service" = "/usr/share/dbus-1/system-services/org.beagleboard.ImagingService.service"

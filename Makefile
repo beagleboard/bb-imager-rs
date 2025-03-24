@@ -29,14 +29,17 @@ ifeq (${VERBOSE}, 1)
 	_CARGO_PACKAGER_ARGS+=--verbose
 endif
 
+_RUST_ARGS_CLI_GUI = ${_RUST_ARGS}
+_RUST_ARGS_SERVICE = ${_RUST_ARGS}
+
 ifeq (${PB2_MSPM0}, 1)
-	_RUST_ARGS+=-F pb2_mspm0
+	_RUST_ARGS_CLI_GUI+=-F pb2_mspm0
 endif
 ifeq (${BCF_CC1352P7}, 1)
-	_RUST_ARGS+=-F bcf_cc1352p7
+	_RUST_ARGS_CLI_GUI+=-F bcf_cc1352p7
 endif
 ifeq (${BCF_MSP430}, 1)
-	_RUST_ARGS+=-F bcf_msp430
+	_RUST_ARGS_CLI_GUI+=-F bcf_msp430
 endif
 
 ## housekeeping: help: Display this help message
@@ -52,6 +55,7 @@ clean:
 	rm -rf target
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
+	rm -rf bb-imager-service/dist
 
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
@@ -72,12 +76,13 @@ ifeq (${NO_BUILD}, 1)
 	@echo "Skip Building GUI"
 else
 	@echo "Building GUI"
-	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS}
+	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_CLI_GUI}
 endif
 
 ## run: run-gui: Run GUI for quick testing on host.
 .PHONY: run-gui
 run-gui:
+	@echo "Running GUI"
 	$(CARGO_PATH) run -p bb-imager-gui
 
 ## build: build-cli: Build CLI. Target platform can be changed using TARGET env variable.
@@ -87,13 +92,25 @@ ifeq (${NO_BUILD}, 1)
 	@echo "Skip Building CLI"
 else
 	@echo "Building CLI"
-	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS}
+	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS_CLI_GUI}
 endif
 
 ## run: run-cli: Run CLI for quick testing on host.
 .PHONY: run-cli
 run-cli:
+	@echo "Running CLI"
 	$(CARGO_PATH) run -p bb-imager-cli
+
+## build: build-service: Build BeagleBoard Service. Target platform can be changed using TARGET env variable.
+.PHONY: build-service
+build-service:
+ifeq (${NO_BUILD}, 1)
+	@echo "Skip Building SERVICE"
+else
+	@echo "Building Service"
+	$(RUST_BUILDER) build -r -p bb-imager-service --target ${TARGET} ${_RUST_ARGS_SERVICE}
+endif
+
 
 ## build: build-cli-manpage: Build manpage for CLI.
 .PHONY: build-cli-manpage
@@ -101,7 +118,7 @@ build-cli-manpage:
 	@echo "Generate CLI Manpages"
 	rm -rf bb-imager-cli/dist/.target/man
 	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-man bb-imager-cli/dist/.target/man/
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-man bb-imager-cli/dist/.target/man/
 	gzip bb-imager-cli/dist/.target/man/*
 
 
@@ -111,8 +128,8 @@ build-cli-shell-comp:
 	@echo "Generate CLI completion"
 	rm -rf bb-imager-cli/dist/.target/shell-comp
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
 
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage
@@ -132,6 +149,12 @@ package-cli-linux-deb: build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as deb"
 	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
+## package: package-service-linux-deb: Build Debian package for Service
+.PHONY: package-service-linux-deb
+package-service-linux-deb: build-service
+	@echo "Packaging Service as deb"
+	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
+
 ## package: package-gui-linux-targz: Build generic linux package for GUI
 .PHONY: package-gui-linux-targz
 package-gui-linux-targz: build-gui
@@ -145,6 +168,13 @@ package-cli-linux-targz: build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as generic linux tar.gz"
 	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-cli/dist/PKGBUILD
+
+## package: package-service-linux-targz: Build generic Linux package for Service
+.PHONY: package-service-linux-targz
+package-service-linux-targz: build-service
+	@echo "Packaging Service as generic linux tar.gz"
+	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
+	rm bb-imager-service/dist/PKGBUILD
 
 ## package: package-gui-windows-portable: Build portable Windows exe package for GUI
 .PHONY: package-gui-windows-portable

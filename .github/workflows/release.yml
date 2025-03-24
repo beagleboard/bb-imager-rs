@@ -17,19 +17,19 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os-name: Linux aarch64
+          - os-name: Linux x86_64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
             bcf: 1
-            pb2: 1
+            pb2: 0
 
-          - os-name: Linux x86_64
+          - os-name: Linux aarch64
             runs-on: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
+            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb package-service-linux-targz package-service-linux-deb
             bcf: 1
-            pb2: 0
+            pb2: 1
 
           - os-name: Windows aarch64
             runs-on: windows-latest
@@ -90,6 +90,7 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
+          bb-imager-service/dist/*
 
   linux-cross:
     strategy:
