@@ -39,19 +39,31 @@ ifeq (${BCF_MSP430}, 1)
 	_RUST_ARGS+=-F bcf_msp430
 endif
 
-## default: help: Display this help message
+## housekeeping: help: Display this help message
 .PHONY: help
 help:
 	@python scripts/make_help.py Makefile
 
-## default: clean: Clean the project files
+## housekeeping: clean: Clean the project files
 .PHONY: clean
 clean:
 	@echo "Cleaning the project..."
-	${CARGO_PATH} clean
+	$(CARGO_PATH) clean
 	rm -rf target
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
+
+## housekeeping: checks: Run code quality checks.
+.PHONY: checks
+checks:
+	@echo "Running clippy checks"
+	$(CARGO_PATH) clippy --all-targets --all-features --no-deps --workspace ${_RUST_ARGS}
+
+## housekeeping: test: Run tests on workspace
+.PHONY: test
+test:
+	@echo "Run workspace tests"
+	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS}
 
 ## build: build-gui: Build GUI. Target platform can be changed using TARGET env variable.
 .PHONY: build-gui
@@ -60,8 +72,13 @@ ifeq (${NO_BUILD}, 1)
 	@echo "Skip Building GUI"
 else
 	@echo "Building GUI"
-	${RUST_BUILDER} build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS}
+	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS}
 endif
+
+## run: run-gui: Run GUI for quick testing on host.
+.PHONY: run-gui
+run-gui:
+	$(CARGO_PATH) run -p bb-imager-gui
 
 ## build: build-cli: Build CLI. Target platform can be changed using TARGET env variable.
 .PHONY: build-cli
@@ -70,8 +87,13 @@ ifeq (${NO_BUILD}, 1)
 	@echo "Skip Building CLI"
 else
 	@echo "Building CLI"
-	${RUST_BUILDER} build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS}
+	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS}
 endif
+
+## run: run-cli: Run CLI for quick testing on host.
+.PHONY: run-cli
+run-cli:
+	$(CARGO_PATH) run -p bb-imager-cli
 
 ## build: build-cli-manpage: Build manpage for CLI.
 .PHONY: build-cli-manpage
@@ -79,7 +101,7 @@ build-cli-manpage:
 	@echo "Generate CLI Manpages"
 	rm -rf bb-imager-cli/dist/.target/man
 	mkdir -p bb-imager-cli/dist/.target/man
-	${CARGO_PATH} xtask ${_RUST_ARGS} cli-man bb-imager-cli/dist/.target/man/
+	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-man bb-imager-cli/dist/.target/man/
 	gzip bb-imager-cli/dist/.target/man/*
 
 
@@ -89,39 +111,39 @@ build-cli-shell-comp:
 	@echo "Generate CLI completion"
 	rm -rf bb-imager-cli/dist/.target/shell-comp
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	${CARGO_PATH} xtask ${_RUST_ARGS} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
-	${CARGO_PATH} xtask ${_RUST_ARGS} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
 
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage
 package-gui-linux-appimage: build-gui
 	@echo "Packaging GUI as appimage"
-	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f appimage ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f appimage ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-linux-deb: Build Debian package for GUI
 .PHONY: package-gui-linux-deb
 package-gui-linux-deb: build-gui
 	@echo "Packaging GUI as deb"
-	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-cli-linux-deb: Build Debian package for CLI
 .PHONY: package-cli-linux-deb
 package-cli-linux-deb: build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as deb"
-	${CARGO_PATH} packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-linux-targz: Build generic linux package for GUI
 .PHONY: package-gui-linux-targz
 package-gui-linux-targz: build-gui
 	@echo "Packaging GUI as generic linux tar.gz"
-	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-gui/dist/PKGBUILD
 
 ## package: package-cli-linux-targz: Build generic linux package for CLI
 .PHONY: package-cli-linux-targz
 package-cli-linux-targz: build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as generic linux tar.gz"
-	${CARGO_PATH} packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-cli/dist/PKGBUILD
 
 ## package: package-gui-windows-portable: Build portable Windows exe package for GUI
@@ -135,13 +157,13 @@ package-gui-windows-portable: build-gui
 .PHONY: package-gui-windows-wix
 package-gui-windows-wix: build-gui
 	@echo "Packaging GUI as windows installer"
-	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f wix ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f wix ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-macos-dmg: Build MacOS DMG package for GUI
 .PHONY: package-gui-macos-dmg
 package-gui-macos-dmg: build-gui
 	@echo "Packaging GUI as deb"
-	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f dmg ${_CARGO_PACKAGER_ARGS}
+	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f dmg ${_CARGO_PACKAGER_ARGS}
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
@@ -154,4 +176,4 @@ setup-debian-deps:
 .PHONY: setup-packaging-deps
 setup-packaging-deps:
 	@echo "Installing dependencies required for packaging"
-	cargo install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch cli
+	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch cli

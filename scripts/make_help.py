@@ -2,6 +2,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 
 
+YELLOW = "\033[33m"
 BLUE = "\033[34m"
 RESET = "\033[0m"
 
@@ -36,7 +37,7 @@ def create_help(files: list[Path]) -> dict[str, list[tuple[str, str]]]:
 
 def print_help(res: dict[str, list[tuple[str, str]]]):
     for grp, targets in res.items():
-        print(f"[{grp}]")
+        print(f"    {YELLOW}[{grp}]{RESET}")
         for cmd, val in targets:
             print(f"    {cmd: <32}{BLUE}# {val}{RESET}")
         print()
