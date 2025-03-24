@@ -21,6 +21,8 @@ BCF_MSP430 ?= 0
 VERBOSE ?= 0
 ## variable: TARGET: Package Target platform. Defaults to Host target.
 TARGET ?= ${_HOST_TARGET}
+## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
+NO_BUILD ?= 0
 
 ifeq (${VERBOSE}, 1)
 	_RUST_ARGS+=--verbose
@@ -54,8 +56,12 @@ clean:
 ## build: build-gui: Build GUI. Target platform can be changed using TARGET env variable.
 .PHONY: build-gui
 build-gui:
+ifeq (${NO_BUILD}, 1)
+	@echo "Skip Building GUI"
+else
 	@echo "Building GUI"
 	${RUST_BUILDER} build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS}
+endif
 
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage
