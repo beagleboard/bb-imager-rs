@@ -53,9 +53,9 @@ clean:
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
 
-## housekeeping: checks: Run code quality checks.
-.PHONY: checks
-checks:
+## housekeeping: check: Run code quality checks.
+.PHONY: check
+check:
 	@echo "Running clippy checks"
 	$(CARGO_PATH) clippy --all-targets --all-features --no-deps --workspace ${_RUST_ARGS}
 
