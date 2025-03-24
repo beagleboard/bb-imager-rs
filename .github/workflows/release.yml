@@ -19,16 +19,44 @@ jobs:
           - os-name: Linux aarch64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            make-targets: setup-debian-deps setup-packaging-deps package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
+            bcf: 1
 
           - os-name: Linux x86_64
             runs-on: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            make-targets: setup-debian-deps setup-packaging-deps package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
+            bcf: 1
+
+          - os-name: Windows aarch64
+            runs-on: windows-latest
+            target: aarch64-pc-windows-msvc
+            make-targets: setup-packaging-deps package-gui-windows-portable
+            bcf: 1
+
+          - os-name: Windows x86_64
+            runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+            make-targets: setup-packaging-deps package-gui-windows-wix package-gui-windows-portable
+            bcf: 1
+
+          - os-name: MacOS aarch64
+            runs-on: macos-latest
+            target: aarch64-apple-darwin
+            make-targets: setup-packaging-deps package-gui-macos-dmg
+            bcf: 0
+
+          - os-name: MacOS x86_64
+            runs-on: macos-latest
+            target: x86_64-apple-darwin
+            make-targets: setup-packaging-deps package-gui-macos-dmg
+            bcf: 0
 
     name: Build Artifacts - ${{ matrix.platform.os-name }}
     runs-on: ${{ matrix.platform.runs-on }}
     env:
-      BCF_CC1352P7: 1
-      BCF_MSP430: 1
+      BCF_CC1352P7: ${{ matrix.platform.bcf }}
+      BCF_MSP430: ${{ matrix.platform.bcf }}
       TARGET: ${{ matrix.platform.target }}
       VERBOSE: 1
     steps:
@@ -36,16 +64,14 @@ jobs:
       uses: actions/checkout@v4
       with:
         lfs: true
-    - name: Install dependencies
-      run: make setup-debian-deps
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
+    - name: Add ${{ matrix.platform.target }} target
+      run:  rustup target add ${{ matrix.platform.target }}
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-    - name: Install Cargo packager
-      run: make setup-packaging-deps
     - name: Build packages
-      run: make package-gui-linux-deb package-gui-linux-targz package-gui-linux-appimage
+      run: make ${{ matrix.platform.make-targets }}
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
@@ -86,97 +112,6 @@ jobs:
     # Additionally, I am building for multiple targets.
     - name: Delete PKGBUILD
       run: rm bb-imager-gui/dist/PKGBUILD
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: bb-imager-gui/dist/*
-
-  windows-x86_64:
-    name: Build Artifacts - Windows x86_64
-    runs-on: windows-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        lfs: true
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-    - name: Use caching
-      uses: Swatinem/rust-cache@v2
-    - name: Install Cargo packager
-      run: cargo install cargo-packager --locked
-    - name: Build GUI Binary
-      run: cargo build --locked --release -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430 --target x86_64-pc-windows-msvc
-    - name: Create Installer
-      run: cargo packager -p bb-imager-gui -r -f wix --target x86_64-pc-windows-msvc
-    - name: Create Portable Executable
-      run: |
-        VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
-        cp target/x86_64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_x86_64.exe
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: bb-imager-gui/dist/*
-
-  # Building installer does not work for aarch64 right now. So only portable exe for now
-  windows-aarch64:
-    name: Build Artifacts - Windows aarch64
-    runs-on: windows-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        lfs: true
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-    - name: Add aarch64 target
-      run:  rustup target add aarch64-pc-windows-msvc
-    - name: Use caching
-      uses: Swatinem/rust-cache@v2
-    - name: Build GUI Binary
-      run: cargo build --locked -r -p bb-imager-gui -F bcf_cc1352p7 -F bcf_msp430 --target aarch64-pc-windows-msvc
-    - name: Create Portable Executable
-      run: |
-        VERSION=$(grep "version =" Cargo.toml | sed "s/version = \"\(.*\)\"/\1/")
-        mkdir -p bb-imager-gui/dist
-        cp target/aarch64-pc-windows-msvc/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_aarch64.exe
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: bb-imager-gui/dist/*
-
-  macos:
-    strategy:
-      matrix:
-        arch: [aarch64, x86_64]
-    name: Build Artifacts - MacOS ${{ matrix.arch }}
-    runs-on: macos-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        lfs: true
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-    - name: Add ${{ matrix.arch }} target
-      run:  rustup target add ${{ matrix.arch }}-apple-darwin
-    - name: Use caching
-      uses: Swatinem/rust-cache@v2
-    - name: Install Cargo packager
-      run: cargo install cargo-packager --locked
-    - name: Build GUI Binary
-      run: cargo build --locked -r -p bb-imager-gui --target ${{ matrix.arch }}-apple-darwin
-    - name: Create dmg
-      run: cargo packager -p bb-imager-gui -r -f dmg --target ${{ matrix.arch }}-apple-darwin
     - name: Release
       uses: softprops/action-gh-release@v2
       with:

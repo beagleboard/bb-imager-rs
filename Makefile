@@ -83,6 +83,12 @@ package-gui-windows-portable: build-gui
 	mkdir -p bb-imager-gui/dist
 	cp target/${TARGET}/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_${_TARGET_ARCH}.exe
 
+## package: package-gui-windows-wix: Build Windows installer for GUI
+.PHONY: package-gui-windows-wix
+package-gui-windows-wix: build-gui
+	@echo "Packaging GUI as windows installer"
+	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f wix ${_CARGO_PACKAGER_ARGS}
+
 ## package: package-gui-macos-dmg: Build MacOS DMG package for GUI
 .PHONY: package-gui-macos-dmg
 package-gui-macos-dmg: build-gui
