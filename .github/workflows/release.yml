@@ -20,42 +20,42 @@ jobs:
           - os-name: Linux aarch64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            make-targets: setup-debian-deps setup-packaging-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
+            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
             bcf: 1
             pb2: 1
 
           - os-name: Linux x86_64
             runs-on: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            make-targets: setup-debian-deps setup-packaging-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
+            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-appimage package-gui-linux-deb
             bcf: 1
             pb2: 0
 
           - os-name: Windows aarch64
             runs-on: windows-latest
             target: aarch64-pc-windows-msvc
-            make-targets: setup-packaging-deps package-gui-windows-portable
+            make-targets: package-gui-windows-portable
             bcf: 1
             pb2: 0
 
           - os-name: Windows x86_64
             runs-on: windows-latest
             target: x86_64-pc-windows-msvc
-            make-targets: setup-packaging-deps package-gui-windows-wix package-gui-windows-portable
+            make-targets: package-gui-windows-wix package-gui-windows-portable
             bcf: 1
             pb2: 0
 
           - os-name: MacOS aarch64
             runs-on: macos-latest
             target: aarch64-apple-darwin
-            make-targets: setup-packaging-deps package-gui-macos-dmg
+            make-targets: package-gui-macos-dmg
             bcf: 0
             pb2: 0
 
           - os-name: MacOS x86_64
             runs-on: macos-latest
             target: x86_64-apple-darwin
-            make-targets: setup-packaging-deps package-gui-macos-dmg
+            make-targets: package-gui-macos-dmg
             bcf: 0
             pb2: 0
 
@@ -77,6 +77,8 @@ jobs:
       run:  rustup target add ${{ matrix.platform.target }}
     - name: Use caching
       uses: Swatinem/rust-cache@v2
+    - name: Install packaging deps
+      run: make setup-packaging-deps
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
     - name: Release
@@ -85,7 +87,9 @@ jobs:
         prerelease: true
         name: Continuous Release
         tag_name: continuous-release
-        files: bb-imager-gui/dist/*
+        files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
 
   linux-cross:
     strategy:
@@ -114,14 +118,18 @@ jobs:
       with:
         command: build
         target: ${{ matrix.platform.target }}
-        args: "--locked --release ${{ matrix.platform.features }} -p bb-imager-gui"
+        args: "--locked --release ${{ matrix.platform.features }} -p bb-imager-cli -p bb-imager-gui"
         strip: true
-    - name: Build package
-      run: make setup-packaging-deps package-cli-linux-targz package-cli-linux-deb package-gui-linux-targz package-gui-linux-deb 
+    - name: Install packaging deps
+      run: make setup-packaging-deps
+    - name: Build packages
+      run: make package-cli-linux-targz package-cli-linux-deb package-gui-linux-targz package-gui-linux-deb 
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
         prerelease: true
         name: Continuous Release
         tag_name: continuous-release
-        files: bb-imager-gui/dist/*
+        files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
