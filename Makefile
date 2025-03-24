@@ -63,6 +63,35 @@ else
 	${RUST_BUILDER} build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS}
 endif
 
+## build: build-cli: Build CLI. Target platform can be changed using TARGET env variable.
+.PHONY: build-cli
+build-cli:
+ifeq (${NO_BUILD}, 1)
+	@echo "Skip Building CLI"
+else
+	@echo "Building CLI"
+	${RUST_BUILDER} build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS}
+endif
+
+## build: build-cli-manpage: Build manpage for CLI.
+.PHONY: build-cli-manpage
+build-cli-manpage:
+	@echo "Generate CLI Manpages"
+	rm -rf bb-imager-cli/dist/.target/man
+	mkdir -p bb-imager-cli/dist/.target/man
+	${CARGO_PATH} xtask ${_RUST_ARGS} cli-man bb-imager-cli/dist/.target/man/
+	gzip bb-imager-cli/dist/.target/man/*
+
+
+## build: build-cli-shell-comp: Build shell completion for CLI.
+.PHONY: build-cli-shell-comp
+build-cli-shell-comp:
+	@echo "Generate CLI completion"
+	rm -rf bb-imager-cli/dist/.target/shell-comp
+	mkdir -p bb-imager-cli/dist/.target/shell-comp
+	${CARGO_PATH} xtask ${_RUST_ARGS} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	${CARGO_PATH} xtask ${_RUST_ARGS} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage
 package-gui-linux-appimage: build-gui
@@ -75,12 +104,25 @@ package-gui-linux-deb: build-gui
 	@echo "Packaging GUI as deb"
 	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
+## package: package-cli-linux-deb: Build Debian package for CLI
+.PHONY: package-cli-linux-deb
+package-cli-linux-deb: build-cli build-cli-manpage build-cli-shell-comp
+	@echo "Packaging CLI as deb"
+	${CARGO_PATH} packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
+
 ## package: package-gui-linux-targz: Build generic linux package for GUI
 .PHONY: package-gui-linux-targz
 package-gui-linux-targz: build-gui
-	@echo "Packaging GUI as deb"
+	@echo "Packaging GUI as generic linux tar.gz"
 	${CARGO_PATH} packager -p bb-imager-gui --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-gui/dist/PKGBUILD
+
+## package: package-cli-linux-targz: Build generic linux package for CLI
+.PHONY: package-cli-linux-targz
+package-cli-linux-targz: build-cli build-cli-manpage build-cli-shell-comp
+	@echo "Packaging CLI as generic linux tar.gz"
+	${CARGO_PATH} packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
+	rm bb-imager-cli/dist/PKGBUILD
 
 ## package: package-gui-windows-portable: Build portable Windows exe package for GUI
 .PHONY: package-gui-windows-portable
@@ -112,4 +154,4 @@ setup-debian-deps:
 .PHONY: setup-packaging-deps
 setup-packaging-deps:
 	@echo "Installing dependencies required for packaging"
-	cargo install cargo-packager --locked
+	cargo install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch cli

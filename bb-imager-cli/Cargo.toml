@@ -31,3 +31,16 @@ default = []
 pb2_mspm0 = [ "bb-flasher/pb2_mspm0" ]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 bcf_msp430 = ["bb-flasher/bcf_msp430"]
+
+[package.metadata.packager]
+category = "DeveloperTool"
+out_dir = "dist"
+
+[package.metadata.packager.linux]
+generate_desktop_entry = false
+
+[package.metadata.packager.deb]
+files = { "dist/.target/man" = "/usr/share/man/man1", "dist/.target/shell-comp/_bb-imager-cli" = "/usr/share/zsh/site-functions/_bb-imager-cli", "dist/.target/shell-comp/bb-imager-cli.bash" = "/usr/share/bash-completion/bb-imager-cli.bash"}
+
+[package.metadata.packager.pacman]
+files = { "dist/.target/man" = "/usr/share/man/man1", "dist/.target/shell-comp/_bb-imager-cli" = "/usr/share/zsh/site-functions/_bb-imager-cli", "dist/.target/shell-comp/bb-imager-cli.bash" = "/usr/share/bash-completion/bb-imager-cli.bash"}
