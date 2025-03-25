@@ -185,6 +185,14 @@ impl Seek for WinDrive {
     }
 }
 
+/// TODO: Implement real eject
+impl crate::helpers::Eject for WinDrive {
+    fn eject(self) -> std::io::Result<()> {
+        let _ = self.drive.sync_all();
+        Ok(())
+    }
+}
+
 pub(crate) fn format(dst: &Path) -> Result<()> {
     tracing::debug!("Trying to format {:?}", dst);
     diskpart_format(dst).map_err(|e| Error::FailedToFormat(e.to_string()))

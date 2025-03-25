@@ -6,7 +6,7 @@ use futures::channel::mpsc;
 use sha2::{Digest, Sha256};
 
 use crate::customization::Customization;
-use crate::helpers::{chan_send, check_arc, progress, sha256_reader_progress};
+use crate::helpers::{Eject, chan_send, check_arc, progress, sha256_reader_progress};
 use crate::{Error, Result, Status};
 
 fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
@@ -152,8 +152,10 @@ pub fn flash<R: Read>(
 
     if let Some(c) = customization {
         sd.seek(SeekFrom::Start(0))?;
-        c.customize(sd)?;
+        c.customize(&mut sd)?;
     }
+
+    let _ = sd.eject();
 
     Ok(())
 }

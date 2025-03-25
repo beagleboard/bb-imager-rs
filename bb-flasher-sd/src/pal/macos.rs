@@ -103,3 +103,11 @@ pub(crate) fn open(dst: &Path) -> Result<File> {
         "Authopen failed to open the file".to_string(),
     ))
 }
+
+/// TODO: Implement real eject
+impl crate::helpers::Eject for std::fs::File {
+    fn eject(self) -> std::io::Result<()> {
+        let _ = self.sync_all();
+        Ok(())
+    }
+}

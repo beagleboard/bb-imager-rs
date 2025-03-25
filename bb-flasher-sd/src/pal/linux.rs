@@ -1,6 +1,9 @@
-use crate::{Error, Result};
+use crate::{Error, Result, helpers::Eject};
 
-use std::path::Path;
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "udev")]
 use std::{
@@ -54,8 +57,8 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
 }
 
 #[cfg(feature = "udev")]
-pub(crate) fn open(dst: &Path) -> Result<std::fs::File> {
-    async fn inner(dst: &Path) -> Result<std::fs::File> {
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
+    async fn inner(dst: &Path) -> Result<LinuxDrive> {
         let dbus_client = udisks2::Client::new().await?;
 
         let devs = dbus_client
@@ -80,8 +83,13 @@ pub(crate) fn open(dst: &Path) -> Result<std::fs::File> {
             .await?;
 
         let fd = obj.open_device("rw", Default::default()).await?;
+        let file =
+            unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
-        Ok(unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) })
+        Ok(LinuxDrive {
+            file,
+            drive: dst.to_path_buf(),
+        })
     }
 
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -92,13 +100,17 @@ pub(crate) fn open(dst: &Path) -> Result<std::fs::File> {
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) fn open(dst: &Path) -> Result<std::fs::File> {
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
     std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .open(dst)
         .map_err(Into::into)
+        .map(|x| LinuxDrive {
+            file: x,
+            drive: dst.to_path_buf(),
+        })
 }
 
 #[cfg(not(feature = "udev"))]
@@ -111,5 +123,103 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
         Err(Error::FailedToFormat(
             String::from_utf8(output.stderr).unwrap(),
         ))
+    }
+}
+
+pub(crate) struct LinuxDrive {
+    file: std::fs::File,
+    drive: PathBuf,
+}
+
+#[cfg(feature = "udev")]
+impl Eject for LinuxDrive {
+    fn eject(self) -> io::Result<()> {
+        async fn inner(dst: PathBuf) -> Result<()> {
+            let dbus_client = udisks2::Client::new().await?;
+
+            let devs = dbus_client
+                .manager()
+                .resolve_device(
+                    HashMap::from([("path", dst.to_str().unwrap().into())]),
+                    HashMap::new(),
+                )
+                .await?;
+
+            let obj_path = devs
+                .first()
+                .ok_or(Error::FailedToOpenDestination(
+                    dst.to_string_lossy().to_string(),
+                ))?
+                .to_owned();
+
+            let block = dbus_client
+                .object(obj_path)
+                .expect("Unexpected error")
+                .block()
+                .await?;
+
+            dbus_client
+                .object(block.drive().await?)
+                .expect("Unexpected error")
+                .drive()
+                .await?
+                .eject(HashMap::new())
+                .await?;
+
+            Ok(())
+        }
+
+        let _ = self.file.sync_all();
+        let dst = self.drive.clone();
+
+        std::mem::drop(self);
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .unwrap();
+        rt.block_on(async move { inner(dst).await })
+            .map_err(io::Error::other)
+    }
+}
+
+#[cfg(not(feature = "udev"))]
+impl Eject for LinuxDrive {
+    fn eject(self) -> std::io::Result<()> {
+        let _ = self.file.sync_all();
+        let drive = self.drive.clone();
+        std::mem::drop(self);
+
+        let output = std::process::Command::new("eject").arg(drive).output()?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(
+                String::from_utf8(output.stderr).unwrap(),
+            ))
+        }
+    }
+}
+
+impl io::Read for LinuxDrive {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.file.read(buf)
+    }
+}
+
+impl io::Seek for LinuxDrive {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.file.seek(pos)
+    }
+}
+
+impl io::Write for LinuxDrive {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
     }
 }
