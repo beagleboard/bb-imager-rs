@@ -19,8 +19,7 @@ where
             let mut row2 = widget::column![text(x.to_string())];
 
             if let Some(size) = x.size() {
-                let s = (size as f32) / (1024.0 * 1024.0 * 1024.0);
-                row2 = row2.push(text(format!("{:.2} GB", s)));
+                row2 = row2.push(text(helpers::format_size(size)));
             }
 
             button(
