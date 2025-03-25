@@ -85,7 +85,7 @@ pub(crate) fn open(dst: &Path) -> Result<File> {
 
             for msg in result.cmsgs().expect("Unexpected error") {
                 if let ControlMessageOwned::ScmRights(scm_rights) = msg {
-                    for fd in scm_rights {
+                    if let Some(fd) = scm_rights.into_iter().next() {
                         tracing::debug!("receive file descriptor");
                         return Ok(unsafe { File::from_raw_fd(fd) });
                     }
@@ -99,5 +99,7 @@ pub(crate) fn open(dst: &Path) -> Result<File> {
 
     let _ = cmd.wait();
 
-    Err(Error::FailedToOpenDestination("Authopen failed to open the file".to_string()).into())
+    Err(Error::FailedToOpenDestination(
+        "Authopen failed to open the file".to_string(),
+    ))
 }
