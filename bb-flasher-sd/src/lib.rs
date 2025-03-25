@@ -79,7 +79,7 @@ pub enum Error {
     FailedToOpenDestination(String),
 
     #[error("Udisks2 Error: {0}")]
-    #[cfg(feature = "udev")]
+    #[cfg(all(feature = "udev", target_os = "linux"))]
     Udisks(#[from] udisks2::Error),
 
     #[cfg(windows)]
