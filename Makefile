@@ -206,4 +206,4 @@ setup-debian-deps:
 .PHONY: setup-packaging-deps
 setup-packaging-deps:
 	@echo "Installing dependencies required for packaging"
-	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch cli
+	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch bb-imager
