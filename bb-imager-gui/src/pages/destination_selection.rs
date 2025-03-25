@@ -9,7 +9,10 @@ pub(crate) fn view<'a, D>(destinations: D, search_bar: &'a str) -> Element<'a, B
 where
     D: Iterator<Item = &'a helpers::Destination>,
 {
-    let items = destinations
+    let mut sorted_destinations = Vec::from_iter(destinations);
+    sorted_destinations.sort_by(|a, b| a.size().cmp(&b.size()));
+    let items = sorted_destinations
+        .into_iter()
         .filter(|x| {
             x.to_string()
                 .to_lowercase()
