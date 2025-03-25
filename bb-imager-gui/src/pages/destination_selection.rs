@@ -10,7 +10,7 @@ where
     D: Iterator<Item = &'a helpers::Destination>,
 {
     let mut sorted_destinations = Vec::from_iter(destinations);
-    sorted_destinations.sort_by(|a, b| a.size().cmp(&b.size()));
+    sorted_destinations.sort_by_key(|a| a.size());
     let items = sorted_destinations
         .into_iter()
         .filter(|x| {

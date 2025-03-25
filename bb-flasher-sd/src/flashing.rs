@@ -37,6 +37,8 @@ fn write_sd(
     let mut buf = [0u8; 512];
     let mut pos = 0;
 
+    // Clippy warning is simply wrong here
+    #[allow(clippy::option_map_or_none)]
     chan_send(
         chan.as_mut().map_or(None, |p| Some(p)),
         Status::Flashing(0.0),
@@ -55,6 +57,8 @@ fn write_sd(
         }
 
         pos += count;
+        // Clippy warning is simply wrong here
+        #[allow(clippy::option_map_or_none)]
         chan_send(
             chan.as_mut().map_or(None, |p| Some(p)),
             Status::Flashing(progress(pos, img_size)),

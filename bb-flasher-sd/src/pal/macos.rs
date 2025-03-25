@@ -50,14 +50,14 @@ pub(crate) fn open(dst: &Path) -> Result<File> {
     let _ = Command::new("diskutil")
         .args(["unmountDisk", dst.to_str().unwrap()])
         .output()
-        .map_err(|_| Error::FailedToOpenDestination(format!("Failed to unmount disk")))?;
+        .map_err(|_| Error::FailedToOpenDestination("Failed to unmount disk".to_string()))?;
 
     let mut cmd = Command::new("/usr/libexec/authopen")
         .args(["-stdoutpipe", "-extauth", "-o", "2", dst.to_str().unwrap()])
         .stdin(Stdio::piped())
         .stdout(OwnedFd::from(pipe1))
         .spawn()
-        .map_err(|_| Error::FailedToOpenDestination(format!("Failed to open disk")))?;
+        .map_err(|_| Error::FailedToOpenDestination("Failed to open disk".to_string()))?;
 
     // Send authorization form
     let mut stdin = cmd.stdin.take().expect("Missing stdin");

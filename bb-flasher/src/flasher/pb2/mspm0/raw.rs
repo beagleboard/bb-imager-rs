@@ -17,11 +17,10 @@ pub(crate) async fn flash(
     let firmware = img.to_bytes(0..d.flash_size, None).unwrap();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_pb2_mspm0::Status>(20);
-    let task = tokio::spawn(async move {
-        bb_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom)
-            .await
-            .map(Into::into)
-    });
+    let task =
+        tokio::spawn(
+            async move { bb_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom).await },
+        );
 
     if let Some(mut chan) = chan {
         while let Some(s) = rx.recv().await {

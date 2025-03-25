@@ -94,7 +94,7 @@ fn physical_drive_to_volume(drive: &Path) -> Result<String> {
 
     let mount = desc
         .mountpoints
-        .get(0)
+        .first()
         .ok_or(Error::DriveNotFound(drive.to_string_lossy().to_string()))?;
 
     let mount_path = format!(
@@ -187,7 +187,7 @@ impl Seek for WinDrive {
 
 pub(crate) fn format(dst: &Path) -> Result<()> {
     tracing::debug!("Trying to format {:?}", dst);
-    diskpart_format(dst).map_err(|e| Error::FailedToFormat(e.to_string()).into())
+    diskpart_format(dst).map_err(|e| Error::FailedToFormat(e.to_string()))
 }
 
 pub(crate) fn open(dst: &Path) -> Result<WinDrive> {
