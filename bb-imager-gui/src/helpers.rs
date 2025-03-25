@@ -944,3 +944,22 @@ const fn flasher_supported(flasher: config::Flasher) -> bool {
         _ => false,
     }
 }
+
+pub(crate) fn format_size(size: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = 1024.0 * KB;
+    const GB: f64 = 1024.0 * MB;
+    const TB: f64 = 1024.0 * GB;
+
+    if size < KB as u64 {
+        format!("{} B", size)
+    } else if size < MB as u64 {
+        format!("{:.2} KB", size as f64 / KB)
+    } else if size < GB as u64 {
+        format!("{:.2} MB", size as f64 / MB)
+    } else if size < TB as u64 {
+        format!("{:.2} GB", size as f64 / GB)
+    } else {
+        format!("{:.2} TB", size as f64 / TB)
+    }
+}
