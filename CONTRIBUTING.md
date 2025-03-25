@@ -6,20 +6,19 @@ The following dependencies are required to work with the codebase.
 
 1. [git-lfs](https://git-lfs.com/): Since this is a Git LFS repository, a lot of weird errors regarding missing assets will come up cloning the repository without installing `git-lfs`.
 2. [rust](https://www.rust-lang.org/): I personally use [rustup](https://rustup.rs/) to manage Rust versions, but development can be done without Rustup as well since everything builds with stable Rust.
-3. [just](https://github.com/casey/just?tab=readme-ov-file#installation): A task runner to make life easier
 
 ### Platform Dependencies
 
 #### Ubuntu and other Debian-based Linux distro
 
 ```
-apt-get install -y --no-install-recommends libudev-dev
+make setup-debian-deps
 ```
 
 #### Fedora
 
 ```shell
-dnf install openssl-devel systemd-devel -y
+make setup-fedora-deps
 ```
 
 ## Run
@@ -29,13 +28,13 @@ dnf install openssl-devel systemd-devel -y
 - GUI
 
 ```
-just run-gui
+make run-gui
 ```
 
 - CLI
 
 ```
-just run-cli
+make run-cli
 ```
 
 # Submitting PRs

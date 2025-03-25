@@ -2,7 +2,7 @@
 
 ## Task system
 
-- This project uses [just](https://just.systems/) as the task runner. For most people, running `just` should be enough get a grasp regarding how to build and run the project.
+- This project uses `make` as the task runner. For most people, running `make` should be enough get a grasp regarding how to build and run the project.
 
 ## Building
 
@@ -13,7 +13,7 @@ The repo contains a `Makefile` to help create the different supported packages.
 1. The project uses [cargo-deb](https://crates.io/crates/cargo-deb) to build the Debian package. It can be installed with a just recipe
 
 ```
-just setup-deb
+make setup-packaging-deps
 ```
 
 2. Build the packages
@@ -21,22 +21,22 @@ just setup-deb
 - CLI
 
 ```
-just package-cli-linux-deb {target}
+make package-cli-linux-deb
 ```
 
 - GUI
 
 ```
-just package-gui-linux-deb {target}
+make package-gui-linux-deb
 ```
 
 - Service
 
 ```
-just package-service-linux-deb {target}
+make package-service-linux-deb
 ```
 
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
 - armv7-unknown-linux-gnueabihf
@@ -48,19 +48,18 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 1. The project uses [appimagetool](https://github.com/AppImage/appimagetool) for building the AppImage.
 
 ```
-just setup-appimage
+make setup-appimage
 ```
 
 2. Build the package
 
 ```
-just package-gui-linux-appimage {target}
+make package-gui-linux-appimage
 ```
 
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
-- armv7-unknown-linux-gnueabihf
 
 For different host/target pair, see [Cross Compilation](#cross-compilation)
 
@@ -68,19 +67,25 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 Just a tarball of everything. Useful for creating packages that need to be maintained out of tree.
 
+- GUI
+
+```
+make package-gui-linux-targz
+```
+
 - CLI
 
 ```
-just package-cli-linux-xz {target}
+make package-cli-linux-targz
 ```
 
 - Service
 
 ```
-just package-service-linux-xz {target}
+make package-service-linux-targz
 ```
 
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
 - armv7-unknown-linux-gnueabihf
@@ -89,56 +94,43 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## Windows Standalone Executable
 
-- CLI
+- GUI
 
 ```
-just package-cli-windows-zip {target}
+make package-gui-windows-portable
 ```
+
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
+- x86_64-pc-windows-gnu
+- x86_64-pc-windows-msvc
+- aarch64-pc-windows-msvc
+
+For different host/target pair, see [Cross Compilation](#cross-compilation)
+
+## Windows Installer
 
 - GUI
 
 ```
-just package-gui-windows-zip {target}
+make package-gui-windows-wix
 ```
 
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
-- x86_64-pc-windows-gnu
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
+- x86_64-pc-windows-msvc
 
 For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## MacOS DMG
 
-1. The project uses [create-dmg](https://github.com/create-dmg/create-dmg) to build DMG package for MacOS
+Build the package.
 
 ```
-just setup-dmg
+make package-gui-darwin-dmg
 ```
 
-2. Build the package.
-
-```
-just package-gui-darwin-dmg {target}
-```
-
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
+The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
 - x86_64-apple-darwin
 - aarch64-apple-darwin
-- universal-apple-darwin
-
-MacOS Package cannot be built on a non-MacOS host.
-
-## MacOS Generic
-
-Zipped package for CLI. Useful for creating out of tree packages. Only supported for CLI.
-
-```
-just package-cli-darwin-zip {target}
-```
-
-Where `target` is the platform you are building for. Currently, the following targets have been tested:
-- x86_64-apple-darwin
-- aarch64-apple-darwin
-- universal-apple-darwin
 
 MacOS Package cannot be built on a non-MacOS host.
 
@@ -148,5 +140,5 @@ Cross Compilation for linux is supported using [cross](https://github.com/cross-
 
 ```
 cargo install cross --git https://github.com/cross-rs/cross
-RUST_BUILDER=$(which cross) just {recipe} {target}
+RUST_BUILDER=$(which cross) make {recipe}
 ```

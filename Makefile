@@ -198,9 +198,15 @@ package-gui-macos-dmg: build-gui
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
 setup-debian-deps:
-	@echo "Installing dependencies"
+	@echo "Installing Debian dependencies"
 	sudo apt-get update -y
 	sudo apt-get install -y --no-install-recommends libudev-dev
+
+## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
+.PHONY: setup-fedora-deps
+setup-fedora-deps:
+	@echo "Installing Fedora dependencies"
+	sudo dnf install -y openssl-devel systemd-devel
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
