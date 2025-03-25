@@ -192,7 +192,7 @@ package-gui-windows-wix: build-gui
 ## package: package-gui-macos-dmg: Build MacOS DMG package for GUI
 .PHONY: package-gui-macos-dmg
 package-gui-macos-dmg: build-gui
-	@echo "Packaging GUI as deb"
+	@echo "Packaging GUI as DMG"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f dmg ${_CARGO_PACKAGER_ARGS}
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
