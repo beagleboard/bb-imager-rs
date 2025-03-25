@@ -16,6 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
+      if: matrix.os == 'ubuntu-latest'
       run: make setup-debian-deps
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
