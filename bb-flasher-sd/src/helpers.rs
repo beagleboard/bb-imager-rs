@@ -51,3 +51,7 @@ pub(crate) fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
         _ => Ok(()),
     }
 }
+
+pub(crate) trait Eject {
+    fn eject(self) -> std::io::Result<()>;
+}
