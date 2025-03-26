@@ -15,14 +15,20 @@ use crate::{Error, Result};
 
 pub(crate) struct WinDrive {
     drive: File,
-    volume: File,
+    volume: Option<File>,
 }
 
 impl WinDrive {
     pub(crate) fn open(path: &Path) -> Result<Self> {
+        tracing::info!("Trying to find {}", path.display());
         let vol_path = physical_drive_to_volume(path)?;
-        tracing::info!("Trying to open {vol_path}");
-        let volume = open_and_lock_volume(&vol_path)?;
+
+        let volume = if let Some(vol_path) = vol_path {
+            tracing::info!("Trying to open {vol_path}");
+            Some(open_and_lock_volume(&vol_path)?)
+        } else {
+            None
+        };
 
         tracing::info!("Trying to clean {:?}", path);
         diskpart_clean(path)?;
@@ -40,18 +46,20 @@ impl WinDrive {
 
 impl Drop for WinDrive {
     fn drop(&mut self) {
-        let _ = unsafe {
-            DeviceIoControl(
-                HANDLE(self.volume.as_raw_handle()),
-                FSCTL_UNLOCK_VOLUME,
-                None,
-                0,
-                None,
-                0,
-                None,
-                None,
-            )
-        };
+        if let Some(volume) = &self.volume {
+            let _ = unsafe {
+                DeviceIoControl(
+                    HANDLE(volume.as_raw_handle()),
+                    FSCTL_UNLOCK_VOLUME,
+                    None,
+                    0,
+                    None,
+                    0,
+                    None,
+                    None,
+                )
+            };
+        }
     }
 }
 
@@ -85,24 +93,25 @@ fn open_and_lock_volume(path: &str) -> Result<File> {
     Ok(volume)
 }
 
-fn physical_drive_to_volume(drive: &Path) -> Result<String> {
+fn physical_drive_to_volume(drive: &Path) -> Result<Option<String>> {
     let desc = bb_drivelist::drive_list()
         .expect("Unexpected error")
         .into_iter()
         .find(|x| x.device == drive.to_str().unwrap())
         .ok_or(Error::DriveNotFound(drive.to_string_lossy().to_string()))?;
 
-    let mount = desc
-        .mountpoints
-        .first()
-        .ok_or(Error::DriveNotFound(drive.to_string_lossy().to_string()))?;
+    tracing::info!("Drive desc {:#?}", desc);
 
-    let mount_path = format!(
-        "\\\\.\\{}",
-        mount.path.strip_suffix("\\").ok_or(Error::InvalidDrive)?
-    );
+    if let Some(mount) = desc.mountpoints.first() {
+        let mount_path = format!(
+            "\\\\.\\{}",
+            mount.path.strip_suffix("\\").ok_or(Error::InvalidDrive)?
+        );
 
-    Ok(mount_path)
+        Ok(Some(mount_path))
+    } else {
+        Ok(None)
+    }
 }
 
 fn diskpart_clean(path: &Path) -> Result<()> {
