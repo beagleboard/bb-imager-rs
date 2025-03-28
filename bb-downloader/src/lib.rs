@@ -162,7 +162,7 @@ impl Downloader {
     pub async fn download<U: reqwest::IntoUrl>(
         &self,
         url: U,
-        mut chan: Option<mpsc::Sender<f32>>,
+        chan: Option<mpsc::Sender<f32>>,
     ) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
@@ -170,6 +170,29 @@ impl Downloader {
         if let Some(p) = self.check_cache_from_url(url.clone()) {
             return Ok(p);
         }
+
+        self.download_no_cache(url, chan).await
+    }
+
+    /// Downloads the file without checking cache.
+    ///
+    /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
+    /// file is known in advance.
+    ///
+    /// # Progress
+    ///
+    /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
+    ///
+    /// # Differences from [Self::download]
+    ///
+    /// This function does not check if the file is present in cache, and will ovewrite the old
+    /// cached file. The file is still cached in the end.
+    pub async fn download_no_cache<U: reqwest::IntoUrl>(
+        &self,
+        url: U,
+        mut chan: Option<mpsc::Sender<f32>>,
+    ) -> io::Result<PathBuf> {
+        let url = url.into_url().map_err(io::Error::other)?;
 
         let file_path = self.path_from_url(url.as_str());
         chan_send(chan.as_mut(), 0.0);
