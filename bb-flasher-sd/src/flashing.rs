@@ -101,12 +101,68 @@ pub fn flash<R: Read>(
     img_resolver: impl FnOnce() -> std::io::Result<(R, u64)>,
     dst: &Path,
     verify: bool,
+    chan: Option<mpsc::Sender<Status>>,
+    customization: Option<Customization>,
+    cancel: Option<Weak<()>>,
+) -> Result<()> {
+    let (img, img_size) = img_resolver()?;
+    flash_internal(img, img_size, verify, dst, chan, customization, cancel)
+}
+
+#[cfg(windows)]
+fn flash_internal(
+    mut img: impl Read,
+    img_size: u64,
+    _verify: bool,
+    dst: &Path,
     mut chan: Option<mpsc::Sender<Status>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
     let mut sd = crate::pal::open(dst)?;
-    let (img, img_size) = img_resolver()?;
+
+    tracing::info!("Creating a copy of image for modification");
+    let mut img = {
+        let mut temp = tempfile::tempfile().unwrap();
+        std::io::copy(&mut img, &mut temp).unwrap();
+        temp
+    };
+
+    chan_send(chan.as_mut(), Status::Flashing(0.0));
+
+    tracing::info!("Applying customization");
+    if let Some(c) = customization {
+        img.seek(SeekFrom::Start(0))?;
+        c.customize(&mut img)?;
+    }
+
+    tracing::info!("Flashing modified image to SD card");
+    img.seek(SeekFrom::Start(0))?;
+    write_sd(
+        BufReader::new(img),
+        img_size,
+        BufWriter::new(&mut sd),
+        None,
+        chan.as_mut(),
+        cancel.as_ref(),
+    )?;
+
+    let _ = sd.eject();
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn flash_internal(
+    img: impl Read,
+    img_size: u64,
+    verify: bool,
+    dst: &Path,
+    mut chan: Option<mpsc::Sender<Status>>,
+    customization: Option<Customization>,
+    cancel: Option<Weak<()>>,
+) -> Result<()> {
+    let mut sd = crate::pal::open(dst)?;
 
     chan_send(chan.as_mut(), Status::Flashing(0.0));
     if verify {
