@@ -14,7 +14,6 @@ categories = ["development-tools", "embedded", "filesystem", "os"]
 futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
-sha2 = "0.10"
 bb-drivelist = "0.1"
 fatfs = "0.3.6"
 fscommon = "0.1.1"

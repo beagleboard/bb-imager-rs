@@ -65,13 +65,11 @@ impl BBFlasherTarget for Target {
 /// Linux Image post-install customization options. Only work on BeagleBoard.org images.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FlashingSdLinuxConfig {
-    verify: bool,
     customization: bb_flasher_sd::Customization,
 }
 
 impl FlashingSdLinuxConfig {
     pub const fn new(
-        verify: bool,
         hostname: Option<String>,
         timezone: Option<String>,
         keymap: Option<String>,
@@ -79,7 +77,6 @@ impl FlashingSdLinuxConfig {
         wifi: Option<(String, String)>,
     ) -> Self {
         Self {
-            verify,
             customization: bb_flasher_sd::Customization {
                 hostname,
                 timezone,
@@ -87,16 +84,6 @@ impl FlashingSdLinuxConfig {
                 user,
                 wifi,
             },
-        }
-    }
-}
-
-impl From<bb_flasher_sd::Status> for crate::DownloadFlashingStatus {
-    fn from(value: bb_flasher_sd::Status) -> Self {
-        match value {
-            bb_flasher_sd::Status::Preparing => Self::Preparing,
-            bb_flasher_sd::Status::Flashing(x) => Self::FlashingProgress(x),
-            bb_flasher_sd::Status::Verifying(x) => Self::VerifyingProgress(x),
         }
     }
 }
@@ -180,7 +167,6 @@ where
         let cancel = Arc::new(());
         let cancel_weak = Arc::downgrade(&cancel);
 
-        let verify = self.customization.verify;
         let customization = self.customization.customization;
         let dst = self.dst;
 
@@ -191,7 +177,6 @@ where
                 bb_flasher_sd::flash(
                     img_resolver,
                     &dst,
-                    verify,
                     Some(tx),
                     Some(customization),
                     Some(cancel_weak),
@@ -201,7 +186,13 @@ where
             // Should run until tx is dropped, i.e. flasher task is done.
             // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
             let _ = rx
-                .map(DownloadFlashingStatus::from)
+                .map(|x| {
+                    if x == 0.0 {
+                        DownloadFlashingStatus::Preparing
+                    } else {
+                        DownloadFlashingStatus::FlashingProgress(x)
+                    }
+                })
                 .map(Ok)
                 .forward(chan)
                 .await;
@@ -212,7 +203,6 @@ where
                 bb_flasher_sd::flash(
                     img_resolver,
                     &dst,
-                    verify,
                     None,
                     Some(customization),
                     Some(cancel_weak),

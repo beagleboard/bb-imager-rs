@@ -32,7 +32,6 @@ fn main() {
         bb_flasher_sd::flash(
             img,
             dst,
-            true,
             Some(tx),
             None,
             None

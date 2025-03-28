@@ -30,7 +30,6 @@
 //!     bb_flasher_sd::flash(
 //!         img,
 //!         dst,
-//!         true,
 //!         Some(tx),
 //!         None,
 //!         None
@@ -64,12 +63,10 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for this crate
 pub enum Error {
-    #[error("Sha256 verification error")]
-    Sha256Verification,
     #[error("Failed to customize flashed image {0}")]
     Customization(String),
     #[error("IO Error: {0}")]
-    IoError(io::Error),
+    IoError(#[from] io::Error),
     /// Aborted before completing
     #[error("Aborted before completing")]
     Aborted,
@@ -91,12 +88,6 @@ pub enum Error {
     #[cfg(windows)]
     #[error("Windows Error: {0}")]
     WindowsError(#[from] windows::core::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
 }
 
 /// Enumerate all SD Cards in system
@@ -127,12 +118,4 @@ impl Device {
 /// Format SD card to fat32
 pub fn format(dst: &std::path::Path) -> Result<()> {
     crate::pal::format(dst)
-}
-
-/// Flashing status
-#[derive(Clone, Debug)]
-pub enum Status {
-    Preparing,
-    Flashing(f32),
-    Verifying(f32),
 }

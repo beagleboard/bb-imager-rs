@@ -533,9 +533,8 @@ impl GuiConfiguration {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct SdCustomization {
-    pub(crate) verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -548,25 +547,7 @@ pub(crate) struct SdCustomization {
     pub(crate) wifi: Option<SdCustomizationWifi>,
 }
 
-impl Default for SdCustomization {
-    fn default() -> Self {
-        Self {
-            verify: true,
-            hostname: None,
-            timezone: None,
-            keymap: None,
-            user: None,
-            wifi: None,
-        }
-    }
-}
-
 impl SdCustomization {
-    pub(crate) fn update_verify(mut self, t: bool) -> Self {
-        self.verify = t;
-        self
-    }
-
     pub(crate) fn update_hostname(mut self, t: Option<String>) -> Self {
         self.hostname = t;
         self
@@ -596,7 +577,6 @@ impl SdCustomization {
 impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
     fn from(value: SdCustomization) -> Self {
         Self::new(
-            value.verify,
             value.hostname,
             value.timezone,
             value.keymap,
