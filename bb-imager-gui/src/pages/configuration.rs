@@ -86,18 +86,6 @@ fn linux_sd_form<'a>(
     config: &'a helpers::SdCustomization,
 ) -> widget::Column<'a, BBImagerMessage> {
     widget::column![
-        widget::container(
-            widget::toggler(!config.verify)
-                .label("Skip Verification")
-                .on_toggle(|y| {
-                    BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
-                        config.clone().update_verify(!y),
-                    ))
-                })
-        )
-        .padding(10)
-        .width(iced::Length::Fill)
-        .style(widget::container::bordered_box),
         hostname_form(config).width(iced::Length::Fill),
         timezone_form(timezones, config).width(iced::Length::Fill),
         keymap_form(keymaps, config).width(iced::Length::Fill),

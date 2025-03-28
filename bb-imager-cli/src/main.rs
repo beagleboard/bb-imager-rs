@@ -111,7 +111,6 @@ async fn flash_internal(
     match target {
         TargetCommands::Sd {
             dst,
-            no_verify,
             hostname,
             timezone,
             keymap,
@@ -124,9 +123,8 @@ async fn flash_internal(
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_flasher::sd::FlashingSdLinuxConfig::new(
-                !no_verify, hostname, timezone, keymap, user, wifi,
-            );
+            let customization =
+                bb_flasher::sd::FlashingSdLinuxConfig::new(hostname, timezone, keymap, user, wifi);
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img),

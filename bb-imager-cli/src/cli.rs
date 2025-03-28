@@ -73,10 +73,6 @@ pub enum TargetCommands {
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: PathBuf,
 
-        /// Disable checksum verification post-flash
-        #[arg(long)]
-        no_verify: bool,
-
         #[arg(long)]
         /// Set a custom hostname for the device (e.g., "beaglebone").
         hostname: Option<String>,

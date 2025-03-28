@@ -1,13 +1,12 @@
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Weak;
 
 use futures::channel::mpsc;
-use sha2::{Digest, Sha256};
 
+use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{Eject, chan_send, check_arc, progress, sha256_reader_progress};
-use crate::{Error, Result, Status};
+use crate::helpers::{Eject, chan_send, check_arc, progress};
 
 fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
     let mut pos = 0;
@@ -30,8 +29,7 @@ fn write_sd(
     mut img: impl Read,
     img_size: u64,
     mut sd: impl Write,
-    mut hasher: Option<&mut Sha256>,
-    mut chan: Option<&mut mpsc::Sender<Status>>,
+    mut chan: Option<&mut mpsc::Sender<f32>>,
     cancel: Option<&Weak<()>>,
 ) -> Result<()> {
     let mut buf = [0u8; 512];
@@ -39,10 +37,7 @@ fn write_sd(
 
     // Clippy warning is simply wrong here
     #[allow(clippy::option_map_or_none)]
-    chan_send(
-        chan.as_mut().map_or(None, |p| Some(p)),
-        Status::Flashing(0.0),
-    );
+    chan_send(chan.as_mut().map_or(None, |p| Some(p)), 0.0);
     loop {
         let count = read_aligned(&mut img, &mut buf)?;
         if count == 0 {
@@ -52,16 +47,13 @@ fn write_sd(
         // Since buf is 512, just write the whole thing since read_aligned will always fill it
         // fully.
         sd.write_all(&buf)?;
-        if let Some(ref mut h) = hasher {
-            h.update(&buf[..count]);
-        }
 
         pos += count;
         // Clippy warning is simply wrong here
         #[allow(clippy::option_map_or_none)]
         chan_send(
             chan.as_mut().map_or(None, |p| Some(p)),
-            Status::Flashing(progress(pos, img_size)),
+            progress(pos, img_size),
         );
         check_arc(cancel)?;
     }
@@ -100,24 +92,22 @@ fn write_sd(
 pub fn flash<R: Read>(
     img_resolver: impl FnOnce() -> std::io::Result<(R, u64)>,
     dst: &Path,
-    verify: bool,
-    chan: Option<mpsc::Sender<Status>>,
+    chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
     let sd = crate::pal::open(dst)?;
 
     let (img, img_size) = img_resolver()?;
-    flash_internal(img, img_size, verify, sd, chan, customization, cancel)
+    flash_internal(img, img_size, sd, chan, customization, cancel)
 }
 
 #[cfg(windows)]
 fn flash_internal(
     mut img: impl Read,
     img_size: u64,
-    _verify: bool,
     mut sd: impl Write + Eject,
-    mut chan: Option<mpsc::Sender<Status>>,
+    mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
@@ -128,7 +118,7 @@ fn flash_internal(
         temp
     };
 
-    chan_send(chan.as_mut(), Status::Flashing(0.0));
+    chan_send(chan.as_mut(), 0.0);
 
     tracing::info!("Applying customization");
     if let Some(c) = customization {
@@ -139,10 +129,9 @@ fn flash_internal(
     tracing::info!("Flashing modified image to SD card");
     img.seek(SeekFrom::Start(0))?;
     write_sd(
-        BufReader::new(img),
+        std::io::BufReader::new(img),
         img_size,
         BufWriter::new(&mut sd),
-        None,
         chan.as_mut(),
         cancel.as_ref(),
     )?;
@@ -156,51 +145,20 @@ fn flash_internal(
 fn flash_internal(
     img: impl Read,
     img_size: u64,
-    verify: bool,
     mut sd: impl Read + Write + Seek + Eject,
-    mut chan: Option<mpsc::Sender<Status>>,
+    mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
-    chan_send(chan.as_mut(), Status::Flashing(0.0));
-    if verify {
-        let mut hasher = Sha256::new();
-        write_sd(
-            img,
-            img_size,
-            BufWriter::new(&mut sd),
-            Some(&mut hasher),
-            chan.as_mut(),
-            cancel.as_ref(),
-        )?;
+    chan_send(chan.as_mut(), 0.0);
 
-        let img_hash: [u8; 32] = hasher
-            .finalize()
-            .as_slice()
-            .try_into()
-            .expect("SHA-256 is 32 bytes");
-
-        // Start verification
-        chan_send(chan.as_mut(), Status::Verifying(0.0));
-        sd.seek(std::io::SeekFrom::Start(0))?;
-        let hash =
-            sha256_reader_progress(BufReader::new((&mut sd).take(img_size)), img_size, chan)?;
-
-        check_arc(cancel.as_ref())?;
-        if hash != img_hash {
-            tracing::debug!("Sd SHA256: {:?}", hash);
-            return Err(Error::Sha256Verification);
-        }
-    } else {
-        write_sd(
-            img,
-            img_size,
-            BufWriter::new(&mut sd),
-            None,
-            chan.as_mut(),
-            cancel.as_ref(),
-        )?;
-    }
+    write_sd(
+        img,
+        img_size,
+        BufWriter::new(&mut sd),
+        chan.as_mut(),
+        cancel.as_ref(),
+    )?;
 
     check_arc(cancel.as_ref())?;
 
