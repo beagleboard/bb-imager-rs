@@ -169,7 +169,7 @@ impl BBImager {
             let downloader = self.downloader.clone();
             let icon_clone = icon.clone();
             Task::perform(
-                async move { downloader.download(icon_clone, None).await },
+                async move { downloader.download_no_cache(icon_clone, None).await },
                 move |p| match p {
                     Ok(_) => BBImagerMessage::Null,
                     Err(_) => {
@@ -212,7 +212,7 @@ impl BBImager {
                     let downloader = self.downloader.clone();
                     let x_clone = x.clone();
                     Task::perform(
-                        async move { downloader.download(x_clone, None).await },
+                        async move { downloader.download_no_cache(x_clone, None).await },
                         move |p| match p {
                             Ok(_path) => BBImagerMessage::Null,
                             Err(e) => {

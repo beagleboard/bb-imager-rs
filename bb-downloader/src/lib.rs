@@ -47,7 +47,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 pub use reqwest::IntoUrl;
 
@@ -162,7 +162,7 @@ impl Downloader {
     pub async fn download<U: reqwest::IntoUrl>(
         &self,
         url: U,
-        mut chan: Option<mpsc::Sender<f32>>,
+        chan: Option<mpsc::Sender<f32>>,
     ) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
@@ -171,13 +171,36 @@ impl Downloader {
             return Ok(p);
         }
 
+        self.download_no_cache(url, chan).await
+    }
+
+    /// Downloads the file without checking cache.
+    ///
+    /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
+    /// file is known in advance.
+    ///
+    /// # Progress
+    ///
+    /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
+    ///
+    /// # Differences from [Self::download]
+    ///
+    /// This function does not check if the file is present in cache, and will ovewrite the old
+    /// cached file. The file is still cached in the end.
+    pub async fn download_no_cache<U: reqwest::IntoUrl>(
+        &self,
+        url: U,
+        mut chan: Option<mpsc::Sender<f32>>,
+    ) -> io::Result<PathBuf> {
+        let url = url.into_url().map_err(io::Error::other)?;
+
         let file_path = self.path_from_url(url.as_str());
         chan_send(chan.as_mut(), 0.0);
 
         let mut cur_pos = 0;
-        let mut file = tokio::fs::File::create_new(&file_path).await?;
+        let mut file = AsyncTempFile::new()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file);
+            let mut file = tokio::io::BufWriter::new(&mut file.0);
 
             let response = self
                 .client
@@ -203,7 +226,7 @@ impl Downloader {
             file.flush().await?
         }
 
-        file.sync_all().await?;
+        file.persist(&file_path).await?;
         Ok(file_path)
     }
 
@@ -235,9 +258,9 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
         chan_send(chan.as_mut(), 0.0);
 
-        let mut file = tokio::fs::File::create_new(&file_path).await?;
+        let mut file = AsyncTempFile::new()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file);
+            let mut file = tokio::io::BufWriter::new(&mut file.0);
 
             let response = self
                 .client
@@ -275,9 +298,6 @@ impl Downloader {
 
             if hash != sha256 {
                 tracing::warn!("{hash:?} != {sha256:?}");
-                std::mem::drop(file);
-                let _ = tokio::fs::remove_file(file_path).await;
-
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Invalid SHA256",
@@ -286,7 +306,7 @@ impl Downloader {
             file.flush().await?;
         }
 
-        file.sync_all().await?;
+        file.persist(&file_path).await?;
         Ok(file_path)
     }
 
@@ -333,5 +353,21 @@ async fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
 fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
+    }
+}
+
+struct AsyncTempFile(tokio::fs::File);
+
+impl AsyncTempFile {
+    fn new() -> io::Result<Self> {
+        let f = tempfile::tempfile()?;
+        Ok(Self(tokio::fs::File::from_std(f)))
+    }
+
+    async fn persist(&mut self, path: &Path) -> io::Result<()> {
+        let mut f = tokio::fs::File::create(path).await?;
+        self.0.seek(io::SeekFrom::Start(0)).await?;
+        tokio::io::copy(&mut self.0, &mut f).await?;
+        Ok(())
     }
 }

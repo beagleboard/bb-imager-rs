@@ -484,6 +484,7 @@ dependencies = [
  "reqwest",
  "serde",
  "sha2",
+ "tempfile",
  "tokio",
  "tracing",
 ]
