@@ -47,7 +47,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub use reqwest::IntoUrl;
 
@@ -175,9 +175,9 @@ impl Downloader {
         chan_send(chan.as_mut(), 0.0);
 
         let mut cur_pos = 0;
-        let mut tmp_file = AsyncTempFile::new()?;
+        let mut file = tokio::fs::File::create_new(&file_path).await?;
         {
-            let mut tmp_file = tokio::io::BufWriter::new(tmp_file.as_mut());
+            let mut file = tokio::io::BufWriter::new(&mut file);
 
             let response = self
                 .client
@@ -196,12 +196,14 @@ impl Downloader {
             while let Some(x) = response_stream.next().await {
                 let mut data = x.map_err(io::Error::other)?;
                 cur_pos += data.len();
-                tmp_file.write_all_buf(&mut data).await?;
+                file.write_all_buf(&mut data).await?;
                 chan_send(chan.as_mut(), (cur_pos as f32) / (response_size as f32));
             }
+
+            file.flush().await?
         }
 
-        tmp_file.persist(&file_path).await?;
+        file.sync_all().await?;
         Ok(file_path)
     }
 
@@ -233,9 +235,9 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
         chan_send(chan.as_mut(), 0.0);
 
-        let mut tmp_file = AsyncTempFile::new()?;
+        let mut file = tokio::fs::File::create_new(&file_path).await?;
         {
-            let mut tmp_file = tokio::io::BufWriter::new(tmp_file.as_mut());
+            let mut file = tokio::io::BufWriter::new(&mut file);
 
             let response = self
                 .client
@@ -260,7 +262,7 @@ impl Downloader {
                 let mut data = x.map_err(io::Error::other)?;
                 cur_pos += data.len();
                 hasher.update(&data);
-                tmp_file.write_all_buf(&mut data).await?;
+                file.write_all_buf(&mut data).await?;
 
                 chan_send(chan.as_mut(), (cur_pos as f32) / (response_size as f32));
             }
@@ -273,15 +275,18 @@ impl Downloader {
 
             if hash != sha256 {
                 tracing::warn!("{hash:?} != {sha256:?}");
+                std::mem::drop(file);
+                let _ = tokio::fs::remove_file(file_path).await;
+
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Invalid SHA256",
                 ));
             }
+            file.flush().await?;
         }
 
-        tmp_file.persist(&file_path).await?;
-
+        file.sync_all().await?;
         Ok(file_path)
     }
 
@@ -298,28 +303,6 @@ impl Downloader {
     fn path_from_sha(&self, sha256: [u8; 32]) -> PathBuf {
         let file_name = const_hex::encode(sha256);
         self.cache_dir.join(file_name)
-    }
-}
-
-struct AsyncTempFile(tokio::fs::File);
-
-impl AsyncTempFile {
-    fn new() -> io::Result<Self> {
-        let f = tempfile::tempfile()?;
-        Ok(Self(tokio::fs::File::from_std(f)))
-    }
-
-    async fn persist(&mut self, path: &Path) -> io::Result<()> {
-        let mut f = tokio::fs::File::create_new(path).await?;
-        self.0.seek(io::SeekFrom::Start(0)).await?;
-        tokio::io::copy(&mut self.0, &mut f).await?;
-        Ok(())
-    }
-}
-
-impl AsMut<tokio::fs::File> for AsyncTempFile {
-    fn as_mut(&mut self) -> &mut tokio::fs::File {
-        &mut self.0
     }
 }
 

@@ -105,8 +105,10 @@ pub fn flash<R: Read>(
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
+    let sd = crate::pal::open(dst)?;
+
     let (img, img_size) = img_resolver()?;
-    flash_internal(img, img_size, verify, dst, chan, customization, cancel)
+    flash_internal(img, img_size, verify, sd, chan, customization, cancel)
 }
 
 #[cfg(windows)]
@@ -114,13 +116,11 @@ fn flash_internal(
     mut img: impl Read,
     img_size: u64,
     _verify: bool,
-    dst: &Path,
+    mut sd: impl Write + Eject,
     mut chan: Option<mpsc::Sender<Status>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
-    let mut sd = crate::pal::open(dst)?;
-
     tracing::info!("Creating a copy of image for modification");
     let mut img = {
         let mut temp = tempfile::tempfile().unwrap();
@@ -157,13 +157,11 @@ fn flash_internal(
     img: impl Read,
     img_size: u64,
     verify: bool,
-    dst: &Path,
+    mut sd: impl Read + Write + Seek + Eject,
     mut chan: Option<mpsc::Sender<Status>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
-    let mut sd = crate::pal::open(dst)?;
-
     chan_send(chan.as_mut(), Status::Flashing(0.0));
     if verify {
         let mut hasher = Sha256::new();
