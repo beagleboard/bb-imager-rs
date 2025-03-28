@@ -47,7 +47,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 pub use reqwest::IntoUrl;
 
@@ -175,9 +175,9 @@ impl Downloader {
         chan_send(chan.as_mut(), 0.0);
 
         let mut cur_pos = 0;
-        let mut file = tokio::fs::File::create_new(&file_path).await?;
+        let mut file = AsyncTempFile::new()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file);
+            let mut file = tokio::io::BufWriter::new(&mut file.0);
 
             let response = self
                 .client
@@ -203,7 +203,7 @@ impl Downloader {
             file.flush().await?
         }
 
-        file.sync_all().await?;
+        file.persist(&file_path).await?;
         Ok(file_path)
     }
 
@@ -235,9 +235,9 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
         chan_send(chan.as_mut(), 0.0);
 
-        let mut file = tokio::fs::File::create_new(&file_path).await?;
+        let mut file = AsyncTempFile::new()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file);
+            let mut file = tokio::io::BufWriter::new(&mut file.0);
 
             let response = self
                 .client
@@ -275,9 +275,6 @@ impl Downloader {
 
             if hash != sha256 {
                 tracing::warn!("{hash:?} != {sha256:?}");
-                std::mem::drop(file);
-                let _ = tokio::fs::remove_file(file_path).await;
-
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Invalid SHA256",
@@ -286,7 +283,7 @@ impl Downloader {
             file.flush().await?;
         }
 
-        file.sync_all().await?;
+        file.persist(&file_path).await?;
         Ok(file_path)
     }
 
@@ -333,5 +330,21 @@ async fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
 fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
+    }
+}
+
+struct AsyncTempFile(tokio::fs::File);
+
+impl AsyncTempFile {
+    fn new() -> io::Result<Self> {
+        let f = tempfile::tempfile()?;
+        Ok(Self(tokio::fs::File::from_std(f)))
+    }
+
+    async fn persist(&mut self, path: &Path) -> io::Result<()> {
+        let mut f = tokio::fs::File::create(path).await?;
+        self.0.seek(io::SeekFrom::Start(0)).await?;
+        tokio::io::copy(&mut self.0, &mut f).await?;
+        Ok(())
     }
 }
