@@ -9,6 +9,7 @@ use iced::{Element, Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
 use pages::{Screen, configuration::FlashingCustomization};
 use tokio_stream::StreamExt;
+use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod constants;
@@ -19,7 +20,11 @@ mod pages;
 fn main() -> iced::Result {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .try_init()
         .expect("Failed to register tracing_subscriber");
 
