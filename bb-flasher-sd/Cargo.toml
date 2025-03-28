@@ -26,6 +26,7 @@ tokio = { version = "1.43", default-features = false, features = ["rt"], optiona
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.60", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
+tempfile = "3.17"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = { version = "3.2", optional = true }
