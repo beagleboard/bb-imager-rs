@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-sd"
-version = "0.1.1"
+version = "1.0.0"
 description = "A library to flash OS images to SD Card"
 edition.workspace = true
 authors.workspace = true
