@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{BBImagerMessage, constants};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ProgressBarState {
     label: Cow<'static, str>,
     progress: f32,

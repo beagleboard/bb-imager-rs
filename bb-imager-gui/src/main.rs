@@ -74,7 +74,6 @@ struct BBImager {
     destinations: Vec<helpers::Destination>,
     cancel_flashing: Option<iced::task::Handle>,
     customization: Option<FlashingCustomization>,
-    flashing_state: Option<pages::FlashingState>,
 
     timezones: widget::combo_box::State<String>,
     keymaps: widget::combo_box::State<String>,
@@ -141,7 +140,6 @@ impl BBImager {
             destinations: Default::default(),
             cancel_flashing: Default::default(),
             customization: Default::default(),
-            flashing_state: Default::default(),
         };
 
         ans.screen.push(Screen::Home);
@@ -224,8 +222,11 @@ impl BBImager {
                 return Task::batch(jobs.chain([remote_image_jobs]));
             }
             BBImagerMessage::ProgressBar(x) => {
-                if let Some(state) = self.flashing_state.take() {
-                    self.flashing_state = Some(state.update(x));
+                if let Some(screen) = self.screen.pop() {
+                    match screen {
+                        Screen::Flashing(s) => self.screen.push(Screen::Flashing(s.update(x))),
+                        _ => self.screen.push(screen),
+                    }
                 }
             }
             BBImagerMessage::SelectImage(x) => {
@@ -283,10 +284,13 @@ impl BBImager {
                     task.abort();
                 }
 
-                if let Some(x) = &self.flashing_state {
-                    if let Some(y) = x.progress().cancel() {
-                        return Task::done(BBImagerMessage::StopFlashing(y));
+                match self.screen.last().unwrap() {
+                    Screen::Flashing(s) => {
+                        if let Some(y) = s.progress().cancel() {
+                            return Task::done(BBImagerMessage::StopFlashing(y));
+                        }
                     }
+                    _ => unreachable!(),
                 }
             }
             BBImagerMessage::StartFlashing => {
@@ -470,10 +474,6 @@ impl BBImager {
             .boards
             .device(self.selected_board.expect("Missing board"))
             .documentation;
-        self.flashing_state = Some(pages::FlashingState::new(
-            ProgressBarState::PREPARING,
-            docs_url.as_ref().map(|x| x.to_string()).unwrap_or_default(),
-        ));
 
         let customization = customization.unwrap_or(self.config());
         let img = self.selected_image.clone();
@@ -514,7 +514,13 @@ impl BBImager {
 
         self.cancel_flashing = Some(h);
 
-        Task::done(BBImagerMessage::SwitchScreen(Screen::Flashing)).chain(t)
+        Task::done(BBImagerMessage::SwitchScreen(Screen::Flashing(
+            pages::FlashingState::new(
+                ProgressBarState::PREPARING,
+                docs_url.as_ref().map(|x| x.to_string()).unwrap_or_default(),
+            ),
+        )))
+        .chain(t)
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
@@ -598,10 +604,6 @@ impl BBImager {
 
     pub(crate) fn keymaps(&self) -> &widget::combo_box::State<String> {
         &self.keymaps
-    }
-
-    pub(crate) fn flashing_state(&self) -> Option<&pages::FlashingState> {
-        self.flashing_state.as_ref()
     }
 
     pub(crate) fn is_flashing(&self) -> bool {

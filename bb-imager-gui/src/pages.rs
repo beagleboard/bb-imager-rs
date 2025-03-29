@@ -1,4 +1,4 @@
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub(crate) enum Screen {
     #[default]
     Home,
@@ -6,7 +6,7 @@ pub(crate) enum Screen {
     ImageSelection(ImageSelectionState),
     DestinationSelection(SearchState),
     ExtraConfiguration,
-    Flashing,
+    Flashing(FlashingState),
     FlashingConfirmation,
 }
 
@@ -70,7 +70,7 @@ impl ImageSelectionState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub(crate) struct FlashingState {
     progress: crate::helpers::ProgressBarState,
     documentation: String,

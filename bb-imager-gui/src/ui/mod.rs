@@ -52,7 +52,7 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
             state.timezones(),
             state.keymaps(),
         ),
-        Screen::Flashing => flash::view(state.flashing_state().unwrap(), state.is_flashing()),
+        Screen::Flashing(s) => flash::view(s, state.is_flashing()),
         Screen::FlashingConfirmation => {
             let base = home::view(
                 state.selected_device(),
