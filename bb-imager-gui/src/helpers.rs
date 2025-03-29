@@ -6,45 +6,13 @@ use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
-    Element, futures,
-    widget::{self, button, text},
+    futures,
+    widget::{self, text},
 };
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 
-use crate::{BBImagerMessage, constants, pages::configuration::FlashingCustomization};
-
-const ICON_SIZE: u16 = 32;
-const PADDING: u16 = 4;
-const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
-
-pub(crate) fn input_with_label<'a, F>(
-    label: &'static str,
-    placeholder: &'static str,
-    val: &'a str,
-    func: F,
-) -> widget::Row<'a, BBImagerMessage>
-where
-    F: 'a + Fn(String) -> FlashingCustomization,
-{
-    element_with_label(
-        label,
-        widget::text_input(placeholder, val)
-            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(func(inp)))
-            .width(200)
-            .into(),
-    )
-}
-
-pub(crate) fn element_with_label<'a>(
-    label: &'static str,
-    el: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![text(label), widget::horizontal_space(), el]
-        .padding(10)
-        .spacing(10)
-        .align_y(iced::Alignment::Center)
-}
+use crate::{BBImagerMessage, constants};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ProgressBarState {
@@ -295,107 +263,6 @@ impl From<config::Config> for Boards {
         };
         Self(filtered)
     }
-}
-
-pub(crate) fn home_btn_text<'a>(
-    txt: impl text::IntoFragment<'a>,
-    active: bool,
-    text_width: iced::Length,
-) -> widget::Button<'a, BBImagerMessage> {
-    fn style(active: bool) -> widget::button::Style {
-        if active {
-            widget::button::Style {
-                background: Some(iced::Color::WHITE.into()),
-                text_color: constants::BEAGLE_BRAND_COLOR,
-                border: iced::border::rounded(4),
-                ..Default::default()
-            }
-        } else {
-            widget::button::Style {
-                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-                text_color: iced::Color::BLACK.scale_alpha(0.8),
-                border: iced::border::rounded(4),
-                ..Default::default()
-            }
-        }
-    }
-
-    button(
-        text(txt)
-            .font(constants::FONT_BOLD)
-            .align_x(iced::Alignment::Center)
-            .align_y(iced::Alignment::Center)
-            .width(text_width),
-    )
-    .padding(8)
-    .style(move |_, _| style(active))
-}
-
-pub(crate) fn home_btn_svg<'a>(
-    icon: &'static [u8],
-    active: bool,
-) -> widget::Button<'a, BBImagerMessage> {
-    fn svg_style(active: bool) -> widget::svg::Style {
-        if active {
-            Default::default()
-        } else {
-            widget::svg::Style {
-                color: Some(iced::Color::BLACK.scale_alpha(0.5)),
-            }
-        }
-    }
-
-    fn btn_style(active: bool) -> widget::button::Style {
-        if active {
-            widget::button::Style {
-                background: Some(iced::Color::WHITE.into()),
-                border: iced::border::rounded(RADIUS),
-                ..Default::default()
-            }
-        } else {
-            widget::button::Style {
-                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-                border: iced::border::rounded(RADIUS),
-                ..Default::default()
-            }
-        }
-    }
-
-    button(
-        widget::svg(widget::svg::Handle::from_memory(icon))
-            .style(move |_, _| svg_style(active))
-            .width(ICON_SIZE)
-            .height(ICON_SIZE),
-    )
-    .style(move |_, _| btn_style(active))
-    .padding(PADDING)
-}
-
-pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).expect("Failed to open image");
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
-    }
-}
-
-pub(crate) fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
-    widget::row![
-        button(widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22))
-            .on_press(BBImagerMessage::PopScreen)
-            .style(widget::button::secondary),
-        widget::text_input("Search", cur_search).on_input(BBImagerMessage::Search)
-    ]
-    .spacing(10)
-    .into()
 }
 
 #[derive(Debug, Clone)]
@@ -925,21 +792,49 @@ const fn flasher_supported(flasher: config::Flasher) -> bool {
     }
 }
 
-pub(crate) fn format_size(size: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = 1024.0 * KB;
-    const GB: f64 = 1024.0 * MB;
-    const TB: f64 = 1024.0 * GB;
+#[derive(Clone, Debug)]
+pub(crate) enum FlashingCustomization {
+    LinuxSdFormat,
+    LinuxSd(SdCustomization),
+    Bcf(BcfCustomization),
+    Msp430,
+    #[cfg(feature = "pb2_mspm0")]
+    Pb2Mspm0(Pb2Mspm0Customization),
+}
 
-    if size < KB as u64 {
-        format!("{} B", size)
-    } else if size < MB as u64 {
-        format!("{:.2} KB", size as f64 / KB)
-    } else if size < GB as u64 {
-        format!("{:.2} MB", size as f64 / MB)
-    } else if size < TB as u64 {
-        format!("{:.2} GB", size as f64 / GB)
-    } else {
-        format!("{:.2} TB", size as f64 / TB)
+impl FlashingCustomization {
+    pub(crate) fn new(
+        flasher: config::Flasher,
+        img: &BoardImage,
+        app_config: &GuiConfiguration,
+    ) -> Self {
+        match flasher {
+            config::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
+            config::Flasher::SdCard => {
+                Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
+            }
+            config::Flasher::BeagleConnectFreedom => {
+                Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
+            }
+            config::Flasher::Msp430Usb => Self::Msp430,
+            #[cfg(feature = "pb2_mspm0")]
+            config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
+                app_config
+                    .pb2_mspm0_customization()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub(crate) fn reset(self) -> Self {
+        match self {
+            Self::LinuxSd(_) => Self::LinuxSd(Default::default()),
+            Self::Bcf(_) => Self::Bcf(Default::default()),
+            #[cfg(feature = "pb2_mspm0")]
+            Self::Pb2Mspm0(_) => Self::Pb2Mspm0(Default::default()),
+            _ => self,
+        }
     }
 }

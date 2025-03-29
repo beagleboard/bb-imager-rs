@@ -3,12 +3,10 @@ use iced::{
     widget::{self, text},
 };
 
-use crate::{
-    BBImagerMessage, constants,
-    helpers::{self, home_btn_svg, home_btn_text},
-};
+use crate::{BBImagerMessage, constants, helpers, pages::ImageSelectionState};
 
-use super::{Screen, image_selection::ImageSelectionPage};
+use super::helpers::{home_btn_svg, home_btn_text};
+use crate::pages::Screen;
 
 pub(crate) fn view<'a>(
     selected_board: Option<&'a bb_config::config::Device>,
@@ -22,7 +20,9 @@ pub(crate) fn view<'a>(
             None => home_btn_text("CHOOSE DEVICE", true, iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection));
+        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection(
+            Default::default(),
+        )));
 
         let choose_image_btn = match selected_image {
             Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
@@ -30,7 +30,7 @@ pub(crate) fn view<'a>(
         }
         .width(iced::Length::Fill)
         .on_press_maybe(selected_board.map(|board| {
-            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionPage::new(
+            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionState::new(
                 board.flasher,
             )))
         }));
@@ -47,7 +47,9 @@ pub(crate) fn view<'a>(
         .on_press_maybe(if selected_image.is_none() || !destination_selectable {
             None
         } else {
-            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection))
+            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection(
+                Default::default(),
+            )))
         });
 
         let reset_btn = home_btn_text("RESET", true, iced::Length::Fill)

@@ -1,10 +1,10 @@
 //! Global GUI Messages
 
-use std::{borrow::Cow, collections::HashSet};
+use std::borrow::Cow;
 
 use crate::{
-    helpers::{BoardImage, Boards, Destination, ProgressBarState},
-    pages::{Screen, configuration::FlashingCustomization},
+    helpers::{BoardImage, Boards, Destination, FlashingCustomization, ProgressBarState},
+    pages::Screen,
 };
 
 #[derive(Debug, Clone)]
@@ -19,8 +19,7 @@ pub(crate) enum BBImagerMessage {
     SelectLocalImage(bb_config::config::Flasher),
     SelectPort(Destination),
     ProgressBar(ProgressBarState),
-    Search(String),
-    Destinations(HashSet<Destination>),
+    Destinations(Vec<Destination>),
     Reset,
 
     StartFlashing,
