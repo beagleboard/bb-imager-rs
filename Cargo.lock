@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "bb-downloader"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "const-hex",
  "futures",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-bcf"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "bin_file",
  "crc32fast",

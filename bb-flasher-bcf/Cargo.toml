@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-bcf"
-version = "1.0.0"
+version = "1.0.1"
 description = "A library to flash BeagleConnect Freedom"
 edition.workspace = true
 authors.workspace = true
@@ -9,8 +9,6 @@ license.workspace = true
 readme = "README.md"
 keywords = ["beagleconnect", "flasher", "beagle"]
 categories = ["development-tools", "embedded", "hardware-support"]
-
-[lib]
 
 [dependencies]
 crc32fast = "1.4"
