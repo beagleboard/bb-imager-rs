@@ -185,7 +185,7 @@ impl BBImager {
             BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
                 self.boards.resolve_remote_subitem(item, &target);
             }
-            BBImagerMessage::BoardSelected(x) => {
+            BBImagerMessage::SelectBoard(x) => {
                 // Reset any previously selected values
                 self.selected_dst.take();
                 self.selected_image.take();

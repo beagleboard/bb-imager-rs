@@ -45,7 +45,7 @@ pub(crate) fn view<'a>(
                 .spacing(10),
             )
             .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::BoardSelected(id))
+            .on_press(BBImagerMessage::SelectBoard(id))
             .style(widget::button::secondary)
         })
         .map(Into::into);

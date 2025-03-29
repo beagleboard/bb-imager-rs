@@ -14,7 +14,7 @@ pub(crate) enum BBImagerMessage {
         item: Vec<bb_config::config::OsListItem>,
         target: Vec<usize>,
     },
-    BoardSelected(usize),
+    SelectBoard(usize),
     SelectImage(BoardImage),
     SelectLocalImage(bb_config::config::Flasher),
     SelectPort(Destination),
@@ -30,6 +30,7 @@ pub(crate) enum BBImagerMessage {
 
     OpenUrl(Cow<'static, str>),
 
+    /// Messages to ignore
     Null,
 
     /// Navigation
