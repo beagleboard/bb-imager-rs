@@ -1,6 +1,6 @@
 [package]
 name = "bb-downloader"
-version = "0.1.0"
+version = "0.2.0"
 description = "A simple async downloader for applications"
 edition.workspace = true
 authors.workspace = true
@@ -26,3 +26,6 @@ json = ["reqwest/json", "dep:serde"]
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
+
+[package.metadata.docs.rs]
+all-features = true
