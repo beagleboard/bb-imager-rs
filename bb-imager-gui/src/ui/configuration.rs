@@ -6,6 +6,7 @@ use iced::{
 use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
+    persistance::SdCustomization,
 };
 
 use super::helpers::home_btn_text;
@@ -84,7 +85,7 @@ pub(crate) fn view<'a>(
 fn linux_sd_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Column<'a, BBImagerMessage> {
     widget::column![
         hostname_form(config).width(iced::Length::Fill),
@@ -97,7 +98,7 @@ fn linux_sd_form<'a>(
 
 fn keymap_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.keymap.is_some())
@@ -128,7 +129,7 @@ fn keymap_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn hostname_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
@@ -165,7 +166,7 @@ fn hostname_form(config: &helpers::SdCustomization) -> widget::Container<BBImage
 
 fn timezone_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.timezone.is_some())
@@ -197,7 +198,7 @@ fn timezone_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
@@ -235,7 +236,7 @@ fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBIma
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")

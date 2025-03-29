@@ -6,7 +6,7 @@ use iced::{
 
 use crate::{BBImagerMessage, constants, pages};
 
-use super::helpers::{img_or_svg, search_bar};
+use super::helpers::search_bar;
 
 pub(crate) fn view<'a>(
     devices: impl Iterator<Item = (usize, &'a config::Device)>,
@@ -60,4 +60,20 @@ pub(crate) fn view<'a>(
     .spacing(10)
     .padding(10)
     .into()
+}
+
+pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
+    let img = std::fs::read(path).expect("Failed to open image");
+
+    match image::guess_format(&img) {
+        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
+            .width(width)
+            .height(width)
+            .into(),
+
+        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
+            .width(width)
+            .height(width)
+            .into(),
+    }
 }

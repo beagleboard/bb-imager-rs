@@ -60,7 +60,7 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
                 state.selected_destination(),
                 state.is_destionation_selectable(),
             );
-            helpers::dialog(base, flashing_confirmation_menu())
+            dialog(base, flashing_confirmation_menu())
         }
     }
 }
@@ -84,4 +84,17 @@ fn flashing_confirmation_menu<'a>() -> Element<'a, BBImagerMessage> {
     widget::container(menu)
         .style(|_| widget::container::background(iced::Color::WHITE))
         .into()
+}
+
+pub(crate) fn dialog<'a>(
+    base: Element<'a, BBImagerMessage>,
+    menu: Element<'a, BBImagerMessage>,
+) -> Element<'a, BBImagerMessage> {
+    let overlay = widget::opaque(widget::center(menu).style(|_| {
+        widget::container::background(iced::Color {
+            a: 0.8,
+            ..iced::Color::BLACK
+        })
+    }));
+    widget::stack![base, overlay].into()
 }

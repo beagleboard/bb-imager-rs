@@ -16,6 +16,7 @@ mod constants;
 mod helpers;
 mod message;
 mod pages;
+mod persistance;
 mod ui;
 
 fn main() -> iced::Result {
@@ -40,7 +41,7 @@ fn main() -> iced::Result {
     // HACK: mac_notification_sys set application name (not an option in notify-rust)
     let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
-    let app_config = helpers::GuiConfiguration::load().unwrap_or_default();
+    let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
 
     let config: config::Config =
         serde_json::from_slice(constants::DEFAULT_CONFIG).expect("Failed to parse config");
@@ -52,7 +53,7 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    iced::application(constants::APP_NAME, BBImager::update, ui::view)
+    iced::application(constants::APP_NAME, message::update, ui::view)
         .subscription(BBImager::subscription)
         .theme(BBImager::theme)
         .window(settings)
@@ -64,7 +65,7 @@ fn main() -> iced::Result {
 
 #[derive(Debug)]
 struct BBImager {
-    app_config: helpers::GuiConfiguration,
+    app_config: persistance::GuiConfiguration,
     boards: helpers::Boards,
     downloader: bb_downloader::Downloader,
     screen: Vec<Screen>,
@@ -82,7 +83,7 @@ struct BBImager {
 impl BBImager {
     fn new(
         boards: helpers::Boards,
-        app_config: helpers::GuiConfiguration,
+        app_config: persistance::GuiConfiguration,
     ) -> (Self, Task<BBImagerMessage>) {
         let downloader = bb_downloader::Downloader::new(
             directories::ProjectDirs::from(
@@ -173,199 +174,6 @@ impl BBImager {
             )
         });
         Task::batch(tasks)
-    }
-
-    fn update(&mut self, message: BBImagerMessage) -> Task<BBImagerMessage> {
-        match message {
-            BBImagerMessage::UpdateConfig(c) => {
-                tracing::info!("Config: {:#?}", c);
-                self.boards = c;
-                return self.fetch_board_images();
-            }
-            BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
-                self.boards.resolve_remote_subitem(item, &target);
-            }
-            BBImagerMessage::SelectBoard(x) => {
-                // Reset any previously selected values
-                self.selected_dst.take();
-                self.selected_image.take();
-                self.destinations.clear();
-                self.customization.take();
-
-                let os_images = self
-                    .boards
-                    .images(x, &[])
-                    .expect("Initial image list can never be None");
-
-                let remote_image_jobs = self.fetch_remote_subitems(x, &[]);
-                let icons: HashSet<url::Url> = os_images.iter().map(|(_, x)| x.icon()).collect();
-                self.selected_board = Some(x);
-
-                let jobs = icons.into_iter().map(|x| {
-                    let downloader = self.downloader.clone();
-                    let x_clone = x.clone();
-                    Task::perform(
-                        async move { downloader.download_no_cache(x_clone, None).await },
-                        move |p| match p {
-                            Ok(_path) => BBImagerMessage::Null,
-                            Err(e) => {
-                                tracing::warn!("Failed to download image {x} with error {e}");
-                                BBImagerMessage::Null
-                            }
-                        },
-                    )
-                });
-
-                // Close Board selection page
-                self.screen.pop();
-
-                return Task::batch(jobs.chain([remote_image_jobs]));
-            }
-            BBImagerMessage::ProgressBar(x) => {
-                if let Some(screen) = self.screen.pop() {
-                    match screen {
-                        Screen::Flashing(s) => self.screen.push(Screen::Flashing(s.update(x))),
-                        _ => self.screen.push(screen),
-                    }
-                }
-            }
-            BBImagerMessage::SelectImage(x) => {
-                tracing::info!("Selected Image: {}", x);
-                self.selected_image = Some(x);
-                self.screen.clear();
-                self.screen.push(Screen::Home);
-            }
-            BBImagerMessage::SelectLocalImage(flasher) => {
-                let extensions = helpers::file_filter(flasher);
-                return Task::perform(
-                    async move {
-                        rfd::AsyncFileDialog::new()
-                            .add_filter("image", extensions)
-                            .pick_file()
-                            .await
-                            .map(|x| x.path().to_path_buf())
-                    },
-                    move |x| match x {
-                        Some(y) => {
-                            BBImagerMessage::SelectImage(helpers::BoardImage::local(y, flasher))
-                        }
-                        None => BBImagerMessage::Null,
-                    },
-                );
-            }
-            BBImagerMessage::SelectPort(x) => {
-                self.selected_dst = Some(x);
-                self.screen.pop();
-            }
-            BBImagerMessage::Reset => {
-                self.selected_dst.take();
-                self.selected_image.take();
-                self.selected_board.take();
-                self.destinations.clear();
-            }
-            BBImagerMessage::SwitchScreen(x) => {
-                self.screen.clear();
-                return self.push_page(x);
-            }
-            BBImagerMessage::ReplaceScreen(x) => {
-                self.screen.pop();
-                return self.push_page(x);
-            }
-            BBImagerMessage::PushScreen(x) => {
-                tracing::debug!("Push Page: {:?}", x);
-                return self.push_page(x);
-            }
-            BBImagerMessage::PopScreen => {
-                tracing::debug!("Pop screen");
-                self.screen.pop();
-            }
-            BBImagerMessage::CancelFlashing => {
-                if let Some(task) = self.cancel_flashing.take() {
-                    task.abort();
-                }
-
-                match self.screen.last().unwrap() {
-                    Screen::Flashing(s) => {
-                        if let Some(y) = s.progress().cancel() {
-                            return Task::done(BBImagerMessage::StopFlashing(y));
-                        }
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            BBImagerMessage::StartFlashing => {
-                return self.start_flashing(self.customization.clone());
-            }
-            BBImagerMessage::StartFlashingWithoutConfiguraton => {
-                return self.start_flashing(None);
-            }
-            BBImagerMessage::StopFlashing(x) => {
-                let _ = self.cancel_flashing.take();
-                let content = x.content();
-
-                let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
-                let notification_task = Task::future(async move {
-                    let res = tokio::task::spawn_blocking(move || {
-                        notify_rust::Notification::new()
-                            .appname("BeagleBoard Imager")
-                            .body(&content)
-                            .finalize()
-                            .show()
-                    })
-                    .await
-                    .expect("Tokio runtime failed to spawn blocking task");
-
-                    tracing::debug!("Notification response {res:?}");
-                    BBImagerMessage::Null
-                });
-
-                return Task::batch([progress_task, notification_task]);
-            }
-            BBImagerMessage::Destinations(x) => {
-                if !self.is_destionation_selectable() {
-                    assert_eq!(x.len(), 1);
-                    self.selected_dst = Some(x[0].clone());
-                }
-                self.destinations = x;
-            }
-            BBImagerMessage::UpdateFlashConfig(x) => self.customization = Some(x),
-            BBImagerMessage::OpenUrl(x) => {
-                return Task::future(async move {
-                    let res = webbrowser::open(&x);
-                    tracing::info!("Open Url Resp {res:?}");
-                    BBImagerMessage::Null
-                });
-            }
-            BBImagerMessage::SaveCustomization => {
-                match self.customization.clone().unwrap() {
-                    FlashingCustomization::LinuxSd(c) => self.app_config.update_sd_customization(c),
-                    FlashingCustomization::Bcf(c) => self.app_config.update_bcf_customization(c),
-                    _ => {}
-                }
-
-                let config = self.app_config.clone();
-
-                // Since we have a cache of config, no need to wait for disk persistance.
-                self.screen.pop();
-
-                return Task::future(async move {
-                    if let Err(e) = config.save().await {
-                        tracing::error!("Failed to save config: {e}");
-                    }
-                    BBImagerMessage::Null
-                });
-            }
-            BBImagerMessage::ResetCustomization => {
-                self.customization = Some(self.customization.clone().unwrap().reset());
-            }
-            BBImagerMessage::CancelCustomization => {
-                self.screen.pop();
-                self.customization = Some(self.config());
-            }
-            BBImagerMessage::Null => {}
-        };
-
-        Task::none()
     }
 
     fn push_page(&mut self, x: Screen) -> Task<BBImagerMessage> {
@@ -535,8 +343,7 @@ impl BBImager {
                     .is_destination_selection()
             {
                 let stream = iced::futures::stream::unfold(flasher, move |f| async move {
-                    let mut dsts: Vec<helpers::Destination> =
-                        helpers::destinations(flasher).await.into_iter().collect();
+                    let mut dsts = helpers::destinations(flasher).await;
                     dsts.sort_by_key(|a| a.size());
                     let dsts = BBImagerMessage::Destinations(dsts);
                     Some((dsts, f))
