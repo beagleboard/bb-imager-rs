@@ -3,6 +3,8 @@ name: Create Release artifacts
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - v*
 
 env:
   CARGO_TERM_COLOR: always
@@ -81,12 +83,22 @@ jobs:
       run: make setup-packaging-deps
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
-    - name: Release
+    - name: Pre-Release
       uses: softprops/action-gh-release@v2
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
       with:
         prerelease: true
         name: Continuous Release
         tag_name: continuous-release
+        files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
+          bb-imager-service/dist/*
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        generate_release_notes: true
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
@@ -125,8 +137,9 @@ jobs:
       run: make setup-packaging-deps
     - name: Build packages
       run: make package-cli-linux-targz package-cli-linux-deb package-gui-linux-targz package-gui-linux-deb 
-    - name: Release
+    - name: Pre-Release
       uses: softprops/action-gh-release@v2
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
       with:
         prerelease: true
         name: Continuous Release
@@ -134,3 +147,13 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
+          bb-imager-service/dist/*
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        generate_release_notes: true
+        files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
+          bb-imager-service/dist/*
