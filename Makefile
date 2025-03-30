@@ -213,3 +213,15 @@ setup-fedora-deps:
 setup-packaging-deps:
 	@echo "Installing dependencies required for packaging"
 	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch bb-imager
+
+
+## housekeeping: package-rename: Replace package version with `_alpha_`. Intended for use in CI.
+.PHONY: package-rename-alpha
+package-rename:
+	for pkg in gui cli service; do \
+		if [ -d bb-imager-$$pkg/dist ]; then \
+			for file in bb-imager-$$pkg/dist/*; do \
+				mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
+			done \
+		fi \
+	done

@@ -83,6 +83,10 @@ jobs:
       run: make setup-packaging-deps
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: make package-rename
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
       if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
@@ -137,6 +141,10 @@ jobs:
       run: make setup-packaging-deps
     - name: Build packages
       run: make package-cli-linux-targz package-cli-linux-deb package-gui-linux-targz package-gui-linux-deb 
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: make package-rename
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
       if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
