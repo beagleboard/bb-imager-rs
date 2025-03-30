@@ -3,12 +3,10 @@ use iced::{
     widget::{self, text},
 };
 
-use crate::{
-    BBImagerMessage, constants,
-    helpers::{self, home_btn_svg, home_btn_text},
-};
+use crate::{BBImagerMessage, constants, helpers, pages::ImageSelectionState};
 
-use super::{Screen, image_selection::ImageSelectionPage};
+use super::helpers::home_btn_text;
+use crate::pages::Screen;
 
 pub(crate) fn view<'a>(
     selected_board: Option<&'a bb_config::config::Device>,
@@ -22,7 +20,9 @@ pub(crate) fn view<'a>(
             None => home_btn_text("CHOOSE DEVICE", true, iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection));
+        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection(
+            Default::default(),
+        )));
 
         let choose_image_btn = match selected_image {
             Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
@@ -30,7 +30,7 @@ pub(crate) fn view<'a>(
         }
         .width(iced::Length::Fill)
         .on_press_maybe(selected_board.map(|board| {
-            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionPage::new(
+            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionState::new(
                 board.flasher,
             )))
         }));
@@ -47,7 +47,9 @@ pub(crate) fn view<'a>(
         .on_press_maybe(if selected_image.is_none() || !destination_selectable {
             None
         } else {
-            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection))
+            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection(
+                Default::default(),
+            )))
         });
 
         let reset_btn = home_btn_text("RESET", true, iced::Length::Fill)
@@ -131,4 +133,48 @@ pub(crate) fn view<'a>(
         .into()
     })
     .into()
+}
+
+pub(crate) fn home_btn_svg<'a>(
+    icon: &'static [u8],
+    active: bool,
+) -> widget::Button<'a, BBImagerMessage> {
+    const ICON_SIZE: u16 = 32;
+    const PADDING: u16 = 4;
+    const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
+
+    fn svg_style(active: bool) -> widget::svg::Style {
+        if active {
+            Default::default()
+        } else {
+            widget::svg::Style {
+                color: Some(iced::Color::BLACK.scale_alpha(0.5)),
+            }
+        }
+    }
+
+    fn btn_style(active: bool) -> widget::button::Style {
+        if active {
+            widget::button::Style {
+                background: Some(iced::Color::WHITE.into()),
+                border: iced::border::rounded(RADIUS),
+                ..Default::default()
+            }
+        } else {
+            widget::button::Style {
+                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
+                border: iced::border::rounded(RADIUS),
+                ..Default::default()
+            }
+        }
+    }
+
+    widget::button(
+        widget::svg(widget::svg::Handle::from_memory(icon))
+            .style(move |_, _| svg_style(active))
+            .width(ICON_SIZE)
+            .height(ICON_SIZE),
+    )
+    .style(move |_, _| btn_style(active))
+    .padding(PADDING)
 }

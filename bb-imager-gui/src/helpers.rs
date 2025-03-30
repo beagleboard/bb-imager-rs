@@ -1,52 +1,15 @@
-use std::{
-    borrow::Cow, collections::HashSet, fmt::Display, io::Read, path::PathBuf, sync::LazyLock,
-};
+use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
 
+use crate::BBImagerMessage;
 use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
-    Element, futures,
-    widget::{self, button, text},
+    futures,
+    widget::{self, text},
 };
-use serde::{Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
 
-use crate::{BBImagerMessage, constants, pages::configuration::FlashingCustomization};
-
-const ICON_SIZE: u16 = 32;
-const PADDING: u16 = 4;
-const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
-
-pub(crate) fn input_with_label<'a, F>(
-    label: &'static str,
-    placeholder: &'static str,
-    val: &'a str,
-    func: F,
-) -> widget::Row<'a, BBImagerMessage>
-where
-    F: 'a + Fn(String) -> FlashingCustomization,
-{
-    element_with_label(
-        label,
-        widget::text_input(placeholder, val)
-            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(func(inp)))
-            .width(200)
-            .into(),
-    )
-}
-
-pub(crate) fn element_with_label<'a>(
-    label: &'static str,
-    el: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![text(label), widget::horizontal_space(), el]
-        .padding(10)
-        .spacing(10)
-        .align_y(iced::Alignment::Center)
-}
-
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ProgressBarState {
     label: Cow<'static, str>,
     progress: f32,
@@ -297,107 +260,6 @@ impl From<config::Config> for Boards {
     }
 }
 
-pub(crate) fn home_btn_text<'a>(
-    txt: impl text::IntoFragment<'a>,
-    active: bool,
-    text_width: iced::Length,
-) -> widget::Button<'a, BBImagerMessage> {
-    fn style(active: bool) -> widget::button::Style {
-        if active {
-            widget::button::Style {
-                background: Some(iced::Color::WHITE.into()),
-                text_color: constants::BEAGLE_BRAND_COLOR,
-                border: iced::border::rounded(4),
-                ..Default::default()
-            }
-        } else {
-            widget::button::Style {
-                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-                text_color: iced::Color::BLACK.scale_alpha(0.8),
-                border: iced::border::rounded(4),
-                ..Default::default()
-            }
-        }
-    }
-
-    button(
-        text(txt)
-            .font(constants::FONT_BOLD)
-            .align_x(iced::Alignment::Center)
-            .align_y(iced::Alignment::Center)
-            .width(text_width),
-    )
-    .padding(8)
-    .style(move |_, _| style(active))
-}
-
-pub(crate) fn home_btn_svg<'a>(
-    icon: &'static [u8],
-    active: bool,
-) -> widget::Button<'a, BBImagerMessage> {
-    fn svg_style(active: bool) -> widget::svg::Style {
-        if active {
-            Default::default()
-        } else {
-            widget::svg::Style {
-                color: Some(iced::Color::BLACK.scale_alpha(0.5)),
-            }
-        }
-    }
-
-    fn btn_style(active: bool) -> widget::button::Style {
-        if active {
-            widget::button::Style {
-                background: Some(iced::Color::WHITE.into()),
-                border: iced::border::rounded(RADIUS),
-                ..Default::default()
-            }
-        } else {
-            widget::button::Style {
-                background: Some(iced::Color::BLACK.scale_alpha(0.5).into()),
-                border: iced::border::rounded(RADIUS),
-                ..Default::default()
-            }
-        }
-    }
-
-    button(
-        widget::svg(widget::svg::Handle::from_memory(icon))
-            .style(move |_, _| svg_style(active))
-            .width(ICON_SIZE)
-            .height(ICON_SIZE),
-    )
-    .style(move |_, _| btn_style(active))
-    .padding(PADDING)
-}
-
-pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).expect("Failed to open image");
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
-    }
-}
-
-pub(crate) fn search_bar(cur_search: &str) -> Element<BBImagerMessage> {
-    widget::row![
-        button(widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22))
-            .on_press(BBImagerMessage::PopScreen)
-            .style(widget::button::secondary),
-        widget::text_input("Search", cur_search).on_input(BBImagerMessage::Search)
-    ]
-    .spacing(10)
-    .into()
-}
-
 #[derive(Debug, Clone)]
 pub(crate) enum BoardImage {
     SdFormat,
@@ -455,222 +317,7 @@ impl std::fmt::Display for BoardImage {
 
 pub(crate) fn system_timezone() -> Option<&'static String> {
     static SYSTEM_TIMEZONE: LazyLock<Option<String>> = LazyLock::new(localzone::get_local_zone);
-
     (*SYSTEM_TIMEZONE).as_ref()
-}
-
-/// Configuration for GUI that should be presisted
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GuiConfiguration {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sd_customization: Option<SdCustomization>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    bcf_customization: Option<BcfCustomization>,
-    #[cfg(feature = "pb2_mspm0")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pb2_mspm0_customization: Option<Pb2Mspm0Customization>,
-}
-
-impl GuiConfiguration {
-    pub(crate) fn load() -> std::io::Result<Self> {
-        let mut data = Vec::with_capacity(512);
-        let config_p = Self::config_path().unwrap();
-
-        let mut config = std::fs::File::open(config_p)?;
-        config.read_to_end(&mut data)?;
-
-        Ok(serde_json::from_slice(&data).unwrap())
-    }
-
-    pub(crate) async fn save(&self) -> std::io::Result<()> {
-        let data = serde_json::to_string_pretty(self).unwrap();
-        let config_p = Self::config_path().unwrap();
-
-        tracing::info!("Configuration Path: {:?}", config_p);
-        tokio::fs::create_dir_all(config_p.parent().unwrap()).await?;
-
-        let mut config = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(config_p)
-            .await?;
-
-        config.write_all(data.as_bytes()).await?;
-
-        Ok(())
-    }
-
-    fn config_path() -> Option<PathBuf> {
-        let dirs = directories::ProjectDirs::from(
-            constants::PACKAGE_QUALIFIER.0,
-            constants::PACKAGE_QUALIFIER.1,
-            constants::PACKAGE_QUALIFIER.2,
-        )?;
-
-        Some(dirs.config_local_dir().join("config.json").to_owned())
-    }
-
-    pub(crate) const fn sd_customization(&self) -> Option<&SdCustomization> {
-        self.sd_customization.as_ref()
-    }
-
-    pub(crate) const fn bcf_customization(&self) -> Option<&BcfCustomization> {
-        self.bcf_customization.as_ref()
-    }
-
-    #[cfg(feature = "pb2_mspm0")]
-    pub(crate) const fn pb2_mspm0_customization(&self) -> Option<&Pb2Mspm0Customization> {
-        self.pb2_mspm0_customization.as_ref()
-    }
-
-    pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
-        self.sd_customization = Some(t);
-    }
-
-    pub(crate) fn update_bcf_customization(&mut self, t: BcfCustomization) {
-        self.bcf_customization = Some(t)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct SdCustomization {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) hostname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) timezone: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) keymap: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) user: Option<SdCustomizationUser>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) wifi: Option<SdCustomizationWifi>,
-}
-
-impl SdCustomization {
-    pub(crate) fn update_hostname(mut self, t: Option<String>) -> Self {
-        self.hostname = t;
-        self
-    }
-
-    pub(crate) fn update_timezone(mut self, t: Option<String>) -> Self {
-        self.timezone = t;
-        self
-    }
-
-    pub(crate) fn update_keymap(mut self, t: Option<String>) -> Self {
-        self.keymap = t;
-        self
-    }
-
-    pub(crate) fn update_user(mut self, t: Option<SdCustomizationUser>) -> Self {
-        self.user = t;
-        self
-    }
-
-    pub(crate) fn update_wifi(mut self, t: Option<SdCustomizationWifi>) -> Self {
-        self.wifi = t;
-        self
-    }
-}
-
-impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
-    fn from(value: SdCustomization) -> Self {
-        Self::new(
-            value.hostname,
-            value.timezone,
-            value.keymap,
-            value.user.map(|x| (x.username, x.password)),
-            value.wifi.map(|x| (x.ssid, x.password)),
-        )
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SdCustomizationUser {
-    pub(crate) username: String,
-    pub(crate) password: String,
-}
-
-impl SdCustomizationUser {
-    pub(crate) const fn new(username: String, password: String) -> Self {
-        Self { username, password }
-    }
-
-    pub(crate) fn update_username(mut self, t: String) -> Self {
-        self.username = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-}
-
-impl Default for SdCustomizationUser {
-    fn default() -> Self {
-        Self::new(whoami::username(), String::new())
-    }
-}
-
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SdCustomizationWifi {
-    pub(crate) ssid: String,
-    pub(crate) password: String,
-}
-
-impl SdCustomizationWifi {
-    pub(crate) fn update_ssid(mut self, t: String) -> Self {
-        self.ssid = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BcfCustomization {
-    pub(crate) verify: bool,
-}
-
-impl BcfCustomization {
-    pub(crate) fn update_verify(mut self, t: bool) -> Self {
-        self.verify = t;
-        self
-    }
-}
-
-impl Default for BcfCustomization {
-    fn default() -> Self {
-        Self { verify: true }
-    }
-}
-
-#[cfg(feature = "pb2_mspm0")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Pb2Mspm0Customization {
-    pub(crate) persist_eeprom: bool,
-}
-
-#[cfg(feature = "pb2_mspm0")]
-impl Pb2Mspm0Customization {
-    pub(crate) fn update_persist_eeprom(mut self, t: bool) -> Self {
-        self.persist_eeprom = t;
-        self
-    }
-}
-
-#[cfg(feature = "pb2_mspm0")]
-impl Default for Pb2Mspm0Customization {
-    fn default() -> Self {
-        Self {
-            persist_eeprom: true,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -855,7 +502,7 @@ impl Destination {
     }
 }
 
-pub(crate) async fn destinations(flasher: config::Flasher) -> HashSet<Destination> {
+pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
     match flasher {
         config::Flasher::SdCard => bb_flasher::sd::Target::destinations()
             .await
@@ -925,21 +572,49 @@ const fn flasher_supported(flasher: config::Flasher) -> bool {
     }
 }
 
-pub(crate) fn format_size(size: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = 1024.0 * KB;
-    const GB: f64 = 1024.0 * MB;
-    const TB: f64 = 1024.0 * GB;
+#[derive(Clone, Debug)]
+pub(crate) enum FlashingCustomization {
+    LinuxSdFormat,
+    LinuxSd(crate::persistance::SdCustomization),
+    Bcf(crate::persistance::BcfCustomization),
+    Msp430,
+    #[cfg(feature = "pb2_mspm0")]
+    Pb2Mspm0(crate::persistance::Pb2Mspm0Customization),
+}
 
-    if size < KB as u64 {
-        format!("{} B", size)
-    } else if size < MB as u64 {
-        format!("{:.2} KB", size as f64 / KB)
-    } else if size < GB as u64 {
-        format!("{:.2} MB", size as f64 / MB)
-    } else if size < TB as u64 {
-        format!("{:.2} GB", size as f64 / GB)
-    } else {
-        format!("{:.2} TB", size as f64 / TB)
+impl FlashingCustomization {
+    pub(crate) fn new(
+        flasher: config::Flasher,
+        img: &BoardImage,
+        app_config: &crate::persistance::GuiConfiguration,
+    ) -> Self {
+        match flasher {
+            config::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
+            config::Flasher::SdCard => {
+                Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
+            }
+            config::Flasher::BeagleConnectFreedom => {
+                Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
+            }
+            config::Flasher::Msp430Usb => Self::Msp430,
+            #[cfg(feature = "pb2_mspm0")]
+            config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
+                app_config
+                    .pb2_mspm0_customization()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub(crate) fn reset(self) -> Self {
+        match self {
+            Self::LinuxSd(_) => Self::LinuxSd(Default::default()),
+            Self::Bcf(_) => Self::Bcf(Default::default()),
+            #[cfg(feature = "pb2_mspm0")]
+            Self::Pb2Mspm0(_) => Self::Pb2Mspm0(Default::default()),
+            _ => self,
+        }
     }
 }

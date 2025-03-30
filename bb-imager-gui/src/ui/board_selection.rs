@@ -1,21 +1,20 @@
+use bb_config::config;
 use iced::{
     Element,
     widget::{self, button, text},
 };
 
-use crate::{
-    BBImagerMessage, constants,
-    helpers::{self, img_or_svg},
-};
+use crate::{BBImagerMessage, constants, pages};
+
+use super::helpers::search_bar;
 
 pub(crate) fn view<'a>(
-    boards: &'a helpers::Boards,
-    search_bar: &'a str,
+    devices: impl Iterator<Item = (usize, &'a config::Device)>,
+    search_str: &'a str,
     downloader: &'a bb_downloader::Downloader,
 ) -> Element<'a, BBImagerMessage> {
-    let items = boards
-        .devices()
-        .filter(|(_, x)| x.name.to_lowercase().contains(&search_bar.to_lowercase()))
+    let items = devices
+        .filter(|(_, x)| x.name.to_lowercase().contains(&search_str.to_lowercase()))
         .map(|(id, dev)| {
             let image: Element<BBImagerMessage> = match &dev.icon {
                 Some(url) => match downloader.clone().check_cache_from_url(url.clone()) {
@@ -46,19 +45,35 @@ pub(crate) fn view<'a>(
                 .spacing(10),
             )
             .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::BoardSelected(id))
+            .on_press(BBImagerMessage::SelectBoard(id))
             .style(widget::button::secondary)
         })
         .map(Into::into);
 
-    let items = widget::scrollable(widget::column(items).spacing(10));
-
     widget::column![
-        helpers::search_bar(search_bar),
+        search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
+            pages::Screen::BoardSelection(pages::SearchState::new(x))
+        )),
         widget::horizontal_rule(2),
-        items
+        widget::scrollable(widget::column(items).spacing(10))
     ]
     .spacing(10)
     .padding(10)
     .into()
+}
+
+pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
+    let img = std::fs::read(path).expect("Failed to open image");
+
+    match image::guess_format(&img) {
+        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
+            .width(width)
+            .height(width)
+            .into(),
+
+        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
+            .width(width)
+            .height(width)
+            .into(),
+    }
 }

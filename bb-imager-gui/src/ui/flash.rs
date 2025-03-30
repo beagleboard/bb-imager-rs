@@ -1,50 +1,15 @@
 use iced::{Element, widget};
 
-use crate::{
-    BBImagerMessage, Screen, constants,
-    helpers::{ProgressBarState, home_btn_text},
-};
+use crate::{BBImagerMessage, Screen, constants, pages::FlashingState};
 
-#[derive(Debug, Clone)]
-pub(crate) struct FlashingState {
-    pub(crate) progress: ProgressBarState,
-    documentation: String,
-}
-
-impl FlashingState {
-    pub(crate) fn new(progress: ProgressBarState, documentation: String) -> Self {
-        Self {
-            documentation,
-            progress,
-        }
-    }
-
-    pub(crate) fn update(mut self, progress: ProgressBarState) -> Self {
-        self.progress = progress;
-        self
-    }
-
-    fn about(&self) -> widget::Scrollable<'_, BBImagerMessage> {
-        widget::scrollable(widget::rich_text![
-            widget::span(constants::BEAGLE_BOARD_ABOUT)
-                .link(BBImagerMessage::OpenUrl(
-                    "https://www.beagleboard.org/about".into()
-                ))
-                .color(iced::Color::WHITE),
-            widget::span("\n\n"),
-            widget::span("For more information, check out our documentation")
-                .link(BBImagerMessage::OpenUrl(self.documentation.clone().into()))
-                .color(iced::Color::WHITE)
-        ])
-    }
-}
+use super::helpers::home_btn_text;
 
 pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
     widget::responsive(move |size| {
         const FOOTER_HEIGHT: f32 = 150.0;
         let banner_height = size.height / 4.0;
 
-        let prog_bar = state.progress.bar().spacing(12);
+        let prog_bar = state.progress().bar().spacing(12);
 
         let btn = if running {
             home_btn_text("CANCEL", true, iced::Length::Shrink)
@@ -56,9 +21,7 @@ pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMess
 
         let bottom = widget::container(
             widget::column![
-                state
-                    .about()
-                    .height(size.height - FOOTER_HEIGHT - banner_height),
+                about(state.documentation()).height(size.height - FOOTER_HEIGHT - banner_height),
                 btn,
                 prog_bar
             ]
@@ -87,4 +50,18 @@ pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMess
         .into()
     })
     .into()
+}
+
+fn about(documentation: &str) -> widget::Scrollable<'_, BBImagerMessage> {
+    widget::scrollable(widget::rich_text![
+        widget::span(constants::BEAGLE_BOARD_ABOUT)
+            .link(BBImagerMessage::OpenUrl(
+                "https://www.beagleboard.org/about".into()
+            ))
+            .color(iced::Color::WHITE),
+        widget::span("\n\n"),
+        widget::span("For more information, check out our documentation")
+            .link(BBImagerMessage::OpenUrl(documentation.to_string().into()))
+            .color(iced::Color::WHITE)
+    ])
 }

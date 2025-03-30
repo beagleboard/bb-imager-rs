@@ -1,4 +1,3 @@
-use bb_config::config;
 use iced::{
     Element,
     widget::{self, text},
@@ -6,8 +5,11 @@ use iced::{
 
 use crate::{
     BBImagerMessage,
-    helpers::{self, home_btn_text},
+    helpers::{self, FlashingCustomization},
+    persistance::SdCustomization,
 };
+
+use super::helpers::home_btn_text;
 
 pub(crate) fn view<'a>(
     customization: &'a FlashingCustomization,
@@ -83,7 +85,7 @@ pub(crate) fn view<'a>(
 fn linux_sd_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Column<'a, BBImagerMessage> {
     widget::column![
         hostname_form(config).width(iced::Length::Fill),
@@ -96,7 +98,7 @@ fn linux_sd_form<'a>(
 
 fn keymap_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.keymap.is_some())
@@ -127,7 +129,7 @@ fn keymap_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn hostname_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
@@ -164,7 +166,7 @@ fn hostname_form(config: &helpers::SdCustomization) -> widget::Container<BBImage
 
 fn timezone_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
-    config: &'a helpers::SdCustomization,
+    config: &'a SdCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.timezone.is_some())
@@ -196,7 +198,7 @@ fn timezone_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
@@ -210,7 +212,7 @@ fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBIma
 
     if let Some(usr) = config.user.as_ref() {
         form = form.extend([
-            helpers::input_with_label("Username", "username", &usr.username, |inp| {
+            input_with_label("Username", "username", &usr.username, |inp| {
                 FlashingCustomization::LinuxSd(
                     config
                         .clone()
@@ -218,7 +220,7 @@ fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBIma
                 )
             })
             .into(),
-            helpers::input_with_label("Password", "password", &usr.password, |inp| {
+            input_with_label("Password", "password", &usr.password, |inp| {
                 FlashingCustomization::LinuxSd(
                     config
                         .clone()
@@ -234,7 +236,7 @@ fn uname_pass_form(config: &helpers::SdCustomization) -> widget::Container<BBIma
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")
@@ -248,7 +250,7 @@ fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMes
 
     if let Some(wifi) = config.wifi.as_ref() {
         form = form.extend([
-            helpers::input_with_label("SSID", "SSID", &wifi.ssid, |inp| {
+            input_with_label("SSID", "SSID", &wifi.ssid, |inp| {
                 FlashingCustomization::LinuxSd(
                     config
                         .clone()
@@ -256,7 +258,7 @@ fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMes
                 )
             })
             .into(),
-            helpers::input_with_label("Password", "password", &wifi.password, |inp| {
+            input_with_label("Password", "password", &wifi.password, |inp| {
                 FlashingCustomization::LinuxSd(
                     config
                         .clone()
@@ -272,49 +274,30 @@ fn wifi_form(config: &helpers::SdCustomization) -> widget::Container<BBImagerMes
         .style(widget::container::bordered_box)
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum FlashingCustomization {
-    LinuxSdFormat,
-    LinuxSd(helpers::SdCustomization),
-    Bcf(helpers::BcfCustomization),
-    Msp430,
-    #[cfg(feature = "pb2_mspm0")]
-    Pb2Mspm0(helpers::Pb2Mspm0Customization),
+pub(crate) fn input_with_label<'a, F>(
+    label: &'static str,
+    placeholder: &'static str,
+    val: &'a str,
+    func: F,
+) -> widget::Row<'a, BBImagerMessage>
+where
+    F: 'a + Fn(String) -> FlashingCustomization,
+{
+    element_with_label(
+        label,
+        widget::text_input(placeholder, val)
+            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(func(inp)))
+            .width(200)
+            .into(),
+    )
 }
 
-impl FlashingCustomization {
-    pub(crate) fn new(
-        flasher: config::Flasher,
-        img: &helpers::BoardImage,
-        app_config: &helpers::GuiConfiguration,
-    ) -> Self {
-        match flasher {
-            config::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
-            config::Flasher::SdCard => {
-                Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
-            }
-            config::Flasher::BeagleConnectFreedom => {
-                Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
-            }
-            config::Flasher::Msp430Usb => Self::Msp430,
-            #[cfg(feature = "pb2_mspm0")]
-            config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
-                app_config
-                    .pb2_mspm0_customization()
-                    .cloned()
-                    .unwrap_or_default(),
-            ),
-            _ => unimplemented!(),
-        }
-    }
-
-    pub(crate) fn reset(self) -> Self {
-        match self {
-            Self::LinuxSd(_) => Self::LinuxSd(Default::default()),
-            Self::Bcf(_) => Self::Bcf(Default::default()),
-            #[cfg(feature = "pb2_mspm0")]
-            Self::Pb2Mspm0(_) => Self::Pb2Mspm0(Default::default()),
-            _ => self,
-        }
-    }
+pub(crate) fn element_with_label<'a>(
+    label: &'static str,
+    el: Element<'a, BBImagerMessage>,
+) -> widget::Row<'a, BBImagerMessage> {
+    widget::row![text(label), widget::horizontal_space(), el]
+        .padding(10)
+        .spacing(10)
+        .align_y(iced::Alignment::Center)
 }
