@@ -148,8 +148,14 @@ impl MSP430 {
 
     fn load_binfile(&self, bin: &bin_file::BinFile) -> Result<()> {
         for (start_address, data) in bin.segments_list() {
+            tracing::debug!(
+                "Start Address: {}, Data: {:?}, Data Len: {}",
+                start_address,
+                data,
+                data.len()
+            );
             let mut offset = 0;
-            assert!(data.len() % 2 == 0);
+            // assert!(data.len() % 2 == 0);
             while offset < data.len() {
                 offset += self.rx_data_block_fast(start_address + offset, &data[offset..])?;
             }
