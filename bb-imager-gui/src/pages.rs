@@ -68,6 +68,11 @@ impl ImageSelectionState {
         self.idx.push(id);
         self
     }
+
+    pub(crate) fn with_flasher(mut self, flasher: bb_config::config::Flasher) -> Self {
+        self.flasher = flasher;
+        self
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]

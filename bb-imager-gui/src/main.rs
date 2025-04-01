@@ -342,6 +342,7 @@ impl BBImager {
                     .expect("No screen")
                     .is_destination_selection()
             {
+                tracing::info!("Refresh destinations for {:?}", flasher);
                 let stream = iced::futures::stream::unfold(flasher, move |f| async move {
                     let mut dsts = helpers::destinations(flasher).await;
                     dsts.sort_by_key(|a| a.size());

@@ -168,21 +168,21 @@ fn entry<'a>(
             item.icon.clone(),
             &item.name,
             &item.description,
-            push_screen(state, id),
+            push_screen(state, id, item.flasher),
         ),
         config::OsListItem::RemoteSubList(item) => internal(
             downloader,
             item.icon.clone(),
             &item.name,
             &item.description,
-            push_screen(state, id),
+            push_screen(state, id, item.flasher),
         ),
     }
 }
 
-fn push_screen(state: &pages::ImageSelectionState, id: usize) -> BBImagerMessage {
+fn push_screen(state: &pages::ImageSelectionState, id: usize, flasher: config::Flasher) -> BBImagerMessage {
     BBImagerMessage::PushScreen(pages::Screen::ImageSelection(
-        state.clone().with_added_id(id),
+        state.clone().with_added_id(id).with_flasher(flasher),
     ))
 }
 
