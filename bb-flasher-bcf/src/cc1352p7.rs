@@ -325,7 +325,6 @@ pub fn flash(
     check_arc(cancel.as_ref())?;
     for (start_address, data) in firmware_bin.segments_list() {
         let mut offset = 0;
-        assert!(data.len() % 2 == 0);
 
         bcf.send_download(
             start_address.try_into().unwrap(),
