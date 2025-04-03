@@ -86,11 +86,39 @@
 			"name": "MicroBlocks",
 			"description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
 			"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
-			"devices": [
-				"beagleconnect-freedom"
-			],
 			"flasher": "BeagleConnectFreedom",
-			"subitems_url": "https://openbeagle.org/api/v4/projects/809/packages/generic/os_list/stable/os_list.json"
+			"subitems": [
+				{
+					"name": "MicroBlocks Stable Builds",
+					"description": "Latest stable MicroBlocks Release",
+					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"flasher": "BeagleConnectFreedom",
+					"devices": [
+						"beagleconnect-freedom"
+					],
+					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_stable.json"
+				},
+				{
+					"name": "MicroBlocks Pilot Builds",
+					"description": "Explore upcoming MicroBlocks release",
+					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"flasher": "BeagleConnectFreedom",
+					"devices": [
+						"beagleconnect-freedom"
+					],
+					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_pilot.json"
+				},
+				{
+					"name": "MicroBlocks Development Builds",
+					"description": "Cutting edge MicroBlocks builds. Do not use in Production",
+					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"flasher": "BeagleConnectFreedom",
+					"devices": [
+						"beagleconnect-freedom"
+					],
+					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_dev.json"
+				}
+			]
 		},
 		{
 			"name": "MSP430 Firmware",
