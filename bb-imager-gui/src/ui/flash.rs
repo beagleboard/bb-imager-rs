@@ -1,4 +1,5 @@
-use iced::{Element, widget};
+use iced::{Color, Element, Length, widget};
+use iced_loading::Linear;
 
 use crate::{BBImagerMessage, Screen, constants, pages::FlashingState};
 
@@ -9,7 +10,22 @@ pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMess
         const FOOTER_HEIGHT: f32 = 150.0;
         let banner_height = size.height / 4.0;
 
-        let prog_bar = state.progress().bar().spacing(12);
+        let label = state.progress().content();
+        let prog_bar =
+            if label == "Preparing..." || label == "Verifying..." || label == "Customizing..." {
+                widget::column![
+                    widget::text(label).color(iced::Color::WHITE),
+                    Linear::new()
+                        .width(Length::Fill)
+                        .height(8.0)
+                        .cycle_duration(std::time::Duration::from_millis(1000))
+                        .color(Color::from_rgb(0.0, 0.5, 1.0)),
+                ]
+                .align_x(iced::Alignment::Center)
+                .spacing(12)
+            } else {
+                state.progress().bar().spacing(12)
+            };
 
         let btn = if running {
             home_btn_text("CANCEL", true, iced::Length::Shrink)
