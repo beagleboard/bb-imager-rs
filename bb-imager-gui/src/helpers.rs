@@ -5,9 +5,8 @@ use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
-    futures,
-    widget::{self, text, progress_bar, Column},
-    Color, Length,
+    Color, Length, futures,
+    widget::{self, Column, progress_bar, text},
 };
 use iced_loading::Linear;
 
@@ -93,8 +92,6 @@ impl ProgressBarState {
                     .cycle_duration(std::time::Duration::from_millis(1000))
                     .color(Color::from_rgb(0.0, 0.5, 1.0)),
             ]
-            .align_x(iced::Alignment::Center)
-            .spacing(12)
         } else {
             widget::column![
                 text(self.label.clone()).color(Color::WHITE),
@@ -102,9 +99,9 @@ impl ProgressBarState {
                     .height(8)
                     .style(self.state.style()),
             ]
-            .align_x(iced::Alignment::Center)
-            .spacing(12)
         }
+        .align_x(iced::Alignment::Center)
+        .spacing(12)
     }
 
     pub(crate) fn cancel(&self) -> Option<Self> {
