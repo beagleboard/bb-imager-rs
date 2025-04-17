@@ -25,7 +25,6 @@ impl Customization {
             let boot_part = mbr.get(1).ok_or(Error::Customization(
                 "Failed to get boot partition".to_string(),
             ))?;
-            assert_eq!(boot_part.sys, 12);
             let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
             let end_offset: u64 =
                 start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
