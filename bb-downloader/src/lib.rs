@@ -297,7 +297,11 @@ impl Downloader {
                 .expect("SHA-256 is 32 bytes");
 
             if hash != sha256 {
-                tracing::warn!("{hash:?} != {sha256:?}");
+                tracing::error!(
+                    "Expected SHA256: {}, got {}",
+                    const_hex::encode(sha256),
+                    const_hex::encode(hash)
+                );
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Invalid SHA256",
@@ -367,7 +371,12 @@ impl AsyncTempFile {
     async fn persist(&mut self, path: &Path) -> io::Result<()> {
         let mut f = tokio::fs::File::create(path).await?;
         self.0.seek(io::SeekFrom::Start(0)).await?;
+
         tokio::io::copy(&mut self.0, &mut f).await?;
+
+        // Causes errors if not present
+        f.flush().await?;
+
         Ok(())
     }
 }
