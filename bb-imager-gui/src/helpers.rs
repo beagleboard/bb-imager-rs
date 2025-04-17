@@ -6,8 +6,10 @@ use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 use iced::{
     futures,
-    widget::{self, text},
+    widget::{self, text, progress_bar, Column},
+    Color, Length,
 };
+use iced_loading::Linear;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ProgressBarState {
@@ -77,19 +79,32 @@ impl ProgressBarState {
         Self::new(label, 1.0, ProgressBarStatus::Fail, None)
     }
 
-    pub(crate) fn bar(&self) -> widget::Column<'_, BBImagerMessage> {
+    pub(crate) fn bar(&self) -> Column<'_, BBImagerMessage> {
         use std::ops::RangeInclusive;
-        use widget::progress_bar;
 
         const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
 
-        widget::column![
-            text(self.label.clone()).color(iced::Color::WHITE),
-            progress_bar(RANGE, self.progress)
-                .height(8)
-                .style(self.state.style()),
-        ]
-        .align_x(iced::Alignment::Center)
+        if self.state == ProgressBarStatus::Loading {
+            widget::column![
+                text(self.label.clone()).color(Color::WHITE),
+                Linear::new()
+                    .width(Length::Fill)
+                    .height(8.0)
+                    .cycle_duration(std::time::Duration::from_millis(1000))
+                    .color(Color::from_rgb(0.0, 0.5, 1.0)),
+            ]
+            .align_x(iced::Alignment::Center)
+            .spacing(12)
+        } else {
+            widget::column![
+                text(self.label.clone()).color(Color::WHITE),
+                progress_bar(RANGE, self.progress)
+                    .height(8)
+                    .style(self.state.style()),
+            ]
+            .align_x(iced::Alignment::Center)
+            .spacing(12)
+        }
     }
 
     pub(crate) fn cancel(&self) -> Option<Self> {
