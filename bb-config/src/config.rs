@@ -158,6 +158,8 @@ pub enum Flasher {
     Msp430Usb,
     /// PocketBeagle2 Mspm0 firmware
     Pb2Mspm0,
+    /// Zephyr SD Card images
+    ZephyrSdCard
 }
 
 impl Extend<Self> for Config {
