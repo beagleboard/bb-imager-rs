@@ -156,10 +156,32 @@
 					"release_date": "2024-11-05",
 					"image_download_sha256": "f6f85213743371ec52d2631b7eee0294bbd170f36feabb4ca54e801cdcd9f110",
 					"devices": [
-						"beagle-pb2"
+						"pocketbeagle2-am62"
 					],
 					"tags": [
 						"freertos"
+					]
+				}
+			]
+		},
+		{
+			"name": "Zephyr SD Card Images",
+			"description": "Images to use Zephyr on A53 Cores",
+			"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
+			"flasher": "ZephyrSdCard",
+			"subitems": [
+				{
+					"name": "Zephyr SD Card Image",
+					"description": "Run Zephyr on A53 Cores",
+					"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
+					"url": "https://github.com/beagleboard/bb-zephyr-images/releases/download/continuous-release/pocketbeagle_2_zephyr.img",
+					"release_date": "2025-04-26",
+					"image_download_sha256": "18294f239ea9b87fccfef7bcb8384f75cc89a760f6eb84d62b65593f71e3a394",
+					"devices": [
+						"pocketbeagle2-am62"
+					],
+					"tags": [
+						"zephyr"
 					]
 				}
 			]
