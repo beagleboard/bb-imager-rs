@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
 
 use crate::BBImagerMessage;
 use bb_config::config::{self, OsListItem};
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
 use futures::StreamExt;
 use iced::{
     Color, Length, futures,
@@ -448,6 +448,19 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
+        (
+            Some(BoardImage::Image { img, .. }),
+            FlashingCustomization::ZephyrSd,
+            Some(Destination::SdCard(t)),
+        ) => {
+            bb_flasher::sd::Flasher::new(
+                img,
+                t,
+                FlashingSdLinuxConfig::new(None, None, None, None, None),
+            )
+            .flash(Some(chan))
+            .await
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         (
             Some(BoardImage::Image { img, .. }),
@@ -474,7 +487,7 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
-        _ => unreachable!(),
+        _ => unimplemented!(),
     }
 }
 
@@ -516,11 +529,13 @@ impl Destination {
 
 pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
     match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::destinations()
-            .await
-            .into_iter()
-            .map(Destination::SdCard)
-            .collect(),
+        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
+            bb_flasher::sd::Target::destinations()
+                .await
+                .into_iter()
+                .map(Destination::SdCard)
+                .collect()
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::destinations()
             .await
@@ -545,7 +560,9 @@ pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
 
 pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
     match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::is_destination_selectable(),
+        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
+            bb_flasher::sd::Target::is_destination_selectable()
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => {
             bb_flasher::bcf::cc1352p7::Target::is_destination_selectable()
@@ -560,7 +577,9 @@ pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
 
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::FILE_TYPES,
+        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
+            bb_flasher::sd::Target::FILE_TYPES
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
@@ -573,7 +592,7 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
 
 const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
-        config::Flasher::SdCard => true,
+        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => true,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
@@ -590,6 +609,7 @@ pub(crate) enum FlashingCustomization {
     LinuxSd(crate::persistance::SdCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
+    ZephyrSd,
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0(crate::persistance::Pb2Mspm0Customization),
 }
@@ -609,6 +629,7 @@ impl FlashingCustomization {
                 Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
             }
             config::Flasher::Msp430Usb => Self::Msp430,
+            config::Flasher::ZephyrSdCard => Self::ZephyrSd,
             #[cfg(feature = "pb2_mspm0")]
             config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
                 app_config
