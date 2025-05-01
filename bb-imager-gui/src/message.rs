@@ -116,6 +116,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             state.selected_image = Some(x);
             state.screen.clear();
             state.screen.push(Screen::Home);
+            state.customization.take();
         }
         BBImagerMessage::SelectLocalImage(flasher) => {
             let extensions = helpers::file_filter(flasher);

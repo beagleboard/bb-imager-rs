@@ -168,7 +168,7 @@
 			"name": "Zephyr SD Card Images",
 			"description": "Images to use Zephyr on A53 Cores",
 			"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
-			"flasher": "ZephyrSdCard",
+			"flasher": "SdCard",
 			"subitems": [
 				{
 					"name": "Zephyr SD Card Image",
