@@ -66,6 +66,15 @@ pub struct Device {
     pub documentation: Option<Url>,
 }
 
+/// Types of customization Initialization formats
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+#[serde(rename_all = "lowercase")]
+pub enum InitFormat {
+    /// Sysconfig based customization
+    Sysconf,
+}
+
 /// Os List can contain multiple types of items depending on the situation.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
@@ -143,6 +152,8 @@ pub struct OsImage {
     /// Os Image tags
     #[serde(default)]
     pub tags: HashSet<String>,
+    /// Initialization Format. Currently only used by SD Card Images
+    pub init_format: Option<InitFormat>,
 }
 
 /// Types of flashers Os Image(s) support
@@ -158,8 +169,6 @@ pub enum Flasher {
     Msp430Usb,
     /// PocketBeagle2 Mspm0 firmware
     Pb2Mspm0,
-    /// Zephyr SD Card images
-    ZephyrSdCard
 }
 
 impl Extend<Self> for Config {

@@ -277,6 +277,7 @@ pub(crate) enum BoardImage {
     SdFormat,
     Image {
         flasher: config::Flasher,
+        init_format: Option<config::InitFormat>,
         img: SelectedImage,
     },
 }
@@ -286,6 +287,11 @@ impl BoardImage {
         Self::Image {
             img: bb_flasher::LocalImage::new(path).into(),
             flasher,
+            init_format: if flasher == config::Flasher::SdCard {
+                Some(config::InitFormat::Sysconf)
+            } else {
+                None
+            },
         }
     }
 
@@ -303,6 +309,7 @@ impl BoardImage {
             )
             .into(),
             flasher,
+            init_format: image.init_format,
         }
     }
 
@@ -313,8 +320,11 @@ impl BoardImage {
         }
     }
 
-    pub(crate) fn is_sd_format(&self) -> bool {
-        matches!(self, BoardImage::SdFormat)
+    pub(crate) const fn init_format(&self) -> Option<config::InitFormat> {
+        match self {
+            BoardImage::Image { init_format, .. } => *init_format,
+            BoardImage::SdFormat => None,
+        }
     }
 }
 
@@ -430,11 +440,7 @@ pub(crate) async fn flash(
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
-        (
-            Some(BoardImage::SdFormat),
-            FlashingCustomization::LinuxSdFormat,
-            Some(Destination::SdCard(t)),
-        ) => {
+        (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
             bb_flasher::sd::FormatFlasher::new(t)
                 .flash(Some(chan))
                 .await
@@ -450,7 +456,7 @@ pub(crate) async fn flash(
         }
         (
             Some(BoardImage::Image { img, .. }),
-            FlashingCustomization::ZephyrSd,
+            FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
             bb_flasher::sd::Flasher::new(
@@ -529,13 +535,11 @@ impl Destination {
 
 pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
     match flasher {
-        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
-            bb_flasher::sd::Target::destinations()
-                .await
-                .into_iter()
-                .map(Destination::SdCard)
-                .collect()
-        }
+        config::Flasher::SdCard => bb_flasher::sd::Target::destinations()
+            .await
+            .into_iter()
+            .map(Destination::SdCard)
+            .collect(),
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::destinations()
             .await
@@ -560,9 +564,7 @@ pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
 
 pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
     match flasher {
-        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
-            bb_flasher::sd::Target::is_destination_selectable()
-        }
+        config::Flasher::SdCard => bb_flasher::sd::Target::is_destination_selectable(),
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => {
             bb_flasher::bcf::cc1352p7::Target::is_destination_selectable()
@@ -577,9 +579,7 @@ pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
 
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
-        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => {
-            bb_flasher::sd::Target::FILE_TYPES
-        }
+        config::Flasher::SdCard => bb_flasher::sd::Target::FILE_TYPES,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
@@ -592,7 +592,7 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
 
 const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
-        config::Flasher::SdCard | config::Flasher::ZephyrSdCard => true,
+        config::Flasher::SdCard => true,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
@@ -605,11 +605,10 @@ const fn flasher_supported(flasher: config::Flasher) -> bool {
 
 #[derive(Clone, Debug)]
 pub(crate) enum FlashingCustomization {
-    LinuxSdFormat,
+    NoneSd,
     LinuxSd(crate::persistance::SdCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
-    ZephyrSd,
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0(crate::persistance::Pb2Mspm0Customization),
 }
@@ -621,15 +620,14 @@ impl FlashingCustomization {
         app_config: &crate::persistance::GuiConfiguration,
     ) -> Self {
         match flasher {
-            config::Flasher::SdCard if img.is_sd_format() => Self::LinuxSdFormat,
-            config::Flasher::SdCard => {
+            config::Flasher::SdCard if img.init_format() == Some(config::InitFormat::Sysconf) => {
                 Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
             }
+            config::Flasher::SdCard => Self::NoneSd,
             config::Flasher::BeagleConnectFreedom => {
                 Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
             }
             config::Flasher::Msp430Usb => Self::Msp430,
-            config::Flasher::ZephyrSdCard => Self::ZephyrSd,
             #[cfg(feature = "pb2_mspm0")]
             config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
                 app_config

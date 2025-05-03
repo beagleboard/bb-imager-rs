@@ -11,7 +11,7 @@ mod home;
 mod image_selection;
 
 pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
-    tracing::info!("Page Stack: {:#?}", state.screen);
+    tracing::debug!("Page Stack: {:#?}", state.screen);
 
     match state.screen.last().expect("No Screen") {
         Screen::Home => home::view(
