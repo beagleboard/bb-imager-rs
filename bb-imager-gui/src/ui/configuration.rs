@@ -92,8 +92,27 @@ fn linux_sd_form<'a>(
         timezone_form(timezones, config).width(iced::Length::Fill),
         keymap_form(keymaps, config).width(iced::Length::Fill),
         uname_pass_form(config).width(iced::Length::Fill),
-        wifi_form(config).width(iced::Length::Fill)
+        wifi_form(config).width(iced::Length::Fill),
+        ssh_form(config).width(iced::Length::Fill),
     ]
+}
+
+fn ssh_form<'a>(config: &'a SdCustomization) -> widget::Container<'a, BBImagerMessage> {
+    let form = widget::column![
+        widget::text("SSH authorization public key"),
+        widget::text_input("authorized key", config.ssh.as_deref().unwrap_or("")).on_input(|x| {
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                config
+                    .clone()
+                    .update_ssh(if x == "" { None } else { Some(x) }),
+            ))
+        })
+    ]
+    .spacing(6);
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn keymap_form<'a>(

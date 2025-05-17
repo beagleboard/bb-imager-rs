@@ -119,12 +119,14 @@ async fn flash_internal(
             wifi_ssid,
             wifi_password,
             img,
+            ssh_key,
         } => {
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization =
-                bb_flasher::sd::FlashingSdLinuxConfig::new(hostname, timezone, keymap, user, wifi);
+            let customization = bb_flasher::sd::FlashingSdLinuxConfig::new(
+                hostname, timezone, keymap, user, wifi, ssh_key,
+            );
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img),
