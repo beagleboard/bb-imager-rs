@@ -75,6 +75,7 @@ impl FlashingSdLinuxConfig {
         keymap: Option<String>,
         user: Option<(String, String)>,
         wifi: Option<(String, String)>,
+        ssh: Option<String>,
     ) -> Self {
         Self {
             customization: bb_flasher_sd::Customization {
@@ -83,6 +84,7 @@ impl FlashingSdLinuxConfig {
                 keymap,
                 user,
                 wifi,
+                ssh,
             },
         }
     }
