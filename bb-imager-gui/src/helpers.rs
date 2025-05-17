@@ -462,7 +462,7 @@ pub(crate) async fn flash(
             bb_flasher::sd::Flasher::new(
                 img,
                 t,
-                FlashingSdLinuxConfig::new(None, None, None, None, None),
+                FlashingSdLinuxConfig::new(None, None, None, None, None, None),
             )
             .flash(Some(chan))
             .await

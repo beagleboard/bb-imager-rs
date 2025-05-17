@@ -93,6 +93,8 @@ pub(crate) struct SdCustomization {
     pub(crate) user: Option<SdCustomizationUser>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) wifi: Option<SdCustomizationWifi>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ssh: Option<String>,
 }
 
 impl SdCustomization {
@@ -120,6 +122,11 @@ impl SdCustomization {
         self.wifi = t;
         self
     }
+
+    pub(crate) fn update_ssh(mut self, t: Option<String>) -> Self {
+        self.ssh = t;
+        self
+    }
 }
 
 impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
@@ -130,6 +137,7 @@ impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
             value.keymap,
             value.user.map(|x| (x.username, x.password)),
             value.wifi.map(|x| (x.ssid, x.password)),
+            value.ssh,
         )
     }
 }
