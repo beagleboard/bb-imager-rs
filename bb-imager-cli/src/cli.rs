@@ -102,6 +102,10 @@ pub enum TargetCommands {
         #[arg(long, requires = "wifi_ssid")]
         /// Set the password for the specified Wi-Fi SSID. Requires `wifi_ssid`.
         wifi_password: Option<String>,
+
+        #[arg(long)]
+        /// Set SSH public key for authentication
+        ssh_key: Option<String>
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
