@@ -10,6 +10,7 @@ pub struct Customization {
     pub keymap: Option<String>,
     pub user: Option<(String, String)>,
     pub wifi: Option<(String, String)>,
+    pub ssh: Option<String>,
 }
 
 impl Customization {
@@ -45,28 +46,28 @@ impl Customization {
         })?;
 
         if let Some(h) = &self.hostname {
-            sysconf_w(&mut conf, &format!("hostname={h}\n"), "hostname")?;
+            sysconf_w(&mut conf, &format!("hostname={h}\n"))?;
         }
 
         if let Some(tz) = &self.timezone {
-            sysconf_w(&mut conf, &format!("timezone={tz}\n"), "timezone")?;
+            sysconf_w(&mut conf, &format!("timezone={tz}\n"))?;
         }
 
         if let Some(k) = &self.keymap {
-            sysconf_w(&mut conf, &format!("keymap={k}\n"), "keymap")?;
+            sysconf_w(&mut conf, &format!("keymap={k}\n"))?;
         }
 
         if let Some((u, p)) = &self.user {
-            sysconf_w(&mut conf, &format!("user_name={u}\n"), "user_name")?;
-            sysconf_w(&mut conf, &format!("user_password={p}\n"), "user_password")?;
+            sysconf_w(&mut conf, &format!("user_name={u}\n"))?;
+            sysconf_w(&mut conf, &format!("user_password={p}\n"))?;
+        }
+
+        if let Some(x) = &self.ssh {
+            sysconf_w(&mut conf, &format!("user_authorized_key={x}"))?;
         }
 
         if let Some((ssid, psk)) = &self.wifi {
-            sysconf_w(
-                &mut conf,
-                &format!("iwd_psk_file={ssid}.psk\n"),
-                "iwd_psk_file",
-            )?;
+            sysconf_w(&mut conf, &format!("iwd_psk_file={ssid}.psk\n"))?;
 
             let mut wifi_file = boot_root
                 .create_file(format!("services/{ssid}.psk").as_str())
@@ -94,9 +95,9 @@ impl Customization {
     }
 }
 
-fn sysconf_w(mut sysconf: impl Write, data: &str, field: &str) -> Result<()> {
-    sysconf.write_all(data.as_bytes()).map_err(|e| {
-        Error::Customization(format!("Failed to write {field} to sysconf.txt: {e}"))
-    })?;
+fn sysconf_w(mut sysconf: impl Write, data: &str) -> Result<()> {
+    sysconf
+        .write_all(data.as_bytes())
+        .map_err(|e| Error::Customization(format!("Failed to write {data} to sysconf.txt: {e}")))?;
     Ok(())
 }
