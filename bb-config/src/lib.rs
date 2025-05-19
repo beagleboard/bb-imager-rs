@@ -20,7 +20,8 @@
 pub mod config;
 
 /// URL for the BeagleBoard.org `distros.json` file
-pub const DISTROS_URL: &str = "https://www.beagleboard.org/distros.json";
+pub const DISTROS_URL: &str =
+    "https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json";
 
 pub use config::Config;
 
