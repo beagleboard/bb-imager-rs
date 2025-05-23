@@ -14,6 +14,9 @@ pub(crate) fn search_bar<'a>(
         )
         .on_press(BBImagerMessage::PopScreen)
         .style(widget::button::secondary),
+        widget::button(widget::svg(widget::svg::Handle::from_memory(constants::REFRESH)).width(22))
+            .on_press(BBImagerMessage::RefreshConfig)
+            .style(widget::button::secondary),
         widget::text_input("Search", cur_search).on_input(f)
     ]
     .spacing(10)

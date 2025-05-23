@@ -43,10 +43,6 @@ fn main() -> iced::Result {
 
     let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
 
-    let config: config::Config =
-        serde_json::from_slice(constants::DEFAULT_CONFIG).expect("Failed to parse config");
-    let boards = helpers::Boards::from(config);
-
     let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
@@ -60,7 +56,7 @@ fn main() -> iced::Result {
         .font(constants::FONT_REGULAR_BYTES)
         .font(constants::FONT_BOLD_BYTES)
         .default_font(constants::FONT_REGULAR)
-        .run_with(move || BBImager::new(boards, app_config))
+        .run_with(move || BBImager::new(app_config))
 }
 
 #[derive(Debug)]
@@ -81,10 +77,7 @@ struct BBImager {
 }
 
 impl BBImager {
-    fn new(
-        boards: helpers::Boards,
-        app_config: persistance::GuiConfiguration,
-    ) -> (Self, Task<BBImagerMessage>) {
+    fn new(app_config: persistance::GuiConfiguration) -> (Self, Task<BBImagerMessage>) {
         let downloader = bb_downloader::Downloader::new(
             directories::ProjectDirs::from(
                 PACKAGE_QUALIFIER.0,
@@ -99,31 +92,10 @@ impl BBImager {
 
         // Fetch old config
         let client = downloader.clone();
-        let boards_clone = boards.clone();
-        let config_task = Task::perform(
-            async move {
-                let data: config::Config = client
-                    .download_json_no_cache(bb_config::DISTROS_URL)
-                    .await
-                    .map_err(|e| format!("Config parsing failed: {e}"))?;
-
-                // If spawn_blocking fails, there is a problem with the underlying runtime
-                tokio::task::spawn_blocking(|| Ok(boards_clone.merge(data.into())))
-                    .await
-                    .expect("Tokio runtime failed to spawn blocking task")
-            },
-            |x: Result<helpers::Boards, String>| match x {
-                Ok(y) => BBImagerMessage::UpdateConfig(y),
-                Err(e) => {
-                    tracing::error!("Failed to fetch config: {e}");
-                    BBImagerMessage::Null
-                }
-            },
-        );
+        let config_task = helpers::refresh_config_task(client);
 
         let mut ans = Self {
             app_config,
-            boards,
             downloader: downloader.clone(),
             timezones: widget::combo_box::State::new(
                 constants::TIMEZONES.iter().map(|x| x.to_string()).collect(),
@@ -135,6 +107,7 @@ impl BBImager {
                     .collect(),
             ),
             screen: Vec::with_capacity(3),
+            boards: Default::default(),
             selected_board: Default::default(),
             selected_image: Default::default(),
             selected_dst: Default::default(),

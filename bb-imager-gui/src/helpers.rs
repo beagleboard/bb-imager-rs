@@ -161,7 +161,7 @@ impl ProgressBarStatus {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Boards(config::Config);
 
 impl Boards {
@@ -269,6 +269,14 @@ impl From<config::Config> for Boards {
             os_list: value.os_list,
         };
         Self(filtered)
+    }
+}
+
+impl Default for Boards {
+    fn default() -> Self {
+        serde_json::from_slice::<config::Config>(crate::constants::DEFAULT_CONFIG)
+            .expect("Failed to parse config")
+            .into()
     }
 }
 
@@ -648,4 +656,31 @@ impl FlashingCustomization {
             _ => self,
         }
     }
+}
+
+/// Fetches the main remote os_list file from `bb_config::DISTROS_URL` and merges it with the base
+/// config.
+async fn fetch_remote_os_list(client: bb_downloader::Downloader) -> std::io::Result<Boards> {
+    let boards = Boards::default();
+    let data: config::Config = client
+        .download_json_no_cache(bb_config::DISTROS_URL)
+        .await?;
+
+    // If spawn_blocking fails, there is a problem with the underlying runtime
+    tokio::task::spawn_blocking(|| Ok(boards.merge(data.into())))
+        .await
+        .expect("Tokio runtime failed to spawn blocking task")
+}
+
+pub fn refresh_config_task(client: bb_downloader::Downloader) -> iced::Task<BBImagerMessage> {
+    iced::Task::perform(
+        fetch_remote_os_list(client),
+        |x: std::io::Result<Boards>| match x {
+            Ok(y) => BBImagerMessage::UpdateConfig(y),
+            Err(e) => {
+                tracing::error!("Failed to fetch config: {e}");
+                BBImagerMessage::Null
+            }
+        },
+    )
 }
