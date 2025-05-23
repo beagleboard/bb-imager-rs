@@ -67,8 +67,8 @@ impl Customization {
             sysconf_w(&mut conf, &format!("user_authorized_key={x}"))?;
         }
 
-        if let Some(x) = self.usb_enable_dhcp {
-            sysconf_w(&mut conf, &format!("usb_enable_dhcp={x}"))?;
+        if Some(true) == self.usb_enable_dhcp {
+            sysconf_w(&mut conf, &format!("usb_enable_dhcp=yes"))?;
         }
 
         if let Some((ssid, psk)) = &self.wifi {
