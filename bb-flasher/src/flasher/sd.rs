@@ -76,6 +76,7 @@ impl FlashingSdLinuxConfig {
         user: Option<(String, String)>,
         wifi: Option<(String, String)>,
         ssh: Option<String>,
+        usb_enable_dhcp: Option<bool>,
     ) -> Self {
         Self {
             customization: bb_flasher_sd::Customization {
@@ -85,6 +86,7 @@ impl FlashingSdLinuxConfig {
                 user,
                 wifi,
                 ssh,
+                usb_enable_dhcp,
             },
         }
     }
