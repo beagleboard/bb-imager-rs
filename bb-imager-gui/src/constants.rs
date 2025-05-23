@@ -19,6 +19,7 @@ pub(crate) const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings
 pub(crate) const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
 pub(crate) const ARROW_FORWARD_IOS_ICON: &[u8] =
     include_bytes!("../assets/icons/arrow-forward-ios.svg");
+pub(crate) const REFRESH: &[u8] = include_bytes!("../assets/icons/refresh.svg");
 
 // Font
 pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");

@@ -8,8 +8,6 @@ use iced::{
 
 use crate::{BBImagerMessage, constants, helpers, pages};
 
-use super::helpers::search_bar;
-
 const ICON_WIDTH: u16 = 60;
 
 pub(crate) struct ExtraImageEntry {
@@ -64,9 +62,15 @@ pub(crate) fn view<'a>(
     };
 
     widget::column![
-        search_bar(state.search_str(), |x| BBImagerMessage::ReplaceScreen(
-            pages::Screen::ImageSelection(state.clone().with_search_string(x))
-        )),
+        search_bar(
+            state.search_str(),
+            |x| BBImagerMessage::ReplaceScreen(pages::Screen::ImageSelection(
+                state.clone().with_search_string(x)
+            )),
+            // Only show refresh button on the initial page. Refreshing from a submenu can lead to
+            // a bad state
+            state.idx().len() == 0
+        ),
         widget::horizontal_rule(2),
         row3
     ]
@@ -180,7 +184,11 @@ fn entry<'a>(
     }
 }
 
-fn push_screen(state: &pages::ImageSelectionState, id: usize, flasher: config::Flasher) -> BBImagerMessage {
+fn push_screen(
+    state: &pages::ImageSelectionState,
+    id: usize,
+    flasher: config::Flasher,
+) -> BBImagerMessage {
     BBImagerMessage::PushScreen(pages::Screen::ImageSelection(
         state.clone().with_added_id(id).with_flasher(flasher),
     ))
@@ -217,4 +225,33 @@ pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a
             .height(width)
             .into(),
     }
+}
+
+pub(crate) fn search_bar<'a>(
+    cur_search: &'a str,
+    f: impl Fn(String) -> BBImagerMessage + 'a,
+    refresh: bool,
+) -> Element<'a, BBImagerMessage> {
+    let back_btn = widget::button(
+        widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22),
+    )
+    .on_press(BBImagerMessage::PopScreen)
+    .style(widget::button::secondary);
+    let search_bar = widget::text_input("Search", cur_search).on_input(f);
+
+    if refresh {
+        widget::row![
+            back_btn,
+            widget::button(
+                widget::svg(widget::svg::Handle::from_memory(constants::REFRESH)).width(22)
+            )
+            .on_press(BBImagerMessage::RefreshConfig)
+            .style(widget::button::secondary),
+            search_bar
+        ]
+    } else {
+        widget::row![back_btn, search_bar]
+    }
+    .spacing(10)
+    .into()
 }

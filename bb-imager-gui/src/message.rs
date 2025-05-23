@@ -23,6 +23,7 @@ pub(crate) enum BBImagerMessage {
     SelectPort(Destination),
     ProgressBar(ProgressBarState),
     Destinations(Vec<Destination>),
+    RefreshConfig,
     Reset,
 
     StartFlashing,
@@ -63,6 +64,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             tracing::info!("Config: {:#?}", c);
             state.boards = c;
             return state.fetch_board_images();
+        }
+        BBImagerMessage::RefreshConfig => {
+            state.boards = Default::default();
+            return helpers::refresh_config_task(state.downloader.clone());
         }
         BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
             state.boards.resolve_remote_subitem(item, &target);
