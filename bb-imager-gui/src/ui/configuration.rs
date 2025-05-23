@@ -94,7 +94,23 @@ fn linux_sd_form<'a>(
         uname_pass_form(config).width(iced::Length::Fill),
         wifi_form(config).width(iced::Length::Fill),
         ssh_form(config).width(iced::Length::Fill),
+        usb_enable_dhcp_form(config)
     ]
+}
+
+fn usb_enable_dhcp_form(config: &SdCustomization) -> widget::Container<'_, BBImagerMessage> {
+    let form = widget::toggler(config.usb_enable_dhcp == Some(true))
+        .label("Enable USB DHCP")
+        .on_toggle(|x| {
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                config.clone().update_usb_enable_dhcp(Some(x)),
+            ))
+        })
+        .width(iced::Length::Fill);
+
+    widget::container(form)
+        .padding(10)
+        .style(widget::container::bordered_box)
 }
 
 fn ssh_form<'a>(config: &'a SdCustomization) -> widget::Container<'a, BBImagerMessage> {

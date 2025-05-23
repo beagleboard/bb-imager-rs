@@ -81,7 +81,7 @@ impl GuiConfiguration {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) hostname: Option<String>,
@@ -95,6 +95,26 @@ pub(crate) struct SdCustomization {
     pub(crate) wifi: Option<SdCustomizationWifi>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ssh: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) usb_enable_dhcp: Option<bool>,
+}
+
+impl Default for SdCustomization {
+    fn default() -> Self {
+        Self {
+            hostname: None,
+            timezone: None,
+            keymap: None,
+            user: None,
+            wifi: None,
+            ssh: None,
+            usb_enable_dhcp: if cfg!(windows) || cfg!(target_os = "macos") {
+                Some(true)
+            } else {
+                None
+            },
+        }
+    }
 }
 
 impl SdCustomization {
@@ -127,6 +147,11 @@ impl SdCustomization {
         self.ssh = t;
         self
     }
+
+    pub(crate) fn update_usb_enable_dhcp(mut self, t: Option<bool>) -> Self {
+        self.usb_enable_dhcp = t;
+        self
+    }
 }
 
 impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
@@ -138,6 +163,7 @@ impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
             value.user.map(|x| (x.username, x.password)),
             value.wifi.map(|x| (x.ssid, x.password)),
             value.ssh,
+            value.usb_enable_dhcp,
         )
     }
 }
