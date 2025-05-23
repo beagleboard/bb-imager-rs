@@ -105,7 +105,11 @@ pub enum TargetCommands {
 
         #[arg(long)]
         /// Set SSH public key for authentication
-        ssh_key: Option<String>
+        ssh_key: Option<String>,
+
+        #[arg(long)]
+        /// Enable USB DHCP
+        usb_enable_dhcp: bool,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
