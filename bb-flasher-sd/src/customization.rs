@@ -11,6 +11,7 @@ pub struct Customization {
     pub user: Option<(String, String)>,
     pub wifi: Option<(String, String)>,
     pub ssh: Option<String>,
+    pub usb_enable_dhcp: Option<bool>,
 }
 
 impl Customization {
@@ -66,6 +67,10 @@ impl Customization {
             sysconf_w(&mut conf, &format!("user_authorized_key={x}"))?;
         }
 
+        if let Some(x) = self.usb_enable_dhcp {
+            sysconf_w(&mut conf, &format!("usb_enable_dhcp={x}"))?;
+        }
+
         if let Some((ssid, psk)) = &self.wifi {
             sysconf_w(&mut conf, &format!("iwd_psk_file={ssid}.psk\n"))?;
 
@@ -92,6 +97,8 @@ impl Customization {
             || self.keymap.is_some()
             || self.user.is_some()
             || self.wifi.is_some()
+            || self.ssh.is_some()
+            || self.usb_enable_dhcp.is_some()
     }
 }
 
