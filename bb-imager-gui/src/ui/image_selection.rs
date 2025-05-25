@@ -69,7 +69,7 @@ pub(crate) fn view<'a>(
             )),
             // Only show refresh button on the initial page. Refreshing from a submenu can lead to
             // a bad state
-            state.idx().len() == 0
+            state.idx().is_empty()
         ),
         widget::horizontal_rule(2),
         row3

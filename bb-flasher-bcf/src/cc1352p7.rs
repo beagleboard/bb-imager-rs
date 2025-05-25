@@ -341,7 +341,7 @@ pub fn flash(
         }
     }
 
-    let res = if verify {
+    if verify {
         chan_send(chan.as_mut(), Status::Verifying);
         if bcf.verify(img_crc32)? {
             info!("Flashing Successful");
@@ -352,9 +352,7 @@ pub fn flash(
         }
     } else {
         Ok(())
-    };
-
-    res
+    }
 }
 
 /// Returns all paths to ports having BeagleConnect Freedom.

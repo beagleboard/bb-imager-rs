@@ -120,7 +120,7 @@ fn ssh_form<'a>(config: &'a SdCustomization) -> widget::Container<'a, BBImagerMe
             BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
                 config
                     .clone()
-                    .update_ssh(if x == "" { None } else { Some(x) }),
+                    .update_ssh(if x.is_empty() { None } else { Some(x) }),
             ))
         })
     ]
