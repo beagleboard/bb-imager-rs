@@ -81,6 +81,39 @@ jobs:
       uses: Swatinem/rust-cache@v2
     - name: Install packaging deps
       run: make setup-packaging-deps
+
+    - name: Setup macos signing
+      if: runner.os == 'macOS'
+      working-directory: bb-imager-gui
+      env:
+        CERT_DEVELOPER_APP_BASE64: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
+        CERT_DEVELOPER_INSTALL_BASE64: ${{ secrets.CERT_DEVELOPER_INSTALL_BASE64 }}
+        CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        TEAM_ID: ${{ secrets.TEAM_ID }}
+      run: |
+        echo "$CERT_DEVELOPER_APP_BASE64" | base64 --decode > developer_app.p12
+        echo "$CERT_DEVELOPER_INSTALL_BASE64" | base64 --decode > developer_installer.p12
+
+        security create-keychain -p "" build.keychain-db
+        security default-keychain -s build.keychain-db
+        security unlock-keychain -p "" build.keychain-db
+
+        security import developer_app.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/codesign
+        security import developer_installer.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/productsign
+
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain-db
+
+        xcrun notarytool store-credentials "AC_PASSWORD" \
+          --apple-id "${{ secrets.APPLE_ID }}" \
+          --team-id "${{ secrets.TEAM_ID }}" \
+          --password "${{ secrets.APP_PASSWORD }}"
+
+        echo "" >> Cargo.toml
+        echo "[package.metadata.packager.macos]" >> Cargo.toml
+        echo "signing_identity = \"${{ secrets.TEAM_ID }}\"" >> Cargo.toml
+
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
     # Do not do versioning for Pre-Release packages
