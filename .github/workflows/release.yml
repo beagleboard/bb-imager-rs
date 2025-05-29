@@ -116,6 +116,19 @@ jobs:
 
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
+
+    - name: Notarize macOS App
+      if: runner.os == 'macOS'
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        TEAM_ID: ${{ secrets.TEAM_ID }}
+      run: |
+        dmg_path=$(find bb-imager-gui/dist/ -name "*.dmg" | head -n 1)
+        echo "Submitting for notarization: $dmg_path"
+        xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
+        xcrun stapler staple "$dmg_path"
+
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
       if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
