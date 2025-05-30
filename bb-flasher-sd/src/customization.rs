@@ -91,14 +91,14 @@ impl Customization {
         Ok(())
     }
 
-    pub(crate) const fn has_customization(&self) -> bool {
+    pub(crate) fn has_customization(&self) -> bool {
         self.hostname.is_some()
             || self.timezone.is_some()
             || self.keymap.is_some()
             || self.user.is_some()
             || self.wifi.is_some()
             || self.ssh.is_some()
-            || self.usb_enable_dhcp.is_some()
+            || self.usb_enable_dhcp == Some(true)
     }
 }
 
