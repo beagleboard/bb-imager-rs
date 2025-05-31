@@ -145,7 +145,7 @@ fn flash_internal(
 fn flash_internal(
     img: impl Read,
     img_size: u64,
-    mut sd: impl Read + Write + Seek + Eject,
+    mut sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,

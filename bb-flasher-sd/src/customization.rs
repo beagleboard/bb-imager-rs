@@ -15,22 +15,17 @@ pub struct Customization {
 }
 
 impl Customization {
-    pub(crate) fn customize(&self, mut dst: impl Write + Seek + Read) -> Result<()> {
+    pub(crate) fn customize(
+        &self,
+        mut dst: impl Write + Seek + Read + std::fmt::Debug,
+    ) -> Result<()> {
         if !self.has_customization() {
             return Ok(());
         }
 
         let boot_partition = {
-            let mbr = mbrman::MBR::read_from(&mut dst, 512)
-                .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
-
-            let boot_part = mbr.get(1).ok_or(Error::Customization(
-                "Failed to get boot partition".to_string(),
-            ))?;
-            let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
-            let end_offset: u64 =
-                start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
-            let slice = fscommon::StreamSlice::new(dst, start_offset, end_offset)
+            let (start_off, end_off) = customization_partition(&mut dst)?;
+            let slice = fscommon::StreamSlice::new(dst, start_off, end_off)
                 .map_err(|_| Error::Customization("Failed to read partition".to_string()))?;
             let boot_stream = fscommon::BufStream::new(slice);
             fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new())
@@ -107,4 +102,34 @@ fn sysconf_w(mut sysconf: impl Write, data: &str) -> Result<()> {
         .write_all(data.as_bytes())
         .map_err(|e| Error::Customization(format!("Failed to write {data} to sysconf.txt: {e}")))?;
     Ok(())
+}
+
+fn customization_partition(
+    mut dst: impl Write + Seek + Read + std::fmt::Debug,
+) -> Result<(u64, u64)> {
+    // First try GPT partition table. If that fails, try MBR
+    if let Ok(disk) = gpt::GptConfig::new()
+        .writable(false)
+        .open_from_device(&mut dst)
+    {
+        // FIXME: Add better partition lookup
+        let partition_2 = disk.partitions().get(&2).unwrap();
+
+        let start_offset: u64 = partition_2.first_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
+        let end_offset: u64 = partition_2.last_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
+
+        Ok((start_offset, end_offset))
+    } else {
+        let mbr = mbrman::MBR::read_from(&mut dst, 512)
+            .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
+
+        let boot_part = mbr.get(1).ok_or(Error::Customization(
+            "Failed to get boot partition".to_string(),
+        ))?;
+        let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
+        let end_offset: u64 =
+            start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
+
+        Ok((start_offset, end_offset))
+    }
 }
