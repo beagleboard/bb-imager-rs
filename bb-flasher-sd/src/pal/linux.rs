@@ -126,6 +126,7 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct LinuxDrive {
     file: std::fs::File,
     drive: PathBuf,

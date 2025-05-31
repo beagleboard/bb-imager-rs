@@ -13,6 +13,7 @@ use windows::Win32::{
 
 use crate::{Error, Result};
 
+#[derive(Debug)]
 pub(crate) struct WinDrive {
     drive: File,
     volume: Option<File>,
