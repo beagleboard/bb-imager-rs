@@ -120,15 +120,14 @@ fn customization_partition(
 
         Ok((start_offset, end_offset))
     } else {
-        let mbr = mbrman::MBR::read_from(&mut dst, 512)
+        let mbr = mbrman::MBRHeader::read_from(&mut dst)
             .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
 
         let boot_part = mbr.get(1).ok_or(Error::Customization(
             "Failed to get boot partition".to_string(),
         ))?;
-        let start_offset: u64 = (boot_part.starting_lba * mbr.sector_size).into();
-        let end_offset: u64 =
-            start_offset + u64::from(boot_part.sectors) * u64::from(mbr.sector_size);
+        let start_offset: u64 = (boot_part.starting_lba * 512).into();
+        let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
 
         Ok((start_offset, end_offset))
     }

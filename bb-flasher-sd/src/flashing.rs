@@ -1,4 +1,4 @@
-use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Read, Seek, Write};
 use std::path::Path;
 use std::sync::Weak;
 
@@ -102,46 +102,6 @@ pub fn flash<R: Read>(
     flash_internal(img, img_size, sd, chan, customization, cancel)
 }
 
-#[cfg(windows)]
-fn flash_internal(
-    mut img: impl Read,
-    img_size: u64,
-    mut sd: impl Write + Eject,
-    mut chan: Option<mpsc::Sender<f32>>,
-    customization: Option<Customization>,
-    cancel: Option<Weak<()>>,
-) -> Result<()> {
-    tracing::info!("Creating a copy of image for modification");
-    let mut img = {
-        let mut temp = tempfile::tempfile().unwrap();
-        std::io::copy(&mut img, &mut temp).unwrap();
-        temp
-    };
-
-    chan_send(chan.as_mut(), 0.0);
-
-    tracing::info!("Applying customization");
-    if let Some(c) = customization {
-        img.seek(SeekFrom::Start(0))?;
-        c.customize(&mut img)?;
-    }
-
-    tracing::info!("Flashing modified image to SD card");
-    img.seek(SeekFrom::Start(0))?;
-    write_sd(
-        std::io::BufReader::new(img),
-        img_size,
-        BufWriter::new(&mut sd),
-        chan.as_mut(),
-        cancel.as_ref(),
-    )?;
-
-    let _ = sd.eject();
-
-    Ok(())
-}
-
-#[cfg(not(windows))]
 fn flash_internal(
     img: impl Read,
     img_size: u64,
@@ -163,8 +123,8 @@ fn flash_internal(
     check_arc(cancel.as_ref())?;
 
     if let Some(c) = customization {
-        sd.seek(SeekFrom::Start(0))?;
-        c.customize(&mut sd)?;
+        let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
+        c.customize(temp)?;
     }
 
     let _ = sd.eject();
