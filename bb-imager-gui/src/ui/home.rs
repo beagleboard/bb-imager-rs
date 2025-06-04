@@ -109,16 +109,30 @@ pub(crate) fn view<'a>(
         .width(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
-        let bottom = widget::center(
-            widget::column![
-                choice_btn_row.height(iced::Length::FillPortion(1)),
-                action_btn_row.height(iced::Length::FillPortion(1)),
-            ]
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center),
-        )
-        .padding([0.0, size.width * 0.05])
-        .style(|_| widget::container::background(constants::BEAGLE_BRAND_COLOR));
+        // Check if BeagleV-Fire is selected
+        let show_beaglev_fire_instructions = selected_board
+            .map(|board| board.name.to_lowercase().contains("beaglev-fire"))
+            .unwrap_or(false);
+
+        let instructions_widget = if show_beaglev_fire_instructions {
+            Some(
+                widget::container(
+                    text(constants::BEAGLEV_FIRE_INSTRUCTIONS)
+                        .size(16)
+                        .color(iced::Color::BLACK)
+                )
+            )
+        } else {
+            None
+        };
+
+        let mut inner_col = widget::column![
+            choice_btn_row.height(iced::Length::FillPortion(1)),
+        ];
+        if let Some(instr) = instructions_widget {
+            inner_col = inner_col.push(instr);
+        }
+        inner_col = inner_col.push(action_btn_row.height(iced::Length::FillPortion(1)));
 
         widget::column![
             widget::container(
@@ -128,7 +142,13 @@ pub(crate) fn view<'a>(
             )
             .padding(iced::Padding::new(0.0).left(40))
             .width(iced::Length::Fill),
-            bottom
+            widget::center(
+                inner_col
+                    .height(iced::Length::Fill)
+                    .align_x(iced::Alignment::Center),
+            )
+            .padding([0.0, size.width * 0.05])
+            .style(|_| widget::container::background(constants::BEAGLE_BRAND_COLOR)),
         ]
         .into()
     })
