@@ -1,3 +1,9 @@
+/// Instructions for BeagleV-Fire board
+pub(crate) const BEAGLEV_FIRE_INSTRUCTIONS: &str = "
+1. Connect the BeagleV-Fire board to your computer via USB.
+2. While powering on the board, click the USER button on the board as soon as you power it on.
+3. BeagleV-Fire must appear as a USB device in the destination list.
+";
 use iced::color;
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
