@@ -295,11 +295,8 @@ impl BoardImage {
         Self::Image {
             img: bb_flasher::LocalImage::new(path).into(),
             flasher,
-            init_format: if flasher == config::Flasher::SdCard {
-                Some(config::InitFormat::Sysconf)
-            } else {
-                None
-            },
+            // Do not try to apply customization for local images
+            init_format: None,
         }
     }
 
