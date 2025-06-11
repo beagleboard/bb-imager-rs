@@ -49,7 +49,7 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    iced::application(constants::APP_NAME, message::update, ui::view)
+    iced::application(app_title, message::update, ui::view)
         .subscription(BBImager::subscription)
         .theme(BBImager::theme)
         .window(settings)
@@ -57,6 +57,14 @@ fn main() -> iced::Result {
         .font(constants::FONT_BOLD_BYTES)
         .default_font(constants::FONT_REGULAR)
         .run_with(move || BBImager::new(app_config))
+}
+
+fn app_title(_: &BBImager) -> String {
+    if option_env!("PRE_RELEASE").is_some() {
+        format!("{} (pre-release)", constants::APP_NAME)
+    } else {
+        format!("{} v{}", constants::APP_NAME, env!("CARGO_PKG_VERSION"))
+    }
 }
 
 #[derive(Debug)]
