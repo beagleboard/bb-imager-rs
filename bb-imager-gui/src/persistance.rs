@@ -152,6 +152,13 @@ impl SdCustomization {
         self.usb_enable_dhcp = t;
         self
     }
+
+    pub(crate) fn validate_user(&self) -> bool {
+        match &self.user {
+            Some(x) => x.validate_username(),
+            None => true,
+        }
+    }
 }
 
 impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
@@ -187,6 +194,10 @@ impl SdCustomizationUser {
     pub(crate) fn update_password(mut self, t: String) -> Self {
         self.password = t;
         self
+    }
+
+    pub(crate) fn validate_username(&self) -> bool {
+        self.username != "root"
     }
 }
 

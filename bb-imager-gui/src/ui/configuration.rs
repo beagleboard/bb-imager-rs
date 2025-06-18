@@ -33,7 +33,13 @@ pub(crate) fn view<'a>(
             home_btn_text("SAVE", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::SaveCustomization),
+                .on_press_maybe({
+                    if customization.validate() {
+                        Some(BBImagerMessage::SaveCustomization)
+                    } else {
+                        None
+                    }
+                }),
         ]
         .padding(4)
         .width(iced::Length::Fill);
@@ -247,21 +253,33 @@ fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessag
 
     if let Some(usr) = config.user.as_ref() {
         form = form.extend([
-            input_with_label("Username", "username", &usr.username, |inp| {
-                FlashingCustomization::LinuxSd(
-                    config
-                        .clone()
-                        .update_user(Some(usr.clone().update_username(inp))),
-                )
-            })
+            input_with_label(
+                "Username",
+                "username",
+                &usr.username,
+                |inp| {
+                    FlashingCustomization::LinuxSd(
+                        config
+                            .clone()
+                            .update_user(Some(usr.clone().update_username(inp))),
+                    )
+                },
+                !usr.validate_username(),
+            )
             .into(),
-            input_with_label("Password", "password", &usr.password, |inp| {
-                FlashingCustomization::LinuxSd(
-                    config
-                        .clone()
-                        .update_user(Some(usr.clone().update_password(inp))),
-                )
-            })
+            input_with_label(
+                "Password",
+                "password",
+                &usr.password,
+                |inp| {
+                    FlashingCustomization::LinuxSd(
+                        config
+                            .clone()
+                            .update_user(Some(usr.clone().update_password(inp))),
+                    )
+                },
+                false,
+            )
             .into(),
         ]);
     }
@@ -285,21 +303,33 @@ fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
 
     if let Some(wifi) = config.wifi.as_ref() {
         form = form.extend([
-            input_with_label("SSID", "SSID", &wifi.ssid, |inp| {
-                FlashingCustomization::LinuxSd(
-                    config
-                        .clone()
-                        .update_wifi(Some(wifi.clone().update_ssid(inp))),
-                )
-            })
+            input_with_label(
+                "SSID",
+                "SSID",
+                &wifi.ssid,
+                |inp| {
+                    FlashingCustomization::LinuxSd(
+                        config
+                            .clone()
+                            .update_wifi(Some(wifi.clone().update_ssid(inp))),
+                    )
+                },
+                false,
+            )
             .into(),
-            input_with_label("Password", "password", &wifi.password, |inp| {
-                FlashingCustomization::LinuxSd(
-                    config
-                        .clone()
-                        .update_wifi(Some(wifi.clone().update_password(inp))),
-                )
-            })
+            input_with_label(
+                "Password",
+                "password",
+                &wifi.password,
+                |inp| {
+                    FlashingCustomization::LinuxSd(
+                        config
+                            .clone()
+                            .update_wifi(Some(wifi.clone().update_password(inp))),
+                    )
+                },
+                false,
+            )
             .into(),
         ]);
     }
@@ -313,7 +343,8 @@ pub(crate) fn input_with_label<'a, F>(
     label: &'static str,
     placeholder: &'static str,
     val: &'a str,
-    func: F,
+    update_config_cb: F,
+    invalid_val: bool,
 ) -> widget::Row<'a, BBImagerMessage>
 where
     F: 'a + Fn(String) -> FlashingCustomization,
@@ -321,7 +352,17 @@ where
     element_with_label(
         label,
         widget::text_input(placeholder, val)
-            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(func(inp)))
+            .on_input(move |inp| BBImagerMessage::UpdateFlashConfig(update_config_cb(inp)))
+            .style(move |theme, status| {
+                let mut t = widget::text_input::default(theme, status);
+
+                if invalid_val {
+                    t.border = t.border.color(iced::Color::from_rgb(1.0, 0.0, 0.0));
+                    t
+                } else {
+                    t
+                }
+            })
             .width(200)
             .into(),
     )

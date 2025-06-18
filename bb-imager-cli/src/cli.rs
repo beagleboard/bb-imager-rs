@@ -86,7 +86,7 @@ pub enum TargetCommands {
         keymap: Option<String>,
 
         #[arg(long, requires = "user_password", verbatim_doc_comment)]
-        /// Set a username for the default user. Requires `user_password`.
+        /// Set a username for the default user. Cannot be `root`. Requires `user_password`.
         /// Required to enter GUI session due to regulatory requirements.
         user_name: Option<String>,
 

@@ -96,6 +96,12 @@ pub fn flash<R: Read>(
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
+    if let Some(x) = &customization {
+        if !x.validate() {
+            return Err(crate::Error::InvalidCustomizaton);
+        }
+    }
+
     let sd = crate::pal::open(dst)?;
 
     let (img, img_size) = img_resolver()?;
