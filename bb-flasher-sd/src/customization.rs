@@ -95,6 +95,14 @@ impl Customization {
             || self.ssh.is_some()
             || self.usb_enable_dhcp == Some(true)
     }
+
+    pub(crate) fn validate(&self) -> bool {
+        if let Some((x, _)) = &self.user {
+            x != "root"
+        } else {
+            true
+        }
+    }
 }
 
 fn sysconf_w(mut sysconf: impl Write, data: &str) -> Result<()> {

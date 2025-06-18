@@ -63,6 +63,8 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for this crate
 pub enum Error {
+    #[error("Invalid customization")]
+    InvalidCustomizaton,
     #[error("Failed to customize flashed image {0}")]
     Customization(String),
     #[error("IO Error: {0}")]
