@@ -653,6 +653,13 @@ impl FlashingCustomization {
             _ => self,
         }
     }
+
+    pub(crate) fn validate(&self) -> bool {
+        match self {
+            FlashingCustomization::LinuxSd(sd_customization) => sd_customization.validate_user(),
+            _ => true,
+        }
+    }
 }
 
 /// Fetches the main remote os_list file from `bb_config::DISTROS_URL` and merges it with the base
