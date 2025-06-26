@@ -169,22 +169,10 @@
 			"description": "Images to use Zephyr on A53 Cores",
 			"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
 			"flasher": "SdCard",
-			"subitems": [
-				{
-					"name": "Zephyr SD Card Image",
-					"description": "Run Zephyr on A53 Cores",
-					"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
-					"url": "https://github.com/beagleboard/bb-zephyr-images/releases/download/v0.0.2/pocketbeagle_2_zephyr.img.xz",
-					"release_date": "2025-06-20",
-					"image_download_sha256": "d186d5ac8eb93a3f23bf70f88f139f2bdd77db455fd4b9acc681786b5ba6b4db",
-					"devices": [
-						"pocketbeagle2-am62"
-					],
-					"tags": [
-						"zephyr"
-					]
-				}
-			]
+			"devices": [
+				"pocketbeagle2-am62"
+			],
+			"subitems_url": "https://github.com/beagleboard/bb-zephyr-images/releases/download/continuous-release/os_list.json"
 		}
 	]
 }
