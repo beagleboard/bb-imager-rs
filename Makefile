@@ -4,13 +4,14 @@ _HOST_TARGET = $(shell rustc -vV | awk '/^host/ { print $$2 }')
 _RUST_ARGS = --locked
 _CARGO_PACKAGER_ARGS = -r
 _TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
+_CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
 ## variable: CARGO_PATH: Path to cargo binary
 CARGO_PATH ?= $(shell which cargo)
 ## variable: RUST_BUILDER: The Rust builder to use. Possble choices - cargo (default), cross.
 RUST_BUILDER ?= $(CARGO_PATH)
 ## variable: VERSION: Release versions for bb-imager-cli and bb-imager-gui
-VERSION ?= $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+VERSION ?= $(_CARGO_TOML_VERSION)
 ## variable: PB2_MSPM0: Enable support for PocketBeagle 2 MSPM0
 PB2_MSPM0 ?= 0
 ## variable: BCF_CC1352P7: Enable support for BeagleConnect Freedom CC1352P7
@@ -56,6 +57,14 @@ clean:
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
 	rm -rf bb-imager-service/dist
+
+## housekeeping: packaging-checks: Some checks to ensure good packaging
+.PHONY: package-checks
+package-checks:
+	$(info Perform some checks before packaging)
+ifneq (${VERSION}, ${_CARGO_TOML_VERSION})
+	$(error ${VERSION} != ${_CARGO_TOML_VERSION})
+endif
 
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
@@ -133,65 +142,65 @@ build-cli-shell-comp:
 
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage
-package-gui-linux-appimage: build-gui
+package-gui-linux-appimage: package-checks build-gui
 	@echo "Packaging GUI as appimage"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f appimage ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-linux-deb: Build Debian package for GUI
 .PHONY: package-gui-linux-deb
-package-gui-linux-deb: build-gui
+package-gui-linux-deb: package-checks build-gui
 	@echo "Packaging GUI as deb"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-cli-linux-deb: Build Debian package for CLI
 .PHONY: package-cli-linux-deb
-package-cli-linux-deb: build-cli build-cli-manpage build-cli-shell-comp
+package-cli-linux-deb: package-checks build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as deb"
 	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-service-linux-deb: Build Debian package for Service
 .PHONY: package-service-linux-deb
-package-service-linux-deb: build-service
+package-service-linux-deb: package-checks build-service
 	@echo "Packaging Service as deb"
 	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-linux-targz: Build generic linux package for GUI
 .PHONY: package-gui-linux-targz
-package-gui-linux-targz: build-gui
+package-gui-linux-targz: package-checks build-gui
 	@echo "Packaging GUI as generic linux tar.gz"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-gui/dist/PKGBUILD
 
 ## package: package-cli-linux-targz: Build generic linux package for CLI
 .PHONY: package-cli-linux-targz
-package-cli-linux-targz: build-cli build-cli-manpage build-cli-shell-comp
+package-cli-linux-targz: package-checks build-cli build-cli-manpage build-cli-shell-comp
 	@echo "Packaging CLI as generic linux tar.gz"
 	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-cli/dist/PKGBUILD
 
 ## package: package-service-linux-targz: Build generic Linux package for Service
 .PHONY: package-service-linux-targz
-package-service-linux-targz: build-service
+package-service-linux-targz: package-checks build-service
 	@echo "Packaging Service as generic linux tar.gz"
 	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
 	rm bb-imager-service/dist/PKGBUILD
 
 ## package: package-gui-windows-portable: Build portable Windows exe package for GUI
 .PHONY: package-gui-windows-portable
-package-gui-windows-portable: build-gui
+package-gui-windows-portable: package-checks build-gui
 	@echo "Packaging GUI as portable Windows exe"
 	mkdir -p bb-imager-gui/dist
 	cp target/${TARGET}/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_${_TARGET_ARCH}.exe
 
 ## package: package-gui-windows-wix: Build Windows installer for GUI
 .PHONY: package-gui-windows-wix
-package-gui-windows-wix: build-gui
+package-gui-windows-wix: package-checks build-gui
 	@echo "Packaging GUI as windows installer"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f wix ${_CARGO_PACKAGER_ARGS}
 
 ## package: package-gui-macos-dmg: Build MacOS DMG package for GUI
 .PHONY: package-gui-macos-dmg
-package-gui-macos-dmg: build-gui
+package-gui-macos-dmg: package-checks build-gui
 	@echo "Packaging GUI as DMG"
 	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f dmg ${_CARGO_PACKAGER_ARGS}
 
