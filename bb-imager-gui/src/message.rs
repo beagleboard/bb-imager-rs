@@ -6,13 +6,13 @@ use iced::Task;
 
 use crate::{
     BBImager,
-    helpers::{self, BoardImage, Boards, Destination, FlashingCustomization, ProgressBarState},
+    helpers::{self, BoardImage, Destination, FlashingCustomization, ProgressBarState},
     pages::Screen,
 };
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
-    UpdateConfig(Boards),
+    ExtendConfig(bb_config::Config),
     ResolveRemoteSubitemItem {
         item: Vec<bb_config::config::OsListItem>,
         target: Vec<usize>,
@@ -60,14 +60,14 @@ pub(crate) enum BBImagerMessage {
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
     match message {
-        BBImagerMessage::UpdateConfig(c) => {
-            tracing::info!("Config: {:#?}", c);
-            state.boards = c;
+        BBImagerMessage::ExtendConfig(c) => {
+            state.boards.merge(c);
+            tracing::debug!("Update Config: {:#?}", state.boards);
             return state.fetch_board_images();
         }
         BBImagerMessage::RefreshConfig => {
             state.boards = Default::default();
-            return helpers::refresh_config_task(state.downloader.clone());
+            return helpers::refresh_config_task(state.downloader.clone(), &state.boards);
         }
         BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
             state.boards.resolve_remote_subitem(item, &target);

@@ -100,7 +100,7 @@ impl BBImager {
 
         // Fetch old config
         let client = downloader.clone();
-        let config_task = helpers::refresh_config_task(client);
+        let config_task = helpers::refresh_config_task(client, &Default::default());
 
         let mut ans = Self {
             app_config,

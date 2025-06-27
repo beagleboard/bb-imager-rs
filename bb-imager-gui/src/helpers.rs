@@ -9,6 +9,7 @@ use iced::{
     widget::{self, Column, progress_bar, text},
 };
 use iced_loading::Linear;
+use url::Url;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ProgressBarState {
@@ -162,20 +163,25 @@ impl ProgressBarStatus {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Boards(config::Config);
+pub(crate) struct Boards {
+    config: config::Config,
+}
 
 impl Boards {
-    pub(crate) fn merge(mut self, config: Self) -> Self {
-        self.0.extend([config.0]);
-        self
+    pub(crate) fn merge(&mut self, config: bb_config::Config) {
+        self.config.extend([config])
+    }
+
+    pub(crate) fn unrsolved_configs(&self) -> impl Iterator<Item = &Url> {
+        self.config.imager.remote_configs.iter()
     }
 
     pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &config::Device)> {
-        self.0.imager.devices.iter().enumerate()
+        self.config.imager.devices.iter().enumerate()
     }
 
     pub(crate) fn image(&self, target: &[usize]) -> &OsListItem {
-        let mut res = &self.0.os_list;
+        let mut res = &self.config.os_list;
         let (last, rest) = target.split_last().unwrap();
 
         for i in rest {
@@ -195,7 +201,7 @@ impl Boards {
         board_idx: usize,
         subitems: &[usize],
     ) -> Option<Vec<(usize, &OsListItem)>> {
-        let mut res = &self.0.os_list;
+        let mut res = &self.config.os_list;
 
         for i in subitems {
             let item = res.get(*i).expect("No Subitem");
@@ -223,7 +229,7 @@ impl Boards {
     }
 
     pub(crate) fn device(&self, board_idx: usize) -> &config::Device {
-        self.0
+        self.config
             .imager
             .devices
             .get(board_idx)
@@ -233,7 +239,7 @@ impl Boards {
     pub(crate) fn resolve_remote_subitem(&mut self, subitems: Vec<OsListItem>, target: &[usize]) {
         assert!(!target.is_empty());
 
-        let mut res = &mut self.0.os_list;
+        let mut res = &mut self.config.os_list;
 
         let (last, rest) = target.split_last().unwrap();
 
@@ -259,6 +265,7 @@ impl From<config::Config> for Boards {
         let filtered = config::Config {
             imager: config::Imager {
                 latest_version: value.imager.latest_version,
+                remote_configs: value.imager.remote_configs,
                 devices: value
                     .imager
                     .devices
@@ -268,7 +275,7 @@ impl From<config::Config> for Boards {
             },
             os_list: value.os_list,
         };
-        Self(filtered)
+        Self { config: filtered }
     }
 }
 
@@ -664,27 +671,28 @@ impl FlashingCustomization {
 
 /// Fetches the main remote os_list file from `bb_config::DISTROS_URL` and merges it with the base
 /// config.
-async fn fetch_remote_os_list(client: bb_downloader::Downloader) -> std::io::Result<Boards> {
-    let boards = Boards::default();
-    let data: config::Config = client
-        .download_json_no_cache(bb_config::DISTROS_URL)
-        .await?;
-
-    // If spawn_blocking fails, there is a problem with the underlying runtime
-    tokio::task::spawn_blocking(|| Ok(boards.merge(data.into())))
-        .await
-        .expect("Tokio runtime failed to spawn blocking task")
+async fn fetch_remote_os_list(
+    client: bb_downloader::Downloader,
+    url: Url,
+) -> std::io::Result<config::Config> {
+    client.download_json_no_cache(url).await
 }
 
-pub fn refresh_config_task(client: bb_downloader::Downloader) -> iced::Task<BBImagerMessage> {
-    iced::Task::perform(
-        fetch_remote_os_list(client),
-        |x: std::io::Result<Boards>| match x {
-            Ok(y) => BBImagerMessage::UpdateConfig(y),
-            Err(e) => {
-                tracing::error!("Failed to fetch config: {e}");
-                BBImagerMessage::Null
-            }
-        },
-    )
+pub fn refresh_config_task(
+    client: bb_downloader::Downloader,
+    config: &Boards,
+) -> iced::Task<BBImagerMessage> {
+    let tasks = config.unrsolved_configs().map(|x| {
+        iced::Task::perform(
+            fetch_remote_os_list(client.clone(), x.clone()),
+            |x: std::io::Result<config::Config>| match x {
+                Ok(y) => BBImagerMessage::ExtendConfig(y),
+                Err(e) => {
+                    tracing::error!("Failed to fetch config: {e}");
+                    BBImagerMessage::Null
+                }
+            },
+        )
+    });
+    iced::Task::batch(tasks)
 }
