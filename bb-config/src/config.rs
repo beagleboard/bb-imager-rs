@@ -41,7 +41,11 @@ pub struct Config {
 pub struct Imager {
     /// Latest BeagleBoard Imaging Utility version
     pub latest_version: Option<Version>,
+    /// A list of remote config files
+    #[serde(default)]
+    pub remote_configs: HashSet<Url>,
     #[serde_as(as = "VecSkipError<_>")]
+    #[serde(default)]
     /// List of BeagleBoard.org boards
     pub devices: Vec<Device>,
 }
@@ -178,6 +182,10 @@ impl Extend<Self> for Config {
             if let Some(v) = config.imager.latest_version {
                 self.imager.latest_version = Some(v);
             }
+
+            self.imager
+                .remote_configs
+                .extend(config.imager.remote_configs);
 
             for c_dev in config.imager.devices {
                 // If the board already exists, overwrite fields.
