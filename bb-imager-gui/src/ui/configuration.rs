@@ -6,18 +6,92 @@ use iced::{
 use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
+    pages::ConfigurationId,
     persistance::SdCustomization,
 };
 
 use super::helpers::home_btn_text;
 
 pub(crate) fn view<'a>(
-    customization: &'a FlashingCustomization,
+    customization: Option<&'a FlashingCustomization>,
+    timezones: &'a widget::combo_box::State<String>,
+    keymaps: &'a widget::combo_box::State<String>,
+    page_id: ConfigurationId,
+) -> Element<'a, BBImagerMessage> {
+    widget::container(
+        iced_aw::Tabs::new_with_tabs(
+            [
+                (
+                    ConfigurationId::Customization,
+                    iced_aw::TabLabel::Text(String::from("Customization")),
+                    customization_page(customization, timezones, keymaps),
+                ),
+                (
+                    ConfigurationId::About,
+                    iced_aw::TabLabel::Text(String::from("About")),
+                    about_page(),
+                ),
+            ],
+            |x| BBImagerMessage::ReplaceScreen(crate::Screen::ExtraConfiguration(x)),
+        )
+        .set_active_tab(&page_id),
+    )
+    .padding(10)
+    .height(iced::Length::Fill)
+    .into()
+}
+
+fn about_page() -> Element<'static, BBImagerMessage> {
+    widget::responsive(move |size| {
+        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
+
+        let mid_el = widget::column![
+            widget::image(widget::image::Handle::from_bytes(
+                crate::constants::WINDOW_ICON
+            )),
+            crate::constants::APP_NAME,
+            crate::constants::APP_RELEASE,
+            crate::constants::APP_DESC,
+            widget::button(text("Website").style(|_| widget::text::Style {
+                color: Some(iced::Color::from_rgb(0.0, 0.0, 1.0))
+            }))
+            .style(widget::button::text)
+            .on_press(BBImagerMessage::OpenUrl(
+                crate::constants::APP_WEBSITE.into()
+            )),
+            widget::container(crate::constants::APP_LINCESE)
+                .style(widget::container::bordered_box)
+                .padding(10)
+        ]
+        .spacing(2)
+        .align_x(iced::Center);
+
+        widget::column![
+            widget::vertical_space().height(2),
+            widget::horizontal_rule(2),
+            widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
+            widget::horizontal_rule(2),
+            home_btn_text("BACK", true, iced::Length::Fill)
+                .style(widget::button::secondary)
+                .width(iced::Length::FillPortion(1))
+                .on_press(BBImagerMessage::CancelCustomization),
+        ]
+        .spacing(10)
+        .height(iced::Length::Fill)
+        .width(iced::Length::Fill)
+        .align_x(iced::Alignment::Center)
+        .into()
+    })
+    .into()
+}
+
+fn customization_page<'a>(
+    customization: Option<&'a FlashingCustomization>,
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
-        const HEADER_FOOTER_HEIGHT: f32 = 150.0;
+        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
 
         let action_btn_row = widget::row![
             home_btn_text("RESET", true, iced::Length::Fill)
@@ -34,10 +108,11 @@ pub(crate) fn view<'a>(
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
                 .on_press_maybe({
-                    if customization.validate() {
-                        Some(BBImagerMessage::SaveCustomization)
-                    } else {
-                        None
+                    match customization {
+                        Some(customization) if customization.validate() => {
+                            Some(BBImagerMessage::SaveCustomization)
+                        }
+                        _ => None,
                     }
                 }),
         ]
@@ -45,41 +120,43 @@ pub(crate) fn view<'a>(
         .width(iced::Length::Fill);
 
         let form = match customization {
-            FlashingCustomization::LinuxSd(x) => linux_sd_form(timezones, keymaps, x),
-            FlashingCustomization::Bcf(x) => widget::column![
-                widget::toggler(!x.verify)
-                    .label("Skip Verification")
-                    .on_toggle(move |y| {
-                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Bcf(
-                            x.clone().update_verify(!y),
-                        ))
-                    })
-            ],
-            #[cfg(feature = "pb2_mspm0")]
-            FlashingCustomization::Pb2Mspm0(x) => {
-                widget::column![
-                    widget::toggler(x.persist_eeprom)
-                        .label("Persist EEPROM")
+            Some(customization) => match customization {
+                FlashingCustomization::LinuxSd(x) => linux_sd_form(timezones, keymaps, x),
+                FlashingCustomization::Bcf(x) => widget::column![
+                    widget::toggler(!x.verify)
+                        .label("Skip Verification")
                         .on_toggle(move |y| {
-                            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0(
-                                x.clone().update_persist_eeprom(y),
+                            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Bcf(
+                                x.clone().update_verify(!y),
                             ))
                         })
-                ]
-            }
+                ],
+                #[cfg(feature = "pb2_mspm0")]
+                FlashingCustomization::Pb2Mspm0(x) => {
+                    widget::column![
+                        widget::toggler(x.persist_eeprom)
+                            .label("Persist EEPROM")
+                            .on_toggle(move |y| {
+                                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0(
+                                    x.clone().update_persist_eeprom(y),
+                                ))
+                            })
+                    ]
+                }
+                _ => widget::column([]),
+            },
             _ => widget::column([]),
         }
         .spacing(5);
 
         widget::column![
-            text("Extra Configuration").size(28),
+            widget::vertical_space().height(2),
             widget::horizontal_rule(2),
             widget::scrollable(form).height(size.height - HEADER_FOOTER_HEIGHT),
             widget::horizontal_rule(2),
             action_btn_row,
         ]
         .spacing(10)
-        .padding(10)
         .height(iced::Length::Fill)
         .width(iced::Length::Fill)
         .align_x(iced::Alignment::Center)

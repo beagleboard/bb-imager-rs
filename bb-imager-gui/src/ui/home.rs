@@ -56,13 +56,8 @@ pub(crate) fn view<'a>(
             .on_press(BBImagerMessage::Reset)
             .width(iced::Length::Fill);
 
-        let config_btn_active = selected_board.is_some() && selected_image.is_some();
-        let config_btn = home_btn_svg(constants::SETTINGS_ICON, config_btn_active).on_press_maybe(
-            if config_btn_active {
-                Some(BBImagerMessage::PushScreen(Screen::ExtraConfiguration))
-            } else {
-                None
-            },
+        let config_btn = home_btn_svg(constants::SETTINGS_ICON, true).on_press(
+            BBImagerMessage::PushScreen(Screen::ExtraConfiguration(Default::default())),
         );
 
         let next_btn_active =

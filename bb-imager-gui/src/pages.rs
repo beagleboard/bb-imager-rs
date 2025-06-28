@@ -5,9 +5,16 @@ pub(crate) enum Screen {
     BoardSelection(SearchState),
     ImageSelection(ImageSelectionState),
     DestinationSelection(SearchState),
-    ExtraConfiguration,
+    ExtraConfiguration(ConfigurationId),
     Flashing(FlashingState),
     FlashingConfirmation,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConfigurationId {
+    #[default]
+    Customization,
+    About,
 }
 
 impl Screen {

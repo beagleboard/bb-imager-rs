@@ -67,7 +67,7 @@ pub(crate) fn format_size(size: u64) -> String {
     const TB: f64 = 1024.0 * GB;
 
     if size < KB as u64 {
-        format!("{} B", size)
+        format!("{size} B")
     } else if size < MB as u64 {
         format!("{:.2} KB", size as f64 / KB)
     } else if size < GB as u64 {
