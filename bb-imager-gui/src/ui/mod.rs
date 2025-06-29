@@ -47,10 +47,11 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
         Screen::DestinationSelection(s) => {
             destination_selection::view(state.destinations(), s.search_str())
         }
-        Screen::ExtraConfiguration => configuration::view(
-            state.customization().unwrap(),
+        Screen::ExtraConfiguration(id) => configuration::view(
+            state.customization(),
             state.timezones(),
             state.keymaps(),
+            *id,
         ),
         Screen::Flashing(s) => flash::view(s, state.is_flashing()),
         Screen::FlashingConfirmation => {
@@ -69,8 +70,9 @@ fn flashing_confirmation_menu<'a>() -> Element<'a, BBImagerMessage> {
     let menu = widget::column![
         widget::text("Would you like to apply customization settings?"),
         widget::row![
-            widget::button("Edit Settings")
-                .on_press(BBImagerMessage::ReplaceScreen(Screen::ExtraConfiguration)),
+            widget::button("Edit Settings").on_press(BBImagerMessage::ReplaceScreen(
+                Screen::ExtraConfiguration(Default::default())
+            )),
             widget::button("Yes").on_press(BBImagerMessage::StartFlashing),
             widget::button("No").on_press(BBImagerMessage::StartFlashingWithoutConfiguraton),
             widget::button("Abort").on_press(BBImagerMessage::SwitchScreen(Screen::Home))

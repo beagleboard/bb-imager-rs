@@ -160,16 +160,10 @@ impl BBImager {
     fn push_page(&mut self, x: Screen) -> Task<BBImagerMessage> {
         self.screen.push(x.clone());
 
-        match x {
-            Screen::ExtraConfiguration if self.customization.is_none() => {
-                self.customization = Some(self.config())
-            }
-            Screen::ImageSelection(page) => {
-                tracing::info!("Image Selection Screen");
-                let board = self.selected_board.unwrap();
-                return self.fetch_remote_subitems(board, page.idx());
-            }
-            _ => {}
+        if let Screen::ImageSelection(page) = x {
+            tracing::info!("Image Selection Screen");
+            let board = self.selected_board.unwrap();
+            return self.fetch_remote_subitems(board, page.idx());
         }
 
         Task::none()

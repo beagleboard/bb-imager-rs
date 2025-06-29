@@ -12,6 +12,14 @@ pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../config.json");
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
 pub(crate) const BEAGLE_BOARD_ABOUT: &str = "The BeagleBoard.org Foundation is a Michigan, USA-based 501(c)(3) non-profit corporation existing to provide education in and collaboration around the design and use of open-source software and hardware in embedded computing. BeagleBoard.org provides a forum for the owners and developers of open-source software and hardware to exchange ideas, knowledge and experience. The BeagleBoard.org community collaborates on the development of open source physical computing solutions including robotics, personal manufacturing tools like 3D printers and laser cutters, and other types of industrial and machine controls.";
+pub(crate) const APP_RELEASE: &str = if option_env!("PRE_RELEASE").is_some() {
+    "pre-release"
+} else {
+    env!("CARGO_PKG_VERSION")
+};
+pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
+pub(crate) const APP_WEBSITE: &str = "https://www.beagleboard.org/bb-imager";
+pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 // Icons
 pub(crate) const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
