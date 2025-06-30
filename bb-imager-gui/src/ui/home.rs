@@ -67,7 +67,7 @@ pub(crate) fn view<'a>(
             .on_press_maybe(if next_btn_active {
                 None
             } else {
-                Some(BBImagerMessage::PushScreen(Screen::FlashingConfirmation))
+                Some(BBImagerMessage::WriteBtn)
             });
 
         let choice_btn_row = widget::row![

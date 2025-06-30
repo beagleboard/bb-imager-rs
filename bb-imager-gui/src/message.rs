@@ -32,6 +32,9 @@ pub(crate) enum BBImagerMessage {
     StopFlashing(ProgressBarState),
     UpdateFlashConfig(FlashingCustomization),
 
+    /// Write button was pressed
+    WriteBtn,
+
     OpenUrl(Cow<'static, str>),
 
     /// Messages to ignore
@@ -178,6 +181,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 }
                 _ => unreachable!(),
             }
+        }
+        BBImagerMessage::WriteBtn => {
+            return match state.customization() {
+                Some(x) if x.need_confirmation() => state.push_page(Screen::FlashingConfirmation),
+                Some(x) => state.start_flashing(Some(x.clone())),
+                None => state.start_flashing(None),
+            };
         }
         BBImagerMessage::StartFlashing => {
             return state.start_flashing(state.customization.clone());

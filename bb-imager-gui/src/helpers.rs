@@ -667,6 +667,16 @@ impl FlashingCustomization {
             _ => true,
         }
     }
+
+    /// Check if any configuration is even present
+    pub(crate) const fn need_confirmation(&self) -> bool {
+        match self {
+            Self::LinuxSd(_) | Self::Bcf(_) => true,
+            #[cfg(feature = "pb2_mspm0")]
+            Self::Pb2Mspm0(_) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Fetches the main remote os_list file from `bb_config::DISTROS_URL` and merges it with the base
