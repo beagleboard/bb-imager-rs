@@ -13,6 +13,7 @@ use crate::{
 use super::helpers::home_btn_text;
 
 pub(crate) fn view<'a>(
+    app_settings: crate::persistance::AppSettings,
     customization: Option<&'a FlashingCustomization>,
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
@@ -25,6 +26,11 @@ pub(crate) fn view<'a>(
                     ConfigurationId::Customization,
                     iced_aw::TabLabel::Text(String::from("Customization")),
                     customization_page(customization, timezones, keymaps),
+                ),
+                (
+                    ConfigurationId::Settings,
+                    iced_aw::TabLabel::Text(String::from("Settings")),
+                    global_settings(app_settings),
                 ),
                 (
                     ConfigurationId::About,
@@ -80,6 +86,39 @@ fn about_page() -> Element<'static, BBImagerMessage> {
         .height(iced::Length::Fill)
         .width(iced::Length::Fill)
         .align_x(iced::Alignment::Center)
+        .into()
+    })
+    .into()
+}
+
+fn global_settings(
+    app_settings: crate::persistance::AppSettings,
+) -> Element<'static, BBImagerMessage> {
+    widget::responsive(move |size| {
+        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
+
+        let mid_el = widget::column![
+            widget::toggler(app_settings.skip_confirmation == Some(true))
+                .label("Disable confirmation dialog")
+                .on_toggle(move |t| BBImagerMessage::UpdateSettings(
+                    app_settings.update_skip_confirmation(Some(t))
+                ))
+        ]
+        .spacing(5);
+
+        widget::column![
+            widget::vertical_space().height(2),
+            widget::horizontal_rule(2),
+            widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
+            widget::horizontal_rule(2),
+            home_btn_text("BACK", true, iced::Length::Fill)
+                .style(widget::button::secondary)
+                .width(iced::Length::FillPortion(1))
+                .on_press(BBImagerMessage::CancelCustomization),
+        ]
+        .spacing(10)
+        .height(iced::Length::Fill)
+        .width(iced::Length::Fill)
         .into()
     })
     .into()

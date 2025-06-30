@@ -11,6 +11,8 @@ use crate::constants;
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
+    app_settings: Option<AppSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     sd_customization: Option<SdCustomization>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bcf_customization: Option<BcfCustomization>,
@@ -67,6 +69,10 @@ impl GuiConfiguration {
         self.bcf_customization.as_ref()
     }
 
+    pub(crate) const fn app_settings(&self) -> Option<&AppSettings> {
+        self.app_settings.as_ref()
+    }
+
     #[cfg(feature = "pb2_mspm0")]
     pub(crate) const fn pb2_mspm0_customization(&self) -> Option<&Pb2Mspm0Customization> {
         self.pb2_mspm0_customization.as_ref()
@@ -78,6 +84,23 @@ impl GuiConfiguration {
 
     pub(crate) fn update_bcf_customization(&mut self, t: BcfCustomization) {
         self.bcf_customization = Some(t)
+    }
+
+    pub(crate) fn update_app_settings(&mut self, t: AppSettings) {
+        self.app_settings = Some(t)
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+pub(crate) struct AppSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) skip_confirmation: Option<bool>,
+}
+
+impl AppSettings {
+    pub(crate) fn update_skip_confirmation(mut self, t: Option<bool>) -> Self {
+        self.skip_confirmation = t;
+        self
     }
 }
 

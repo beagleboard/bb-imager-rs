@@ -48,6 +48,7 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
             destination_selection::view(state.destinations(), s.search_str())
         }
         Screen::ExtraConfiguration(id) => configuration::view(
+            state.app_settings(),
             state.customization(),
             state.timezones(),
             state.keymaps(),

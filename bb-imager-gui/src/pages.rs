@@ -14,6 +14,7 @@ pub(crate) enum Screen {
 pub(crate) enum ConfigurationId {
     #[default]
     Customization,
+    Settings,
     About,
 }
 
