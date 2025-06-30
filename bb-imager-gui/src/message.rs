@@ -32,6 +32,9 @@ pub(crate) enum BBImagerMessage {
     StopFlashing(ProgressBarState),
     UpdateFlashConfig(FlashingCustomization),
 
+    /// Actions for App Settings
+    UpdateSettings(crate::persistance::AppSettings),
+
     /// Write button was pressed
     WriteBtn,
 
@@ -183,8 +186,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
         }
         BBImagerMessage::WriteBtn => {
+            let skip_confirmation = state.app_settings().skip_confirmation == Some(true);
             return match state.customization() {
-                Some(x) if x.need_confirmation() => state.push_page(Screen::FlashingConfirmation),
+                Some(x) if x.need_confirmation() && !skip_confirmation => {
+                    state.push_page(Screen::FlashingConfirmation)
+                }
                 Some(x) => state.start_flashing(Some(x.clone())),
                 None => state.start_flashing(None),
             };
@@ -244,6 +250,17 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // Since we have a cache of config, no need to wait for disk persistance.
             state.screen.pop();
 
+            return Task::future(async move {
+                if let Err(e) = config.save().await {
+                    tracing::error!("Failed to save config: {e}");
+                }
+                BBImagerMessage::Null
+            });
+        }
+        BBImagerMessage::UpdateSettings(s) => {
+            state.app_config.update_app_settings(s);
+
+            let config = state.app_config.clone();
             return Task::future(async move {
                 if let Err(e) = config.save().await {
                     tracing::error!("Failed to save config: {e}");

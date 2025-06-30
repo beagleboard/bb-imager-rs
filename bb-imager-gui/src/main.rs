@@ -381,6 +381,10 @@ impl BBImager {
         self.customization.as_ref()
     }
 
+    pub(crate) fn app_settings(&self) -> persistance::AppSettings {
+        self.app_config.app_settings().cloned().unwrap_or_default()
+    }
+
     pub(crate) fn timezones(&self) -> &widget::combo_box::State<String> {
         &self.timezones
     }
