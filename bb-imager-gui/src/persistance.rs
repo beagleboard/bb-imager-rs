@@ -131,7 +131,7 @@ impl Default for SdCustomization {
             user: None,
             wifi: None,
             ssh: None,
-            usb_enable_dhcp: if cfg!(windows) || cfg!(target_os = "macos") {
+            usb_enable_dhcp: if cfg!(target_os = "macos") {
                 Some(true)
             } else {
                 None
