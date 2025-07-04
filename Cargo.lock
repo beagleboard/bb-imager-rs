@@ -583,6 +583,7 @@ dependencies = [
 name = "bb-imager-gui"
 version = "0.0.8"
 dependencies = [
+ "ashpd",
  "bb-config",
  "bb-downloader",
  "bb-flasher",

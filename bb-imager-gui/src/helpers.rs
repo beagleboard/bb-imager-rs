@@ -688,7 +688,7 @@ async fn fetch_remote_os_list(
     client.download_json_no_cache(url).await
 }
 
-pub fn refresh_config_task(
+pub(crate) fn refresh_config_task(
     client: bb_downloader::Downloader,
     config: &Boards,
 ) -> iced::Task<BBImagerMessage> {
@@ -705,4 +705,35 @@ pub fn refresh_config_task(
         )
     });
     iced::Task::batch(tasks)
+}
+
+#[cfg(target_os = "linux")]
+async fn show_notification_xdg_portal(body: &str) -> ashpd::Result<()> {
+    let proxy = ashpd::desktop::notification::NotificationProxy::new().await?;
+
+    let app_id = "org.beagleboard.imagingutility";
+    proxy
+        .add_notification(
+            app_id,
+            ashpd::desktop::notification::Notification::new("BeagleBoard Imager").body(body),
+        )
+        .await
+}
+
+pub(crate) async fn show_notification(body: String) -> notify_rust::error::Result<()> {
+    #[cfg(target_os = "linux")]
+    if let Ok(_) = show_notification_xdg_portal(&body).await {
+        return Ok(());
+    }
+
+    tokio::task::spawn_blocking(move || {
+        notify_rust::Notification::new()
+            .appname("BeagleBoard Imager")
+            .body(&body)
+            .finalize()
+            .show()
+    })
+    .await
+    .unwrap()
+    .map(|_| ())
 }

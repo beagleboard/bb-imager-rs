@@ -207,15 +207,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
             let notification_task = Task::future(async move {
-                let res = tokio::task::spawn_blocking(move || {
-                    notify_rust::Notification::new()
-                        .appname("BeagleBoard Imager")
-                        .body(&content)
-                        .finalize()
-                        .show()
-                })
-                .await
-                .expect("Tokio runtime failed to spawn blocking task");
+                let res = helpers::show_notification(content)
+                    .await
+                    .expect("Tokio runtime failed to spawn blocking task");
 
                 tracing::debug!("Notification response {res:?}");
                 BBImagerMessage::Null
