@@ -8,15 +8,15 @@
 
 The repo contains a `Makefile` to help create the different supported packages.
 
-## Deb Package
+## Packaging tools
 
-1. The project uses [cargo-deb](https://crates.io/crates/cargo-deb) to build the Debian package. It can be installed with a just recipe
+This project uses [cargo-packager](https://crates.io/crates/cargo-packager) to build the target packages. Install it first via:
 
-```
+```sh
 make setup-packaging-deps
 ```
 
-2. Build the packages
+## Deb Package
 
 - CLI
 
@@ -44,14 +44,6 @@ The target platform can be specified with `TARGET` environment variable. Default
 For different host/target pair, see [Cross Compilation](#cross-compilation)
 
 ## AppImage
-
-1. The project uses [appimagetool](https://github.com/AppImage/appimagetool) for building the AppImage.
-
-```
-make setup-appimage
-```
-
-2. Build the package
 
 ```
 make package-gui-linux-appimage
@@ -125,7 +117,7 @@ For different host/target pair, see [Cross Compilation](#cross-compilation)
 Build the package.
 
 ```
-make package-gui-darwin-dmg
+make package-gui-macos-dmg
 ```
 
 The target platform can be specified with `TARGET` environment variable. Defaults to host target. Currently, the following targets have been tested:
