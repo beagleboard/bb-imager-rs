@@ -248,12 +248,13 @@ endif
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
 \t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/v$(VERSION)</url>\
 \t\t</release>' bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
+	cargo build
 	$(info Showing Diff)
 	git diff
 	@while [ -z "$$CONTINUE" ]; do \
         	read -r -p "Create git commit and tag [y/N]: " CONTINUE; \
 	done ; \
 	[ $$CONTINUE = "y" ] || [ $$CONTINUE = "Y" ] || (echo "Aborting."; exit 1;)
-	git add Cargo.toml bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
+	git add Cargo.toml Cargo.lock bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
 	git commit -s -m "Bump version to ${VERSION}"
 	git tag v${VERSION}
