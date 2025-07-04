@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component type="desktop-application">
+	<id>org.beagleboard.imagingutility</id>
+
+	<name>BeagleBoard Imaging Utility</name>
+	<summary>Flash firmware to various BeagleBoard.org development boards</summary>
+	<developer id="org.beagleboard">
+		<name>Ayush Singh and contributors</name>
+	</developer>
+
+	<metadata_license>CC0-1.0</metadata_license>
+	<project_license>MIT</project_license>
+
+	<description>
+		<p>
+			Notice: Please download the udev permissions for fixing permission errors when working with BeagleConnect Freedom.
+		</p>
+		<p>
+			The easiest way to install the latest operating system images for your Beagle.
+		</p>
+	</description>
+
+	<launchable type="desktop-id">org.beagleboard.imagingutility.desktop</launchable>
+
+	<branding>
+		<color type="primary" scheme_preference="light">#aa5137</color>
+		<color type="primary" scheme_preference="dark">#aa5137</color>
+	</branding>
+
+	<categories>
+		<category>Development</category>
+	</categories>
+
+	<url type="homepage">https://www.beagleboard.org/bb-imager</url>
+	<url type="bugtracker">https://github.com/beagleboard/bb-imager-rs/issues</url>
+
+	<content_rating type="oars-1.1" />
+
+	<screenshots>
+		<screenshot type="default">
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/home.png</image>
+			<caption>Home</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/config.png</image>
+			<caption>Image customization</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/flash.png</image>
+			<caption>Flashing progress</caption>
+        	</screenshot>
+	</screenshots>
+
+	<releases>
+		<release version="0.0.8" date="2025-06-26">
+			<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/v0.0.8</url>
+		</release>
+	</releases>
+</component>
