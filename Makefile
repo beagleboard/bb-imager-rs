@@ -5,6 +5,7 @@ _RUST_ARGS = --locked
 _CARGO_PACKAGER_ARGS = -r
 _TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+_DATE = $(shell date +%F)
 
 ## variable: CARGO_PATH: Path to cargo binary
 CARGO_PATH ?= $(shell which cargo)
@@ -234,3 +235,25 @@ package-rename:
 			done \
 		fi \
 	done
+
+## housekeeping: version-bump: Bump version
+.PHONY: version-bump
+version-bump:
+	$(info Bumping version)
+ifeq (${VERSION}, ${_CARGO_TOML_VERSION})
+	$(error ${VERSION} == ${_CARGO_TOML_VERSION})
+endif
+	sed -i '/\[workspace.package\]/,/^\[/{s/^\s*version\s*=.*/version = "${VERSION}"/}' Cargo.toml
+	sed -i '/<releases>/a \
+\t\t<release version="$(VERSION)" date="$(_DATE)">\
+\t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/v$(VERSION)</url>\
+\t\t</release>' bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
+	$(info Showing Diff)
+	git diff
+	@while [ -z "$$CONTINUE" ]; do \
+        	read -r -p "Create git commit and tag [y/N]: " CONTINUE; \
+	done ; \
+	[ $$CONTINUE = "y" ] || [ $$CONTINUE = "Y" ] || (echo "Aborting."; exit 1;)
+	git add Cargo.toml bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
+	git commit -s -m "Bump version to ${VERSION}"
+	git tag v${VERSION}
