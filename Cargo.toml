@@ -13,7 +13,7 @@ strip = true
 lto = "thin"
 
 [workspace.package]
-version = "0.0.9"
+version = "0.0.10"
 edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
