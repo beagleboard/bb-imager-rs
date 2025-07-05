@@ -3,10 +3,10 @@
 <component type="desktop-application">
 	<id>org.beagleboard.imagingutility</id>
 
-	<name>BeagleBoard Imaging Utility</name>
-	<summary>Flash firmware to various BeagleBoard.org development boards</summary>
+	<name>BeagleBoard Imager</name>
+	<summary>BeagleBoard Imaging Utility</summary>
 	<developer id="org.beagleboard">
-		<name>Ayush Singh and contributors</name>
+		<name>BeagleBoard.org Developers</name>
 	</developer>
 
 	<metadata_license>CC0-1.0</metadata_license>
