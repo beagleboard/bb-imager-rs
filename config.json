@@ -19,7 +19,7 @@
 					"beagleconnect-freedom"
 				],
 				"description": "BeagleConnect Freedom based on Ti CC1352P7",
-				"icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/bcf.png",
 				"flasher": "BeagleConnectFreedom",
 				"documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html"
 			},
@@ -29,7 +29,7 @@
 					"beagle-am67"
 				],
 				"description": "BeagleY-AI based on TI AM67A",
-				"icon": "https://www.beagleboard.org/app/uploads/2024/06/beagley-ai.svg",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beagley.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beagley/ai/index.html#beagley-ai-home"
 			},
@@ -39,7 +39,7 @@
 					"beagle-am62"
 				],
 				"description": "BeaglePlay and other boards based on TI AM62",
-				"icon": "https://www.beagleboard.org/app/uploads/2024/03/image6.png",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beagleplay.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beagleplay/index.html#beagleplay-home"
 			},
@@ -49,7 +49,7 @@
 					"beagle-tda4vm"
 				],
 				"description": "BeagleBone AI-64 based on TI TDA4VM",
-				"icon": "https://www.beagleboard.org/app/uploads/2024/06/bbai64-front-a-2.png",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/ai64.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html#bbai64-home"
 			},
@@ -59,7 +59,7 @@
 					"beaglev-fire"
 				],
 				"description": "BeagleV-Fire based on Microchip PolarFire SoC",
-				"icon": "https://www.beagleboard.org/app/uploads/2023/10/1-102110898-BeagleV-Fire-45-degree-front.jpg",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beaglevfire.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home"
 			},
@@ -69,7 +69,7 @@
 					"beagle-am335"
 				],
 				"description": "BeagleBone Black and other boards based on TI AM335",
-				"icon": "https://www.beagleboard.org/app/uploads/2022/10/product_beaglebone_black.jpg",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/bbb.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home"
 			},
@@ -79,7 +79,7 @@
 					"pocketbeagle2-am62"
 				],
 				"description": "PocketBeagle 2 and other boards based on TI AM62",
-				"icon": "https://openbeagle.org/lorforlinux/docs.beagleboard.io/-/raw/main/boards/pocketbeagle-2/images/product/pocketbeagle-2-45-front.jpg",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/pocket2.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle-2/index.html"
 			}
@@ -171,7 +171,7 @@
 		{
 			"name": "Zephyr SD Card Images",
 			"description": "Images to use Zephyr on A53 Cores",
-			"icon": "https://avatars.githubusercontent.com/u/19595895?s=200&v=4",
+			"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/zephyr.png",
 			"flasher": "SdCard",
 			"devices": [
 				"pocketbeagle2-am62"
