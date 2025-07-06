@@ -2,3 +2,4 @@
 /gui/libs
 /release
 */dist
+.DS_Store
