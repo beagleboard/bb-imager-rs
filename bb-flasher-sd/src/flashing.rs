@@ -1,6 +1,7 @@
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::sync::Weak;
+use std::time::{Duration, Instant};
 
 use futures::channel::mpsc;
 
@@ -46,19 +47,26 @@ fn write_sd(
 ) -> Result<()> {
     let mut buf = Box::new(DirectIoBuffer::<BUFFER_SIZE>::new());
     let mut pos = 0;
+    let global_start = Instant::now();
+    let mut reading_time = Duration::from_secs(0);
+    let mut writing_time = Duration::from_secs(0);
 
     // Clippy warning is simply wrong here
     #[allow(clippy::option_map_or_none)]
     chan_send(chan.as_mut().map_or(None, |p| Some(p)), 0.0);
     loop {
+        let read_start = Instant::now();
         let count = read_aligned(&mut img, buf.as_mut_slice())?;
+        reading_time += read_start.elapsed();
         if count == 0 {
             break;
         }
 
         // Since buf is 512 byte aligned, just write the whole thing since read_aligned will always
         // fill it fully.
+        let write_start = Instant::now();
         sd.write_all(&buf.as_slice()[..count])?;
+        writing_time += write_start.elapsed();
 
         pos += count;
         // Clippy warning is simply wrong here
@@ -69,6 +77,10 @@ fn write_sd(
         );
         check_arc(cancel)?;
     }
+
+    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
+    tracing::info!("Reading Time: {:?}", reading_time);
+    tracing::info!("Writing Time: {:?}", writing_time);
 
     sd.flush().map_err(Into::into)
 }
