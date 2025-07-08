@@ -6,18 +6,35 @@ use futures::channel::mpsc;
 
 use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{Eject, chan_send, check_arc, progress};
+use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_arc, progress};
 
+// Stack overflow occurs during debug since box moves data from stack to heap in debug builds
+#[cfg(not(debug_assertions))]
 const BUFFER_SIZE: usize = 1 * 1024 * 1024;
-const ALIGNMENT: usize = 512;
+#[cfg(debug_assertions)]
+const BUFFER_SIZE: usize = 8 * 1024;
 
-#[repr(align(512))]
-struct DirectIoBuffer([u8; BUFFER_SIZE]);
+/// A lot of reads from compressed files are not aligned. Since reading even from compressed files
+/// is significantly faster than writing to SD Card, better to do multiple reads.
+fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
+    const ALIGNMENT: usize = 512;
 
-impl DirectIoBuffer {
-    const fn new() -> Self {
-        Self([0u8; BUFFER_SIZE])
+    let mut pos = 0;
+
+    while pos != buf.len() {
+        let count = img.read(&mut buf[pos..])?;
+        if count == 0 {
+            if pos % ALIGNMENT != 0 {
+                let end = pos - pos % ALIGNMENT + ALIGNMENT;
+                buf[pos..end].fill(0);
+                pos = end;
+            }
+            return Ok(pos);
+        }
+        pos += count;
     }
+
+    Ok(pos)
 }
 
 fn write_sd(
@@ -27,35 +44,23 @@ fn write_sd(
     mut chan: Option<&mut mpsc::Sender<f32>>,
     cancel: Option<&Weak<()>>,
 ) -> Result<()> {
-    let mut buf = Box::new(DirectIoBuffer::new());
+    let mut buf = Box::new(DirectIoBuffer::<BUFFER_SIZE>::new());
     let mut pos = 0;
 
     // Clippy warning is simply wrong here
     #[allow(clippy::option_map_or_none)]
     chan_send(chan.as_mut().map_or(None, |p| Some(p)), 0.0);
     loop {
-        let buf_pos = pos % ALIGNMENT;
-
-        let count = img.read(&mut buf.0[buf_pos..])?;
+        let count = read_aligned(&mut img, buf.as_mut_slice())?;
         if count == 0 {
-            // Pad remaining data with 0 and write
-            if buf_pos != 0 {
-                buf.0[buf_pos..ALIGNMENT].fill(0);
-                sd.write_all(&mut buf.0[..ALIGNMENT])?;
-            }
-
             break;
         }
 
-        // Can only write in ALIGNMENT byte chunks
-        let bytes_to_write = buf_pos + count - count % ALIGNMENT;
-        sd.write_all(&buf.0[..bytes_to_write])?;
+        // Since buf is 512 byte aligned, just write the whole thing since read_aligned will always
+        // fill it fully.
+        sd.write_all(&buf.as_slice()[..count])?;
 
-        // Copy the remaining bytes to buffer start and update position in buffer
-        buf.0
-            .copy_within(bytes_to_write..(bytes_to_write + count % ALIGNMENT), 0);
-
-        pos += bytes_to_write;
+        pos += count;
         // Clippy warning is simply wrong here
         #[allow(clippy::option_map_or_none)]
         chan_send(
@@ -137,4 +142,70 @@ fn flash_internal(
     let _ = sd.eject();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::flashing::read_aligned;
+
+    use super::write_sd;
+
+    fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
+        let data: Vec<u8> = (0..len)
+            .into_iter()
+            .map(|x| x % 255)
+            .map(|x| u8::try_from(x).unwrap())
+            .collect();
+        std::io::Cursor::new(data.into())
+    }
+
+    #[test]
+    fn sd_write() {
+        const FILE_LEN: usize = 12 * 1024;
+
+        let mut dummy_file = test_file(FILE_LEN);
+        let mut sd = std::io::Cursor::new(Vec::<u8>::new());
+
+        write_sd(&mut dummy_file, FILE_LEN as u64, &mut sd, None, None).unwrap();
+
+        assert_eq!(sd.get_ref().as_slice(), dummy_file.get_ref().as_ref());
+    }
+
+    struct UnalignedReader(std::io::Cursor<Box<[u8]>>);
+
+    impl UnalignedReader {
+        const fn as_slice(&self) -> &[u8] {
+            self.0.get_ref()
+        }
+    }
+
+    impl std::io::Read for UnalignedReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let count = std::cmp::min(self.0.get_ref().len() - self.0.position() as usize, 3);
+            let count = std::cmp::min(count, buf.len());
+            self.0.read(&mut buf[..count])
+        }
+    }
+
+    #[test]
+    fn aligned_read() {
+        const FILE_LEN: usize = 12 * 1024;
+
+        let mut dummy_file = UnalignedReader(test_file(FILE_LEN));
+        let mut buf = [0u8; 1024];
+        let mut pos = 0;
+
+        loop {
+            let count = read_aligned(&mut dummy_file, &mut buf).unwrap();
+            if count == 0 {
+                break;
+            }
+
+            assert_eq!(count % 512, 0);
+            assert_eq!(buf[..count], dummy_file.as_slice()[pos..(pos + count)]);
+            pos += count;
+        }
+
+        assert_eq!(pos, FILE_LEN);
+    }
 }
