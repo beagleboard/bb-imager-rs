@@ -31,7 +31,7 @@ const BLOCK_SIZE: usize = 4096;
 pub(crate) struct DeviceWrapper<F> {
     f: F,
     offset: u64,
-    buf: Box<[u8]>,
+    buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
     cache_offset: u64,
 }
 
@@ -63,7 +63,7 @@ where
             offset: 0,
             // Hack to make reading from 0 working
             cache_offset: 1,
-            buf: vec![0u8; BLOCK_SIZE].into(),
+            buf: Box::new(DirectIoBuffer::new()),
         })
     }
 }
@@ -76,7 +76,7 @@ where
         if self.cache_offset != self.block_offset() {
             self.cache_offset = self.block_offset();
             self.f.seek(io::SeekFrom::Start(self.cache_offset))?;
-            self.f.read_exact(&mut self.buf)
+            self.f.read_exact(self.buf.as_mut_slice())
         } else {
             Ok(())
         }
@@ -91,8 +91,9 @@ where
         self.fill_cache()?;
         let count = std::cmp::min(buf.len(), self.cache_buf_hit_len());
 
-        buf[..count]
-            .copy_from_slice(&self.buf[self.cache_buf_offset()..(self.cache_buf_offset() + count)]);
+        buf[..count].copy_from_slice(
+            &self.buf.as_slice()[self.cache_buf_offset()..(self.cache_buf_offset() + count)],
+        );
 
         self.offset += count as u64;
 
@@ -109,10 +110,10 @@ where
         let count = std::cmp::min(buf.len(), self.cache_buf_hit_len());
         let start = self.cache_buf_offset();
 
-        self.buf[start..(start + count)].copy_from_slice(&buf[..count]);
+        self.buf.as_mut_slice()[start..(start + count)].copy_from_slice(&buf[..count]);
 
         self.f.seek(io::SeekFrom::Start(self.cache_offset))?;
-        self.f.write(&self.buf)?;
+        self.f.write(self.buf.as_slice())?;
 
         self.offset += count as u64;
 
@@ -136,6 +137,28 @@ where
         }
 
         Ok(self.offset)
+    }
+}
+
+#[repr(align(512))]
+#[derive(Debug)]
+pub(crate) struct DirectIoBuffer<const N: usize>([u8; N]);
+
+impl<const N: usize> DirectIoBuffer<N> {
+    pub(crate) const fn new() -> Self {
+        Self([0u8; N])
+    }
+
+    pub(crate) const fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub(crate) const fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+
+    const fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -193,6 +216,5 @@ mod tests {
         temp.read_exact(&mut buf).unwrap();
 
         assert_eq!(ans, buf);
-
     }
 }
