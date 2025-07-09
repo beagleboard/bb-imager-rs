@@ -43,15 +43,15 @@
 
 	<screenshots>
 		<screenshot type="default">
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/home.png</image>
+			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.11/assets/screenshots/home.webp</image>
 			<caption>Home</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/config.png</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.11/assets/screenshots/config.webp</image>
 			<caption>Image customization</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.8/screenshots/flash.png</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/v0.0.11/assets/screenshots/flash.webp</image>
 			<caption>Flashing progress</caption>
         	</screenshot>
 	</screenshots>
