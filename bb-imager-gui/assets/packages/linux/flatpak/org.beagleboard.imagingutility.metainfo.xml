@@ -34,6 +34,10 @@
 
 	<url type="homepage">https://www.beagleboard.org/bb-imager</url>
 	<url type="bugtracker">https://github.com/beagleboard/bb-imager-rs/issues</url>
+	<url type="donation">https://github.com/sponsors/beagleboard</url>
+	<url type="contact">https://www.beagleboard.org/collaborate</url>
+	<url type="contribute">https://github.com/beagleboard/bb-imager-rs/blob/main/CONTRIBUTING.md</url>
+	<url type="vcs-browser">https://github.com/beagleboard/bb-imager-rs</url>
 
 	<content_rating type="oars-1.1" />
 
