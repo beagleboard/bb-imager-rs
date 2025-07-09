@@ -14,12 +14,12 @@ bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing = "0.1.41"
 iced_aw = { version = "0.12.0", default-features = false, features = ["badge", "tabs"] }
-image = "0.25.5"
-tokio = { version = "1.43.0", default-features = false, features = ["macros"] }
+image = "0.25"
+tokio = { version = "1.46", default-features = false, features = ["macros"] }
 webbrowser = "1.0.3"
 notify-rust = "4.11.5"
-url = { version = "2.5.4" }
-whoami = "1.5.2"
+url = "2.5.4"
+whoami = "1.6"
 localzone = "0.3.1"
 tokio-stream = "0.1.17"
 iced-loading = { path = "../iced-loading" }
@@ -30,7 +30,7 @@ bb-downloader = { path = "../bb-downloader", features = ["json"] }
 bb-config = { path = "../bb-config" }
 
 [build-dependencies]
-embed-resource = "2.5.0"
+embed-resource = "3.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
