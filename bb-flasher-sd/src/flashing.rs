@@ -1,7 +1,7 @@
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::sync::Weak;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use futures::channel::mpsc;
 
@@ -14,6 +14,53 @@ use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_arc, progress};
 const BUFFER_SIZE: usize = 1 * 1024 * 1024;
 #[cfg(debug_assertions)]
 const BUFFER_SIZE: usize = 8 * 1024;
+
+fn reader_task(
+    mut img: impl Read,
+    buf_rx: std::sync::mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    buf_tx: std::sync::mpsc::SyncSender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    cancel: Option<Weak<()>>,
+) -> Result<()> {
+    while let Ok(mut buf) = buf_rx.recv() {
+        let count = read_aligned(&mut img, buf.as_mut_slice())?;
+        if count == 0 {
+            break;
+        }
+
+        buf_tx.send((buf, count)).unwrap();
+        check_arc(cancel.as_ref())?;
+    }
+
+    Ok(())
+}
+
+fn writer_task(
+    img_size: u64,
+    mut sd: impl Write + Seek,
+    mut chan: Option<&mut mpsc::Sender<f32>>,
+    buf_rx: std::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: std::sync::mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    cancel: Option<Weak<()>>,
+) -> Result<()> {
+    let mut pos = 0;
+
+    while let Ok((buf, count)) = buf_rx.recv() {
+        sd.write_all(&buf.as_slice()[..count])?;
+
+        pos += count;
+        // Clippy warning is simply wrong here
+        #[allow(clippy::option_map_or_none)]
+        chan_send(
+            chan.as_mut().map_or(None, |p| Some(p)),
+            progress(pos, img_size),
+        );
+
+        let _ = buf_tx.send(buf);
+        check_arc(cancel.as_ref())?;
+    }
+
+    sd.flush().map_err(Into::into)
+}
 
 /// A lot of reads from compressed files are not aligned. Since reading even from compressed files
 /// is significantly faster than writing to SD Card, better to do multiple reads.
@@ -39,50 +86,31 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 }
 
 fn write_sd(
-    mut img: impl Read,
+    img: impl Read + Send + 'static,
     img_size: u64,
-    mut sd: impl Write + Seek,
-    mut chan: Option<&mut mpsc::Sender<f32>>,
-    cancel: Option<&Weak<()>>,
+    sd: impl Write + Seek,
+    chan: Option<&mut mpsc::Sender<f32>>,
+    cancel: Option<Weak<()>>,
 ) -> Result<()> {
-    let mut buf = Box::new(DirectIoBuffer::<BUFFER_SIZE>::new());
-    let mut pos = 0;
+    const NUM_BUFFERS: usize = 4;
+
+    let (tx1, rx1) = std::sync::mpsc::sync_channel(NUM_BUFFERS);
+    let (tx2, rx2) = std::sync::mpsc::sync_channel(NUM_BUFFERS);
     let global_start = Instant::now();
-    let mut reading_time = Duration::from_secs(0);
-    let mut writing_time = Duration::from_secs(0);
 
-    // Clippy warning is simply wrong here
-    #[allow(clippy::option_map_or_none)]
-    chan_send(chan.as_mut().map_or(None, |p| Some(p)), 0.0);
-    loop {
-        let read_start = Instant::now();
-        let count = read_aligned(&mut img, buf.as_mut_slice())?;
-        reading_time += read_start.elapsed();
-        if count == 0 {
-            break;
-        }
-
-        // Since buf is 512 byte aligned, just write the whole thing since read_aligned will always
-        // fill it fully.
-        let write_start = Instant::now();
-        sd.write_all(&buf.as_slice()[..count])?;
-        writing_time += write_start.elapsed();
-
-        pos += count;
-        // Clippy warning is simply wrong here
-        #[allow(clippy::option_map_or_none)]
-        chan_send(
-            chan.as_mut().map_or(None, |p| Some(p)),
-            progress(pos, img_size),
-        );
-        check_arc(cancel)?;
+    // Starting buffers
+    for _ in 0..NUM_BUFFERS {
+        tx1.send(Box::new(DirectIoBuffer::new())).unwrap();
     }
 
-    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
-    tracing::info!("Reading Time: {:?}", reading_time);
-    tracing::info!("Writing Time: {:?}", writing_time);
+    let cancle_clone = cancel.clone();
+    let handle = std::thread::spawn(move || reader_task(img, rx1, tx2, cancle_clone));
 
-    sd.flush().map_err(Into::into)
+    writer_task(img_size, sd, chan, rx2, tx1, cancel)?;
+
+    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
+
+    handle.join().unwrap()
 }
 
 /// Flash OS image to SD card.
@@ -113,7 +141,7 @@ fn write_sd(
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub fn flash<R: Read>(
+pub fn flash<R: Read + Send + 'static>(
     img_resolver: impl FnOnce() -> std::io::Result<(R, u64)>,
     dst: &Path,
     chan: Option<mpsc::Sender<f32>>,
@@ -133,7 +161,7 @@ pub fn flash<R: Read>(
 }
 
 fn flash_internal(
-    img: impl Read,
+    img: impl Read + Send + 'static,
     img_size: u64,
     mut sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
@@ -142,7 +170,7 @@ fn flash_internal(
 ) -> Result<()> {
     chan_send(chan.as_mut(), 0.0);
 
-    write_sd(img, img_size, &mut sd, chan.as_mut(), cancel.as_ref())?;
+    write_sd(img, img_size, &mut sd, chan.as_mut(), cancel.clone())?;
 
     check_arc(cancel.as_ref())?;
 
@@ -175,10 +203,10 @@ mod tests {
     fn sd_write() {
         const FILE_LEN: usize = 12 * 1024;
 
-        let mut dummy_file = test_file(FILE_LEN);
+        let dummy_file = test_file(FILE_LEN);
         let mut sd = std::io::Cursor::new(Vec::<u8>::new());
 
-        write_sd(&mut dummy_file, FILE_LEN as u64, &mut sd, None, None).unwrap();
+        write_sd(dummy_file.clone(), FILE_LEN as u64, &mut sd, None, None).unwrap();
 
         assert_eq!(sd.get_ref().as_slice(), dummy_file.get_ref().as_ref());
     }
