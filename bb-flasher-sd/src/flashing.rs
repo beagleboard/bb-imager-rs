@@ -192,7 +192,6 @@ mod tests {
 
     fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
         let data: Vec<u8> = (0..len)
-            .into_iter()
             .map(|x| x % 255)
             .map(|x| u8::try_from(x).unwrap())
             .collect();
