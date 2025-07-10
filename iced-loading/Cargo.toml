@@ -7,5 +7,5 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-iced = { version = "0.13.1", features = ["advanced", "canvas"] }
-lyon_algorithms = "1.0.5"
+iced = { version = "0.13", features = ["advanced", "canvas"] }
+lyon_algorithms = "1.0"

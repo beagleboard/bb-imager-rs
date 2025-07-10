@@ -15,23 +15,23 @@ futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
 bb-drivelist = "0.1"
-fatfs = "0.3.6"
-fscommon = "0.1.1"
-mbrman = "0.5.4"
-gpt = "4.1.0"
+fatfs = "0.3"
+fscommon = "0.1"
+mbrman = "0.6"
+gpt = "4.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
-tokio = { version = "1.43", default-features = false, features = ["rt"], optional = true }
+tokio = { version = "1.46", default-features = false, features = ["rt"], optional = true }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.60", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
-tempfile = "3.17"
+windows = { version = "0.61", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
+tempfile = "3.20"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = { version = "3.2", optional = true }
-nix = { version = "0.29", features = ["socket", "uio"], optional = true }
+nix = { version = "0.30", features = ["socket", "uio"], optional = true }
 
 [features]
 macos_authopen = ["dep:security-framework", "dep:nix"]

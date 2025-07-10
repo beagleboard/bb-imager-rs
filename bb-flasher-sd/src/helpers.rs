@@ -170,7 +170,6 @@ mod tests {
         const FILE_LEN: usize = 12 * 1024;
 
         let data: Vec<u8> = (0..FILE_LEN)
-            .into_iter()
             .map(|x| x % 255)
             .map(|x| u8::try_from(x).unwrap())
             .collect();
@@ -185,13 +184,13 @@ mod tests {
         temp.seek(SeekFrom::Start(10)).unwrap();
         temp.read_exact(&mut buf).unwrap();
 
-        let ans: Vec<u8> = (10..60).into_iter().collect();
+        let ans: Vec<u8> = (10..60).collect();
         assert_eq!(buf.as_slice(), &ans);
 
         temp.seek(SeekFrom::Start(4095)).unwrap();
         temp.read_exact(&mut buf).unwrap();
 
-        let ans: Vec<u8> = (4095..4145).into_iter().map(|x| (x % 255) as u8).collect();
+        let ans: Vec<u8> = (4095..4145).map(|x| (x % 255) as u8).collect();
         assert_eq!(buf.as_slice(), &ans);
     }
 

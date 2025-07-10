@@ -722,7 +722,7 @@ async fn show_notification_xdg_portal(body: &str) -> ashpd::Result<()> {
 
 pub(crate) async fn show_notification(body: String) -> notify_rust::error::Result<()> {
     #[cfg(target_os = "linux")]
-    if let Ok(_) = show_notification_xdg_portal(&body).await {
+    if show_notification_xdg_portal(&body).await.is_ok() {
         return Ok(());
     }
 
