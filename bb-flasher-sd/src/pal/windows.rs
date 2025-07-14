@@ -19,6 +19,9 @@ pub(crate) struct WinDrive {
     volume: Option<File>,
 }
 
+const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
+const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
+
 impl WinDrive {
     pub(crate) fn open(path: &Path) -> Result<Self> {
         tracing::info!("Trying to find {}", path.display());
@@ -38,7 +41,7 @@ impl WinDrive {
         let drive = OpenOptions::new()
             .read(true)
             .write(true)
-            .custom_flags(0x20000000)
+            .custom_flags(FILE_FLAG_WRITE_THROUGH | FILE_FLAG_NO_BUFFERING)
             .open(path)?;
 
         Ok(Self { drive, volume })
