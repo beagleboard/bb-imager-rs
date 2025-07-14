@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "bb-flasher",
  "clap",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "ashpd",
  "bb-config",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-service"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "bb-flasher-pb2-mspm0",
  "serde_json",
@@ -2448,7 +2448,7 @@ dependencies = [
 
 [[package]]
 name = "iced-loading"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "iced",
  "lyon_algorithms",
@@ -7529,7 +7529,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "cargo_toml",
  "clap",
