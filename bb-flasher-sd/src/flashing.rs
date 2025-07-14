@@ -163,12 +163,14 @@ pub fn flash<R: Read + Send + 'static>(
 fn flash_internal(
     img: impl Read + Send + 'static,
     img_size: u64,
-    mut sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
+    sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
     chan_send(chan.as_mut(), 0.0);
+
+    let mut sd = crate::helpers::SdCardWrapper::new(sd);
 
     write_sd(img, img_size, &mut sd, chan.as_mut(), cancel.clone())?;
 
