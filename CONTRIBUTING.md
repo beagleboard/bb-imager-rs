@@ -84,31 +84,3 @@ Signed-off-by: Ayush Singh <ayush@beagleboard.org>
 ```
 
 using a known identity (sorry, no anonymous contributions.) This will be done for you automatically if you use `git commit -s`. Reverts should also include “Signed-off-by”. `git revert -s` does that for you.
-
-## Changelog Trailers
-
-This repository uses [GitLab Changelog Entries](https://docs.gitlab.com/ee/development/changelog.html) to generate release Changelog. The Changelog trailer accepts the following values:
-
-- added: New feature
-- fixed: Bug fix
-- changed: Feature change
-- deprecated: New deprecation
-- removed: Feature removal
-- security: Security fix
-- performance: Performance improvement
-- other: Other 
-
-An example of a Git commit to include in the Changelog is the following: 
-
-```
-Update git vendor to GitLab
-
-Now that we are using gitaly to compile git, the git version isn't known
-from the manifest, instead, we are getting the gitaly version. Update our
-vendor field to be `gitlab` to avoid cve matching old versions.
-
-Changelog: changed
-Signed-off-by: XYZ <abc@email.com>
-```
-
-The changelog entries are only required in cases of user-facing changes. They should not be added for internal code changes.
