@@ -75,3 +75,9 @@ Options:
 ```shell
 ❯ bb-imager-cli flash --quiet bcf $IMG_PATH /dev/ttyACM0
 ```
+
+# Creating Issues
+
+While creating new issues for bugs, please attach logs from the application. Log files are created automatically by the GUI from v0.0.12.
+
+On Linux the log file is stored in cache directory (eg. `$HOME/.cache/org.beagleboard.imagingutility.log`) and on Windows, it seems be at `C:\Users\ayush\AppData\Local\beagleboard\imagingutility\org.beagleboard.imagingutility.log`. If anyone can find out MacOS path, feel free to add here.
