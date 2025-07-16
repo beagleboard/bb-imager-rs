@@ -77,6 +77,8 @@ pub struct Device {
 pub enum InitFormat {
     /// Sysconfig based customization
     Sysconf,
+    /// Armbian base customization
+    Armbian
 }
 
 /// Os List can contain multiple types of items depending on the situation.
