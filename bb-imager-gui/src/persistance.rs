@@ -5,8 +5,6 @@ use std::{io::Read, path::PathBuf};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 
-use crate::constants;
-
 /// Configuration for GUI that should be presisted
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
@@ -52,12 +50,7 @@ impl GuiConfiguration {
     }
 
     fn config_path() -> Option<PathBuf> {
-        let dirs = directories::ProjectDirs::from(
-            constants::PACKAGE_QUALIFIER.0,
-            constants::PACKAGE_QUALIFIER.1,
-            constants::PACKAGE_QUALIFIER.2,
-        )?;
-
+        let dirs = crate::helpers::project_dirs()?;
         Some(dirs.config_local_dir().join("config.json").to_owned())
     }
 

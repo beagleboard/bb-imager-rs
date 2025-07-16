@@ -226,7 +226,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::OpenUrl(x) => {
             return Task::future(async move {
                 let res = webbrowser::open(&x);
-                tracing::info!("Open Url Resp {res:?}");
+                tracing::debug!("Open Url Resp {res:?}");
                 BBImagerMessage::Null
             });
         }

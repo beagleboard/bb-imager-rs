@@ -245,7 +245,7 @@ impl Downloader {
         mut chan: Option<mpsc::Sender<f32>>,
     ) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
-        tracing::info!(
+        tracing::debug!(
             "Download {:?} with sha256: {:?}",
             url,
             const_hex::encode(sha256)
