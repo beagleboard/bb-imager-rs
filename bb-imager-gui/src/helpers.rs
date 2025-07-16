@@ -737,3 +737,11 @@ pub(crate) async fn show_notification(body: String) -> notify_rust::error::Resul
     .unwrap()
     .map(|_| ())
 }
+
+pub(crate) fn project_dirs() -> Option<directories::ProjectDirs> {
+    directories::ProjectDirs::from(
+        crate::constants::PACKAGE_QUALIFIER.0,
+        crate::constants::PACKAGE_QUALIFIER.1,
+        crate::constants::PACKAGE_QUALIFIER.2,
+    )
+}

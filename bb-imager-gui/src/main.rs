@@ -20,15 +20,31 @@ mod persistance;
 mod ui;
 
 fn main() -> iced::Result {
+    let dirs = crate::helpers::project_dirs().unwrap();
+    let log_file_p = dirs
+        .cache_dir()
+        .with_file_name("bb-imager.log")
+        .with_file_name(format!(
+            "{}.{}.{}.log",
+            PACKAGE_QUALIFIER.0, PACKAGE_QUALIFIER.1, PACKAGE_QUALIFIER.2
+        ));
+
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
         .with(
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .with_writer(std::fs::File::create(&log_file_p).unwrap()),
+        )
         .try_init()
         .expect("Failed to register tracing_subscriber");
+
+    tracing::info!("Logging to file at: {:?}", log_file_p);
 
     let icon = iced::window::icon::from_file_data(
         constants::WINDOW_ICON,
@@ -161,7 +177,6 @@ impl BBImager {
         self.screen.push(x.clone());
 
         if let Screen::ImageSelection(page) = x {
-            tracing::info!("Image Selection Screen");
             let board = self.selected_board.unwrap();
             return self.fetch_remote_subitems(board, page.idx());
         }
@@ -174,7 +189,7 @@ impl BBImager {
             // Maybe resolving was missed
             if let config::OsListItem::RemoteSubList(item) = self.boards.image(target) {
                 let url = item.subitems_url.clone();
-                tracing::info!("Downloading subites from {:?}", url);
+                tracing::debug!("Downloading subitems from {:?}", url);
 
                 let target_clone: Vec<usize> = target.to_vec();
                 let downloader = self.downloader.clone();
@@ -202,7 +217,7 @@ impl BBImager {
             .into_iter()
             .filter_map(|(idx, x)| {
                 if let config::OsListItem::RemoteSubList(item) = x {
-                    tracing::info!("Fetch: {:?} at {}", item.subitems_url, idx);
+                    tracing::debug!("Fetch: {:?} at {}", item.subitems_url, idx);
                     Some((idx, item.subitems_url.clone()))
                 } else {
                     None
@@ -253,14 +268,20 @@ impl BBImager {
         &mut self,
         customization: Option<FlashingCustomization>,
     ) -> Task<BBImagerMessage> {
-        let docs_url = &self
+        let board = &self
             .boards
-            .device(self.selected_board.expect("Missing board"))
-            .documentation;
+            .device(self.selected_board.expect("Missing board"));
+        let docs_url = board.documentation.clone();
 
         let customization = customization.unwrap_or(self.config());
         let img = self.selected_image.clone();
         let dst = self.selected_dst.clone();
+
+        tracing::info!("Starting Flashing Process");
+        tracing::info!("Selected Board: {:#?}", board);
+        tracing::info!("Selected Image: {:#?}", img);
+        tracing::info!("Selected Destination: {:#?}", dst);
+        tracing::info!("Selected Customization: {:#?}", customization);
 
         let s = iced::stream::channel(20, move |mut chan| async move {
             let _ = chan
@@ -283,10 +304,16 @@ impl BBImager {
                 .expect("Tokio runtime failed to spawn task");
 
             let res = match res {
-                Ok(_) => BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS),
-                Err(e) => BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
-                    "Flashing Failed {e}"
-                ))),
+                Ok(_) => {
+                    tracing::info!("Flashing Successfull");
+                    BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS)
+                }
+                Err(e) => {
+                    tracing::error!("Flashing failed with error: {e}");
+                    BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
+                        "Flashing Failed {e}"
+                    )))
+                }
             };
 
             let _ = chan.send(res).await;
@@ -317,7 +344,7 @@ impl BBImager {
                     .expect("No screen")
                     .is_destination_selection()
             {
-                tracing::info!("Refresh destinations for {:?}", flasher);
+                tracing::debug!("Refresh destinations for {:?}", flasher);
                 let stream = iced::futures::stream::unfold(flasher, move |f| async move {
                     let mut dsts = helpers::destinations(flasher).await;
                     dsts.sort_by_key(|a| a.size());
