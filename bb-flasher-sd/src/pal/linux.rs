@@ -83,10 +83,7 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
             .await?;
 
         let fd = obj
-            .open_device(
-                "rw",
-                HashMap::from([("flags", (libc::O_EXCL | libc::O_DIRECT).into())]),
-            )
+            .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
             .await?;
         let file =
             unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
@@ -112,7 +109,7 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
         .read(true)
         .write(true)
         .create(false)
-        .custom_flags(libc::O_DIRECT | libc::O_EXCL)
+        .custom_flags(libc::O_DIRECT)
         .open(dst)
         .map_err(Into::into)
         .map(|x| LinuxDrive {
