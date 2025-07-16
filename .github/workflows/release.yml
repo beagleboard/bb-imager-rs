@@ -33,34 +33,6 @@ jobs:
             bcf: 1
             pb2: 1
 
-          - os-name: Windows aarch64
-            runs-on: windows-latest
-            target: aarch64-pc-windows-msvc
-            make-targets: package-gui-windows-portable
-            bcf: 1
-            pb2: 0
-
-          - os-name: Windows x86_64
-            runs-on: windows-latest
-            target: x86_64-pc-windows-msvc
-            make-targets: package-gui-windows-wix package-gui-windows-portable
-            bcf: 1
-            pb2: 0
-
-          - os-name: MacOS aarch64
-            runs-on: macos-latest
-            target: aarch64-apple-darwin
-            make-targets: package-gui-macos-dmg
-            bcf: 0
-            pb2: 0
-
-          - os-name: MacOS x86_64
-            runs-on: macos-latest
-            target: x86_64-apple-darwin
-            make-targets: package-gui-macos-dmg
-            bcf: 0
-            pb2: 0
-
     name: Build Artifacts - ${{ matrix.platform.os-name }}
     runs-on: ${{ matrix.platform.runs-on }}
     env:
@@ -96,52 +68,8 @@ jobs:
     - name: Install packaging deps
       run: make setup-packaging-deps
 
-    - name: Setup macos signing
-      if: runner.os == 'macOS'
-      working-directory: bb-imager-gui
-      env:
-        CERT_DEVELOPER_APP_BASE64: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
-        CERT_DEVELOPER_INSTALL_BASE64: ${{ secrets.CERT_DEVELOPER_INSTALL_BASE64 }}
-        CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
-        TEAM_ID: ${{ secrets.TEAM_ID }}
-      run: |
-        echo "$CERT_DEVELOPER_APP_BASE64" | base64 --decode > developer_app.p12
-        echo "$CERT_DEVELOPER_INSTALL_BASE64" | base64 --decode > developer_installer.p12
-
-        security create-keychain -p "" build.keychain-db
-        security default-keychain -s build.keychain-db
-        security unlock-keychain -p "" build.keychain-db
-
-        security import developer_app.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/codesign
-        security import developer_installer.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/productsign
-
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain-db
-
-        xcrun notarytool store-credentials "AC_PASSWORD" \
-          --apple-id "${{ secrets.APPLE_ID }}" \
-          --team-id "${{ secrets.TEAM_ID }}" \
-          --password "${{ secrets.APP_PASSWORD }}"
-
-        echo "" >> Cargo.toml
-        echo "[package.metadata.packager.macos]" >> Cargo.toml
-        echo "signing_identity = \"${{ secrets.TEAM_ID }}\"" >> Cargo.toml
-
     - name: Build packages
       run: make ${{ matrix.platform.make-targets }}
-
-    - name: Notarize macOS App
-      if: runner.os == 'macOS'
-      env:
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
-        TEAM_ID: ${{ secrets.TEAM_ID }}
-      run: |
-        dmg_path=$(find bb-imager-gui/dist/ -name "*.dmg" | head -n 1)
-        echo "Submitting for notarization: $dmg_path"
-        xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
-        xcrun stapler staple "$dmg_path"
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -262,3 +190,168 @@ jobs:
       with:
         generate_release_notes: true
         files: cargo-vendor.tar.gz
+
+  macos-job:
+    name: Build MacOS Artifacts
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Set version
+      if: startsWith(github.ref, 'refs/tags/')
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+    - name: Set PRE_RELEASE Environment Variable
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Add ${{ matrix.platform.target }} target
+      run:  rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v1"
+        
+    - name: Install packaging deps
+      run: make setup-packaging-deps
+
+    - name: Setup macos signing
+      working-directory: bb-imager-gui
+      env:
+        CERT_DEVELOPER_APP_BASE64: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
+        CERT_DEVELOPER_INSTALL_BASE64: ${{ secrets.CERT_DEVELOPER_INSTALL_BASE64 }}
+        CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        TEAM_ID: ${{ secrets.TEAM_ID }}
+      run: |
+        echo "$CERT_DEVELOPER_APP_BASE64" | base64 --decode > developer_app.p12
+        echo "$CERT_DEVELOPER_INSTALL_BASE64" | base64 --decode > developer_installer.p12
+
+        security create-keychain -p "" build.keychain-db
+        security default-keychain -s build.keychain-db
+        security unlock-keychain -p "" build.keychain-db
+
+        security import developer_app.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/codesign
+        security import developer_installer.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/productsign
+
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain-db
+
+        xcrun notarytool store-credentials "AC_PASSWORD" \
+          --apple-id "${{ secrets.APPLE_ID }}" \
+          --team-id "${{ secrets.TEAM_ID }}" \
+          --password "${{ secrets.APP_PASSWORD }}"
+
+        echo "" >> Cargo.toml
+        echo "[package.metadata.packager.macos]" >> Cargo.toml
+        echo "signing_identity = \"${{ secrets.TEAM_ID }}\"" >> Cargo.toml
+
+    - name: Build packages
+      run: |
+        TARGET=x86_64-apple-darwin make package-gui-macos-dmg
+        TARGET=aarch64-apple-darwin make package-gui-macos-dmg
+
+    - name: Notarize macOS App
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        TEAM_ID: ${{ secrets.TEAM_ID }}
+      run: |
+        dmg_paths=$(find bb-imager-gui/dist/ -name "*.dmg")
+        for dmg_path in $dmg_paths; do
+          echo "Submitting for notarization: $dmg_path"
+          xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
+          xcrun stapler staple "$dmg_path"
+        done
+
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: make package-rename
+
+    - name: Pre-Release
+      uses: softprops/action-gh-release@v2
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      with:
+        prerelease: true
+        name: Continuous Release
+        tag_name: continuous-release
+        files: |
+          bb-imager-gui/dist/*
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        generate_release_notes: true
+        files: |
+          bb-imager-gui/dist/*
+
+  windows-job:
+    name: Build Windows Artifacts
+    runs-on: windows-latest
+    env:
+      BCF_CC1352P7: 1
+      BCF_MSP430: 1
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Set version
+      if: startsWith(github.ref, 'refs/tags/')
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+    - name: Set PRE_RELEASE Environment Variable
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Add ${{ matrix.platform.target }} target
+      run:  rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v1"
+        
+    - name: Install packaging deps
+      run: make setup-packaging-deps
+
+    - name: Build packages
+      run: |
+        TARGET=x86_64-pc-windows-msvc make package-gui-windows-wix package-gui-windows-portable
+        TARGET=aarch64-pc-windows-msvc make package-gui-windows-portable
+
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      run: make package-rename
+
+    - name: Pre-Release
+      uses: softprops/action-gh-release@v2
+      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      with:
+        prerelease: true
+        name: Continuous Release
+        tag_name: continuous-release
+        files: |
+          bb-imager-gui/dist/*
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        generate_release_notes: true
+        files: |
+          bb-imager-gui/dist/*
