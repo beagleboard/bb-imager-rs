@@ -125,7 +125,7 @@ async fn flash_internal(
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
-            let customization = bb_flasher::sd::FlashingSdLinuxConfig::new(
+            let customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
                 hostname,
                 timezone,
                 keymap,

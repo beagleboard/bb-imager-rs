@@ -97,8 +97,24 @@ impl AppSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomization {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sysconf: Option<SdSysconfCustomization>,
+}
+
+impl SdCustomization {
+    pub(crate) fn sysconf_customization(&self) -> Option<&SdSysconfCustomization> {
+        self.sysconf.as_ref()
+    }
+
+    pub(crate) fn update_sysconfig(&mut self, t: SdSysconfCustomization) {
+        self.sysconf = Some(t)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct SdSysconfCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -115,7 +131,7 @@ pub(crate) struct SdCustomization {
     pub(crate) usb_enable_dhcp: Option<bool>,
 }
 
-impl Default for SdCustomization {
+impl Default for SdSysconfCustomization {
     fn default() -> Self {
         Self {
             hostname: None,
@@ -133,7 +149,7 @@ impl Default for SdCustomization {
     }
 }
 
-impl SdCustomization {
+impl SdSysconfCustomization {
     pub(crate) fn update_hostname(mut self, t: Option<String>) -> Self {
         self.hostname = t;
         self
@@ -177,9 +193,9 @@ impl SdCustomization {
     }
 }
 
-impl From<SdCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
-    fn from(value: SdCustomization) -> Self {
-        Self::new(
+impl From<SdSysconfCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
+    fn from(value: SdSysconfCustomization) -> Self {
+        Self::sysconfig(
             value.hostname,
             value.timezone,
             value.keymap,

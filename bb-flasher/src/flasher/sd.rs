@@ -65,11 +65,11 @@ impl BBFlasherTarget for Target {
 /// Linux Image post-install customization options. Only work on BeagleBoard.org images.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FlashingSdLinuxConfig {
-    customization: bb_flasher_sd::Customization,
+    customization: Option<bb_flasher_sd::Customization>,
 }
 
 impl FlashingSdLinuxConfig {
-    pub const fn new(
+    pub const fn sysconfig(
         hostname: Option<String>,
         timezone: Option<String>,
         keymap: Option<String>,
@@ -79,15 +79,23 @@ impl FlashingSdLinuxConfig {
         usb_enable_dhcp: Option<bool>,
     ) -> Self {
         Self {
-            customization: bb_flasher_sd::Customization {
-                hostname,
-                timezone,
-                keymap,
-                user,
-                wifi,
-                ssh,
-                usb_enable_dhcp,
-            },
+            customization: Some(bb_flasher_sd::Customization::Sysconf(
+                bb_flasher_sd::SysconfCustomization {
+                    hostname,
+                    timezone,
+                    keymap,
+                    user,
+                    wifi,
+                    ssh,
+                    usb_enable_dhcp,
+                },
+            )),
+        }
+    }
+
+    pub const fn none() -> Self {
+        Self {
+            customization: None,
         }
     }
 }
@@ -182,7 +190,7 @@ where
                     img_resolver,
                     &dst,
                     Some(tx),
-                    Some(customization),
+                    customization,
                     Some(cancel_weak),
                 )
             });
@@ -204,13 +212,7 @@ where
             flash_thread
         } else {
             std::thread::spawn(move || {
-                bb_flasher_sd::flash(
-                    img_resolver,
-                    &dst,
-                    None,
-                    Some(customization),
-                    Some(cancel_weak),
-                )
+                bb_flasher_sd::flash(img_resolver, &dst, None, customization, Some(cancel_weak))
             })
         };
 

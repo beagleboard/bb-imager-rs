@@ -459,7 +459,7 @@ pub(crate) async fn flash(
         }
         (
             Some(BoardImage::Image { img, .. }),
-            FlashingCustomization::LinuxSd(customization),
+            FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
             bb_flasher::sd::Flasher::new(img, t, customization.into())
@@ -471,13 +471,9 @@ pub(crate) async fn flash(
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(
-                img,
-                t,
-                FlashingSdLinuxConfig::new(None, None, None, None, None, None, None),
-            )
-            .flash(Some(chan))
-            .await
+            bb_flasher::sd::Flasher::new(img, t, FlashingSdLinuxConfig::none())
+                .flash(Some(chan))
+                .await
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (
@@ -618,7 +614,7 @@ const fn flasher_supported(flasher: config::Flasher) -> bool {
 #[derive(Clone, Debug)]
 pub(crate) enum FlashingCustomization {
     NoneSd,
-    LinuxSd(crate::persistance::SdCustomization),
+    LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
     #[cfg(feature = "pb2_mspm0")]
@@ -633,7 +629,12 @@ impl FlashingCustomization {
     ) -> Self {
         match flasher {
             config::Flasher::SdCard if img.init_format() == Some(config::InitFormat::Sysconf) => {
-                Self::LinuxSd(app_config.sd_customization().cloned().unwrap_or_default())
+                Self::LinuxSdSysconfig(
+                    app_config
+                        .sd_customization()
+                        .map(|x| x.sysconf_customization().cloned().unwrap_or_default())
+                        .unwrap_or_default(),
+                )
             }
             config::Flasher::SdCard => Self::NoneSd,
             config::Flasher::BeagleConnectFreedom => {
@@ -653,7 +654,7 @@ impl FlashingCustomization {
 
     pub(crate) fn reset(self) -> Self {
         match self {
-            Self::LinuxSd(_) => Self::LinuxSd(Default::default()),
+            Self::LinuxSdSysconfig(_) => Self::LinuxSdSysconfig(Default::default()),
             Self::Bcf(_) => Self::Bcf(Default::default()),
             #[cfg(feature = "pb2_mspm0")]
             Self::Pb2Mspm0(_) => Self::Pb2Mspm0(Default::default()),
@@ -663,7 +664,9 @@ impl FlashingCustomization {
 
     pub(crate) fn validate(&self) -> bool {
         match self {
-            FlashingCustomization::LinuxSd(sd_customization) => sd_customization.validate_user(),
+            FlashingCustomization::LinuxSdSysconfig(sd_customization) => {
+                sd_customization.validate_user()
+            }
             _ => true,
         }
     }
@@ -671,7 +674,7 @@ impl FlashingCustomization {
     /// Check if any configuration is even present
     pub(crate) const fn need_confirmation(&self) -> bool {
         match self {
-            Self::LinuxSd(_) | Self::Bcf(_) => true,
+            Self::LinuxSdSysconfig(_) | Self::Bcf(_) => true,
             #[cfg(feature = "pb2_mspm0")]
             Self::Pb2Mspm0(_) => true,
             _ => false,
