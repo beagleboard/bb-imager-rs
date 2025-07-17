@@ -232,9 +232,19 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::SaveCustomization => {
             match state.customization.clone().unwrap() {
-                FlashingCustomization::LinuxSd(c) => state.app_config.update_sd_customization(c),
+                FlashingCustomization::LinuxSdSysconfig(c) => {
+                    let mut temp = state
+                        .app_config
+                        .sd_customization()
+                        .cloned()
+                        .unwrap_or_default();
+                    temp.update_sysconfig(c);
+                    state.app_config.update_sd_customization(temp)
+                }
                 FlashingCustomization::Bcf(c) => state.app_config.update_bcf_customization(c),
-                _ => {}
+                FlashingCustomization::Msp430 | FlashingCustomization::NoneSd => {}
+                #[cfg(feature = "pb2_mspm0")]
+                FlashingCustomization::Pb2Mspm0(_) => {}
             }
 
             let config = state.app_config.clone();

@@ -2,9 +2,28 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use crate::{Error, Result};
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Customization {
+    Sysconf(SysconfCustomization),
+}
+
+impl Customization {
+    pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
+        match self {
+            Self::Sysconf(x) => x.customize(dst),
+        }
+    }
+
+    pub(crate) fn validate(&self) -> bool {
+        match self {
+            Self::Sysconf(x) => x.validate(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 /// Post install customization options
-pub struct Customization {
+pub struct SysconfCustomization {
     pub hostname: Option<String>,
     pub timezone: Option<String>,
     pub keymap: Option<String>,
@@ -14,7 +33,7 @@ pub struct Customization {
     pub usb_enable_dhcp: Option<bool>,
 }
 
-impl Customization {
+impl SysconfCustomization {
     pub(crate) fn customize(
         &self,
         mut dst: impl Write + Seek + Read + std::fmt::Debug,

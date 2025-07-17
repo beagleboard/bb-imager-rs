@@ -55,7 +55,7 @@ mod flashing;
 mod helpers;
 pub(crate) mod pal;
 
-pub use customization::Customization;
+pub use customization::{Customization, SysconfCustomization};
 pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
