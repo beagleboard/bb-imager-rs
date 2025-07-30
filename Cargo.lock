@@ -495,9 +495,9 @@ dependencies = [
 
 [[package]]
 name = "bb-drivelist"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a8e083a7457d5c05d298df025f43c048816515b9ddab47414d7ebede9c2d9f"
+checksum = "53e10763581369b23b638b7b8523cf1d92332f1bb2731c4cac8188f027a2d99d"
 dependencies = [
  "anyhow",
  "plist",
