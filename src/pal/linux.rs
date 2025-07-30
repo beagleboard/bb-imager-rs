@@ -98,10 +98,27 @@ impl From<Device> for DeviceDescriptor {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(untagged)]
+/// Sometimes fssize and fsavail are strings. So need to handle that.
+enum FsSize {
+    String(String),
+    U64(u64),
+}
+
+impl From<FsSize> for u64 {
+    fn from(value: FsSize) -> Self {
+        match value {
+            FsSize::String(x) => x.parse().unwrap(),
+            FsSize::U64(x) => x,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
 struct Child {
     mountpoint: Option<String>,
-    fssize: Option<u64>,
-    fsavail: Option<u64>,
+    fssize: Option<FsSize>,
+    fsavail: Option<FsSize>,
     label: Option<String>,
     partlabel: Option<String>,
 }
@@ -115,8 +132,8 @@ impl From<Child> for MountPoint {
             } else {
                 value.partlabel
             },
-            total_bytes: value.fssize,
-            available_bytes: value.fsavail,
+            total_bytes: value.fssize.map(Into::into),
+            available_bytes: value.fsavail.map(Into::into),
         }
     }
 }
