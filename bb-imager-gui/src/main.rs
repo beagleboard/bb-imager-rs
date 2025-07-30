@@ -20,15 +20,6 @@ mod persistance;
 mod ui;
 
 fn main() -> iced::Result {
-    let dirs = crate::helpers::project_dirs().unwrap();
-    let log_file_p = dirs
-        .cache_dir()
-        .with_file_name("bb-imager.log")
-        .with_file_name(format!(
-            "{}.{}.{}.log",
-            PACKAGE_QUALIFIER.0, PACKAGE_QUALIFIER.1, PACKAGE_QUALIFIER.2
-        ));
-
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::builder()
@@ -39,12 +30,10 @@ fn main() -> iced::Result {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
-                .with_writer(std::fs::File::create(&log_file_p).unwrap()),
+                .with_writer(std::fs::File::create(helpers::log_file_path()).unwrap()),
         )
         .try_init()
         .expect("Failed to register tracing_subscriber");
-
-    tracing::info!("Logging to file at: {:?}", log_file_p);
 
     let icon = iced::window::icon::from_file_data(
         constants::WINDOW_ICON,

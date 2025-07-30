@@ -97,12 +97,25 @@ fn global_settings(
     widget::responsive(move |size| {
         const HEADER_FOOTER_HEIGHT: f32 = 90.0;
 
+        let log_file_p = helpers::log_file_path().to_string_lossy().to_string();
         let mid_el = widget::column![
-            widget::toggler(app_settings.skip_confirmation == Some(true))
-                .label("Disable confirmation dialog")
-                .on_toggle(move |t| BBImagerMessage::UpdateSettings(
-                    app_settings.update_skip_confirmation(Some(t))
-                ))
+            widget::container(
+                widget::toggler(app_settings.skip_confirmation == Some(true))
+                    .label("Disable confirmation dialog")
+                    .on_toggle(move |t| BBImagerMessage::UpdateSettings(
+                        app_settings.update_skip_confirmation(Some(t))
+                    ))
+            )
+            .width(iced::Length::Fill)
+            .padding(10)
+            .style(widget::container::bordered_box),
+            widget::container(element_with_label(
+                "Log File",
+                widget::text_input(&log_file_p, &log_file_p)
+                    .on_input(|_| BBImagerMessage::Null)
+                    .into()
+            ))
+            .style(widget::container::bordered_box)
         ]
         .spacing(5);
 

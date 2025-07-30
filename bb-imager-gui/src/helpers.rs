@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
 
-use crate::BBImagerMessage;
+use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
 use futures::StreamExt;
@@ -747,4 +747,12 @@ pub(crate) fn project_dirs() -> Option<directories::ProjectDirs> {
         crate::constants::PACKAGE_QUALIFIER.1,
         crate::constants::PACKAGE_QUALIFIER.2,
     )
+}
+
+pub(crate) fn log_file_path() -> PathBuf {
+    let dirs = crate::helpers::project_dirs().unwrap();
+    dirs.cache_dir().with_file_name(format!(
+        "{}.{}.{}.log",
+        PACKAGE_QUALIFIER.0, PACKAGE_QUALIFIER.1, PACKAGE_QUALIFIER.2
+    ))
 }
