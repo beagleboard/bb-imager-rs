@@ -7,7 +7,7 @@ use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
     pages::ConfigurationId,
-    persistance::SdCustomization,
+    persistance::SdSysconfCustomization,
 };
 
 use super::helpers::home_btn_text;
@@ -160,7 +160,7 @@ fn customization_page<'a>(
 
         let form = match customization {
             Some(customization) => match customization {
-                FlashingCustomization::LinuxSd(x) => linux_sd_form(timezones, keymaps, x),
+                FlashingCustomization::LinuxSdSysconfig(x) => linux_sd_form(timezones, keymaps, x),
                 FlashingCustomization::Bcf(x) => widget::column![
                     widget::toggler(!x.verify)
                         .label("Skip Verification")
@@ -207,7 +207,7 @@ fn customization_page<'a>(
 fn linux_sd_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a SdCustomization,
+    config: &'a SdSysconfCustomization,
 ) -> widget::Column<'a, BBImagerMessage> {
     widget::column![
         hostname_form(config).width(iced::Length::Fill),
@@ -220,11 +220,11 @@ fn linux_sd_form<'a>(
     ]
 }
 
-fn usb_enable_dhcp_form(config: &SdCustomization) -> widget::Container<'_, BBImagerMessage> {
+fn usb_enable_dhcp_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
     let form = widget::toggler(config.usb_enable_dhcp == Some(true))
         .label("Enable USB DHCP")
         .on_toggle(|x| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                 config.clone().update_usb_enable_dhcp(Some(x)),
             ))
         })
@@ -235,11 +235,11 @@ fn usb_enable_dhcp_form(config: &SdCustomization) -> widget::Container<'_, BBIma
         .style(widget::container::bordered_box)
 }
 
-fn ssh_form<'a>(config: &'a SdCustomization) -> widget::Container<'a, BBImagerMessage> {
+fn ssh_form<'a>(config: &'a SdSysconfCustomization) -> widget::Container<'a, BBImagerMessage> {
     let form = widget::column![
         widget::text("SSH authorization public key"),
         widget::text_input("authorized key", config.ssh.as_deref().unwrap_or("")).on_input(|x| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                 config
                     .clone()
                     .update_ssh(if x.is_empty() { None } else { Some(x) }),
@@ -255,14 +255,14 @@ fn ssh_form<'a>(config: &'a SdCustomization) -> widget::Container<'a, BBImagerMe
 
 fn keymap_form<'a>(
     keymaps: &'a widget::combo_box::State<String>,
-    config: &'a SdCustomization,
+    config: &'a SdSysconfCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.keymap.is_some())
             .label("Set Keymap")
             .on_toggle(|t| {
                 let keymap = if t { Some(String::from("us")) } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_keymap(keymap),
                 ))
             }),
@@ -273,7 +273,7 @@ fn keymap_form<'a>(
         let xc = config.clone();
 
         let keymap_box = widget::combo_box(keymaps, "Keymap", Some(&keymap.to_owned()), move |t| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                 xc.clone().update_keymap(Some(t)),
             ))
         })
@@ -286,7 +286,7 @@ fn keymap_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
+fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
@@ -296,7 +296,7 @@ fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage>
                 } else {
                     None
                 };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_hostname(hostname),
                 ))
             }),
@@ -308,7 +308,7 @@ fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage>
 
         let hostname_box = widget::text_input("beagle", hostname)
             .on_input(move |inp| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     xc.clone().update_hostname(Some(inp)),
                 ))
             })
@@ -323,14 +323,14 @@ fn hostname_form(config: &SdCustomization) -> widget::Container<BBImagerMessage>
 
 fn timezone_form<'a>(
     timezones: &'a widget::combo_box::State<String>,
-    config: &'a SdCustomization,
+    config: &'a SdSysconfCustomization,
 ) -> widget::Container<'a, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.timezone.is_some())
             .label("Set Timezone")
             .on_toggle(|t| {
                 let tz = if t { helpers::system_timezone() } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_timezone(tz.cloned()),
                 ))
             }),
@@ -342,7 +342,7 @@ fn timezone_form<'a>(
 
         let timezone_box =
             widget::combo_box(timezones, "Timezone", Some(&tz.to_owned()), move |t| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     xc.clone().update_timezone(Some(t)),
                 ))
             })
@@ -355,13 +355,13 @@ fn timezone_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
+fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
             .on_toggle(|t| {
                 let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_user(c),
                 ))
             })
@@ -374,7 +374,7 @@ fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessag
                 "username",
                 &usr.username,
                 |inp| {
-                    FlashingCustomization::LinuxSd(
+                    FlashingCustomization::LinuxSdSysconfig(
                         config
                             .clone()
                             .update_user(Some(usr.clone().update_username(inp))),
@@ -388,7 +388,7 @@ fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessag
                 "password",
                 &usr.password,
                 |inp| {
-                    FlashingCustomization::LinuxSd(
+                    FlashingCustomization::LinuxSdSysconfig(
                         config
                             .clone()
                             .update_user(Some(usr.clone().update_password(inp))),
@@ -405,13 +405,13 @@ fn uname_pass_form(config: &SdCustomization) -> widget::Container<BBImagerMessag
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")
             .on_toggle(|t| {
                 let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSd(
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_wifi(c),
                 ))
             })
@@ -424,7 +424,7 @@ fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
                 "SSID",
                 &wifi.ssid,
                 |inp| {
-                    FlashingCustomization::LinuxSd(
+                    FlashingCustomization::LinuxSdSysconfig(
                         config
                             .clone()
                             .update_wifi(Some(wifi.clone().update_ssid(inp))),
@@ -438,7 +438,7 @@ fn wifi_form(config: &SdCustomization) -> widget::Container<BBImagerMessage> {
                 "password",
                 &wifi.password,
                 |inp| {
-                    FlashingCustomization::LinuxSd(
+                    FlashingCustomization::LinuxSdSysconfig(
                         config
                             .clone()
                             .update_wifi(Some(wifi.clone().update_password(inp))),

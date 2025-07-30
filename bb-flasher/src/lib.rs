@@ -15,7 +15,7 @@
 //!     let img = bb_flasher::LocalImage::new("/tmp/abc.img.xz".into());
 //!     let target = PathBuf::from("/tmp/target").try_into().unwrap();
 //!     let customization =
-//!         bb_flasher::sd::FlashingSdLinuxConfig::new(None, None, None, None, None, None, None);
+//!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
 //!     let flasher = bb_flasher::sd::Flasher::new(img, target, customization)
 //!         .flash(None)
