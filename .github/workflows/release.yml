@@ -192,7 +192,10 @@ jobs:
         files: cargo-vendor.tar.gz
 
   macos-job:
-    name: Build MacOS Artifacts
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    name: Build MacOS Artifacts for ${{ matrix.target }}
     runs-on: macos-latest
     steps:
     - name: Checkout
@@ -212,7 +215,7 @@ jobs:
       run: rustup toolchain install stable --profile minimal
 
     - name: Add ${{ matrix.platform.target }} target
-      run:  rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      run:  rustup target add ${{ matrix.target }}
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
@@ -254,9 +257,9 @@ jobs:
         echo "signing_identity = \"${{ secrets.TEAM_ID }}\"" >> Cargo.toml
 
     - name: Build packages
-      run: |
-        TARGET=x86_64-apple-darwin make package-gui-macos-dmg
-        TARGET=aarch64-apple-darwin make package-gui-macos-dmg
+      env:
+        TARGET: ${{ matrix.target }}
+      run: make package-gui-macos-dmg
 
     - name: Notarize macOS App
       env:
@@ -264,12 +267,10 @@ jobs:
         APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
         TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
-        dmg_paths=$(find bb-imager-gui/dist/ -name "*.dmg")
-        for dmg_path in $dmg_paths; do
-          echo "Submitting for notarization: $dmg_path"
-          xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
-          xcrun stapler staple "$dmg_path"
-        done
+        dmg_path=$(find bb-imager-gui/dist/ -name "*.dmg" | head -n 1)
+        echo "Submitting for notarization: $dmg_path"
+        xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
+        xcrun stapler staple "$dmg_path"
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
