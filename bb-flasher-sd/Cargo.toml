@@ -19,6 +19,7 @@ fatfs = "0.3"
 fscommon = "0.1"
 mbrman = "0.6"
 gpt = "4.1"
+bmap-parser = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }

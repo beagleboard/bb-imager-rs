@@ -4,7 +4,7 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, path::PathBuf, sync::Arc};
+use std::{fmt::Display, io::Read, path::PathBuf, sync::Arc};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, ImageFile};
 use futures::StreamExt;
@@ -135,6 +135,7 @@ impl BBFlasher for FormatFlasher {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Flasher<I: ImageFile> {
     img: I,
+    bmap: Option<I>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
@@ -143,9 +144,10 @@ impl<I> Flasher<I>
 where
     I: ImageFile,
 {
-    pub fn new(img: I, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(img: I, bmap: Option<I>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
             img,
+            bmap,
             dst: dst.0.path,
             customization,
         }
@@ -162,6 +164,7 @@ where
     ) -> std::io::Result<()> {
         let chan_clone = chan.clone();
         let img = self.img;
+        let bmap = self.bmap;
 
         let img_resolver = move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -169,11 +172,24 @@ where
                 .enable_io()
                 .build()
                 .unwrap();
+            let chan_clone_1 = chan_clone.clone();
+            let bmap = match bmap {
+                Some(x) => {
+                    let mut f =
+                        rt.block_on(
+                            async move { crate::img::OsImage::open(x, chan_clone_1).await },
+                        )?;
+                    let mut data = String::new();
+                    f.read_to_string(&mut data)?;
+                    Some(data)
+                }
+                None => None,
+            };
             let img =
                 rt.block_on(async move { crate::img::OsImage::open(img, chan_clone).await })?;
             let img_size = img.size();
 
-            Ok((img, img_size))
+            Ok((img, img_size, bmap))
         };
 
         let cancel = Arc::new(());

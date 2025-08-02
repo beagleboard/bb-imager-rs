@@ -110,6 +110,9 @@ pub enum TargetCommands {
         #[arg(long)]
         /// Enable USB DHCP
         usb_enable_dhcp: bool,
+        /// Provide the bmap file for the image
+        #[arg(long)]
+        bmap: Option<PathBuf>,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
