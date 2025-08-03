@@ -34,6 +34,11 @@ fn reader_task(
     Ok(())
 }
 
+/// While writing, a few assumptions should hold:
+/// - All writes should be in buffers multiple of block size (4K).
+/// - All writes should be aligned to block size (4K).
+///
+/// Thus, we will be writing some data that is not strictly present in the bmap.
 fn writer_task_bmap(
     bmap: bmap_parser::Bmap,
     mut sd: impl Write + Seek,
@@ -51,6 +56,7 @@ fn writer_task_bmap(
         let end_offset = b.offset() + b.length();
 
         loop {
+            // Write any buffer that lies even partially in the bmap range.
             if pos + (count as u64) > b.offset() && pos < end_offset {
                 sd.seek(std::io::SeekFrom::Start(pos))?;
                 sd.write_all(&buf.as_slice()[..count])?;
