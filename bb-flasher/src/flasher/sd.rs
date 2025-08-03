@@ -70,12 +70,12 @@ pub struct FlashingSdLinuxConfig {
 
 impl FlashingSdLinuxConfig {
     pub const fn sysconfig(
-        hostname: Option<String>,
-        timezone: Option<String>,
-        keymap: Option<String>,
-        user: Option<(String, String)>,
-        wifi: Option<(String, String)>,
-        ssh: Option<String>,
+        hostname: Option<Box<str>>,
+        timezone: Option<Box<str>>,
+        keymap: Option<Box<str>>,
+        user: Option<(Box<str>, Box<str>)>,
+        wifi: Option<(Box<str>, Box<str>)>,
+        ssh: Option<Box<str>>,
         usb_enable_dhcp: Option<bool>,
     ) -> Self {
         Self {
