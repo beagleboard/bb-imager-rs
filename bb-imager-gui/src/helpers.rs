@@ -1,4 +1,9 @@
-use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
+use std::{
+    borrow::Cow,
+    fmt::Display,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config::{self, OsListItem};
@@ -301,7 +306,7 @@ pub(crate) enum BoardImage {
 impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
         Self::Image {
-            img: bb_flasher::LocalImage::new(path).into(),
+            img: bb_flasher::LocalImage::new(path.into()).into(),
             bmap: None,
             flasher,
             // Do not try to apply customization for local images
@@ -316,13 +321,16 @@ impl BoardImage {
     ) -> Self {
         Self::Image {
             img: RemoteImage::new(
-                image.name,
-                image.url,
+                image.name.into(),
+                Box::new(image.url),
                 image.image_download_sha256,
                 downloader.clone(),
             )
             .into(),
-            bmap: image.bmap.map(|url| Bmap { url, downloader }),
+            bmap: image.bmap.map(|url| Bmap {
+                url: Box::new(url),
+                downloader,
+            }),
             flasher,
             init_format: image.init_format,
         }
@@ -359,16 +367,16 @@ pub(crate) fn system_timezone() -> Option<&'static String> {
 
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
-    name: String,
-    url: url::Url,
+    name: Box<str>,
+    url: Box<url::Url>,
     extract_sha256: [u8; 32],
     downloader: bb_downloader::Downloader,
 }
 
 impl RemoteImage {
     pub(crate) const fn new(
-        name: String,
-        url: url::Url,
+        name: Box<str>,
+        url: Box<url::Url>,
         extract_sha256: [u8; 32],
         downloader: bb_downloader::Downloader,
     ) -> Self {
@@ -385,7 +393,7 @@ impl bb_flasher::ImageFile for RemoteImage {
     async fn resolve(
         &self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<PathBuf> {
+    ) -> std::io::Result<Box<Path>> {
         let (tx, rx) = futures::channel::mpsc::channel(20);
 
         if let Some(chan) = chan {
@@ -398,8 +406,9 @@ impl bb_flasher::ImageFile for RemoteImage {
         }
 
         self.downloader
-            .download_with_sha(self.url.clone(), self.extract_sha256, Some(tx))
+            .download_with_sha(*self.url.clone(), self.extract_sha256, Some(tx))
             .await
+            .map(Into::into)
     }
 }
 
@@ -411,7 +420,7 @@ impl std::fmt::Display for RemoteImage {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Bmap {
-    url: Url,
+    url: Box<Url>,
     downloader: bb_downloader::Downloader,
 }
 
@@ -419,7 +428,7 @@ impl bb_flasher::ImageFile for Bmap {
     async fn resolve(
         &self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<PathBuf> {
+    ) -> std::io::Result<Box<Path>> {
         let (tx, rx) = futures::channel::mpsc::channel(20);
 
         if let Some(chan) = chan {
@@ -431,7 +440,10 @@ impl bb_flasher::ImageFile for Bmap {
             });
         }
 
-        self.downloader.download(self.url.clone(), Some(tx)).await
+        self.downloader
+            .download(*self.url.clone(), Some(tx))
+            .await
+            .map(Into::into)
     }
 }
 
@@ -445,7 +457,7 @@ impl bb_flasher::ImageFile for SelectedImage {
     async fn resolve(
         &self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<PathBuf> {
+    ) -> std::io::Result<Box<Path>> {
         match self {
             SelectedImage::LocalImage(x) => x.resolve(chan).await,
             SelectedImage::RemoteImage(x) => x.resolve(chan).await,

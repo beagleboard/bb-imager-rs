@@ -196,12 +196,12 @@ impl SdSysconfCustomization {
 impl From<SdSysconfCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
     fn from(value: SdSysconfCustomization) -> Self {
         Self::sysconfig(
-            value.hostname,
-            value.timezone,
-            value.keymap,
-            value.user.map(|x| (x.username, x.password)),
-            value.wifi.map(|x| (x.ssid, x.password)),
-            value.ssh,
+            value.hostname.map(Into::into),
+            value.timezone.map(Into::into),
+            value.keymap.map(Into::into),
+            value.user.map(|x| (x.username.into(), x.password.into())),
+            value.wifi.map(|x| (x.ssid.into(), x.password.into())),
+            value.ssh.map(Into::into),
             value.usb_enable_dhcp,
         )
     }
