@@ -294,6 +294,7 @@ pub(crate) enum BoardImage {
         flasher: config::Flasher,
         init_format: Option<config::InitFormat>,
         img: SelectedImage,
+        bmap: Option<Bmap>,
     },
 }
 
@@ -301,6 +302,7 @@ impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
         Self::Image {
             img: bb_flasher::LocalImage::new(path).into(),
+            bmap: None,
             flasher,
             // Do not try to apply customization for local images
             init_format: None,
@@ -317,9 +319,10 @@ impl BoardImage {
                 image.name,
                 image.url,
                 image.image_download_sha256,
-                downloader,
+                downloader.clone(),
             )
             .into(),
+            bmap: image.bmap.map(|url| Bmap { url, downloader }),
             flasher,
             init_format: image.init_format,
         }
@@ -407,6 +410,32 @@ impl std::fmt::Display for RemoteImage {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct Bmap {
+    url: Url,
+    downloader: bb_downloader::Downloader,
+}
+
+impl bb_flasher::ImageFile for Bmap {
+    async fn resolve(
+        &self,
+        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
+    ) -> std::io::Result<PathBuf> {
+        let (tx, rx) = futures::channel::mpsc::channel(20);
+
+        if let Some(chan) = chan {
+            tokio::spawn(async move {
+                rx.map(DownloadFlashingStatus::DownloadingProgress)
+                    .map(Ok)
+                    .forward(chan)
+                    .await
+            });
+        }
+
+        self.downloader.download(self.url.clone(), Some(tx)).await
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum SelectedImage {
     LocalImage(bb_flasher::LocalImage),
     RemoteImage(RemoteImage),
@@ -458,20 +487,20 @@ pub(crate) async fn flash(
                 .await
         }
         (
-            Some(BoardImage::Image { img, .. }),
+            Some(BoardImage::Image { img, bmap, .. }),
             FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, t, customization.into())
+            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into())
                 .flash(Some(chan))
                 .await
         }
         (
-            Some(BoardImage::Image { img, .. }),
+            Some(BoardImage::Image { img, bmap, .. }),
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, t, FlashingSdLinuxConfig::none())
+            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none())
                 .flash(Some(chan))
                 .await
         }

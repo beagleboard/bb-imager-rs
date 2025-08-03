@@ -133,18 +133,19 @@ impl BBFlasher for FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: ImageFile, B: ImageFile> {
     img: I,
-    bmap: Option<I>,
+    bmap: Option<B>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<I> Flasher<I>
+impl<I, B> Flasher<I, B>
 where
     I: ImageFile,
+    B: ImageFile,
 {
-    pub fn new(img: I, bmap: Option<I>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
             img,
             bmap,
@@ -154,9 +155,10 @@ where
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I, B> BBFlasher for Flasher<I, B>
 where
     I: ImageFile + Send + 'static,
+    B: ImageFile + Send + 'static,
 {
     async fn flash(
         self,
