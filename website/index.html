@@ -1,12 +1,166 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="/icon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BeagleBoard Imager</title>
+</head>
+
+<body>
+  <script type="module" src="/src/main.ts"></script>
+
+  <section class="hero has-text-centered is-primary is-medium">
+    <div class="hero-head">
+      <nav class="navbar">
+        <div class="container">
+          <div class="navbar-menu">
+            <div class="navbar-end">
+              <span class="navbar-item">
+                <a class="button is-primary is-inverted" href="https://github.com/beagleboard/bb-imager-rs">
+                  <span class="icon">
+                    <i class="fab fa-github"></i>
+                  </span>
+                  <span>Source</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </div>
+    <div class="hero-body">
+      <h1 class="title">BeagleBoard Imaging Utility</h1>
+      <h2 class="subtitle">The easiest way to install the latest operating system images for your Beagle</h2>
+    </div>
+  </section>
+
+  <section class="section has-text-centered container" x-data="latest_builds">
+    <h1 class="title">Download</h1>
+    <div class="columns is-centered">
+      <table class="table has-text-left">
+        <thead>
+          <tr>
+            <th>ASSET</th>
+            <th>DOWNLOAD LINK</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="build in latest_packages">
+            <tr>
+              <td x-text="build.name"></td>
+              <td>
+                <template x-for="pkg in build.packages">
+                  <p>
+                    <a x-bind:href="pkg.url" x-text="pkg.name"></a>
+                  </p>
+                </template>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" x-data="{open: false}">
+      <header class="card-header">
+        <p class="card-header-title">Looking for More Linux Packages?</p>
+        <button class="card-header-icon" aria-label="more options" x-on:click="open = ! open">
+          <span class="icon">
+            <i class="fas fa-angle-down" aria-hidden="true"></i>
+          </span>
+        </button>
+      </header>
+      <div class="card-content" x-show="open">
+        <div class="columns is-centered">
+          <table class="table has-text-left">
+            <thead>
+              <tr>
+                <th>ASSET</th>
+                <th>DOWNLOAD LINK</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="build in linux_builds_more">
+                <tr>
+                  <td x-text="build.name"></td>
+                  <td>
+                    <template x-for="pkg in build.packages">
+                      <p>
+                        <a x-bind:href="pkg.url" x-text="pkg.name"></a>
+                      </p>
+                    </template>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" x-data="{open: false}">
+      <header class="card-header">
+        <p class="card-header-title">Looking for CLI?</p>
+        <button class="card-header-icon" aria-label="more options" x-on:click="open = ! open">
+          <span class="icon">
+            <i class="fas fa-angle-down" aria-hidden="true"></i>
+          </span>
+        </button>
+      </header>
+      <div class="card-content" x-show="open">
+        <div class="columns is-centered">
+          <table class="table has-text-left">
+            <thead>
+              <tr>
+                <th>ASSET</th>
+                <th>DOWNLOAD LINK</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="build in cli_builds">
+                <tr>
+                  <td x-text="build.name"></td>
+                  <td>
+                    <template x-for="pkg in build.packages">
+                      <p>
+                        <a x-bind:href="pkg.url" x-text="pkg.name"></a>
+                      </p>
+                    </template>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" x-data="{open: false}">
+      <header class="card-header">
+        <p class="card-header-title">Looking for Experimental Builds?</p>
+        <button class="card-header-icon" aria-label="more options" x-on:click="open = ! open">
+          <span class="icon">
+            <i class="fas fa-angle-down" aria-hidden="true"></i>
+          </span>
+        </button>
+      </header>
+      <div class="card-content" x-show="open">
+        <div class="content">
+          Please checkout <a href="https://github.com/beagleboard/bb-imager-rs/releases/tag/continuous-release">Release
+            Page.</a>
+          Experimental builds should only be used for development.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="has-text-centered">
+      <p>Copyright 2025 BeagleBoard.org | All Rights Reserved.</p>
+    </div>
+  </footer>
+</body>
+
 </html>
