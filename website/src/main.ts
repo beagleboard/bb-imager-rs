@@ -1,4 +1,4 @@
-import './style.css'
+import './style.scss'
 import Alpine from 'alpinejs'
 
 const BB_IMAGER_VERSION = import.meta.env.VITE_BB_IMAGER_VERSION
