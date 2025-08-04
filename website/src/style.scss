@@ -1,0 +1,36 @@
+@use "bulma/sass/base";
+@use "bulma/sass/form";
+@use "bulma/sass/helpers";
+@use "bulma/sass/themes";
+
+// Load other Bulma components
+@use "bulma/sass/elements/button";
+@use "bulma/sass/elements/content";
+@use "bulma/sass/elements/table";
+@use "bulma/sass/elements/icon";
+@use "bulma/sass/elements/title";
+
+@use "bulma/sass/layout/container";
+@use "bulma/sass/layout/footer";
+@use "bulma/sass/layout/hero";
+@use "bulma/sass/layout/section";
+
+// Load Bulma Components
+@use "bulma/sass/components/navbar";
+@use "bulma/sass/components/card";
+
+@use "bulma/sass/grid/columns";
+
+@use '@fortawesome/fontawesome-free/css/all.min.css';
+
+:root {
+  --bulma-primary-h: 17deg;
+  --bulma-primary-s: 88%;
+  --bulma-primary-l: 58%;
+  --bulma-info-h: 197deg;
+  --bulma-info-s: 80%;
+  --bulma-info-l: 52%;
+  --bulma-success-h: 97deg;
+  --bulma-success-s: 47%;
+  --bulma-success-l: 60%;
+}

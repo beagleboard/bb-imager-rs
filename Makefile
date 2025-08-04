@@ -244,6 +244,7 @@ ifeq (${VERSION}, ${_CARGO_TOML_VERSION})
 	$(error ${VERSION} == ${_CARGO_TOML_VERSION})
 endif
 	sed -i '/\[workspace.package\]/,/^\[/{s/^\s*version\s*=.*/version = "${VERSION}"/}' Cargo.toml
+	sed -i "s/^VITE_BB_IMAGER_VERSION=.*/VITE_BB_IMAGER_VERSION=${VERSION}/" website/.env
 	sed -i '/<releases>/a \
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
 \t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/v$(VERSION)</url>\
