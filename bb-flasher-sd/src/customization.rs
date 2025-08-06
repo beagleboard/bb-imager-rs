@@ -24,12 +24,12 @@ impl Customization {
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 /// Post install customization options
 pub struct SysconfCustomization {
-    pub hostname: Option<String>,
-    pub timezone: Option<String>,
-    pub keymap: Option<String>,
-    pub user: Option<(String, String)>,
-    pub wifi: Option<(String, String)>,
-    pub ssh: Option<String>,
+    pub hostname: Option<Box<str>>,
+    pub timezone: Option<Box<str>>,
+    pub keymap: Option<Box<str>>,
+    pub user: Option<(Box<str>, Box<str>)>,
+    pub wifi: Option<(Box<str>, Box<str>)>,
+    pub ssh: Option<Box<str>>,
     pub usb_enable_dhcp: Option<bool>,
 }
 
@@ -117,7 +117,7 @@ impl SysconfCustomization {
 
     pub(crate) fn validate(&self) -> bool {
         if let Some((x, _)) = &self.user {
-            x != "root"
+            x.as_ref() != "root"
         } else {
             true
         }

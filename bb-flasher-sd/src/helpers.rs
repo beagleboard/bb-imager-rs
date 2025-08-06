@@ -10,7 +10,7 @@ pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
     }
 }
 
-pub(crate) const fn progress(pos: usize, img_size: u64) -> f32 {
+pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
 }
 

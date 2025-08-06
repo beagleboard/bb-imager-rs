@@ -160,6 +160,8 @@ pub struct OsImage {
     pub tags: HashSet<String>,
     /// Initialization Format. Currently only used by SD Card Images
     pub init_format: Option<InitFormat>,
+    /// Bmap file for the image
+    pub bmap: Option<Url>,
 }
 
 /// Types of flashers Os Image(s) support

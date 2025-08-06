@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -56,7 +56,7 @@ pub enum TargetCommands {
     #[cfg(feature = "bcf_cc1352p7")]
     Bcf {
         /// Local path to image file. Can be compressed (xz) or extracted file
-        img: PathBuf,
+        img: Box<Path>,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
@@ -68,54 +68,57 @@ pub enum TargetCommands {
     /// Flash an SD card with customizable settings for BeagleBoard devices.
     Sd {
         /// Local path to image file. Can be compressed (xz) or extracted file
-        img: PathBuf,
+        img: Box<Path>,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: PathBuf,
 
         #[arg(long)]
         /// Set a custom hostname for the device (e.g., "beaglebone").
-        hostname: Option<String>,
+        hostname: Option<Box<str>>,
 
         #[arg(long)]
         /// Set the timezone for the device (e.g., "America/New_York").
-        timezone: Option<String>,
+        timezone: Option<Box<str>>,
 
         #[arg(long)]
         /// Set the keyboard layout/keymap (e.g., "us" for the US layout).
-        keymap: Option<String>,
+        keymap: Option<Box<str>>,
 
         #[arg(long, requires = "user_password", verbatim_doc_comment)]
         /// Set a username for the default user. Cannot be `root`. Requires `user_password`.
         /// Required to enter GUI session due to regulatory requirements.
-        user_name: Option<String>,
+        user_name: Option<Box<str>>,
 
         #[arg(long, requires = "user_name", verbatim_doc_comment)]
         /// Set a password for the default user. Requires `user_name`.
         /// Required to enter GUI session due to regulatory requirements.
-        user_password: Option<String>,
+        user_password: Option<Box<str>>,
 
         #[arg(long, requires = "wifi_password")]
         /// Configure a Wi-Fi SSID for network access. Requires `wifi_password`.
-        wifi_ssid: Option<String>,
+        wifi_ssid: Option<Box<str>>,
 
         #[arg(long, requires = "wifi_ssid")]
         /// Set the password for the specified Wi-Fi SSID. Requires `wifi_ssid`.
-        wifi_password: Option<String>,
+        wifi_password: Option<Box<str>>,
 
         #[arg(long)]
         /// Set SSH public key for authentication
-        ssh_key: Option<String>,
+        ssh_key: Option<Box<str>>,
 
         #[arg(long)]
         /// Enable USB DHCP
         usb_enable_dhcp: bool,
+        /// Provide the bmap file for the image
+        #[arg(long)]
+        bmap: Option<Box<Path>>,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
     Msp430 {
         /// Local path to image file. Can be compressed (xz) or extracted file
-        img: PathBuf,
+        img: Box<Path>,
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: String,
@@ -124,7 +127,7 @@ pub enum TargetCommands {
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0 {
         /// Local path to image file. Can be compressed (xz) or extracted file
-        img: PathBuf,
+        img: Box<Path>,
 
         /// Do not persist EEPROM contents
         #[arg(long)]

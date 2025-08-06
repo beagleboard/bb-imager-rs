@@ -34,6 +34,60 @@ fn reader_task(
     Ok(())
 }
 
+/// While writing, a few assumptions should hold:
+/// - All writes should be in buffers multiple of block size (4K).
+/// - All writes should be aligned to block size (4K).
+///
+/// Thus, we will be writing some data that is not strictly present in the bmap.
+fn writer_task_bmap(
+    bmap: bmap_parser::Bmap,
+    mut sd: impl Write + Seek,
+    mut chan: Option<&mut mpsc::Sender<f32>>,
+    buf_rx: std::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: std::sync::mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    cancel: Option<Weak<()>>,
+) -> Result<()> {
+    let mut pos = 0;
+    let (mut buf, mut count) = buf_rx.recv().unwrap();
+    let img_size = bmap.total_mapped_size();
+    let mut bytes_written = 0u64;
+
+    for b in bmap.block_map() {
+        let end_offset = b.offset() + b.length();
+
+        loop {
+            // Write any buffer that lies even partially in the bmap range.
+            if pos + (count as u64) > b.offset() && pos < end_offset {
+                sd.seek(std::io::SeekFrom::Start(pos))?;
+                sd.write_all(&buf.as_slice()[..count])?;
+                bytes_written += count as u64;
+            } else if pos >= end_offset {
+                break;
+            }
+
+            pos += count as u64;
+            // Clippy warning is simply wrong here
+            #[allow(clippy::option_map_or_none)]
+            chan_send(
+                chan.as_mut().map_or(None, |p| Some(p)),
+                progress(bytes_written, img_size),
+            );
+            check_arc(cancel.as_ref())?;
+
+            match buf_rx.recv() {
+                Ok((x, y)) => {
+                    let _ = buf_tx.send(buf);
+                    buf = x;
+                    count = y;
+                }
+                Err(_) => break,
+            }
+        }
+    }
+
+    sd.flush().map_err(Into::into)
+}
+
 fn writer_task(
     img_size: u64,
     mut sd: impl Write + Seek,
@@ -42,12 +96,12 @@ fn writer_task(
     buf_tx: std::sync::mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<Weak<()>>,
 ) -> Result<()> {
-    let mut pos = 0;
+    let mut pos = 0u64;
 
     while let Ok((buf, count)) = buf_rx.recv() {
         sd.write_all(&buf.as_slice()[..count])?;
 
-        pos += count;
+        pos += count as u64;
         // Clippy warning is simply wrong here
         #[allow(clippy::option_map_or_none)]
         chan_send(
@@ -88,6 +142,7 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 fn write_sd(
     img: impl Read + Send + 'static,
     img_size: u64,
+    bmap: Option<bmap_parser::Bmap>,
     sd: impl Write + Seek,
     chan: Option<&mut mpsc::Sender<f32>>,
     cancel: Option<Weak<()>>,
@@ -106,7 +161,10 @@ fn write_sd(
     let cancle_clone = cancel.clone();
     let handle = std::thread::spawn(move || reader_task(img, rx1, tx2, cancle_clone));
 
-    writer_task(img_size, sd, chan, rx2, tx1, cancel)?;
+    match bmap {
+        Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
+        None => writer_task(img_size, sd, chan, rx2, tx1, cancel),
+    }?;
 
     tracing::info!("Total Time taken: {:?}", global_start.elapsed());
 
@@ -142,7 +200,7 @@ fn write_sd(
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub fn flash<R: Read + Send + 'static>(
-    img_resolver: impl FnOnce() -> std::io::Result<(R, u64)>,
+    img_resolver: impl FnOnce() -> std::io::Result<(R, u64, Option<String>)>,
     dst: &Path,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -156,13 +214,18 @@ pub fn flash<R: Read + Send + 'static>(
 
     let sd = crate::pal::open(dst)?;
 
-    let (img, img_size) = img_resolver()?;
-    flash_internal(img, img_size, sd, chan, customization, cancel)
+    let (img, img_size, bmap) = img_resolver()?;
+    let bmap = match bmap {
+        Some(x) => Some(bmap_parser::Bmap::from_xml(&x).map_err(|_| crate::Error::InvalidBmap)?),
+        None => None,
+    };
+    flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
 }
 
 fn flash_internal(
     img: impl Read + Send + 'static,
     img_size: u64,
+    bmap: Option<bmap_parser::Bmap>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -172,7 +235,7 @@ fn flash_internal(
 
     let mut sd = crate::helpers::SdCardWrapper::new(sd);
 
-    write_sd(img, img_size, &mut sd, chan.as_mut(), cancel.clone())?;
+    write_sd(img, img_size, bmap, &mut sd, chan.as_mut(), cancel.clone())?;
 
     check_arc(cancel.as_ref())?;
 
@@ -188,7 +251,7 @@ fn flash_internal(
 
 #[cfg(test)]
 mod tests {
-    use crate::flashing::read_aligned;
+    use crate::flashing::{BUFFER_SIZE, read_aligned};
 
     use super::write_sd;
 
@@ -207,9 +270,67 @@ mod tests {
         let dummy_file = test_file(FILE_LEN);
         let mut sd = std::io::Cursor::new(Vec::<u8>::new());
 
-        write_sd(dummy_file.clone(), FILE_LEN as u64, &mut sd, None, None).unwrap();
+        write_sd(
+            dummy_file.clone(),
+            FILE_LEN as u64,
+            None,
+            &mut sd,
+            None,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(sd.get_ref().as_slice(), dummy_file.get_ref().as_ref());
+    }
+
+    #[test]
+    fn sd_write_bmap() {
+        const FILE_LEN: usize = 32 * 1024;
+        const BLOCK_LEN: u64 = BUFFER_SIZE as u64;
+        const BLOCKS: u64 = (FILE_LEN as u64) / BLOCK_LEN;
+        const MAPPED_BLOCKS: &[u64] = &[0, 2, BLOCKS - 1];
+
+        let dummy_file = test_file(FILE_LEN);
+        let mut sd = std::io::Cursor::new(vec![0u8; FILE_LEN]);
+
+        let mut bmap = bmap_parser::Bmap::builder();
+        bmap.image_size(FILE_LEN as u64)
+            .block_size(BLOCK_LEN)
+            .blocks(BLOCKS)
+            .mapped_blocks(MAPPED_BLOCKS.len() as u64)
+            .checksum_type(bmap_parser::HashType::Sha256);
+
+        for i in MAPPED_BLOCKS {
+            bmap.add_block_range(*i, *i, bmap_parser::HashValue::Sha256(Default::default()));
+        }
+
+        let bmap = bmap.build().unwrap();
+
+        write_sd(
+            dummy_file.clone(),
+            FILE_LEN as u64,
+            Some(bmap.clone()),
+            &mut sd,
+            None,
+            None,
+        )
+        .unwrap();
+
+        for i in 0..(BLOCKS as usize) {
+            let start = i * (BLOCK_LEN as usize);
+            let end = start + (BLOCK_LEN as usize);
+            if MAPPED_BLOCKS.contains(&(i as u64)) {
+                assert_eq!(
+                    sd.get_ref().as_slice()[start..end],
+                    dummy_file.get_ref().as_ref()[start..end]
+                );
+            } else {
+                assert_eq!(
+                    &sd.get_ref().as_slice()[start..end],
+                    [0u8; BLOCK_LEN as usize].as_slice()
+                );
+            }
+        }
     }
 
     struct UnalignedReader(std::io::Cursor<Box<[u8]>>);
