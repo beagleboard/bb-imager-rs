@@ -20,6 +20,12 @@ mod persistance;
 mod ui;
 
 fn main() -> iced::Result {
+    let log_file_p = helpers::log_file_path();
+    let log_file_dir = log_file_p.parent().unwrap();
+    if !log_file_dir.is_dir() {
+        std::fs::create_dir_all(log_file_dir).unwrap();
+    }
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::builder()
