@@ -121,6 +121,7 @@ async fn flash_internal(
             img,
             ssh_key,
             usb_enable_dhcp,
+            bmap,
         } => {
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
@@ -137,6 +138,7 @@ async fn flash_internal(
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img),
+                bmap.map(LocalImage::new),
                 dst.try_into().unwrap(),
                 customization,
             )

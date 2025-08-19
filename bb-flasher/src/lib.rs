@@ -12,12 +12,12 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let img = bb_flasher::LocalImage::new("/tmp/abc.img.xz".into());
+//!     let img = bb_flasher::LocalImage::new(PathBuf::from("/tmp/abc.img.xz").into());
 //!     let target = PathBuf::from("/tmp/target").try_into().unwrap();
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::new(img, target, customization)
+//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_flasher::LocalImage>, target, customization)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -41,7 +41,7 @@ mod common;
 mod flasher;
 mod img;
 
-use std::path::PathBuf;
+use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
@@ -54,16 +54,16 @@ pub trait ImageFile {
     fn resolve(
         &self,
         chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<PathBuf>>;
+    ) -> impl Future<Output = std::io::Result<Box<Path>>>;
 }
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
-pub struct LocalImage(PathBuf);
+pub struct LocalImage(Box<Path>);
 
 impl LocalImage {
     /// Construct a new local image from path.
-    pub const fn new(path: PathBuf) -> Self {
+    pub const fn new(path: Box<Path>) -> Self {
         Self(path)
     }
 }
@@ -72,7 +72,7 @@ impl ImageFile for LocalImage {
     fn resolve(
         &self,
         _: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<PathBuf>> {
+    ) -> impl Future<Output = std::io::Result<Box<Path>>> {
         std::future::ready(Ok(self.0.clone()))
     }
 }

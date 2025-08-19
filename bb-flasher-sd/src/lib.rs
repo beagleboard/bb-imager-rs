@@ -22,7 +22,7 @@
 //!
 //! let dst = Path::new("/tmp/dummy");
 //! let img = || {
-//!     Ok((File::open("/tmp/image")?, 1024))
+//!     Ok((File::open("/tmp/image")?, 1024, None))
 //! };
 //! let (tx, rx) = futures::channel::mpsc::channel(20);
 //!
@@ -76,6 +76,8 @@ pub enum Error {
     FailedToFormat(String),
     #[error("Failed to open {0}")]
     FailedToOpenDestination(String),
+    #[error("Invalid bmap")]
+    InvalidBmap,
 
     #[error("Udisks2 Error: {0}")]
     #[cfg(all(feature = "udev", target_os = "linux"))]

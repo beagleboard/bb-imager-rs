@@ -4,7 +4,7 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, path::PathBuf, sync::Arc};
+use std::{fmt::Display, io::Read, path::PathBuf, sync::Arc};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, ImageFile};
 use futures::StreamExt;
@@ -70,12 +70,12 @@ pub struct FlashingSdLinuxConfig {
 
 impl FlashingSdLinuxConfig {
     pub const fn sysconfig(
-        hostname: Option<String>,
-        timezone: Option<String>,
-        keymap: Option<String>,
-        user: Option<(String, String)>,
-        wifi: Option<(String, String)>,
-        ssh: Option<String>,
+        hostname: Option<Box<str>>,
+        timezone: Option<Box<str>>,
+        keymap: Option<Box<str>>,
+        user: Option<(Box<str>, Box<str>)>,
+        wifi: Option<(Box<str>, Box<str>)>,
+        ssh: Option<Box<str>>,
         usb_enable_dhcp: Option<bool>,
     ) -> Self {
         Self {
@@ -133,28 +133,32 @@ impl BBFlasher for FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: ImageFile, B: ImageFile> {
     img: I,
+    bmap: Option<B>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<I> Flasher<I>
+impl<I, B> Flasher<I, B>
 where
     I: ImageFile,
+    B: ImageFile,
 {
-    pub fn new(img: I, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
             img,
+            bmap,
             dst: dst.0.path,
             customization,
         }
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I, B> BBFlasher for Flasher<I, B>
 where
     I: ImageFile + Send + 'static,
+    B: ImageFile + Send + 'static,
 {
     async fn flash(
         self,
@@ -162,6 +166,7 @@ where
     ) -> std::io::Result<()> {
         let chan_clone = chan.clone();
         let img = self.img;
+        let bmap = self.bmap;
 
         let img_resolver = move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -169,11 +174,24 @@ where
                 .enable_io()
                 .build()
                 .unwrap();
+            let chan_clone_1 = chan_clone.clone();
+            let bmap = match bmap {
+                Some(x) => {
+                    let mut f =
+                        rt.block_on(
+                            async move { crate::img::OsImage::open(x, chan_clone_1).await },
+                        )?;
+                    let mut data = String::new();
+                    f.read_to_string(&mut data)?;
+                    Some(data)
+                }
+                None => None,
+            };
             let img =
                 rt.block_on(async move { crate::img::OsImage::open(img, chan_clone).await })?;
             let img_size = img.size();
 
-            Ok((img, img_size))
+            Ok((img, img_size, bmap))
         };
 
         let cancel = Arc::new(());
