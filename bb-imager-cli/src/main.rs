@@ -1,6 +1,6 @@
 mod cli;
 
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use futures::StreamExt;
@@ -136,9 +136,14 @@ async fn flash_internal(
                 Some(usb_enable_dhcp),
             );
 
+            let bmap = match bmap {
+                Some(x) => Some(tokio::fs::read_to_string(x).await?.into()),
+                None => None,
+            };
+
             bb_flasher::sd::Flasher::new(
                 bb_flasher::OsImage::from_path(&img)?,
-                bmap.map(LocalImage::new),
+                bmap,
                 dst.try_into().unwrap(),
                 customization,
             )

@@ -41,52 +41,6 @@ mod common;
 mod flasher;
 mod img;
 
-use std::path::Path;
-
 pub use common::*;
 pub use flasher::*;
-use futures::channel::mpsc;
 pub use img::{OsImage, ReadPipe};
-
-/// A trait to signify Os Images. Flashers in this crate can take any file as an input that
-/// implements this trait.
-pub trait ImageFile {
-    /// Get the local path to an image. Network calls can be done here.
-    fn resolve(
-        &self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>>;
-}
-
-/// An Os Image present in the local filesystem
-#[derive(Debug, Clone)]
-pub struct LocalImage(Box<Path>);
-
-impl LocalImage {
-    /// Construct a new local image from path.
-    pub const fn new(path: Box<Path>) -> Self {
-        Self(path)
-    }
-}
-
-impl ImageFile for LocalImage {
-    fn resolve(
-        &self,
-        _: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>> {
-        std::future::ready(Ok(self.0.clone()))
-    }
-}
-
-impl std::fmt::Display for LocalImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .file_name()
-                .expect("image cannot be a directory")
-                .to_string_lossy()
-        )
-    }
-}

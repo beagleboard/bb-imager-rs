@@ -4,9 +4,9 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, io::Read, path::PathBuf, sync::Arc};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use futures::StreamExt;
 
 use bb_flasher_sd::Error;
@@ -132,20 +132,17 @@ impl BBFlasher for FormatFlasher {
 ///
 /// - img: Raw images
 /// - xz: Xz compressed raw images
-pub struct Flasher<B: ImageFile> {
+pub struct Flasher {
     img: crate::img::OsImage,
-    bmap: Option<B>,
+    bmap: Option<Box<str>>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<B> Flasher<B>
-where
-    B: ImageFile,
-{
+impl Flasher {
     pub fn new(
         img: crate::img::OsImage,
-        bmap: Option<B>,
+        bmap: Option<Box<str>>,
         dst: Target,
         customization: FlashingSdLinuxConfig,
     ) -> Self {
@@ -158,39 +155,16 @@ where
     }
 }
 
-impl<B> BBFlasher for Flasher<B>
-where
-    B: ImageFile + Send + 'static,
-{
+impl BBFlasher for Flasher {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
-        let chan_clone = chan.clone();
         let img = self.img;
         let bmap = self.bmap;
 
         let img_resolver = move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_time()
-                .enable_io()
-                .build()
-                .unwrap();
-            let chan_clone_1 = chan_clone.clone();
-            let bmap = match bmap {
-                Some(x) => {
-                    let mut f =
-                        rt.block_on(
-                            async move { crate::img::OsImage::open(x, chan_clone_1).await },
-                        )?;
-                    let mut data = String::new();
-                    f.read_to_string(&mut data)?;
-                    Some(data.into())
-                }
-                None => None,
-            };
             let img_size = img.size();
-
             Ok((img, img_size, bmap))
         };
 

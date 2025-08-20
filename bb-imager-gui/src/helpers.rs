@@ -8,7 +8,6 @@ use std::{
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
-use futures::StreamExt;
 use iced::{
     Color, Length, futures,
     widget::{self, Column, progress_bar, text},
@@ -433,26 +432,10 @@ pub(crate) struct Bmap {
     downloader: bb_downloader::Downloader,
 }
 
-impl bb_flasher::ImageFile for Bmap {
-    async fn resolve(
-        &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
-        let (tx, rx) = futures::channel::mpsc::channel(20);
-
-        if let Some(chan) = chan {
-            tokio::spawn(async move {
-                rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .map(Ok)
-                    .forward(chan)
-                    .await
-            });
-        }
-
-        self.downloader
-            .download(*self.url.clone(), Some(tx))
-            .await
-            .map(Into::into)
+impl Bmap {
+    async fn data(&self) -> std::io::Result<Box<str>> {
+        let p = self.downloader.download(*self.url.clone(), None).await?;
+        tokio::fs::read_to_string(p).await.map(Into::into)
     }
 }
 
@@ -503,6 +486,10 @@ pub(crate) async fn flash(
             FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
+            let bmap = match bmap {
+                Some(x) => Some(x.data().await?),
+                None => None,
+            };
             bb_flasher::sd::Flasher::new(img.image().await?, bmap, t, customization.into())
                 .flash(Some(chan))
                 .await
@@ -512,6 +499,10 @@ pub(crate) async fn flash(
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
+            let bmap = match bmap {
+                Some(x) => Some(x.data().await?),
+                None => None,
+            };
             bb_flasher::sd::Flasher::new(img.image().await?, bmap, t, FlashingSdLinuxConfig::none())
                 .flash(Some(chan))
                 .await

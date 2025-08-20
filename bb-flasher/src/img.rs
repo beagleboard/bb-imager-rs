@@ -1,7 +1,5 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use crate::{DownloadFlashingStatus, ImageFile};
-use futures::channel::mpsc;
 use std::{
     io::{Read, Seek},
     path::Path,
@@ -24,14 +22,6 @@ pub(crate) enum OsImageReader {
 }
 
 impl OsImage {
-    pub(crate) async fn open(
-        img: impl ImageFile,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Self> {
-        let img_path = img.resolve(chan).await?;
-        Self::from_path(&img_path)
-    }
-
     pub fn from_path(path: &Path) -> std::io::Result<Self> {
         let mut file = std::fs::File::open(path)?;
 
