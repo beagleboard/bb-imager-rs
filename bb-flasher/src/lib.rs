@@ -7,12 +7,12 @@
 //! # Usage
 //!
 //! ```no_run
-//! use std::path::PathBuf;
+//! use std::path::{PathBuf, Path};
 //! use bb_flasher::BBFlasher;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let img = bb_flasher::LocalImage::new(PathBuf::from("/tmp/abc.img.xz").into());
+//!     let img = bb_flasher::OsImage::from_path(Path::new("/tmp/abc.img.xz")).unwrap();
 //!     let target = PathBuf::from("/tmp/target").try_into().unwrap();
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
@@ -46,6 +46,7 @@ use std::path::Path;
 pub use common::*;
 pub use flasher::*;
 use futures::channel::mpsc;
+pub use img::{OsImage, ReadPipe};
 
 /// A trait to signify Os Images. Flashers in this crate can take any file as an input that
 /// implements this trait.

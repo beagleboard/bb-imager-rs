@@ -8,7 +8,7 @@ use std::{ffi::CString, fmt::Display, io::Read};
 
 use futures::StreamExt;
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget};
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -65,17 +65,13 @@ impl BBFlasherTarget for Target {
 ///
 /// [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 /// [MSP430]: https://www.ti.com/product/MSP430F5503
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Flasher<I: ImageFile> {
-    img: I,
+pub struct Flasher {
+    img: crate::img::OsImage,
     port: std::ffi::CString,
 }
 
-impl<I> Flasher<I>
-where
-    I: ImageFile,
-{
-    pub fn new(img: I, port: Target) -> Self {
+impl Flasher {
+    pub fn new(img: crate::img::OsImage, port: Target) -> Self {
         Self {
             img,
             port: port.raw_path,
@@ -83,19 +79,15 @@ where
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
-where
-    I: ImageFile,
-{
+impl BBFlasher for Flasher {
     async fn flash(
-        self,
+        mut self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
         let dst = self.port;
         let img = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
             let mut data = Vec::new();
-            img.read_to_end(&mut data)?;
+            self.img.read_to_end(&mut data)?;
             data
         };
 

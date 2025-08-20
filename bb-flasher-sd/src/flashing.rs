@@ -200,7 +200,7 @@ fn write_sd(
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub fn flash<R: Read + Send + 'static>(
-    img_resolver: impl FnOnce() -> std::io::Result<(R, u64, Option<String>)>,
+    img_resolver: impl FnOnce() -> std::io::Result<(R, u64, Option<Box<str>>)>,
     dst: &Path,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -235,15 +235,18 @@ fn flash_internal(
 
     let mut sd = crate::helpers::SdCardWrapper::new(sd);
 
+    tracing::info!("Writing Image");
     write_sd(img, img_size, bmap, &mut sd, chan.as_mut(), cancel.clone())?;
 
     check_arc(cancel.as_ref())?;
 
+    tracing::info!("Customizing Image");
     if let Some(c) = customization {
         let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
         c.customize(temp)?;
     }
 
+    tracing::info!("Ejecting SD Card");
     let _ = sd.eject();
 
     Ok(())

@@ -137,7 +137,7 @@ async fn flash_internal(
             );
 
             bb_flasher::sd::Flasher::new(
-                LocalImage::new(img),
+                bb_flasher::OsImage::from_path(&img)?,
                 bmap.map(LocalImage::new),
                 dst.try_into().unwrap(),
                 customization,
@@ -151,19 +151,23 @@ async fn flash_internal(
             dst,
             no_verify,
         } => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(LocalImage::new(img), dst.into(), !no_verify)
-                .flash(chan)
-                .await
+            bb_flasher::bcf::cc1352p7::Flasher::new(
+                bb_flasher::OsImage::from_path(&img)?,
+                dst.into(),
+                !no_verify,
+            )
+            .flash(chan)
+            .await
         }
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {
-            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img), dst.into())
+            bb_flasher::bcf::msp430::Flasher::new(bb_flasher::OsImage::from_path(&img)?, dst.into())
                 .flash(chan)
                 .await
         }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img), !no_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(bb_flasher::OsImage::from_path(&img)?, !no_eeprom)
                 .flash(chan)
                 .await
         }

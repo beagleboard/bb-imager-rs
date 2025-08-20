@@ -17,7 +17,7 @@ cfg_if::cfg_if! {
 use std::collections::HashSet;
 use std::io::Read;
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget};
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -59,17 +59,13 @@ impl std::fmt::Display for Target {
 ///
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 /// [MSPM0L1105]: https://www.ti.com/product/MSPM0L1105
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile> {
-    img: I,
+pub struct Flasher {
+    img: crate::img::OsImage,
     persist_eeprom: bool,
 }
 
-impl<I> Flasher<I>
-where
-    I: ImageFile,
-{
-    pub const fn new(img: I, persist_eeprom: bool) -> Self {
+impl Flasher {
+    pub const fn new(img: crate::img::OsImage, persist_eeprom: bool) -> Self {
         Self {
             img,
             persist_eeprom,
@@ -77,19 +73,14 @@ where
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
-where
-    I: ImageFile,
-{
+impl BBFlasher for Flasher {
     async fn flash(
-        self,
+        mut self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
         let bin = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
-
             let mut data = String::new();
-            img.read_to_string(&mut data)?;
+            self.img.read_to_string(&mut data)?;
             data.parse().map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
             })?

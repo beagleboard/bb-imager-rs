@@ -132,20 +132,23 @@ impl BBFlasher for FormatFlasher {
 ///
 /// - img: Raw images
 /// - xz: Xz compressed raw images
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile, B: ImageFile> {
-    img: I,
+pub struct Flasher<B: ImageFile> {
+    img: crate::img::OsImage,
     bmap: Option<B>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<I, B> Flasher<I, B>
+impl<B> Flasher<B>
 where
-    I: ImageFile,
     B: ImageFile,
 {
-    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(
+        img: crate::img::OsImage,
+        bmap: Option<B>,
+        dst: Target,
+        customization: FlashingSdLinuxConfig,
+    ) -> Self {
         Self {
             img,
             bmap,
@@ -155,9 +158,8 @@ where
     }
 }
 
-impl<I, B> BBFlasher for Flasher<I, B>
+impl<B> BBFlasher for Flasher<B>
 where
-    I: ImageFile + Send + 'static,
     B: ImageFile + Send + 'static,
 {
     async fn flash(
@@ -183,12 +185,10 @@ where
                         )?;
                     let mut data = String::new();
                     f.read_to_string(&mut data)?;
-                    Some(data)
+                    Some(data.into())
                 }
                 None => None,
             };
-            let img =
-                rt.block_on(async move { crate::img::OsImage::open(img, chan_clone).await })?;
             let img_size = img.size();
 
             Ok((img, img_size, bmap))

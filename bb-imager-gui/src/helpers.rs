@@ -14,6 +14,7 @@ use iced::{
     widget::{self, Column, progress_bar, text},
 };
 use iced_loading::Linear;
+use tokio::io::AsyncWriteExt;
 use url::Url;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -306,7 +307,7 @@ pub(crate) enum BoardImage {
 impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
         Self::Image {
-            img: bb_flasher::LocalImage::new(path.into()).into(),
+            img: SelectedImage::LocalImage(path.into()),
             bmap: None,
             flasher,
             // Do not try to apply customization for local images
@@ -324,6 +325,7 @@ impl BoardImage {
                 image.name.into(),
                 Box::new(image.url),
                 image.image_download_sha256,
+                image.extract_size,
                 downloader.clone(),
             )
             .into(),
@@ -370,6 +372,7 @@ pub(crate) struct RemoteImage {
     name: Box<str>,
     url: Box<url::Url>,
     extract_sha256: [u8; 32],
+    extract_size: u64,
     downloader: bb_downloader::Downloader,
 }
 
@@ -378,37 +381,43 @@ impl RemoteImage {
         name: Box<str>,
         url: Box<url::Url>,
         extract_sha256: [u8; 32],
+        extract_size: u64,
         downloader: bb_downloader::Downloader,
     ) -> Self {
         Self {
             name,
             url,
             extract_sha256,
+            extract_size,
             downloader,
         }
     }
-}
 
-impl bb_flasher::ImageFile for RemoteImage {
-    async fn resolve(
-        &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
-        let (tx, rx) = futures::channel::mpsc::channel(20);
+    async fn image(&self) -> std::io::Result<bb_flasher::OsImage> {
+        const BUF_LEN: usize = 2 * 1024 * 1024;
 
-        if let Some(chan) = chan {
-            tokio::spawn(async move {
-                rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .map(Ok)
-                    .forward(chan)
-                    .await
-            });
-        }
-
-        self.downloader
-            .download_with_sha(*self.url.clone(), self.extract_sha256, Some(tx))
+        if let Some(path) = self
+            .downloader
+            .check_cache_from_sha(self.extract_sha256)
             .await
-            .map(Into::into)
+        {
+            tracing::info!("Found the remote image in cache");
+            bb_flasher::OsImage::from_path(&path)
+        } else {
+            let (rx, mut tx) = tokio::io::simplex(BUF_LEN);
+            let downloader = self.downloader.clone();
+            let url = self.url.clone();
+            let sha = self.extract_sha256;
+            tokio::spawn(async move {
+                downloader
+                    .download_with_sha_and_pipe(*url, sha, &mut tx)
+                    .await
+                    .unwrap();
+                tx.shutdown().await.unwrap();
+            });
+
+            bb_flasher::OsImage::from_piped(rx, self.extract_size).await
+        }
     }
 }
 
@@ -449,18 +458,15 @@ impl bb_flasher::ImageFile for Bmap {
 
 #[derive(Debug, Clone)]
 pub(crate) enum SelectedImage {
-    LocalImage(bb_flasher::LocalImage),
+    LocalImage(Box<Path>),
     RemoteImage(RemoteImage),
 }
 
-impl bb_flasher::ImageFile for SelectedImage {
-    async fn resolve(
-        &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
+impl SelectedImage {
+    async fn image(&self) -> std::io::Result<bb_flasher::OsImage> {
         match self {
-            SelectedImage::LocalImage(x) => x.resolve(chan).await,
-            SelectedImage::RemoteImage(x) => x.resolve(chan).await,
+            SelectedImage::LocalImage(x) => bb_flasher::OsImage::from_path(x),
+            SelectedImage::RemoteImage(x) => x.image().await,
         }
     }
 }
@@ -468,7 +474,7 @@ impl bb_flasher::ImageFile for SelectedImage {
 impl std::fmt::Display for SelectedImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SelectedImage::LocalImage(x) => x.fmt(f),
+            SelectedImage::LocalImage(x) => x.display().fmt(f),
             SelectedImage::RemoteImage(x) => x.fmt(f),
         }
     }
@@ -477,12 +483,6 @@ impl std::fmt::Display for SelectedImage {
 impl From<RemoteImage> for SelectedImage {
     fn from(value: RemoteImage) -> Self {
         Self::RemoteImage(value)
-    }
-}
-
-impl From<bb_flasher::LocalImage> for SelectedImage {
-    fn from(value: bb_flasher::LocalImage) -> Self {
-        Self::LocalImage(value)
     }
 }
 
@@ -503,7 +503,7 @@ pub(crate) async fn flash(
             FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into())
+            bb_flasher::sd::Flasher::new(img.image().await?, bmap, t, customization.into())
                 .flash(Some(chan))
                 .await
         }
@@ -512,7 +512,7 @@ pub(crate) async fn flash(
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none())
+            bb_flasher::sd::Flasher::new(img.image().await?, bmap, t, FlashingSdLinuxConfig::none())
                 .flash(Some(chan))
                 .await
         }
@@ -522,7 +522,7 @@ pub(crate) async fn flash(
             FlashingCustomization::Bcf(customization),
             Some(Destination::BeagleConnectFreedom(t)),
         ) => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify)
+            bb_flasher::bcf::cc1352p7::Flasher::new(img.image().await?, t, customization.verify)
                 .flash(Some(chan))
                 .await
         }
@@ -532,13 +532,13 @@ pub(crate) async fn flash(
             FlashingCustomization::Msp430,
             Some(Destination::Msp430(t)),
         ) => {
-            bb_flasher::bcf::msp430::Flasher::new(img, t)
+            bb_flasher::bcf::msp430::Flasher::new(img.image().await?, t)
                 .flash(Some(chan))
                 .await
         }
         #[cfg(feature = "pb2_mspm0")]
         (Some(BoardImage::Image { img, .. }), FlashingCustomization::Pb2Mspm0(x), _) => {
-            bb_flasher::pb2::mspm0::Flasher::new(img, x.persist_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(img.image().await?, x.persist_eeprom)
                 .flash(Some(chan))
                 .await
         }
