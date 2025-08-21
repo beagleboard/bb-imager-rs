@@ -141,6 +141,7 @@ async fn flash_internal(
                 bmap.map(LocalFile::new),
                 dst.try_into().unwrap(),
                 customization,
+                None,
             )
             .flash(chan)
             .await

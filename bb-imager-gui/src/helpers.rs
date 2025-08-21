@@ -482,6 +482,7 @@ pub(crate) async fn flash(
     customization: FlashingCustomization,
     dst: Option<Destination>,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+    cancel: tokio::sync::watch::Receiver<()>,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
         (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
@@ -494,7 +495,7 @@ pub(crate) async fn flash(
             FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into())
+            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into(), Some(cancel))
                 .flash(Some(chan))
                 .await
         }
@@ -503,7 +504,7 @@ pub(crate) async fn flash(
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none())
+            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none(), Some(cancel))
                 .flash(Some(chan))
                 .await
         }

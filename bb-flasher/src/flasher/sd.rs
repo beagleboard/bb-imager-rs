@@ -4,7 +4,7 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, io::Read, path::PathBuf, sync::Arc};
+use std::{fmt::Display, io::Read, path::PathBuf};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
 use futures::StreamExt;
@@ -132,12 +132,13 @@ impl BBFlasher for FormatFlasher {
 ///
 /// - img: Raw images
 /// - xz: Xz compressed raw images
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Flasher<I: Resolvable, B: Resolvable> {
     img: I,
     bmap: Option<B>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
+    cancel: Option<tokio::sync::watch::Receiver<()>>,
 }
 
 impl<I, B> Flasher<I, B>
@@ -145,12 +146,19 @@ where
     I: Resolvable,
     B: Resolvable,
 {
-    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+    pub fn new(
+        img: I,
+        bmap: Option<B>,
+        dst: Target,
+        customization: FlashingSdLinuxConfig,
+        cancel: Option<tokio::sync::watch::Receiver<()>>,
+    ) -> Self {
         Self {
             img,
             bmap,
             dst: dst.0.path,
             customization,
+            cancel,
         }
     }
 }
@@ -183,9 +191,6 @@ where
             Ok((img, img_size, bmap))
         };
 
-        let cancel = Arc::new(());
-        let cancel_weak = Arc::downgrade(&cancel);
-
         let customization = self.customization.customization;
         let dst = self.dst;
 
@@ -208,20 +213,15 @@ where
                     .await;
             });
 
-            let resp = bb_flasher_sd::flash(
-                img_resolver,
-                &dst,
-                Some(tx),
-                customization,
-                Some(cancel_weak),
-            )
-            .await;
+            let resp =
+                bb_flasher_sd::flash(img_resolver, &dst, Some(tx), customization, self.cancel)
+                    .await;
 
             t.abort();
 
             resp
         } else {
-            bb_flasher_sd::flash(img_resolver, &dst, None, customization, Some(cancel_weak)).await
+            bb_flasher_sd::flash(img_resolver, &dst, None, customization, self.cancel).await
         }
         .map_err(|e| match e {
             Error::IoError(error) => error,
