@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_flasher::LocalImage>, target, customization)
+//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_flasher::LocalFile>, target, customization)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -45,16 +45,15 @@ use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
-use futures::channel::mpsc;
+pub use img::OsImage;
 
 /// A trait to signify Os Images. Flashers in this crate can take any file as an input that
 /// implements this trait.
-pub trait ImageFile {
+pub trait Resolvable {
+    type ResolvedType: std::io::Read;
+
     /// Get the local path to an image. Network calls can be done here.
-    fn resolve(
-        &self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>>;
+    fn resolve(&self) -> impl Future<Output = std::io::Result<Self::ResolvedType>>;
 }
 
 /// An Os Image present in the local filesystem
@@ -68,12 +67,33 @@ impl LocalImage {
     }
 }
 
-impl ImageFile for LocalImage {
-    fn resolve(
-        &self,
-        _: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>> {
-        std::future::ready(Ok(self.0.clone()))
+impl Resolvable for LocalImage {
+    type ResolvedType = OsImage;
+
+    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+        let p = self.0.clone();
+        tokio::task::spawn_blocking(move || OsImage::from_path(&p))
+            .await
+            .unwrap()
+    }
+}
+
+/// An Os Image present in the local filesystem
+#[derive(Debug, Clone)]
+pub struct LocalFile(Box<Path>);
+
+impl LocalFile {
+    /// Construct a new local image from path.
+    pub const fn new(path: Box<Path>) -> Self {
+        Self(path)
+    }
+}
+
+impl Resolvable for LocalFile {
+    type ResolvedType = std::fs::File;
+
+    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+        std::fs::File::open(&self.0)
     }
 }
 

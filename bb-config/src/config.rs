@@ -78,7 +78,7 @@ pub enum InitFormat {
     /// Sysconfig based customization
     Sysconf,
     /// Armbian base customization
-    Armbian
+    Armbian,
 }
 
 /// Os List can contain multiple types of items depending on the situation.
@@ -151,6 +151,8 @@ pub struct OsImage {
     /// Os Image sha256 (before extraction)
     #[serde(with = "const_hex")]
     pub image_download_sha256: [u8; 32],
+    /// Os Image size after extraction
+    pub extract_size: u64,
     /// Os Image release date
     pub release_date: chrono::NaiveDate,
     /// Devices the Os Image can be used with

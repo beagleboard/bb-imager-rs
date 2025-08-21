@@ -8,7 +8,7 @@ use std::{ffi::CString, fmt::Display, io::Read};
 
 use futures::StreamExt;
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -66,14 +66,14 @@ impl BBFlasherTarget for Target {
 /// [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 /// [MSP430]: https://www.ti.com/product/MSP430F5503
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: Resolvable> {
     img: I,
     port: std::ffi::CString,
 }
 
 impl<I> Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable,
 {
     pub fn new(img: I, port: Target) -> Self {
         Self {
@@ -85,7 +85,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable<ResolvedType = crate::OsImage>,
 {
     async fn flash(
         self,
@@ -93,7 +93,7 @@ where
     ) -> std::io::Result<()> {
         let dst = self.port;
         let img = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
+            let mut img = self.img.resolve().await?;
             let mut data = Vec::new();
             img.read_to_end(&mut data)?;
             data

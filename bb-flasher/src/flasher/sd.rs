@@ -6,7 +6,7 @@
 
 use std::{fmt::Display, io::Read, path::PathBuf, sync::Arc};
 
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
 use futures::StreamExt;
 
 use bb_flasher_sd::Error;
@@ -133,7 +133,7 @@ impl BBFlasher for FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile, B: ImageFile> {
+pub struct Flasher<I: Resolvable, B: Resolvable> {
     img: I,
     bmap: Option<B>,
     dst: PathBuf,
@@ -142,8 +142,8 @@ pub struct Flasher<I: ImageFile, B: ImageFile> {
 
 impl<I, B> Flasher<I, B>
 where
-    I: ImageFile,
-    B: ImageFile,
+    I: Resolvable,
+    B: Resolvable,
 {
     pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
@@ -157,38 +157,27 @@ where
 
 impl<I, B> BBFlasher for Flasher<I, B>
 where
-    I: ImageFile + Send + 'static,
-    B: ImageFile + Send + 'static,
+    I: Resolvable<ResolvedType = crate::OsImage> + Send + 'static,
+    B: Resolvable<ResolvedType = std::fs::File> + Send + 'static,
 {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
-        let chan_clone = chan.clone();
         let img = self.img;
         let bmap = self.bmap;
 
-        let img_resolver = move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_time()
-                .enable_io()
-                .build()
-                .unwrap();
-            let chan_clone_1 = chan_clone.clone();
+        let img_resolver = async move || {
             let bmap = match bmap {
                 Some(x) => {
-                    let mut f =
-                        rt.block_on(
-                            async move { crate::img::OsImage::open(x, chan_clone_1).await },
-                        )?;
+                    let mut f = x.resolve().await?;
                     let mut data = String::new();
                     f.read_to_string(&mut data)?;
-                    Some(data)
+                    Some(data.into())
                 }
                 None => None,
             };
-            let img =
-                rt.block_on(async move { crate::img::OsImage::open(img, chan_clone).await })?;
+            let img = img.resolve().await?;
             let img_size = img.size();
 
             Ok((img, img_size, bmap))
@@ -200,41 +189,41 @@ where
         let customization = self.customization.customization;
         let dst = self.dst;
 
-        let flash_thread = if let Some(chan) = chan {
+        if let Some(chan) = chan {
             let (tx, rx) = futures::channel::mpsc::channel(20);
 
-            let flash_thread = std::thread::spawn(move || {
-                bb_flasher_sd::flash(
-                    img_resolver,
-                    &dst,
-                    Some(tx),
-                    customization,
-                    Some(cancel_weak),
-                )
+            let t = tokio::spawn(async move {
+                // Should run until tx is dropped, i.e. flasher task is done.
+                // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
+                let _ = rx
+                    .map(|x| {
+                        if x == 0.0 {
+                            DownloadFlashingStatus::Preparing
+                        } else {
+                            DownloadFlashingStatus::FlashingProgress(x)
+                        }
+                    })
+                    .map(Ok)
+                    .forward(chan)
+                    .await;
             });
 
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            let _ = rx
-                .map(|x| {
-                    if x == 0.0 {
-                        DownloadFlashingStatus::Preparing
-                    } else {
-                        DownloadFlashingStatus::FlashingProgress(x)
-                    }
-                })
-                .map(Ok)
-                .forward(chan)
-                .await;
+            let resp = bb_flasher_sd::flash(
+                img_resolver,
+                &dst,
+                Some(tx),
+                customization,
+                Some(cancel_weak),
+            )
+            .await;
 
-            flash_thread
+            t.abort();
+
+            resp
         } else {
-            std::thread::spawn(move || {
-                bb_flasher_sd::flash(img_resolver, &dst, None, customization, Some(cancel_weak))
-            })
-        };
-
-        flash_thread.join().unwrap().map_err(|e| match e {
+            bb_flasher_sd::flash(img_resolver, &dst, None, customization, Some(cancel_weak)).await
+        }
+        .map_err(|e| match e {
             Error::IoError(error) => error,
             _ => std::io::Error::other(e),
         })

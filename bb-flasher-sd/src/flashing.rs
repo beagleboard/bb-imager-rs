@@ -23,6 +23,7 @@ fn reader_task(
 ) -> Result<()> {
     while let Ok(mut buf) = buf_rx.recv() {
         let count = read_aligned(&mut img, buf.as_mut_slice())?;
+        tracing::info!("Read: {}", count);
         if count == 0 {
             break;
         }
@@ -199,8 +200,8 @@ fn write_sd(
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub fn flash<R: Read + Send + 'static>(
-    img_resolver: impl FnOnce() -> std::io::Result<(R, u64, Option<String>)>,
+pub async fn flash<R: Read + Send + 'static>(
+    img_resolver: impl AsyncFnOnce() -> std::io::Result<(R, u64, Option<Box<str>>)>,
     dst: &Path,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -212,14 +213,23 @@ pub fn flash<R: Read + Send + 'static>(
         }
     }
 
-    let sd = crate::pal::open(dst)?;
+    tracing::info!("Opening Destination");
+    let dst_clone = dst.to_path_buf();
+    let sd = tokio::task::spawn_blocking(move || crate::pal::open(&dst_clone))
+        .await
+        .unwrap()?;
 
-    let (img, img_size, bmap) = img_resolver()?;
+    tracing::info!("Resolving Image");
+    let (img, img_size, bmap) = img_resolver().await?;
     let bmap = match bmap {
         Some(x) => Some(bmap_parser::Bmap::from_xml(&x).map_err(|_| crate::Error::InvalidBmap)?),
         None => None,
     };
-    flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
+    tokio::task::spawn_blocking(move || {
+        flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
+    })
+    .await
+    .unwrap()
 }
 
 fn flash_internal(
@@ -235,15 +245,18 @@ fn flash_internal(
 
     let mut sd = crate::helpers::SdCardWrapper::new(sd);
 
+    tracing::info!("Writing to SD Card");
     write_sd(img, img_size, bmap, &mut sd, chan.as_mut(), cancel.clone())?;
 
     check_arc(cancel.as_ref())?;
 
+    tracing::info!("Applying customization");
     if let Some(c) = customization {
         let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
         c.customize(temp)?;
     }
 
+    tracing::info!("Ejecting SD Card");
     let _ = sd.eject();
 
     Ok(())

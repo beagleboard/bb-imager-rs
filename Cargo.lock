@@ -521,6 +521,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-util",
  "tracing",
  "zbus 5.8.0",
 ]
