@@ -22,7 +22,6 @@ fn reader_task(
 ) -> Result<()> {
     while let Ok(mut buf) = buf_rx.recv() {
         let count = read_aligned(&mut img, buf.as_mut_slice())?;
-        tracing::info!("Read: {}", count);
         if count == 0 {
             break;
         }

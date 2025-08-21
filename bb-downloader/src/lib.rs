@@ -234,11 +234,11 @@ impl Downloader {
     /// download to finish to use the partial file.
     ///
     /// Uses SHA256 to verify that the file in cache is valid.
-    pub async fn download_with_sha_and_pipe<U: reqwest::IntoUrl>(
+    pub async fn download_to_stream<U: reqwest::IntoUrl>(
         self,
         url: U,
         sha256: [u8; 32],
-        writer: &mut tokio::io::WriteHalf<tokio::io::SimplexStream>,
+        mut writer: bb_helper::file_stream::WriterFileStream,
     ) -> io::Result<()> {
         let url = url.into_url().map_err(io::Error::other)?;
         tracing::debug!(
@@ -249,9 +249,8 @@ impl Downloader {
 
         let file_path = self.path_from_sha(sha256);
 
-        let mut file = AsyncTempFile::new()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file.0);
+            let mut file = tokio::io::BufWriter::new(&mut writer);
 
             let response = self
                 .client
@@ -268,7 +267,6 @@ impl Downloader {
                 tracing::debug!("Got buf");
                 let mut data = x.map_err(io::Error::other)?;
                 hasher.update(&data);
-                writer.write_all(&data).await?;
                 file.write_all_buf(&mut data).await?;
             }
 
@@ -293,7 +291,7 @@ impl Downloader {
         }
 
         tracing::info!("Saving donwloaded file to disk");
-        file.persist(&file_path).await
+        writer.persist(&file_path).await
     }
 
     /// Checks if the file is present in cache. If the file is present, returns path to it. Else
@@ -444,5 +442,11 @@ impl AsyncTempFile {
         f.flush().await?;
 
         Ok(())
+    }
+}
+
+impl From<std::fs::File> for AsyncTempFile {
+    fn from(value: std::fs::File) -> Self {
+        Self(tokio::fs::File::from_std(value))
     }
 }

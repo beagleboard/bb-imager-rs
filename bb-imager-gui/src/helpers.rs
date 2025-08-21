@@ -8,7 +8,6 @@ use iced::{
     widget::{self, Column, progress_bar, text},
 };
 use iced_loading::Linear;
-use tokio::io::AsyncWriteExt;
 use url::Url;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -392,8 +391,6 @@ impl bb_flasher::Resolvable for RemoteImage {
     type ResolvedType = bb_flasher::OsImage;
 
     async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
-        const BUF_LEN: usize = 2 * 1024 * 1024;
-
         if let Some(path) = self
             .downloader
             .check_cache_from_sha(self.extract_sha256)
@@ -402,18 +399,17 @@ impl bb_flasher::Resolvable for RemoteImage {
             tracing::info!("Found the remote image in cache");
             bb_flasher::OsImage::from_path(&path)
         } else {
-            let (rx, mut tx) = tokio::io::simplex(BUF_LEN);
+            let (tx, rx) = bb_helper::file_stream::file_stream()?;
             let downloader = self.downloader.clone();
             let url = self.url.clone();
             let sha = self.extract_sha256;
             tokio::spawn(async move {
-                downloader
-                    .download_with_sha_and_pipe(*url, sha, &mut tx)
-                    .await
-                    .unwrap();
-                tx.shutdown().await.unwrap();
+                downloader.download_to_stream(*url, sha, tx).await.unwrap();
             });
-            bb_flasher::OsImage::from_piped(rx, self.extract_size).await
+            let extract_size = self.extract_size;
+            tokio::task::spawn_blocking(move || bb_flasher::OsImage::from_piped(rx, extract_size))
+                .await
+                .unwrap()
         }
     }
 }
