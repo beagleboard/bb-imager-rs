@@ -126,28 +126,6 @@
 			]
 		},
 		{
-			"name": "MSP430 Firmware",
-			"description": "Firmware for the built-in USB to UART Bridge",
-			"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-			"flasher": "Msp430Usb",
-			"subitems": [
-				{
-					"name": "USB To UART Bridge",
-					"description": "MSP430 USB to UART firmware with Windows Support",
-					"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-					"url": "https://openbeagle.org/beagleconnect/msp430/usb_uart_bridge/-/jobs/38525/artifacts/raw/usb_uart_bridge.hex?inline=false",
-					"release_date": "2024-09-19",
-					"image_download_sha256": "d4bbffd365b50f35adeee91787d50b8bd13717b8cd65e2e16cab81f82ac01e42",
-					"devices": [
-						"beagleconnect-freedom"
-					],
-					"tags": [
-						"freertos"
-					]
-				}
-			]
-		},
-		{
 			"name": "MSPM0 Firmware",
 			"description": "Firmware for internal MSPM0L1105",
 			"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
