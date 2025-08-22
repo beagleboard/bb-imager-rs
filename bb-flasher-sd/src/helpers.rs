@@ -14,9 +14,9 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
 }
 
-pub(crate) fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
+pub(crate) fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
     match cancel {
-        Some(x) if x.strong_count() == 0 => Err(crate::Error::Aborted),
+        Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),
         _ => Ok(()),
     }
 }

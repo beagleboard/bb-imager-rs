@@ -28,6 +28,8 @@ serde_json = { version = "1.0.139" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", features = ["json"] }
 bb-config = { path = "../bb-config" }
+bb-helper = { path = "../bb-helper", features = ["file_stream"] }
+tokio-util = { version = "0.7" }
 
 [build-dependencies]
 embed-resource = "3.0"

@@ -17,7 +17,7 @@ cfg_if::cfg_if! {
 use std::collections::HashSet;
 use std::io::Read;
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -60,14 +60,14 @@ impl std::fmt::Display for Target {
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 /// [MSPM0L1105]: https://www.ti.com/product/MSPM0L1105
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: Resolvable> {
     img: I,
     persist_eeprom: bool,
 }
 
 impl<I> Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable,
 {
     pub const fn new(img: I, persist_eeprom: bool) -> Self {
         Self {
@@ -79,20 +79,34 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)>,
 {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
         let bin = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
+            let mut tasks = tokio::task::JoinSet::new();
+            let (mut img, _) = self.img.resolve(&mut tasks).await?;
 
-            let mut data = String::new();
-            img.read_to_string(&mut data)?;
-            data.parse().map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
-            })?
+            let resp = tokio::task::spawn_blocking(move || {
+                let mut data = String::new();
+                img.read_to_string(&mut data)?;
+                data.parse().map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
+                })
+            })
+            .await
+            .unwrap()?;
+
+            while let Some(t) = tasks.join_next().await {
+                if let Err(e) = t.unwrap() {
+                    tasks.abort_all();
+                    return Err(e);
+                }
+            }
+
+            resp
         };
 
         flash(bin, chan, self.persist_eeprom)

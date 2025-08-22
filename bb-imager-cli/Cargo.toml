@@ -17,6 +17,7 @@ url = "2.5.4"
 const-hex = "1.14"
 clap_complete = "4.5"
 futures = "0.3"
+bb-helper = { path = "../bb-helper", features = ["resolvable"] }
 
 [features]
 default = []

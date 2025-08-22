@@ -1,14 +1,8 @@
-use std::{
-    borrow::Cow,
-    fmt::Display,
-    path::{Path, PathBuf},
-    sync::LazyLock,
-};
+use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
-use futures::StreamExt;
 use iced::{
     Color, Length, futures,
     widget::{self, Column, progress_bar, text},
@@ -324,6 +318,7 @@ impl BoardImage {
                 image.name.into(),
                 Box::new(image.url),
                 image.image_download_sha256,
+                image.extract_size,
                 downloader.clone(),
             )
             .into(),
@@ -370,45 +365,69 @@ pub(crate) struct RemoteImage {
     name: Box<str>,
     url: Box<url::Url>,
     extract_sha256: [u8; 32],
+    extract_size: u64,
     downloader: bb_downloader::Downloader,
 }
 
 impl RemoteImage {
-    pub(crate) const fn new(
+    pub(crate) fn new(
         name: Box<str>,
         url: Box<url::Url>,
         extract_sha256: [u8; 32],
+        extract_size: u64,
         downloader: bb_downloader::Downloader,
     ) -> Self {
         Self {
             name,
             url,
             extract_sha256,
+            extract_size,
             downloader,
         }
     }
 }
 
-impl bb_flasher::ImageFile for RemoteImage {
+impl bb_flasher::Resolvable for RemoteImage {
+    type ResolvedType = (bb_flasher::OsImage, u64);
+
     async fn resolve(
         &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
-        let (tx, rx) = futures::channel::mpsc::channel(20);
-
-        if let Some(chan) = chan {
-            tokio::spawn(async move {
-                rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .map(Ok)
-                    .forward(chan)
-                    .await
-            });
-        }
-
-        self.downloader
-            .download_with_sha(*self.url.clone(), self.extract_sha256, Some(tx))
+        rt: &mut tokio::task::JoinSet<std::io::Result<()>>,
+    ) -> std::io::Result<Self::ResolvedType> {
+        if let Some(path) = self
+            .downloader
+            .check_cache_from_sha(self.extract_sha256)
             .await
-            .map(Into::into)
+        {
+            tracing::info!("Found the remote image in cache");
+            Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size))
+        } else {
+            tracing::info!("Remote image not found in cache. Downloading");
+            let (tx, rx) = bb_helper::file_stream::file_stream()?;
+            let downloader = self.downloader.clone();
+            let url = self.url.clone();
+            let sha = self.extract_sha256;
+            rt.spawn(async move {
+                downloader
+                    .download_to_stream(*url, sha, tx)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error while downloading Os Image: {e}");
+                        tracing::error!("{}", &msg);
+                        std::io::Error::other(msg)
+                    })?;
+                tracing::info!("Image download finished");
+                Ok(())
+            });
+
+            let extract_size = self.extract_size;
+            let img = tokio::task::spawn_blocking(move || {
+                bb_flasher::OsImage::from_piped(rx, extract_size)
+            })
+            .await
+            .unwrap()?;
+            Ok((img, self.extract_size))
+        }
     }
 }
 
@@ -424,26 +443,16 @@ pub(crate) struct Bmap {
     downloader: bb_downloader::Downloader,
 }
 
-impl bb_flasher::ImageFile for Bmap {
+impl bb_flasher::Resolvable for Bmap {
+    type ResolvedType = Box<str>;
+
     async fn resolve(
         &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
-        let (tx, rx) = futures::channel::mpsc::channel(20);
+        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
+    ) -> std::io::Result<Self::ResolvedType> {
+        let p = self.downloader.download(*self.url.clone(), None).await?;
 
-        if let Some(chan) = chan {
-            tokio::spawn(async move {
-                rx.map(DownloadFlashingStatus::DownloadingProgress)
-                    .map(Ok)
-                    .forward(chan)
-                    .await
-            });
-        }
-
-        self.downloader
-            .download(*self.url.clone(), Some(tx))
-            .await
-            .map(Into::into)
+        tokio::fs::read_to_string(p).await.map(Into::into)
     }
 }
 
@@ -453,14 +462,16 @@ pub(crate) enum SelectedImage {
     RemoteImage(RemoteImage),
 }
 
-impl bb_flasher::ImageFile for SelectedImage {
+impl bb_flasher::Resolvable for SelectedImage {
+    type ResolvedType = (bb_flasher::OsImage, u64);
+
     async fn resolve(
         &self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Box<Path>> {
+        rt: &mut tokio::task::JoinSet<std::io::Result<()>>,
+    ) -> std::io::Result<Self::ResolvedType> {
         match self {
-            SelectedImage::LocalImage(x) => x.resolve(chan).await,
-            SelectedImage::RemoteImage(x) => x.resolve(chan).await,
+            SelectedImage::LocalImage(x) => x.resolve(rt).await,
+            SelectedImage::RemoteImage(x) => x.resolve(rt).await,
         }
     }
 }
@@ -491,6 +502,7 @@ pub(crate) async fn flash(
     customization: FlashingCustomization,
     dst: Option<Destination>,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+    cancel: tokio_util::sync::CancellationToken,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
         (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
@@ -503,7 +515,7 @@ pub(crate) async fn flash(
             FlashingCustomization::LinuxSdSysconfig(customization),
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into())
+            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into(), Some(cancel))
                 .flash(Some(chan))
                 .await
         }
@@ -512,7 +524,7 @@ pub(crate) async fn flash(
             FlashingCustomization::NoneSd,
             Some(Destination::SdCard(t)),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none())
+            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none(), Some(cancel))
                 .flash(Some(chan))
                 .await
         }

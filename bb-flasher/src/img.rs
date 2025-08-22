@@ -1,32 +1,25 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use crate::{DownloadFlashingStatus, ImageFile};
-use futures::channel::mpsc;
+use bb_helper::file_stream::ReaderFileStream;
 use std::{
-    io::{Read, Seek},
+    io::{Read, Seek, SeekFrom},
     path::Path,
 };
 
-pub(crate) struct OsImage {
+pub struct OsImage {
     size: u64,
     img: OsImageReader,
 }
 
 pub(crate) enum OsImageReader {
     Xz(liblzma::read::XzDecoder<std::fs::File>),
+    XzPiped(liblzma::read::XzDecoder<ReaderFileStream>),
     Uncompressed(std::io::BufReader<std::fs::File>),
+    UncompressedPiped(std::io::BufReader<ReaderFileStream>),
 }
 
 impl OsImage {
-    pub(crate) async fn open(
-        img: impl ImageFile,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<Self> {
-        let img_path = img.resolve(chan).await?;
-        Self::from_path(&img_path)
-    }
-
-    pub(crate) fn from_path(path: &Path) -> std::io::Result<Self> {
+    pub fn from_path(path: &Path) -> std::io::Result<Self> {
         let mut file = std::fs::File::open(path)?;
 
         let mut magic = [0u8; 6];
@@ -57,6 +50,23 @@ impl OsImage {
         }
     }
 
+    pub fn from_piped(mut img: ReaderFileStream, size: u64) -> std::io::Result<Self> {
+        let mut magic = [0u8; 6];
+        img.read_exact(&mut magic)?;
+        img.seek(SeekFrom::Start(0))?;
+
+        match magic {
+            [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => Ok(Self {
+                size,
+                img: OsImageReader::XzPiped(liblzma::read::XzDecoder::new_parallel(img)),
+            }),
+            _ => Ok(Self {
+                size,
+                img: OsImageReader::UncompressedPiped(std::io::BufReader::new(img)),
+            }),
+        }
+    }
+
     pub(crate) const fn size(&self) -> u64 {
         self.size
     }
@@ -67,6 +77,8 @@ impl std::io::Read for OsImage {
         match &mut self.img {
             OsImageReader::Xz(x) => x.read(buf),
             OsImageReader::Uncompressed(x) => x.read(buf),
+            OsImageReader::XzPiped(x) => x.read(buf),
+            OsImageReader::UncompressedPiped(x) => x.read(buf),
         }
     }
 }

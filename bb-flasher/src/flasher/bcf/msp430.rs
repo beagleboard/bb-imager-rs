@@ -8,7 +8,7 @@ use std::{ffi::CString, fmt::Display, io::Read};
 
 use futures::StreamExt;
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -66,14 +66,14 @@ impl BBFlasherTarget for Target {
 /// [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 /// [MSP430]: https://www.ti.com/product/MSP430F5503
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: Resolvable> {
     img: I,
     port: std::ffi::CString,
 }
 
 impl<I> Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable,
 {
     pub fn new(img: I, port: Target) -> Self {
         Self {
@@ -85,7 +85,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)>,
 {
     async fn flash(
         self,
@@ -93,10 +93,25 @@ where
     ) -> std::io::Result<()> {
         let dst = self.port;
         let img = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
-            let mut data = Vec::new();
-            img.read_to_end(&mut data)?;
-            data
+            let mut tasks = tokio::task::JoinSet::new();
+            let (mut img, _) = self.img.resolve(&mut tasks).await?;
+
+            let resp = tokio::task::spawn_blocking(move || {
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)?;
+                Ok::<Vec<u8>, std::io::Error>(data)
+            })
+            .await
+            .unwrap()?;
+
+            while let Some(t) = tasks.join_next().await {
+                if let Err(e) = t.unwrap() {
+                    tasks.abort_all();
+                    return Err(e);
+                }
+            }
+
+            resp
         };
 
         let flasher_task = if let Some(chan) = chan {

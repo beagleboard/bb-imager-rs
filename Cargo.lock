@@ -483,6 +483,7 @@ dependencies = [
 name = "bb-downloader"
 version = "0.2.0"
 dependencies = [
+ "bb-helper",
  "const-hex",
  "futures",
  "reqwest",
@@ -513,6 +514,7 @@ dependencies = [
  "bb-flasher-bcf",
  "bb-flasher-pb2-mspm0",
  "bb-flasher-sd",
+ "bb-helper",
  "bin_file",
  "cfg-if",
  "futures",
@@ -521,6 +523,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-util",
  "tracing",
  "zbus 5.8.0",
 ]
@@ -553,6 +556,7 @@ name = "bb-flasher-sd"
 version = "1.0.0"
 dependencies = [
  "bb-drivelist",
+ "bb-helper",
  "bmap-parser",
  "fatfs",
  "fscommon",
@@ -565,9 +569,18 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-util",
  "tracing",
  "udisks2",
  "windows 0.61.3",
+]
+
+[[package]]
+name = "bb-helper"
+version = "0.0.12"
+dependencies = [
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -575,6 +588,7 @@ name = "bb-imager-cli"
 version = "0.0.12"
 dependencies = [
  "bb-flasher",
+ "bb-helper",
  "clap",
  "clap_complete",
  "console",
@@ -593,6 +607,7 @@ dependencies = [
  "bb-config",
  "bb-downloader",
  "bb-flasher",
+ "bb-helper",
  "directories",
  "embed-resource",
  "iced",
@@ -606,6 +621,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "url",

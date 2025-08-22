@@ -278,6 +278,8 @@ impl BBImager {
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
 
+        let cancel = tokio_util::sync::CancellationToken::new();
+
         let s = iced::stream::channel(20, move |mut chan| async move {
             let _ = chan
                 .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
@@ -285,14 +287,17 @@ impl BBImager {
 
             let (tx, mut rx) = iced::futures::channel::mpsc::channel(19);
 
-            let flash_task =
-                tokio::spawn(async move { helpers::flash(img, customization, dst, tx).await });
+            let cancel_child = cancel.child_token();
+            let flash_task = tokio::spawn(async move {
+                helpers::flash(img, customization, dst, tx, cancel_child).await
+            });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::spawn(async move {
                 while let Some(progress) = rx.next().await {
                     let _ = chan_clone.try_send(BBImagerMessage::ProgressBar(progress.into()));
                 }
             });
+            let _guard = cancel.drop_guard();
 
             let res = flash_task
                 .await

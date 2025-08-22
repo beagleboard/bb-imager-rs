@@ -94,6 +94,7 @@ impl Downloader {
 
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(15))
             .build()
             .expect("Unsupported OS");
 
@@ -228,6 +229,70 @@ impl Downloader {
 
         file.persist(&file_path).await?;
         Ok(file_path)
+    }
+
+    /// Downloads the file and streams the content to pipe. This allows not having to wait for the
+    /// download to finish to use the partial file.
+    ///
+    /// Uses SHA256 to verify that the file in cache is valid.
+    pub async fn download_to_stream<U: reqwest::IntoUrl>(
+        self,
+        url: U,
+        sha256: [u8; 32],
+        mut writer: bb_helper::file_stream::WriterFileStream,
+    ) -> io::Result<()> {
+        let url = url.into_url().map_err(io::Error::other)?;
+        tracing::debug!(
+            "Download {:?} with sha256: {:?}",
+            url,
+            const_hex::encode(sha256)
+        );
+
+        let file_path = self.path_from_sha(sha256);
+
+        {
+            let mut file = tokio::io::BufWriter::new(&mut writer);
+
+            let response = self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(io::Error::other)?;
+
+            let mut response_stream = response.bytes_stream();
+
+            let mut hasher = Sha256::new();
+
+            while let Some(x) = response_stream.next().await {
+                tracing::debug!("Got buf");
+                let mut data = x.map_err(io::Error::other)?;
+                hasher.update(&data);
+                file.write_all_buf(&mut data).await?;
+            }
+
+            let hash: [u8; 32] = hasher
+                .finalize()
+                .as_slice()
+                .try_into()
+                .expect("SHA-256 is 32 bytes");
+
+            if hash != sha256 {
+                tracing::error!(
+                    "Expected SHA256: {}, got {}",
+                    const_hex::encode(sha256),
+                    const_hex::encode(hash)
+                );
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Invalid SHA256",
+                ));
+            }
+            file.flush().await?;
+        }
+
+        tracing::info!("Saving donwloaded file to disk");
+        writer.persist(&file_path).await
     }
 
     /// Checks if the file is present in cache. If the file is present, returns path to it. Else
@@ -378,5 +443,11 @@ impl AsyncTempFile {
         f.flush().await?;
 
         Ok(())
+    }
+}
+
+impl From<std::fs::File> for AsyncTempFile {
+    fn from(value: std::fs::File) -> Self {
+        Self(tokio::fs::File::from_std(value))
     }
 }

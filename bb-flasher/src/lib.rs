@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_flasher::LocalImage>, target, customization)
+//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_helper::resolvable::LocalStringFile>, target, customization, None)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -43,19 +43,10 @@ mod img;
 
 use std::path::Path;
 
+pub use bb_helper::resolvable::Resolvable;
 pub use common::*;
 pub use flasher::*;
-use futures::channel::mpsc;
-
-/// A trait to signify Os Images. Flashers in this crate can take any file as an input that
-/// implements this trait.
-pub trait ImageFile {
-    /// Get the local path to an image. Network calls can be done here.
-    fn resolve(
-        &self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>>;
-}
+pub use img::OsImage;
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
@@ -68,12 +59,20 @@ impl LocalImage {
     }
 }
 
-impl ImageFile for LocalImage {
-    fn resolve(
+impl Resolvable for LocalImage {
+    type ResolvedType = (OsImage, u64);
+
+    async fn resolve(
         &self,
-        _: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<Box<Path>>> {
-        std::future::ready(Ok(self.0.clone()))
+        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
+    ) -> std::io::Result<Self::ResolvedType> {
+        let p = self.0.clone();
+        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
+            .await
+            .unwrap()?;
+        let size = img.size();
+
+        Ok((img, size))
     }
 }
 

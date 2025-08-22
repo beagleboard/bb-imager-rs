@@ -5,7 +5,7 @@
 
 use std::{fmt::Display, io::Read, sync::Arc};
 
-use crate::{BBFlasher, BBFlasherTarget, ImageFile};
+use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 use bb_flasher_bcf::cc1352p7::Error;
 use futures::StreamExt;
 
@@ -54,7 +54,7 @@ impl Display for Target {
 /// - iHex
 /// - xz: Xz compressed files for any of the above
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Flasher<I: ImageFile> {
+pub struct Flasher<I: Resolvable> {
     img: I,
     port: String,
     verify: bool,
@@ -62,7 +62,7 @@ pub struct Flasher<I: ImageFile> {
 
 impl<I> Flasher<I>
 where
-    I: ImageFile,
+    I: Resolvable,
 {
     pub fn new(img: I, port: Target, verify: bool) -> Self {
         Self {
@@ -75,7 +75,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: ImageFile + Clone + Sync,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Sync,
 {
     async fn flash(
         self,
@@ -87,10 +87,25 @@ where
         let port = self.port;
         let verify = self.verify;
         let img = {
-            let mut img = crate::img::OsImage::open(self.img, chan.clone()).await?;
-            let mut data = Vec::new();
-            img.read_to_end(&mut data)?;
-            data
+            let mut tasks = tokio::task::JoinSet::new();
+            let (mut img, _) = self.img.resolve(&mut tasks).await?;
+
+            let resp = tokio::task::spawn_blocking(move || {
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)?;
+                Ok::<Vec<u8>, std::io::Error>(data)
+            })
+            .await
+            .unwrap()?;
+
+            while let Some(t) = tasks.join_next().await {
+                if let Err(e) = t.unwrap() {
+                    tasks.abort_all();
+                    return Err(e);
+                }
+            }
+
+            resp
         };
 
         let flasher_task = if let Some(chan) = chan {

@@ -1,13 +1,12 @@
 use std::io::{Read, Seek, Write};
 use std::path::Path;
-use std::sync::Weak;
 use std::time::Instant;
 
 use futures::channel::mpsc;
 
 use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_arc, progress};
+use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_token, progress};
 
 // Stack overflow occurs during debug since box moves data from stack to heap in debug builds
 #[cfg(not(debug_assertions))]
@@ -19,7 +18,7 @@ fn reader_task(
     mut img: impl Read,
     buf_rx: std::sync::mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     buf_tx: std::sync::mpsc::SyncSender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
-    cancel: Option<Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     while let Ok(mut buf) = buf_rx.recv() {
         let count = read_aligned(&mut img, buf.as_mut_slice())?;
@@ -27,8 +26,10 @@ fn reader_task(
             break;
         }
 
-        buf_tx.send((buf, count)).unwrap();
-        check_arc(cancel.as_ref())?;
+        buf_tx
+            .send((buf, count))
+            .map_err(|_| crate::Error::WriterClosed)?;
+        check_token(cancel.as_ref())?;
     }
 
     Ok(())
@@ -45,7 +46,7 @@ fn writer_task_bmap(
     mut chan: Option<&mut mpsc::Sender<f32>>,
     buf_rx: std::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: std::sync::mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
-    cancel: Option<Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     let mut pos = 0;
     let (mut buf, mut count) = buf_rx.recv().unwrap();
@@ -72,7 +73,7 @@ fn writer_task_bmap(
                 chan.as_mut().map_or(None, |p| Some(p)),
                 progress(bytes_written, img_size),
             );
-            check_arc(cancel.as_ref())?;
+            check_token(cancel.as_ref())?;
 
             match buf_rx.recv() {
                 Ok((x, y)) => {
@@ -94,7 +95,7 @@ fn writer_task(
     mut chan: Option<&mut mpsc::Sender<f32>>,
     buf_rx: std::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: std::sync::mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
-    cancel: Option<Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     let mut pos = 0u64;
 
@@ -110,7 +111,7 @@ fn writer_task(
         );
 
         let _ = buf_tx.send(buf);
-        check_arc(cancel.as_ref())?;
+        check_token(cancel.as_ref())?;
     }
 
     sd.flush().map_err(Into::into)
@@ -140,12 +141,12 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 }
 
 fn write_sd(
-    img: impl Read + Send + 'static,
+    img: impl Read + Send,
     img_size: u64,
     bmap: Option<bmap_parser::Bmap>,
     sd: impl Write + Seek,
     chan: Option<&mut mpsc::Sender<f32>>,
-    cancel: Option<Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     const NUM_BUFFERS: usize = 4;
 
@@ -158,17 +159,18 @@ fn write_sd(
         tx1.send(Box::new(DirectIoBuffer::new())).unwrap();
     }
 
-    let cancle_clone = cancel.clone();
-    let handle = std::thread::spawn(move || reader_task(img, rx1, tx2, cancle_clone));
+    std::thread::scope(|s| {
+        let cancle_clone = cancel.clone();
+        let handle = s.spawn(move || reader_task(img, rx1, tx2, cancle_clone));
 
-    match bmap {
-        Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
-        None => writer_task(img_size, sd, chan, rx2, tx1, cancel),
-    }?;
+        match bmap {
+            Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
+            None => writer_task(img_size, sd, chan, rx2, tx1, cancel),
+        }?;
+        tracing::info!("Total Time taken: {:?}", global_start.elapsed());
 
-    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
-
-    handle.join().unwrap()
+        handle.join().unwrap()
+    })
 }
 
 /// Flash OS image to SD card.
@@ -199,51 +201,82 @@ fn write_sd(
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub fn flash<R: Read + Send + 'static>(
-    img_resolver: impl FnOnce() -> std::io::Result<(R, u64, Option<String>)>,
-    dst: &Path,
+pub async fn flash<R: Read + Send + 'static>(
+    img: impl bb_helper::resolvable::Resolvable<ResolvedType = (R, u64)>,
+    bmap: Option<impl bb_helper::resolvable::Resolvable<ResolvedType = Box<str>>>,
+    dst: Box<Path>,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
-    cancel: Option<Weak<()>>,
-) -> Result<()> {
+    cancel: Option<tokio_util::sync::CancellationToken>,
+) -> std::io::Result<()> {
     if let Some(x) = &customization {
         if !x.validate() {
-            return Err(crate::Error::InvalidCustomizaton);
+            return Err(crate::Error::InvalidCustomizaton.into());
         }
     }
 
-    let sd = crate::pal::open(dst)?;
+    tracing::info!("Opening Destination");
+    let dst_clone = dst.to_path_buf();
+    let sd = tokio::task::spawn_blocking(move || crate::pal::open(&dst_clone))
+        .await
+        .unwrap()?;
 
-    let (img, img_size, bmap) = img_resolver()?;
+    let mut tasks = tokio::task::JoinSet::new();
+
+    tracing::info!("Resolving Image");
     let bmap = match bmap {
-        Some(x) => Some(bmap_parser::Bmap::from_xml(&x).map_err(|_| crate::Error::InvalidBmap)?),
+        Some(x) => Some(
+            bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
+                .map_err(|_| crate::Error::InvalidBmap)?,
+        ),
         None => None,
     };
-    flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
+    let (img, img_size) = img.resolve(&mut tasks).await?;
+
+    let cancel_child = cancel.as_ref().map(|x| x.child_token());
+    tasks.spawn_blocking(move || {
+        flash_internal(img, img_size, bmap, sd, chan, customization, cancel_child)
+            .map_err(Into::into)
+    });
+
+    // Cancel all tasks on drop
+    let _drop_guard = cancel.map(|x| x.drop_guard());
+
+    while let Some(t) = tasks.join_next().await {
+        if let Err(e) = t.unwrap() {
+            tasks.abort_all();
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
 
 fn flash_internal(
-    img: impl Read + Send + 'static,
+    img: impl Read + Send,
     img_size: u64,
     bmap: Option<bmap_parser::Bmap>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
-    cancel: Option<Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     chan_send(chan.as_mut(), 0.0);
 
     let mut sd = crate::helpers::SdCardWrapper::new(sd);
 
+    tracing::info!("Writing to SD Card");
     write_sd(img, img_size, bmap, &mut sd, chan.as_mut(), cancel.clone())?;
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
 
+    tracing::info!("Applying customization");
     if let Some(c) = customization {
         let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
         c.customize(temp)?;
     }
 
+    tracing::info!("Ejecting SD Card");
     let _ = sd.eject();
 
     Ok(())
