@@ -1,6 +1,7 @@
 mod cli;
 
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalFile, LocalImage};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
+use bb_helper::resolvable::LocalStringFile;
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use futures::StreamExt;
@@ -138,7 +139,7 @@ async fn flash_internal(
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img),
-                bmap.map(LocalFile::new),
+                bmap.map(LocalStringFile::new),
                 dst.try_into().unwrap(),
                 customization,
                 None,

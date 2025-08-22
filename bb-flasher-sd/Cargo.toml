@@ -22,6 +22,7 @@ gpt = "4.1"
 bmap-parser = "0.2"
 tokio = { version = "1.46", default-features = false, features = ["rt-multi-thread"] }
 tokio-util = { version = "0.7" }
+bb-helper = { path = "../bb-helper", features = ["resolvable"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }

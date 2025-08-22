@@ -25,7 +25,7 @@ zbus = { version = "5.8", default-features = false, features = ["tokio"], option
 bin_file = { version = "0.1", optional = true }
 cfg-if = "1.0"
 tokio-util = { version = "0.7" }
-bb-helper = { path = "../bb-helper" }
+bb-helper = { path = "../bb-helper", features = ["file_stream", "resolvable"] }
 
 [dev-dependencies]
 tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }

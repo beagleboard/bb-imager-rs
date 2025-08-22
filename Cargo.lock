@@ -556,6 +556,7 @@ name = "bb-flasher-sd"
 version = "1.0.0"
 dependencies = [
  "bb-drivelist",
+ "bb-helper",
  "bmap-parser",
  "fatfs",
  "fscommon",
@@ -587,6 +588,7 @@ name = "bb-imager-cli"
 version = "0.0.12"
 dependencies = [
  "bb-flasher",
+ "bb-helper",
  "clap",
  "clap_complete",
  "console",

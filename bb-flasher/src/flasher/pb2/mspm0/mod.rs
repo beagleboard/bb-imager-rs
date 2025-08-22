@@ -79,20 +79,34 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Resolvable<ResolvedType = crate::OsImage>,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)>,
 {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
         let bin = {
-            let mut img = self.img.resolve().await?;
+            let mut tasks = tokio::task::JoinSet::new();
+            let (mut img, _) = self.img.resolve(&mut tasks).await?;
 
-            let mut data = String::new();
-            img.read_to_string(&mut data)?;
-            data.parse().map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
-            })?
+            let resp = tokio::task::spawn_blocking(move || {
+                let mut data = String::new();
+                img.read_to_string(&mut data)?;
+                data.parse().map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
+                })
+            })
+            .await
+            .unwrap()?;
+
+            while let Some(t) = tasks.join_next().await {
+                if let Err(e) = t.unwrap() {
+                    tasks.abort_all();
+                    return Err(e);
+                }
+            }
+
+            resp
         };
 
         flash(bin, chan, self.persist_eeprom)

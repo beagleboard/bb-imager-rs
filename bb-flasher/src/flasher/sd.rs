@@ -4,7 +4,7 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, io::Read, path::PathBuf};
+use std::{fmt::Display, path::PathBuf};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
 use futures::StreamExt;
@@ -165,33 +165,13 @@ where
 
 impl<I, B> BBFlasher for Flasher<I, B>
 where
-    I: Resolvable<ResolvedType = crate::OsImage> + Send + 'static,
-    B: Resolvable<ResolvedType = std::fs::File> + Send + 'static,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Send + 'static,
+    B: Resolvable<ResolvedType = Box<str>> + Send + 'static,
 {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
-        let img = self.img;
-        let bmap = self.bmap;
-
-        let img_resolver = async move || {
-            let bmap = match bmap {
-                Some(x) => {
-                    let (mut f, task) = x.resolve().await?;
-                    assert!(task.is_none());
-                    let mut data = String::new();
-                    f.read_to_string(&mut data)?;
-                    Some(data.into())
-                }
-                None => None,
-            };
-            let (img, task) = img.resolve().await?;
-            let img_size = img.size();
-
-            Ok((img, img_size, bmap, task))
-        };
-
         let customization = self.customization.customization;
         let dst = self.dst;
 
@@ -214,19 +194,29 @@ where
                     .await;
             });
 
-            let resp =
-                bb_flasher_sd::flash(img_resolver, &dst, Some(tx), customization, self.cancel)
-                    .await;
+            let resp = bb_flasher_sd::flash(
+                self.img,
+                self.bmap,
+                dst.into(),
+                Some(tx),
+                customization,
+                self.cancel,
+            )
+            .await;
 
             t.abort();
 
             resp
         } else {
-            bb_flasher_sd::flash(img_resolver, &dst, None, customization, self.cancel).await
+            bb_flasher_sd::flash(
+                self.img,
+                self.bmap,
+                dst.into(),
+                None,
+                customization,
+                self.cancel,
+            )
+            .await
         }
-        .map_err(|e| match e {
-            Error::IoError(error) => error,
-            _ => std::io::Error::other(e),
-        })
     }
 }

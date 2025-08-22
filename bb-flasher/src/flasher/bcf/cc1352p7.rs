@@ -75,7 +75,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Resolvable<ResolvedType = crate::OsImage> + Sync,
+    I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Sync,
 {
     async fn flash(
         self,
@@ -87,10 +87,25 @@ where
         let port = self.port;
         let verify = self.verify;
         let img = {
-            let mut img = self.img.resolve().await?;
-            let mut data = Vec::new();
-            img.read_to_end(&mut data)?;
-            data
+            let mut tasks = tokio::task::JoinSet::new();
+            let (mut img, _) = self.img.resolve(&mut tasks).await?;
+
+            let resp = tokio::task::spawn_blocking(move || {
+                let mut data = Vec::new();
+                img.read_to_end(&mut data)?;
+                Ok::<Vec<u8>, std::io::Error>(data)
+            })
+            .await
+            .unwrap()?;
+
+            while let Some(t) = tasks.join_next().await {
+                if let Err(e) = t.unwrap() {
+                    tasks.abort_all();
+                    return Err(e);
+                }
+            }
+
+            resp
         };
 
         let flasher_task = if let Some(chan) = chan {

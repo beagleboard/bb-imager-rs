@@ -17,18 +17,16 @@
 //! # Usage
 //!
 //! ```no_run
-//! use std::path::Path;
+//! use std::path::PathBuf;
 //! use std::fs::File;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let dst = Path::new("/tmp/dummy");
-//!     let img = async || {
-//!         Ok((File::open("/tmp/image")?, 1024, None))
-//!     };
+//!     let dst = PathBuf::from("/tmp/dummy").into();
+//!     let img = bb_helper::resolvable::LocalFile::new(PathBuf::from("/tmp/image").into());
 //!     let (tx, rx) = futures::channel::mpsc::channel(20);
 //!
-//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, dst, Some(tx), None, None).await });
+//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<bb_helper::resolvable::LocalStringFile>, dst, Some(tx), None, None).await });
 //!
 //!     let msgs = futures::executor::block_on_stream(rx);
 //!     for m in msgs {
@@ -89,6 +87,15 @@ pub enum Error {
     WindowsError(#[from] windows::core::Error),
     #[error("Writer thread has been closed")]
     WriterClosed,
+}
+
+impl From<Error> for std::io::Error {
+    fn from(value: Error) -> Self {
+        match value {
+            Error::IoError(e) => e,
+            _ => Self::other(value),
+        }
+    }
 }
 
 /// Enumerate all SD Cards in system

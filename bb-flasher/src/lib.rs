@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_flasher::LocalFile>, target, customization, None)
+//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_helper::resolvable::LocalStringFile>, target, customization, None)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -43,25 +43,10 @@ mod img;
 
 use std::path::Path;
 
+pub use bb_helper::resolvable::Resolvable;
 pub use common::*;
 pub use flasher::*;
 pub use img::OsImage;
-
-/// A trait to signify Os Images. Flashers in this crate can take any file as an input that
-/// implements this trait.
-pub trait Resolvable {
-    type ResolvedType: std::io::Read;
-
-    /// Get the local path to an image. Network calls can be done here.
-    fn resolve(
-        &self,
-    ) -> impl Future<
-        Output = std::io::Result<(
-            Self::ResolvedType,
-            Option<tokio::task::JoinHandle<std::io::Result<()>>>,
-        )>,
-    >;
-}
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
@@ -75,44 +60,19 @@ impl LocalImage {
 }
 
 impl Resolvable for LocalImage {
-    type ResolvedType = OsImage;
+    type ResolvedType = (OsImage, u64);
 
     async fn resolve(
         &self,
-    ) -> std::io::Result<(
-        Self::ResolvedType,
-        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
-    )> {
+        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
+    ) -> std::io::Result<Self::ResolvedType> {
         let p = self.0.clone();
         let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
             .await
             .unwrap()?;
+        let size = img.size();
 
-        Ok((img, None))
-    }
-}
-
-/// An Os Image present in the local filesystem
-#[derive(Debug, Clone)]
-pub struct LocalFile(Box<Path>);
-
-impl LocalFile {
-    /// Construct a new local image from path.
-    pub const fn new(path: Box<Path>) -> Self {
-        Self(path)
-    }
-}
-
-impl Resolvable for LocalFile {
-    type ResolvedType = std::fs::File;
-
-    async fn resolve(
-        &self,
-    ) -> std::io::Result<(
-        Self::ResolvedType,
-        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
-    )> {
-        Ok((std::fs::File::open(&self.0)?, None))
+        Ok((img, size))
     }
 }
 

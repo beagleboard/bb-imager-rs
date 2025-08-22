@@ -1,9 +1,7 @@
 use std::io::{Read, Seek, Write};
 use std::path::Path;
-use std::task::Poll;
 use std::time::Instant;
 
-use futures::TryFutureExt;
 use futures::channel::mpsc;
 
 use crate::Result;
@@ -143,7 +141,7 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 }
 
 fn write_sd(
-    img: impl Read + Send + 'static,
+    img: impl Read + Send,
     img_size: u64,
     bmap: Option<bmap_parser::Bmap>,
     sd: impl Write + Seek,
@@ -161,17 +159,18 @@ fn write_sd(
         tx1.send(Box::new(DirectIoBuffer::new())).unwrap();
     }
 
-    let cancle_clone = cancel.clone();
-    let handle = std::thread::spawn(move || reader_task(img, rx1, tx2, cancle_clone));
+    std::thread::scope(|s| {
+        let cancle_clone = cancel.clone();
+        let handle = s.spawn(move || reader_task(img, rx1, tx2, cancle_clone));
 
-    match bmap {
-        Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
-        None => writer_task(img_size, sd, chan, rx2, tx1, cancel),
-    }?;
+        match bmap {
+            Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
+            None => writer_task(img_size, sd, chan, rx2, tx1, cancel),
+        }?;
+        tracing::info!("Total Time taken: {:?}", global_start.elapsed());
 
-    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
-
-    handle.join().unwrap()
+        handle.join().unwrap()
+    })
 }
 
 /// Flash OS image to SD card.
@@ -203,20 +202,16 @@ fn write_sd(
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub async fn flash<R: Read + Send + 'static>(
-    img_resolver: impl AsyncFnOnce() -> std::io::Result<(
-        R,
-        u64,
-        Option<Box<str>>,
-        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
-    )>,
-    dst: &Path,
+    img: impl bb_helper::resolvable::Resolvable<ResolvedType = (R, u64)>,
+    bmap: Option<impl bb_helper::resolvable::Resolvable<ResolvedType = Box<str>>>,
+    dst: Box<Path>,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
-) -> Result<()> {
+) -> std::io::Result<()> {
     if let Some(x) = &customization {
         if !x.validate() {
-            return Err(crate::Error::InvalidCustomizaton);
+            return Err(crate::Error::InvalidCustomizaton.into());
         }
     }
 
@@ -226,86 +221,39 @@ pub async fn flash<R: Read + Send + 'static>(
         .await
         .unwrap()?;
 
+    let mut tasks = tokio::task::JoinSet::new();
+
     tracing::info!("Resolving Image");
-    let (img, img_size, bmap, task) = img_resolver().await?;
     let bmap = match bmap {
-        Some(x) => Some(bmap_parser::Bmap::from_xml(&x).map_err(|_| crate::Error::InvalidBmap)?),
+        Some(x) => Some(
+            bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
+                .map_err(|_| crate::Error::InvalidBmap)?,
+        ),
         None => None,
     };
+    let (img, img_size) = img.resolve(&mut tasks).await?;
 
-    let mut flasher_task = tokio::task::spawn_blocking(move || {
-        flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
+    let cancel_child = cancel.as_ref().map(|x| x.child_token());
+    tasks.spawn_blocking(move || {
+        flash_internal(img, img_size, bmap, sd, chan, customization, cancel_child)
+            .map_err(Into::into)
     });
 
-    match task {
-        Some(mut background_task) => {
-            std::future::poll_fn(move |cx| {
-                if flasher_task.is_finished() {
-                    match flasher_task.try_poll_unpin(cx) {
-                        Poll::Ready(x) => Poll::Ready(x.unwrap()),
-                        Poll::Pending => Poll::Pending,
-                    }
-                } else if background_task.is_finished() {
-                    match flasher_task.try_poll_unpin(cx) {
-                        Poll::Ready(x) => Poll::Ready(x.unwrap()),
-                        Poll::Pending => Poll::Pending,
-                    }
-                } else {
-                    match (
-                        flasher_task.try_poll_unpin(cx),
-                        background_task.try_poll_unpin(cx),
-                    ) {
-                        (Poll::Ready(x), Poll::Ready(y)) => match (x.unwrap(), y.unwrap()) {
-                            (Ok(_), Ok(_)) => Poll::Ready(Ok(())),
-                            (Ok(_), Err(e)) => Poll::Ready(Err(e.into())),
-                            (Err(e), Ok(_)) => Poll::Ready(Err(e)),
-                            // Priority to background_task error since it is unlikely to fail normally
-                            (Err(_), Err(e)) => Poll::Ready(Err(e.into())),
-                        },
-                        (Poll::Ready(x), Poll::Pending) => match x.unwrap() {
-                            Ok(_) => Poll::Pending,
-                            Err(e) => {
-                                background_task.abort();
-                                Poll::Ready(Err(e))
-                            }
-                        },
-                        (Poll::Pending, Poll::Ready(x)) => match x.unwrap() {
-                            Ok(_) => Poll::Pending,
-                            Err(e) => {
-                                flasher_task.abort();
-                                Poll::Ready(Err(e.into()))
-                            }
-                        },
-                        (Poll::Pending, Poll::Pending) => Poll::Pending,
-                    }
-                }
-            })
-            .await
+    // Cancel all tasks on drop
+    let _drop_guard = cancel.map(|x| x.drop_guard());
+
+    while let Some(t) = tasks.join_next().await {
+        if let Err(e) = t.unwrap() {
+            tasks.abort_all();
+            return Err(e);
         }
-        None => flasher_task.await.unwrap(),
     }
 
-    // let resp = tokio::task::spawn_blocking(move || {
-    //     flash_internal(img, img_size, bmap, sd, chan, customization, cancel)
-    // })
-    // .await
-    // .unwrap();
-
-    // match task {
-    //     Some(x) => {
-    //         if resp.is_err() {
-    //             x.abort();
-    //             resp
-    //         } else {
-    //             x.await.unwrap().map_err(Into::into)
-    //         }
-    //     }
-    //     None => resp,
-    // }
+    Ok(())
 }
 
 fn flash_internal(
-    img: impl Read + Send + 'static,
+    img: impl Read + Send,
     img_size: u64,
     bmap: Option<bmap_parser::Bmap>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
