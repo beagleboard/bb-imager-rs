@@ -88,7 +88,6 @@ struct BBImager {
     selected_image: Option<helpers::BoardImage>,
     selected_dst: Option<helpers::Destination>,
     destinations: Vec<helpers::Destination>,
-    flash_finish_channel: tokio::sync::watch::Sender<()>,
     cancel_flashing: Option<iced::task::Handle>,
     customization: Option<FlashingCustomization>,
 
@@ -134,7 +133,6 @@ impl BBImager {
             destinations: Default::default(),
             cancel_flashing: Default::default(),
             customization: Default::default(),
-            flash_finish_channel: tokio::sync::watch::channel(()).0,
         };
 
         ans.screen.push(Screen::Home);
@@ -280,7 +278,7 @@ impl BBImager {
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
 
-        let cancel = self.flash_finish_channel.subscribe();
+        let cancel = tokio_util::sync::CancellationToken::new();
 
         let s = iced::stream::channel(20, move |mut chan| async move {
             let _ = chan
@@ -289,16 +287,17 @@ impl BBImager {
 
             let (tx, mut rx) = iced::futures::channel::mpsc::channel(19);
 
-            let flash_task =
-                tokio::spawn(
-                    async move { helpers::flash(img, customization, dst, tx, cancel).await },
-                );
+            let cancel_child = cancel.child_token();
+            let flash_task = tokio::spawn(async move {
+                helpers::flash(img, customization, dst, tx, cancel_child).await
+            });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::spawn(async move {
                 while let Some(progress) = rx.next().await {
                     let _ = chan_clone.try_send(BBImagerMessage::ProgressBar(progress.into()));
                 }
             });
+            let _guard = cancel.drop_guard();
 
             let res = flash_task
                 .await

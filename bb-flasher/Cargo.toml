@@ -24,7 +24,7 @@ bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
 zbus = { version = "5.8", default-features = false, features = ["tokio"], optional = true}
 bin_file = { version = "0.1", optional = true }
 cfg-if = "1.0"
-tokio-util = { version = "0.7", features = ["io", "io-util"] }
+tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper" }
 
 [dev-dependencies]

@@ -390,26 +390,46 @@ impl RemoteImage {
 impl bb_flasher::Resolvable for RemoteImage {
     type ResolvedType = bb_flasher::OsImage;
 
-    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+    async fn resolve(
+        &self,
+    ) -> std::io::Result<(
+        Self::ResolvedType,
+        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    )> {
         if let Some(path) = self
             .downloader
             .check_cache_from_sha(self.extract_sha256)
             .await
         {
             tracing::info!("Found the remote image in cache");
-            bb_flasher::OsImage::from_path(&path)
+            Ok((bb_flasher::OsImage::from_path(&path)?, None))
         } else {
+            tracing::info!("Remote image not found in cache. Downloading");
             let (tx, rx) = bb_helper::file_stream::file_stream()?;
             let downloader = self.downloader.clone();
             let url = self.url.clone();
             let sha = self.extract_sha256;
-            tokio::spawn(async move {
-                downloader.download_to_stream(*url, sha, tx).await.unwrap();
+            let task = tokio::spawn(async move {
+                downloader
+                    .download_to_stream(*url, sha, tx)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error while downloading Os Image: {}", e);
+                        tracing::error!("{}", &msg);
+                        std::io::Error::other(msg)
+                    })?;
+                tracing::info!("Image download finished");
+                Ok(())
             });
+
             let extract_size = self.extract_size;
-            tokio::task::spawn_blocking(move || bb_flasher::OsImage::from_piped(rx, extract_size))
-                .await
-                .unwrap()
+            let img = tokio::task::spawn_blocking(move || {
+                bb_flasher::OsImage::from_piped(rx, extract_size)
+            })
+            .await
+            .unwrap()?;
+
+            Ok((img, Some(task)))
         }
     }
 }
@@ -429,9 +449,14 @@ pub(crate) struct Bmap {
 impl bb_flasher::Resolvable for Bmap {
     type ResolvedType = std::fs::File;
 
-    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+    async fn resolve(
+        &self,
+    ) -> std::io::Result<(
+        Self::ResolvedType,
+        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    )> {
         let p = self.downloader.download(*self.url.clone(), None).await?;
-        std::fs::File::open(p)
+        Ok((std::fs::File::open(p)?, None))
     }
 }
 
@@ -444,7 +469,12 @@ pub(crate) enum SelectedImage {
 impl bb_flasher::Resolvable for SelectedImage {
     type ResolvedType = bb_flasher::OsImage;
 
-    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+    async fn resolve(
+        &self,
+    ) -> std::io::Result<(
+        Self::ResolvedType,
+        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    )> {
         match self {
             SelectedImage::LocalImage(x) => x.resolve().await,
             SelectedImage::RemoteImage(x) => x.resolve().await,
@@ -478,7 +508,7 @@ pub(crate) async fn flash(
     customization: FlashingCustomization,
     dst: Option<Destination>,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
-    cancel: tokio::sync::watch::Receiver<()>,
+    cancel: tokio_util::sync::CancellationToken,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
         (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {

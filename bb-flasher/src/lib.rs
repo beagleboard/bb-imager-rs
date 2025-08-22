@@ -53,7 +53,14 @@ pub trait Resolvable {
     type ResolvedType: std::io::Read;
 
     /// Get the local path to an image. Network calls can be done here.
-    fn resolve(&self) -> impl Future<Output = std::io::Result<Self::ResolvedType>>;
+    fn resolve(
+        &self,
+    ) -> impl Future<
+        Output = std::io::Result<(
+            Self::ResolvedType,
+            Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+        )>,
+    >;
 }
 
 /// An Os Image present in the local filesystem
@@ -70,11 +77,18 @@ impl LocalImage {
 impl Resolvable for LocalImage {
     type ResolvedType = OsImage;
 
-    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
+    async fn resolve(
+        &self,
+    ) -> std::io::Result<(
+        Self::ResolvedType,
+        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    )> {
         let p = self.0.clone();
-        tokio::task::spawn_blocking(move || OsImage::from_path(&p))
+        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
             .await
-            .unwrap()
+            .unwrap()?;
+
+        Ok((img, None))
     }
 }
 
@@ -92,8 +106,13 @@ impl LocalFile {
 impl Resolvable for LocalFile {
     type ResolvedType = std::fs::File;
 
-    async fn resolve(&self) -> std::io::Result<Self::ResolvedType> {
-        std::fs::File::open(&self.0)
+    async fn resolve(
+        &self,
+    ) -> std::io::Result<(
+        Self::ResolvedType,
+        Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    )> {
+        Ok((std::fs::File::open(&self.0)?, None))
     }
 }
 

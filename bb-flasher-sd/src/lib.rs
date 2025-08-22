@@ -87,6 +87,8 @@ pub enum Error {
     #[cfg(windows)]
     #[error("Windows Error: {0}")]
     WindowsError(#[from] windows::core::Error),
+    #[error("Writer thread has been closed")]
+    WriterClosed,
 }
 
 /// Enumerate all SD Cards in system

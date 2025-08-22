@@ -138,7 +138,7 @@ pub struct Flasher<I: Resolvable, B: Resolvable> {
     bmap: Option<B>,
     dst: PathBuf,
     customization: FlashingSdLinuxConfig,
-    cancel: Option<tokio::sync::watch::Receiver<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 impl<I, B> Flasher<I, B>
@@ -151,7 +151,7 @@ where
         bmap: Option<B>,
         dst: Target,
         customization: FlashingSdLinuxConfig,
-        cancel: Option<tokio::sync::watch::Receiver<()>>,
+        cancel: Option<tokio_util::sync::CancellationToken>,
     ) -> Self {
         Self {
             img,
@@ -178,17 +178,18 @@ where
         let img_resolver = async move || {
             let bmap = match bmap {
                 Some(x) => {
-                    let mut f = x.resolve().await?;
+                    let (mut f, task) = x.resolve().await?;
+                    assert!(task.is_none());
                     let mut data = String::new();
                     f.read_to_string(&mut data)?;
                     Some(data.into())
                 }
                 None => None,
             };
-            let img = img.resolve().await?;
+            let (img, task) = img.resolve().await?;
             let img_size = img.size();
 
-            Ok((img, img_size, bmap))
+            Ok((img, img_size, bmap, task))
         };
 
         let customization = self.customization.customization;

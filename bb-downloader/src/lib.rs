@@ -94,6 +94,7 @@ impl Downloader {
 
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(15))
             .build()
             .expect("Unsupported OS");
 
