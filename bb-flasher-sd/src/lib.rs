@@ -85,6 +85,9 @@ pub enum Error {
     #[cfg(windows)]
     #[error("Windows Error: {0}")]
     WindowsError(#[from] windows::core::Error),
+    #[cfg(windows)]
+    #[error("Failed to clear SD Card: {0:?}")]
+    WindowsCleanError(std::process::Output),
     #[error("Writer thread has been closed")]
     WriterClosed,
 }

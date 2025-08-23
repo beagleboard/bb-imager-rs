@@ -5,7 +5,6 @@ use std::{
     path::Path,
     process::{Command, Stdio},
 };
-use tokio::io::AsyncWriteExt;
 use windows::Win32::{
     Foundation::HANDLE,
     System::IO::DeviceIoControl,
@@ -133,25 +132,23 @@ async fn diskpart_clean(path: &Path) -> Result<()> {
         .strip_prefix("\\\\.\\PhysicalDrive")
         .ok_or(Error::InvalidDrive)?;
 
-    let mut cmd = tokio::process::Command::new("diskpart")
-        .stderr(Stdio::null())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .spawn()?;
+    let resp = tokio::process::Command::new("powershell")
+        .args(&[
+            "Clear-Disk",
+            "-Number",
+            disk_num,
+            "-RemoveData",
+            "-Confirm:$false",
+        ])
+        .output()
+        .await?;
+    tracing::info!("Disk Clear Response: {:#?}", resp);
 
-    let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
-    stdin.write_all(b"select disk ").await?;
-    stdin.write_all(disk_num.as_bytes()).await?;
-    stdin.write_all(b"\n").await?;
-    stdin.write_all(b"clean\n").await?;
-    stdin.write_all(b"rescan\n").await?;
-    stdin.write_all(b"exit\n").await?;
-
-    drop(stdin);
-
-    cmd.wait().await?;
-
-    Ok(())
+    if resp.status.success() {
+        Ok(())
+    } else {
+        Err(Error::WindowsCleanError(resp))
+    }
 }
 
 fn diskpart_format(path: &Path) -> Result<()> {
