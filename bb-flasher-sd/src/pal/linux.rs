@@ -57,65 +57,57 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
 }
 
 #[cfg(feature = "udev")]
-pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
-    async fn inner(dst: &Path) -> Result<LinuxDrive> {
-        let dbus_client = udisks2::Client::new().await?;
+pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
+    let dbus_client = udisks2::Client::new().await?;
 
-        let devs = dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", dst.to_str().unwrap().into())]),
-                HashMap::new(),
-            )
-            .await?;
+    let devs = dbus_client
+        .manager()
+        .resolve_device(
+            HashMap::from([("path", dst.to_str().unwrap().into())]),
+            HashMap::new(),
+        )
+        .await?;
 
-        let block = devs
-            .first()
-            .ok_or(Error::FailedToOpenDestination(
-                dst.to_string_lossy().to_string(),
-            ))?
-            .to_owned();
+    let block = devs
+        .first()
+        .ok_or(Error::FailedToOpenDestination(
+            dst.to_string_lossy().to_string(),
+        ))?
+        .to_owned();
 
-        let obj = dbus_client
-            .object(block)
-            .expect("Unexpected error")
-            .block()
-            .await?;
+    let obj = dbus_client
+        .object(block)
+        .expect("Unexpected error")
+        .block()
+        .await?;
 
-        let fd = obj
-            .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
-            .await?;
-        let file =
-            unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
+    let fd = obj
+        .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
+        .await?;
+    let file = unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
-        Ok(LinuxDrive {
-            file,
-            drive: dst.to_path_buf(),
-        })
-    }
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_io()
-        .build()
-        .unwrap();
-    rt.block_on(async move { inner(dst).await })
+    Ok(LinuxDrive {
+        file,
+        drive: dst.to_path_buf(),
+    })
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
-    use std::os::unix::fs::OpenOptionsExt;
-
-    std::fs::OpenOptions::new()
+pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
+    let file = tokio::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .custom_flags(libc::O_DIRECT)
         .open(dst)
-        .map_err(Into::into)
-        .map(|x| LinuxDrive {
-            file: x,
-            drive: dst.to_path_buf(),
-        })
+        .await?
+        .into_std()
+        .await;
+
+    Ok(LinuxDrive {
+        file,
+        drive: dst.to_path_buf(),
+    })
 }
 
 #[cfg(not(feature = "udev"))]

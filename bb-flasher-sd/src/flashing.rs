@@ -217,9 +217,7 @@ pub async fn flash<R: Read + Send + 'static>(
 
     tracing::info!("Opening Destination");
     let dst_clone = dst.to_path_buf();
-    let sd = tokio::task::spawn_blocking(move || crate::pal::open(&dst_clone))
-        .await
-        .unwrap()?;
+    let sd = crate::pal::open(&dst_clone).await?;
 
     let mut tasks = tokio::task::JoinSet::new();
 
