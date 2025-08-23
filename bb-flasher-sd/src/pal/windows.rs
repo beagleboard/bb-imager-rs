@@ -1,10 +1,11 @@
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
-    os::windows::{fs::OpenOptionsExt, io::AsRawHandle},
+    os::windows::io::AsRawHandle,
     path::Path,
     process::{Command, Stdio},
 };
+use tokio::io::AsyncWriteExt;
 use windows::Win32::{
     Foundation::HANDLE,
     System::IO::DeviceIoControl,
@@ -23,26 +24,33 @@ const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
 const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
 
 impl WinDrive {
-    pub(crate) fn open(path: &Path) -> Result<Self> {
+    pub(crate) async fn open(path: &Path) -> Result<Self> {
         tracing::info!("Trying to find {}", path.display());
         let vol_path = physical_drive_to_volume(path)?;
 
         let volume = if let Some(vol_path) = vol_path {
             tracing::info!("Trying to open {vol_path}");
-            Some(open_and_lock_volume(&vol_path)?)
+            Some(
+                tokio::task::spawn_blocking(move || open_and_lock_volume(&vol_path))
+                    .await
+                    .unwrap()?,
+            )
         } else {
             None
         };
 
         tracing::info!("Trying to clean {:?}", path);
-        diskpart_clean(path)?;
+        diskpart_clean(path).await?;
 
         tracing::info!("Trying to open {:?}", path);
-        let drive = OpenOptions::new()
+        let drive = tokio::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .custom_flags(FILE_FLAG_WRITE_THROUGH | FILE_FLAG_NO_BUFFERING)
-            .open(path)?;
+            .open(path)
+            .await?
+            .into_std()
+            .await;
 
         Ok(Self { drive, volume })
     }
@@ -118,30 +126,30 @@ fn physical_drive_to_volume(drive: &Path) -> Result<Option<String>> {
     }
 }
 
-fn diskpart_clean(path: &Path) -> Result<()> {
+async fn diskpart_clean(path: &Path) -> Result<()> {
     let disk_num = path
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
         .ok_or(Error::InvalidDrive)?;
 
-    let mut cmd = Command::new("diskpart")
+    let mut cmd = tokio::process::Command::new("diskpart")
         .stderr(Stdio::null())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .spawn()?;
 
     let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
-    stdin.write_all(b"select disk ")?;
-    stdin.write_all(disk_num.as_bytes())?;
-    stdin.write_all(b"\n")?;
-    stdin.write_all(b"clean\n")?;
-    stdin.write_all(b"rescan\n")?;
-    stdin.write_all(b"exit\n")?;
+    stdin.write_all(b"select disk ").await?;
+    stdin.write_all(disk_num.as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.write_all(b"clean\n").await?;
+    stdin.write_all(b"rescan\n").await?;
+    stdin.write_all(b"exit\n").await?;
 
     drop(stdin);
 
-    cmd.wait()?;
+    cmd.wait().await?;
 
     Ok(())
 }
@@ -211,6 +219,6 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
     diskpart_format(dst).map_err(|e| Error::FailedToFormat(e.to_string()))
 }
 
-pub(crate) fn open(dst: &Path) -> Result<WinDrive> {
-    WinDrive::open(dst)
+pub(crate) async fn open(dst: &Path) -> Result<WinDrive> {
+    WinDrive::open(dst).await
 }
