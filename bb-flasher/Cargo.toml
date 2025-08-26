@@ -15,20 +15,20 @@ liblzma = { version = "0.4", features = ["static", "parallel"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 thiserror = { version = "2.0", optional = true }
-tokio = { version = "1.46", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
+tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
 tracing = "0.1"
 futures = "0.3"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
 bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
-zbus = { version = "5.8", default-features = false, features = ["tokio"], optional = true}
+zbus = { version = "5.10", default-features = false, features = ["tokio"], optional = true}
 bin_file = { version = "0.1", optional = true }
 cfg-if = "1.0"
 tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper", features = ["file_stream", "resolvable"] }
 
 [dev-dependencies]
-tokio = { version = "1.43.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
+tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
 
 [features]
 default = ["sd"]
