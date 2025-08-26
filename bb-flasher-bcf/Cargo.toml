@@ -11,7 +11,7 @@ keywords = ["beagleconnect", "flasher", "beagle"]
 categories = ["development-tools", "embedded", "hardware-support"]
 
 [dependencies]
-crc32fast = "1.4"
+crc32fast = "1.5"
 futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
