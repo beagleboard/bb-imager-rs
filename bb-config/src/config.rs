@@ -68,6 +68,8 @@ pub struct Device {
     pub flasher: Flasher,
     /// Link to board documentation
     pub documentation: Option<Url>,
+    /// Special Instructions for flashing board.
+    pub instructions: Option<String>
 }
 
 /// Types of customization Initialization formats
@@ -164,6 +166,8 @@ pub struct OsImage {
     pub init_format: Option<InitFormat>,
     /// Bmap file for the image
     pub bmap: Option<Url>,
+    /// Special Instructions for flashing board.
+    pub info_text: Option<String>
 }
 
 /// Types of flashers Os Image(s) support
