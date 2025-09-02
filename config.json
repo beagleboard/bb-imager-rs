@@ -62,7 +62,8 @@
 				"description": "BeagleV-Fire based on Microchip PolarFire SoC",
 				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beaglevfire.png",
 				"flasher": "SdCard",
-				"documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home"
+				"documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home",
+				"instructions": "1. Connect the BeagleV-Fire board to your computer via USB.\n2. While powering on the board, click the USER button on the board as soon as you power it on.\n3. BeagleV-Fire must appear as a USB device in the destination list."
 			},
 			{
 				"name": "BeagleBone Black",

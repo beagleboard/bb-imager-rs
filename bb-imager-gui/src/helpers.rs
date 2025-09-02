@@ -294,6 +294,7 @@ pub(crate) enum BoardImage {
         init_format: Option<config::InitFormat>,
         img: SelectedImage,
         bmap: Option<Bmap>,
+        info_text: Option<String>,
     },
 }
 
@@ -305,6 +306,7 @@ impl BoardImage {
             flasher,
             // Do not try to apply customization for local images
             init_format: None,
+            info_text: None,
         }
     }
 
@@ -328,6 +330,7 @@ impl BoardImage {
             }),
             flasher,
             init_format: image.init_format,
+            info_text: image.info_text,
         }
     }
 
@@ -341,6 +344,13 @@ impl BoardImage {
     pub(crate) const fn init_format(&self) -> Option<config::InitFormat> {
         match self {
             BoardImage::Image { init_format, .. } => *init_format,
+            BoardImage::SdFormat => None,
+        }
+    }
+
+    pub(crate) fn info_text(&self) -> Option<String> {
+        match self {
+            BoardImage::Image { info_text, .. } => info_text.clone(),
             BoardImage::SdFormat => None,
         }
     }

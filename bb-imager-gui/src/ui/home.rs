@@ -104,17 +104,16 @@ pub(crate) fn view<'a>(
         .width(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
-        // Check if BeagleV-Fire is selected
-        let show_beaglev_fire_instructions = selected_board
-            .map(|board| board.name.to_lowercase().contains("beaglev-fire"))
-            .unwrap_or(false);
-
-        let instructions_widget = if show_beaglev_fire_instructions {
-            Some(widget::container(
-                text(constants::BEAGLEV_FIRE_INSTRUCTIONS)
-                    .size(16)
-                    .color(iced::Color::BLACK),
-            ))
+        let instructions_widget = if selected_image.is_some() && selected_board.is_some() {
+            match (
+                selected_board.map(|x| x.instructions.clone()).flatten(),
+                selected_image.map(|x| x.info_text()).flatten(),
+            ) {
+                (_, Some(x)) | (Some(x), None) => Some(widget::container(
+                    text(x).size(16).color(iced::Color::BLACK),
+                )),
+                _ => None,
+            }
         } else {
             None
         };
