@@ -2,8 +2,12 @@ use std::{fs::File, path::Path};
 
 use crate::{Error, Result};
 
-pub(crate) async fn format(_dst: &Path) -> Result<()> {
-    unimplemented!()
+pub(crate) async fn format(dst: &Path) -> Result<()> {
+    let sd = open(dst).await?;
+    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
+        .await
+        .unwrap()
+        .map_err(|e| Error::FailedToFormat(e.to_string()))
 }
 
 #[cfg(not(feature = "macos_authopen"))]
