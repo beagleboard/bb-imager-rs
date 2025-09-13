@@ -205,38 +205,15 @@ jobs:
     - name: Use caching
       uses: Swatinem/rust-cache@v2
       with:
-        prefix-key: "v1"
+        prefix-key: "v2"
         
     - name: Install packaging deps
       run: make setup-packaging-deps
 
+    # The ENV variable names are what cargo-packager requires
     - name: Setup macos signing
       working-directory: bb-imager-gui
-      env:
-        CERT_DEVELOPER_APP_BASE64: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
-        CERT_DEVELOPER_INSTALL_BASE64: ${{ secrets.CERT_DEVELOPER_INSTALL_BASE64 }}
-        CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
-        TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
-        echo "$CERT_DEVELOPER_APP_BASE64" | base64 --decode > developer_app.p12
-        echo "$CERT_DEVELOPER_INSTALL_BASE64" | base64 --decode > developer_installer.p12
-
-        security create-keychain -p "" build.keychain-db
-        security default-keychain -s build.keychain-db
-        security unlock-keychain -p "" build.keychain-db
-
-        security import developer_app.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/codesign
-        security import developer_installer.p12 -k build.keychain-db -P "$CERT_PASSWORD" -T /usr/bin/productsign
-
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain-db
-
-        xcrun notarytool store-credentials "AC_PASSWORD" \
-          --apple-id "${{ secrets.APPLE_ID }}" \
-          --team-id "${{ secrets.TEAM_ID }}" \
-          --password "${{ secrets.APP_PASSWORD }}"
-
         echo "" >> Cargo.toml
         echo "[package.metadata.packager.macos]" >> Cargo.toml
         echo "signing_identity = \"${{ secrets.TEAM_ID }}\"" >> Cargo.toml
@@ -244,18 +221,13 @@ jobs:
     - name: Build packages
       env:
         TARGET: ${{ matrix.target }}
-      run: make package-gui-macos-dmg
-
-    - name: Notarize macOS App
-      env:
+        APPLE_CERTIFICATE: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
+        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.CERT_PASSWORD }}
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
-        TEAM_ID: ${{ secrets.TEAM_ID }}
+        APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
-        dmg_path=$(find bb-imager-gui/dist/ -name "*.dmg" | head -n 1)
-        echo "Submitting for notarization: $dmg_path"
-        xcrun notarytool submit "$dmg_path" --keychain-profile "AC_PASSWORD" --wait
-        xcrun stapler staple "$dmg_path"
+        make package-gui-macos-dmg
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
