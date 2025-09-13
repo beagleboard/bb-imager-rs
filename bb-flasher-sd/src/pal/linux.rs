@@ -103,8 +103,11 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) fn format(dst: &Path) -> Result<()> {
-    let output = std::process::Command::new("mkfs.vfat").arg(dst).output()?;
+pub(crate) async fn format(dst: &Path) -> Result<()> {
+    let output = tokio::process::Command::new("mkfs.vfat")
+        .arg(dst)
+        .output()
+        .await?;
 
     if output.status.success() {
         Ok(())
