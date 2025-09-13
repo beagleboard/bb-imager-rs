@@ -2,7 +2,7 @@
 
 _HOST_TARGET = $(shell rustc -vV | awk '/^host/ { print $$2 }')
 _RUST_ARGS = --locked
-_CARGO_PACKAGER_ARGS = -r
+_CARGO_PACKAGER_ARGS = -r -vvv
 _TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
