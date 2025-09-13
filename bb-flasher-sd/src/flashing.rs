@@ -41,7 +41,7 @@ fn reader_task(
 ///
 /// Thus, we will be writing some data that is not strictly present in the bmap.
 fn writer_task_bmap(
-    bmap: bmap_parser::Bmap,
+    bmap: bb_bmap_parser::Bmap,
     mut sd: impl Write + Seek,
     mut chan: Option<&mut mpsc::Sender<f32>>,
     buf_rx: std::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
@@ -143,7 +143,7 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 fn write_sd(
     img: impl Read + Send,
     img_size: u64,
-    bmap: Option<bmap_parser::Bmap>,
+    bmap: Option<bb_bmap_parser::Bmap>,
     sd: impl Write + Seek,
     chan: Option<&mut mpsc::Sender<f32>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
@@ -224,7 +224,7 @@ pub async fn flash<R: Read + Send + 'static>(
     tracing::info!("Resolving Image");
     let bmap = match bmap {
         Some(x) => Some(
-            bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
+            bb_bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
                 .map_err(|_| crate::Error::InvalidBmap)?,
         ),
         None => None,
@@ -253,7 +253,7 @@ pub async fn flash<R: Read + Send + 'static>(
 fn flash_internal(
     img: impl Read + Send,
     img_size: u64,
-    bmap: Option<bmap_parser::Bmap>,
+    bmap: Option<bb_bmap_parser::Bmap>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -324,15 +324,19 @@ mod tests {
         let dummy_file = test_file(FILE_LEN);
         let mut sd = std::io::Cursor::new(vec![0u8; FILE_LEN]);
 
-        let mut bmap = bmap_parser::Bmap::builder();
+        let mut bmap = bb_bmap_parser::Bmap::builder();
         bmap.image_size(FILE_LEN as u64)
             .block_size(BLOCK_LEN)
             .blocks(BLOCKS)
             .mapped_blocks(MAPPED_BLOCKS.len() as u64)
-            .checksum_type(bmap_parser::HashType::Sha256);
+            .checksum_type(bb_bmap_parser::HashType::Sha256);
 
         for i in MAPPED_BLOCKS {
-            bmap.add_block_range(*i, *i, bmap_parser::HashValue::Sha256(Default::default()));
+            bmap.add_block_range(
+                *i,
+                *i,
+                bb_bmap_parser::HashValue::Sha256(Default::default()),
+            );
         }
 
         let bmap = bmap.build().unwrap();

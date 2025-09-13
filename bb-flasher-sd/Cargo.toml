@@ -19,7 +19,7 @@ fatfs = "0.3"
 fscommon = "0.1"
 mbrman = "0.6"
 gpt = "4.1"
-bmap-parser = "0.2"
+bb-bmap-parser = "0.1"
 tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread"] }
 tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper", features = ["resolvable"] }

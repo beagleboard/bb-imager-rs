@@ -18,6 +18,3 @@ edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
 license = "MIT"
-
-[patch.crates-io]
-bmap-parser = { git = "https://github.com/Ayush1325/bmap-rs.git", branch = "windows-msvc" }

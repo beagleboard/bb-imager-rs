@@ -484,6 +484,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "bb-bmap-parser"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26cdf8db3a883ec3c1c50e7fb7dc5a55265399fb680a9835b8f291089e6da679"
+dependencies = [
+ "quick-xml 0.37.5",
+ "serde",
+ "thiserror 2.0.16",
+]
+
+[[package]]
 name = "bb-config"
 version = "0.1.0"
 dependencies = [
@@ -573,9 +584,9 @@ dependencies = [
 name = "bb-flasher-sd"
 version = "1.0.0"
 dependencies = [
+ "bb-bmap-parser",
  "bb-drivelist",
  "bb-helper",
- "bmap-parser",
  "fatfs",
  "fscommon",
  "futures",
@@ -786,21 +797,6 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
-]
-
-[[package]]
-name = "bmap-parser"
-version = "0.2.0"
-source = "git+https://github.com/Ayush1325/bmap-rs.git?branch=windows-msvc#00c7fdbf775ee2c60cb037d005d797b58579338d"
-dependencies = [
- "digest",
- "flate2",
- "futures",
- "quick-xml 0.37.5",
- "serde",
- "sha2",
- "strum",
- "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -5587,27 +5583,6 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
-
-[[package]]
-name = "strum"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
-dependencies = [
- "strum_macros",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck 0.5.0",
- "proc-macro2",
- "quote",
- "syn 2.0.106",
-]
 
 [[package]]
 name = "subtle"
