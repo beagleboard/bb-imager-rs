@@ -106,8 +106,8 @@ pub(crate) fn view<'a>(
 
         let instructions_widget = if selected_image.is_some() && selected_board.is_some() {
             match (
-                selected_board.map(|x| x.instructions.clone()).flatten(),
-                selected_image.map(|x| x.info_text()).flatten(),
+                selected_board.and_then(|x| x.instructions.clone()),
+                selected_image.and_then(|x| x.info_text()),
             ) {
                 (_, Some(x)) | (Some(x), None) => Some(widget::container(
                     text(x).size(16).color(iced::Color::BLACK),
