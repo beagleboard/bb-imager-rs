@@ -28,5 +28,8 @@ json = ["reqwest/json", "dep:serde"]
 [dev-dependencies]
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
 
+[target.'cfg(not(windows))'.dependencies]
+sha2 = { version = "0.10", features = ["asm"] }
+
 [package.metadata.docs.rs]
 all-features = true
