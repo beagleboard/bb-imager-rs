@@ -3,8 +3,9 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
     os::windows::io::AsRawHandle,
     path::Path,
-    process::{Command, Stdio},
+    process::Stdio,
 };
+use tokio::io::AsyncWriteExt;
 use windows::Win32::{
     Foundation::HANDLE,
     System::IO::DeviceIoControl,
@@ -151,34 +152,37 @@ async fn diskpart_clean(path: &Path) -> Result<()> {
     }
 }
 
-fn diskpart_format(path: &Path) -> Result<()> {
+async fn diskpart_format(path: &Path) -> Result<()> {
     let disk_num = path
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
         .ok_or(Error::InvalidDrive)?;
 
-    let mut cmd = Command::new("diskpart")
+    let mut cmd = tokio::process::Command::new("diskpart")
         .stderr(Stdio::null())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .spawn()?;
 
     let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
-    stdin.write_all(b"select disk ")?;
-    stdin.write_all(disk_num.as_bytes())?;
-    stdin.write_all(b"\n")?;
-    stdin.write_all(b"clean\n")?;
-    stdin.write_all(b"create partition primary\n")?;
-    stdin.write_all(b"format quick fs=fat32\n")?;
-    stdin.write_all(b"assign\n")?;
-    stdin.write_all(b"exit\n")?;
+    stdin.write_all(b"select disk ").await?;
+    stdin.write_all(disk_num.as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.write_all(b"clean\n").await?;
+    stdin.write_all(b"create partition primary\n").await?;
+    stdin.write_all(b"format quick fs=fat32\n").await?;
+    stdin.write_all(b"assign\n").await?;
+    stdin.write_all(b"exit\n").await?;
 
     drop(stdin);
 
-    cmd.wait()?;
-
-    Ok(())
+    let status = cmd.wait().await?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::FailedToFormat(format!("Status: {}", status)))
+    }
 }
 
 impl Read for WinDrive {
@@ -211,9 +215,8 @@ impl crate::helpers::Eject for WinDrive {
     }
 }
 
-pub(crate) fn format(dst: &Path) -> Result<()> {
-    tracing::debug!("Trying to format {:?}", dst);
-    diskpart_format(dst).map_err(|e| Error::FailedToFormat(e.to_string()))
+pub(crate) async fn format(dst: &Path) -> Result<()> {
+    diskpart_format(dst).await
 }
 
 pub(crate) async fn open(dst: &Path) -> Result<WinDrive> {

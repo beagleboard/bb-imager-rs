@@ -2,7 +2,7 @@ use std::{fs::File, path::Path};
 
 use crate::{Error, Result};
 
-pub(crate) fn format(_dst: &Path) -> Result<()> {
+pub(crate) async fn format(_dst: &Path) -> Result<()> {
     unimplemented!()
 }
 
