@@ -12,48 +12,40 @@ use std::{
 };
 
 #[cfg(feature = "udev")]
-pub(crate) fn format(dst: &Path) -> Result<()> {
-    async fn inner(dst: &Path) -> Result<()> {
-        let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
+pub(crate) async fn format(dst: &Path) -> Result<()> {
+    let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
 
-        let devs = dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", dst.to_str().unwrap().into())]),
-                HashMap::new(),
-            )
-            .await
-            .map_err(Error::from)?;
-
-        let block = devs
-            .first()
-            .ok_or(Error::FailedToOpenDestination(
-                dst.to_string_lossy().to_string(),
-            ))?
-            .to_owned();
-
-        let obj = dbus_client
-            .object(block)
-            .expect("Unexpected error")
-            .block()
-            .await
-            .map_err(Error::from)?;
-
-        obj.format(
-            "vfat",
-            HashMap::from([("update-partition-type", true.into())]),
+    let devs = dbus_client
+        .manager()
+        .resolve_device(
+            HashMap::from([("path", dst.to_str().unwrap().into())]),
+            HashMap::new(),
         )
         .await
         .map_err(Error::from)?;
 
-        Ok(())
-    }
+    let block = devs
+        .first()
+        .ok_or(Error::FailedToOpenDestination(
+            dst.to_string_lossy().to_string(),
+        ))?
+        .to_owned();
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_io()
-        .build()
-        .unwrap();
-    rt.block_on(async move { inner(dst).await })
+    let obj = dbus_client
+        .object(block)
+        .expect("Unexpected error")
+        .block()
+        .await
+        .map_err(Error::from)?;
+
+    obj.format(
+        "vfat",
+        HashMap::from([("update-partition-type", true.into())]),
+    )
+    .await
+    .map_err(Error::from)?;
+
+    Ok(())
 }
 
 #[cfg(feature = "udev")]

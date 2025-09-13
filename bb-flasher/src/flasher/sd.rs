@@ -116,9 +116,8 @@ impl BBFlasher for FormatFlasher {
         _: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
         let p = self.0;
-        tokio::task::spawn_blocking(move || bb_flasher_sd::format(p.as_path()))
+        bb_flasher_sd::format(p.as_path())
             .await
-            .unwrap()
             .map_err(|e| match e {
                 Error::IoError(error) => error,
                 _ => std::io::Error::other(e.to_string()),
