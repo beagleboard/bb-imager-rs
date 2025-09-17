@@ -137,7 +137,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         .add_filter("image", extensions)
                         .pick_file()
                         .await
-                        .map(|x| x.path().to_path_buf())
+                        .map(|x| x.inner().to_path_buf())
                 },
                 move |x| match x {
                     Some(y) => BBImagerMessage::SelectImage(helpers::BoardImage::local(y, flasher)),
