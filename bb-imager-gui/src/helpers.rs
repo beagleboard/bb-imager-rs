@@ -354,6 +354,13 @@ impl BoardImage {
             BoardImage::SdFormat => None,
         }
     }
+
+    pub(crate) fn file_name(&self) -> Option<String> {
+        match self {
+            Self::SdFormat => None,
+            Self::Image { img, .. } => Some(img.file_name()),
+        }
+    }
 }
 
 impl std::fmt::Display for BoardImage {
@@ -394,6 +401,33 @@ impl RemoteImage {
             extract_size,
             downloader,
         }
+    }
+
+    fn file_name(&self) -> &str {
+        self.url.path_segments().unwrap().last().unwrap()
+    }
+
+    async fn save(
+        &self,
+        path: &std::path::Path,
+        mut chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+    ) -> std::io::Result<()> {
+        let (tx, mut rx) = futures::channel::mpsc::channel(5);
+
+        let handle = tokio::spawn(async move {
+            while let Some(x) = futures::StreamExt::next(&mut rx).await {
+                let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(x));
+            }
+        });
+
+        let p = self
+            .downloader
+            .download_with_sha(*self.url.clone(), self.extract_sha256, Some(tx))
+            .await?;
+        tokio::fs::copy(p, path).await?;
+        handle.abort();
+
+        Ok(())
     }
 }
 
@@ -472,6 +506,26 @@ pub(crate) enum SelectedImage {
     RemoteImage(RemoteImage),
 }
 
+impl SelectedImage {
+    fn file_name(&self) -> String {
+        match self {
+            Self::LocalImage(x) => x.file_name().to_string_lossy().to_string(),
+            Self::RemoteImage(x) => x.file_name().to_string(),
+        }
+    }
+
+    async fn save(
+        &self,
+        path: &std::path::Path,
+        chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+    ) -> std::io::Result<()> {
+        match self {
+            Self::LocalImage(x) => tokio::fs::copy(x.path(), path).await.map(|_| ()),
+            Self::RemoteImage(x) => x.save(path, chan).await,
+        }
+    }
+}
+
 impl bb_flasher::Resolvable for SelectedImage {
     type ResolvedType = (bb_flasher::OsImage, u64);
 
@@ -515,6 +569,9 @@ pub(crate) async fn flash(
     cancel: tokio_util::sync::CancellationToken,
 ) -> std::io::Result<()> {
     match (img, customization, dst) {
+        (Some(BoardImage::Image { img, .. }), _, Some(Destination::LocalFile(f))) => {
+            img.save(&f, chan).await
+        }
         (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
             bb_flasher::sd::FormatFlasher::new(t)
                 .flash(Some(chan))
@@ -570,6 +627,7 @@ pub(crate) async fn flash(
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum Destination {
+    LocalFile(PathBuf),
     SdCard(bb_flasher::sd::Target),
     #[cfg(feature = "bcf_cc1352p7")]
     BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
@@ -582,6 +640,7 @@ pub(crate) enum Destination {
 impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Destination::LocalFile(x) => x.display().fmt(f),
             Destination::SdCard(target) => target.fmt(f),
             #[cfg(feature = "bcf_cc1352p7")]
             Destination::BeagleConnectFreedom(target) => target.fmt(f),
@@ -601,6 +660,11 @@ impl Destination {
         } else {
             None
         }
+    }
+
+    /// Download instead of flashing
+    pub(crate) fn is_download_action(&self) -> bool {
+        matches!(self, Self::LocalFile(_))
     }
 }
 

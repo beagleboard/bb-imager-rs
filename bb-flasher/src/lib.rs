@@ -57,6 +57,14 @@ impl LocalImage {
     pub const fn new(path: Box<Path>) -> Self {
         Self(path)
     }
+
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+
+    pub fn file_name(&self) -> &std::ffi::OsStr {
+        self.0.file_name().unwrap()
+    }
 }
 
 impl Resolvable for LocalImage {

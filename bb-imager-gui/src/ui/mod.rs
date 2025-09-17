@@ -19,6 +19,7 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
             state.selected_image(),
             state.selected_destination(),
             state.is_destionation_selectable(),
+            state.is_download_action(),
         ),
         Screen::BoardSelection(p) => {
             board_selection::view(state.devices(), p.search_str(), state.downloader())
@@ -44,9 +45,11 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
                 extra_entries,
             )
         }
-        Screen::DestinationSelection(s) => {
-            destination_selection::view(state.destinations(), s.search_str())
-        }
+        Screen::DestinationSelection(s) => destination_selection::view(
+            state.destinations(),
+            s.search_str(),
+            state.selected_image().unwrap().file_name(),
+        ),
         Screen::ExtraConfiguration(id) => configuration::view(
             state.app_settings(),
             state.customization(),
@@ -61,6 +64,7 @@ pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
                 state.selected_image(),
                 state.selected_destination(),
                 state.is_destionation_selectable(),
+                state.is_download_action(),
             );
             dialog(base, flashing_confirmation_menu())
         }

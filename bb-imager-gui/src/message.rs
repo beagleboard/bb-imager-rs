@@ -21,6 +21,7 @@ pub(crate) enum BBImagerMessage {
     SelectImage(BoardImage),
     SelectLocalImage(bb_config::config::Flasher),
     SelectPort(Destination),
+    SelectDestinationFile(String),
     ProgressBar(ProgressBarState),
     Destinations(Vec<Destination>),
     RefreshConfig,
@@ -145,6 +146,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             );
         }
+        BBImagerMessage::SelectDestinationFile(x) => {
+            return Task::perform(
+                async move {
+                    rfd::AsyncFileDialog::new()
+                        .set_file_name(x)
+                        .save_file()
+                        .await
+                        .map(|x| x.inner().to_path_buf())
+                },
+                move |y| match y {
+                    Some(z) => BBImagerMessage::SelectPort(helpers::Destination::LocalFile(z)),
+                    None => BBImagerMessage::Null,
+                },
+            );
+        }
         BBImagerMessage::SelectPort(x) => {
             state.selected_dst = Some(x);
             state.screen.pop();
@@ -187,8 +203,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::WriteBtn => {
             let skip_confirmation = state.app_settings().skip_confirmation == Some(true);
+            let downloading = state.is_download_action();
             return match state.customization() {
-                Some(x) if x.need_confirmation() && !skip_confirmation => {
+                Some(x) if x.need_confirmation() && !skip_confirmation && !downloading => {
                     state.push_page(Screen::FlashingConfirmation)
                 }
                 Some(x) => state.start_flashing(Some(x.clone())),

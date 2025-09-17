@@ -6,7 +6,11 @@ use iced::{
 use super::helpers::search_bar;
 use crate::{BBImagerMessage, constants, helpers};
 
-pub(crate) fn view<'a, D>(destinations: D, search_str: &'a str) -> Element<'a, BBImagerMessage>
+pub(crate) fn view<'a, D>(
+    destinations: D,
+    search_str: &'a str,
+    file_name: Option<String>,
+) -> Element<'a, BBImagerMessage>
 where
     D: Iterator<Item = &'a helpers::Destination>,
 {
@@ -38,15 +42,32 @@ where
         })
         .map(Into::into);
 
-    let row3: iced::Element<_> = if items.size_hint() == (0, Some(0)) {
-        text("No destinations found")
-            .width(iced::Length::Fill)
-            .size(20)
-            .color([0.8, 0.8, 0.8])
-            .into()
-    } else {
-        widget::scrollable(widget::column(items).spacing(10)).into()
+    let col = match file_name {
+        Some(fname) => widget::column(
+            items.chain(
+                [button(
+                    widget::row![
+                        widget::svg(widget::svg::Handle::from_memory(constants::FILE_SAVE_ICON))
+                            .width(40),
+                        widget::column![
+                            text("Save to File"),
+                            text("Save the image to a local file without flashing")
+                        ]
+                    ]
+                    .align_y(iced::Alignment::Center)
+                    .spacing(10),
+                )
+                .width(iced::Length::Fill)
+                .on_press(BBImagerMessage::SelectDestinationFile(fname))
+                .style(widget::button::secondary)
+                .into()]
+                .into_iter(),
+            ),
+        ),
+        None => widget::column(items),
     };
+
+    let row3: iced::Element<_> = widget::scrollable(col.spacing(10)).into();
 
     widget::column![
         search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
