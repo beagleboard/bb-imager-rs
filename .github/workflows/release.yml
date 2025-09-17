@@ -177,10 +177,7 @@ jobs:
         files: cargo-vendor.tar.gz
 
   macos-job:
-    strategy:
-      matrix:
-        target: [aarch64-apple-darwin, x86_64-apple-darwin]
-    name: Build MacOS Artifacts for ${{ matrix.target }}
+    name: Build MacOS Artifacts
     runs-on: macos-latest
     steps:
     - name: Checkout
@@ -199,8 +196,8 @@ jobs:
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
 
-    - name: Add ${{ matrix.platform.target }} target
-      run:  rustup target add ${{ matrix.target }}
+    - name: Add Rust targets
+      run:  rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
@@ -220,14 +217,14 @@ jobs:
 
     - name: Build packages
       env:
-        TARGET: ${{ matrix.target }}
         APPLE_CERTIFICATE: ${{ secrets.CERT_DEVELOPER_APP_BASE64 }}
         APPLE_CERTIFICATE_PASSWORD: ${{ secrets.CERT_PASSWORD }}
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
         APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
       run: |
-        make package-gui-macos-dmg
+        TARGET=aarch64-apple-darwin make package-gui-macos-dmg
+        TARGET=x86_64-apple-darwin make package-gui-macos-dmg
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
