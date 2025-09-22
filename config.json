@@ -91,13 +91,13 @@
 		{
 			"name": "MicroBlocks",
 			"description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-			"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+			"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
 			"flasher": "BeagleConnectFreedom",
 			"subitems": [
 				{
 					"name": "MicroBlocks Stable Builds",
 					"description": "Latest stable MicroBlocks Release",
-					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
 					"flasher": "BeagleConnectFreedom",
 					"devices": [
 						"beagleconnect-freedom"
@@ -107,7 +107,7 @@
 				{
 					"name": "MicroBlocks Pilot Builds",
 					"description": "Explore upcoming MicroBlocks release",
-					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
 					"flasher": "BeagleConnectFreedom",
 					"devices": [
 						"beagleconnect-freedom"
@@ -117,7 +117,7 @@
 				{
 					"name": "MicroBlocks Development Builds",
 					"description": "Cutting edge MicroBlocks builds. Do not use in Production",
-					"icon": "https://microblocks.fun/assets/img/logos/MicroBlocks-white.svg",
+					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
 					"flasher": "BeagleConnectFreedom",
 					"devices": [
 						"beagleconnect-freedom"
@@ -151,7 +151,7 @@
 		{
 			"name": "Zephyr SD Card Images",
 			"description": "Images to use Zephyr on A53 Cores",
-			"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/zephyr.png",
+			"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/zephyr.webp",
 			"flasher": "SdCard",
 			"devices": [
 				"pocketbeagle2-am62"
