@@ -30,7 +30,7 @@ libc = "0.2"
 tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread", "process"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
+windows = { version = "0.62", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
 tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
