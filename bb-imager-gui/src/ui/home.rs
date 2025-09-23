@@ -13,6 +13,7 @@ pub(crate) fn view<'a>(
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a helpers::Destination>,
     destination_selectable: bool,
+    download: bool,
 ) -> Element<'a, BBImagerMessage> {
     widget::responsive(move |size| {
         let choose_device_btn = match selected_board {
@@ -36,7 +37,12 @@ pub(crate) fn view<'a>(
         }));
 
         let choose_dst_btn = match selected_dst {
-            Some(x) => home_btn_text(x.to_string(), destination_selectable, iced::Length::Fill),
+            Some(x) => {
+                let dst_txt = x.to_string();
+                let max_len = std::cmp::min((size.width / 25.0).floor() as usize, dst_txt.len());
+                let (temp, _) = dst_txt.split_at(max_len);
+                home_btn_text(temp.to_string(), destination_selectable, iced::Length::Fill)
+            }
             None => home_btn_text(
                 "CHOOSE DESTINATION",
                 selected_image.is_some() && destination_selectable,
@@ -62,13 +68,17 @@ pub(crate) fn view<'a>(
 
         let next_btn_active =
             selected_board.is_none() || selected_image.is_none() || selected_dst.is_none();
-        let next_btn = home_btn_text("WRITE", !next_btn_active, iced::Length::Fill)
-            .width(iced::Length::Fill)
-            .on_press_maybe(if next_btn_active {
-                None
-            } else {
-                Some(BBImagerMessage::WriteBtn)
-            });
+        let next_btn = home_btn_text(
+            if download { "DOWNLOAD" } else { "WRITE" },
+            !next_btn_active,
+            iced::Length::Fill,
+        )
+        .width(iced::Length::Fill)
+        .on_press_maybe(if next_btn_active {
+            None
+        } else {
+            Some(BBImagerMessage::WriteBtn)
+        });
 
         let choice_btn_row = widget::row![
             widget::column![

@@ -423,4 +423,12 @@ impl BBImager {
     pub(crate) fn is_flashing(&self) -> bool {
         self.cancel_flashing.is_some()
     }
+
+    /// Download instead of flashing
+    pub(crate) fn is_download_action(&self) -> bool {
+        match self.selected_destination() {
+            Some(x) => x.is_download_action(),
+            None => false,
+        }
+    }
 }
