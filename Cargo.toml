@@ -1,6 +1,6 @@
 [package]
 name = "bb-drivelist"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Mazter Irwan <ir1keren@gmail.com>", "Ayush Singh <ayush@beagleboard.org>"]
 edition = "2024"
 description = "This is basically a Rust implementation of [Balena's drivelist](https://github.com/balena-io-modules/drivelist)"
