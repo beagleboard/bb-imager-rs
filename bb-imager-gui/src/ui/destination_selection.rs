@@ -44,25 +44,22 @@ where
 
     let col = match file_name {
         Some(fname) => widget::column(
-            items.chain(
-                [button(
-                    widget::row![
-                        widget::svg(widget::svg::Handle::from_memory(constants::FILE_SAVE_ICON))
-                            .width(40),
-                        widget::column![
-                            text("Save to File"),
-                            text("Save the image to a local file without flashing")
-                        ]
+            items.chain([button(
+                widget::row![
+                    widget::svg(widget::svg::Handle::from_memory(constants::FILE_SAVE_ICON))
+                        .width(40),
+                    widget::column![
+                        text("Save to File"),
+                        text("Save the image to a local file without flashing")
                     ]
-                    .align_y(iced::Alignment::Center)
-                    .spacing(10),
-                )
-                .width(iced::Length::Fill)
-                .on_press(BBImagerMessage::SelectDestinationFile(fname))
-                .style(widget::button::secondary)
-                .into()]
-                .into_iter(),
-            ),
+                ]
+                .align_y(iced::Alignment::Center)
+                .spacing(10),
+            )
+            .width(iced::Length::Fill)
+            .on_press(BBImagerMessage::SelectDestinationFile(fname))
+            .style(widget::button::secondary)
+            .into()]),
         ),
         None => widget::column(items),
     };

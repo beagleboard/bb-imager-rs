@@ -209,10 +209,10 @@ pub async fn flash<R: Read + Send + 'static>(
     customization: Option<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> std::io::Result<()> {
-    if let Some(x) = &customization {
-        if !x.validate() {
-            return Err(crate::Error::InvalidCustomizaton.into());
-        }
+    if let Some(x) = &customization
+        && !x.validate()
+    {
+        return Err(crate::Error::InvalidCustomizaton.into());
     }
 
     tracing::info!("Opening Destination");

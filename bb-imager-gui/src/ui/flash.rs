@@ -4,7 +4,7 @@ use crate::{BBImagerMessage, Screen, constants, pages::FlashingState};
 
 use super::helpers::home_btn_text;
 
-pub(crate) fn view(state: &FlashingState, running: bool) -> Element<BBImagerMessage> {
+pub(crate) fn view(state: &FlashingState, running: bool) -> Element<'_, BBImagerMessage> {
     widget::responsive(move |size| {
         const FOOTER_HEIGHT: f32 = 150.0;
         let banner_height = size.height / 4.0;

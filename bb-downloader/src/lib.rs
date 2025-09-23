@@ -106,10 +106,10 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {
-            if let Ok(hash) = sha256_from_path(&file_path).await {
-                if hash == sha256 {
-                    return Some(file_path);
-                }
+            if let Ok(hash) = sha256_from_path(&file_path).await
+                && hash == sha256
+            {
+                return Some(file_path);
             }
 
             // Delete old file

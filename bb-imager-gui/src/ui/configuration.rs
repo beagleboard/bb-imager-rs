@@ -299,7 +299,7 @@ fn keymap_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
+fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
     let mut form = widget::row![
         widget::toggler(config.hostname.is_some())
             .label("Set Hostname")
@@ -368,7 +368,7 @@ fn timezone_form<'a>(
         .style(widget::container::bordered_box)
 }
 
-fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
+fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
@@ -418,7 +418,7 @@ fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<BBImage
         .style(widget::container::bordered_box)
 }
 
-fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<BBImagerMessage> {
+fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
     let mut form = widget::column![
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")

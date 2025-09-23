@@ -404,7 +404,7 @@ impl RemoteImage {
     }
 
     fn file_name(&self) -> &str {
-        self.url.path_segments().unwrap().last().unwrap()
+        self.url.path_segments().unwrap().next_back().unwrap()
     }
 
     async fn save(
