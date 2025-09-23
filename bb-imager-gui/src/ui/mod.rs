@@ -10,7 +10,7 @@ mod helpers;
 mod home;
 mod image_selection;
 
-pub(crate) fn view(state: &BBImager) -> Element<BBImagerMessage> {
+pub(crate) fn view(state: &BBImager) -> Element<'_, BBImagerMessage> {
     tracing::debug!("Page Stack: {:#?}", state.screen);
 
     match state.screen.last().expect("No Screen") {
