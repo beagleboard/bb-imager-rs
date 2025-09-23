@@ -12,7 +12,7 @@
     "@types/alpinejs": "^3.13.11",
     "sass-embedded": "^1.89.2",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.7"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.0.0",
