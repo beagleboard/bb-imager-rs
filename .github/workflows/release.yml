@@ -38,7 +38,7 @@ jobs:
       TARGET: ${{ matrix.platform.target }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         lfs: true
 
@@ -102,7 +102,7 @@ jobs:
       TARGET: armv7-unknown-linux-gnueabihf
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         lfs: true
 
@@ -161,7 +161,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         lfs: true
 
@@ -181,7 +181,7 @@ jobs:
     runs-on: macos-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         lfs: true
 
@@ -257,7 +257,7 @@ jobs:
       BCF_MSP430: 1
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         lfs: true
 
