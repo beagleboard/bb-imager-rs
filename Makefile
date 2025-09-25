@@ -31,7 +31,7 @@ ifeq (${VERBOSE}, 1)
 	_CARGO_PACKAGER_ARGS+=--verbose
 endif
 
-_RUST_ARGS_CLI_GUI = ${_RUST_ARGS}
+_RUST_ARGS_CLI_GUI = ${_RUST_ARGS} -F updater
 _RUST_ARGS_SERVICE = ${_RUST_ARGS}
 
 ifeq (${PB2_MSPM0}, 1)
