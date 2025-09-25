@@ -222,7 +222,7 @@ setup-fedora-deps:
 .PHONY: setup-packaging-deps
 setup-packaging-deps:
 	@echo "Installing dependencies required for packaging"
-	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/Ayush1325/cargo-packager.git --branch test-branch
+	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/crabnebula-dev/cargo-packager.git
 
 
 ## housekeeping: package-rename: Replace package version with `_alpha_`. Intended for use in CI.
