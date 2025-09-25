@@ -31,7 +31,7 @@ ifeq (${VERBOSE}, 1)
 	_CARGO_PACKAGER_ARGS+=--verbose
 endif
 
-_RUST_ARGS_CLI_GUI = ${_RUST_ARGS} -F updater
+_RUST_ARGS_CLI_GUI = ${_RUST_ARGS}
 _RUST_ARGS_SERVICE = ${_RUST_ARGS}
 
 ifeq (${PB2_MSPM0}, 1)
@@ -86,7 +86,7 @@ ifeq (${NO_BUILD}, 1)
 	@echo "Skip Building GUI"
 else
 	@echo "Building GUI"
-	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_CLI_GUI}
+	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_CLI_GUI} -F updater
 endif
 
 ## run: run-gui: Run GUI for quick testing on host.
