@@ -649,6 +649,7 @@ dependencies = [
  "localzone",
  "notify-rust",
  "rfd",
+ "semver",
  "serde",
  "serde_json",
  "tokio",
