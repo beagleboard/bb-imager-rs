@@ -93,6 +93,7 @@ impl Downloader {
         }
 
         let client = reqwest::Client::builder()
+            .user_agent(env!("CARGO_PKG_NAME"))
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(15))
             .build()

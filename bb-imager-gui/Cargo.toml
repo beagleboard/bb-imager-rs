@@ -30,6 +30,7 @@ bb-downloader = { path = "../bb-downloader", features = ["json"] }
 bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-util = { version = "0.7" }
+semver = "1.0.27"
 
 [build-dependencies]
 embed-resource = "3.0"
@@ -47,6 +48,8 @@ pb2_mspm0 = ["bb-flasher/pb2_mspm0_dbus"]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 # GUI requires the base board support for any sub soc firmware
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
+# Handle application updates
+updater = []
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]

@@ -63,6 +63,9 @@ pub(crate) enum BBImagerMessage {
     CancelCustomization,
     /// Reset customization to default state
     ResetCustomization,
+
+    /// A new version of application is available
+    UpdateAvailable(semver::Version),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
@@ -231,6 +234,19 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
 
             return Task::batch([progress_task, notification_task]);
+        }
+        BBImagerMessage::UpdateAvailable(x) => {
+            return Task::future(async move {
+                let res = helpers::show_notification(format!(
+                    "A new version of application is available {}",
+                    x
+                ))
+                .await;
+
+                tracing::debug!("Notification response {res:?}");
+
+                BBImagerMessage::Null
+            });
         }
         BBImagerMessage::Destinations(x) => {
             if !state.is_destionation_selectable() {

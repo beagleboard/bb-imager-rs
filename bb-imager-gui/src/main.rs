@@ -18,6 +18,7 @@ mod message;
 mod pages;
 mod persistance;
 mod ui;
+mod updater;
 
 fn main() -> iced::Result {
     let log_file_p = helpers::log_file_path();
@@ -140,7 +141,33 @@ impl BBImager {
         // Fetch all board images
         let board_image_task = ans.fetch_board_images();
 
-        (ans, Task::batch([config_task, board_image_task]))
+        let updater_task = ans.updater_task();
+        (
+            ans,
+            Task::batch([config_task, board_image_task, updater_task]),
+        )
+    }
+
+    fn updater_task(&self) -> Task<BBImagerMessage> {
+        if cfg!(feature = "updater") {
+            let downloader = self.downloader.clone();
+            Task::perform(
+                async move { updater::check_update(downloader).await },
+                |x| match x {
+                    Ok(Some(ver)) => BBImagerMessage::UpdateAvailable(ver),
+                    Ok(None) => {
+                        tracing::info!("Application is at the latest version");
+                        BBImagerMessage::Null
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to check for application update: {e:?}");
+                        BBImagerMessage::Null
+                    }
+                },
+            )
+        } else {
+            Task::none()
+        }
     }
 
     fn fetch_board_images(&self) -> Task<BBImagerMessage> {
