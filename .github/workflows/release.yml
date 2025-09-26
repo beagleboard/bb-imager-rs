@@ -119,14 +119,14 @@ jobs:
       with:
         command: build
         target: armv7-unknown-linux-gnueabihf
-        args: "--locked --release -F bcf_msp430 -F bcf_cc1352p7 -p bb-imager-cli -p bb-imager-gui"
+        args: "--locked --release -F bcf_msp430 -F bcf_cc1352p7 -p bb-imager-cli"
         strip: true
 
     - name: Install packaging deps
       run: make setup-packaging-deps
 
     - name: Build packages
-      run: make package-cli-linux-targz package-cli-linux-deb package-gui-linux-targz package-gui-linux-deb 
+      run: make package-cli-linux-targz package-cli-linux-deb
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
