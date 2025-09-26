@@ -232,6 +232,7 @@ jobs:
     # The ENV variable names are what cargo-packager requires
     - name: Setup macos signing
       working-directory: bb-imager-gui
+      if: github.event_name != 'pull_request'
       run: |
         echo "" >> Cargo.toml
         echo "[package.metadata.packager.macos]" >> Cargo.toml
