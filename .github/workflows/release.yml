@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
     tags:
       - v*
+  pull_request:
+    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -74,7 +76,7 @@ jobs:
 
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
-      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') == false
       with:
         prerelease: true
         name: Continuous Release
@@ -90,6 +92,16 @@ jobs:
       with:
         generate_release_notes: true
         files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
+          bb-imager-service/dist/*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: github.event_name == 'pull_request'
+      with:
+        name: artifacts-${{ matrix.platform.target }}
+        path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
           bb-imager-service/dist/*
@@ -135,7 +147,7 @@ jobs:
 
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
-      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') == false
       with:
         prerelease: true
         name: Continuous Release
@@ -151,6 +163,16 @@ jobs:
       with:
         generate_release_notes: true
         files: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
+          bb-imager-service/dist/*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: github.event_name == 'pull_request'
+      with:
+        name: artifacts-armv7-unknown-linux-gnueabihf
+        path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
           bb-imager-service/dist/*
@@ -233,7 +255,7 @@ jobs:
 
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
-      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') == false
       with:
         prerelease: true
         name: Continuous Release
@@ -247,6 +269,14 @@ jobs:
       with:
         generate_release_notes: true
         files: |
+          bb-imager-gui/dist/*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: github.event_name == 'pull_request'
+      with:
+        name: artifacts-macos
+        path: |
           bb-imager-gui/dist/*
 
   windows-job:
@@ -295,7 +325,7 @@ jobs:
 
     - name: Pre-Release
       uses: softprops/action-gh-release@v2
-      if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+      if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') == false
       with:
         prerelease: true
         name: Continuous Release
@@ -309,4 +339,12 @@ jobs:
       with:
         generate_release_notes: true
         files: |
+          bb-imager-gui/dist/*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: github.event_name == 'pull_request'
+      with:
+        name: artifacts-windows
+        path: |
           bb-imager-gui/dist/*
