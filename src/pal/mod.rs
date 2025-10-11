@@ -19,5 +19,5 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
 
 #[cfg(target_os = "macos")]
 pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
-    macos::diskutil()
+    macos::drive_list()
 }
