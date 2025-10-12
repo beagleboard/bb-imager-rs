@@ -204,16 +204,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         }
 
         device.enumerator = "DiskArbitration".to_string();
-
-        device.bus_type = device_protocol.as_ref().map(|p| unsafe {
-            let utf8 = p.UTF8String();
-            if utf8.is_null() {
-                String::new()
-            } else {
-                CStr::from_ptr(utf8).to_string_lossy().into_owned()
-            }
-        });
-
+        device.bus_type = device_protocol.as_ref().map(|s| s.to_string());
         device.bus_version = None;
         device.device = format!("/dev/{}", disk_bsd_name);
 
