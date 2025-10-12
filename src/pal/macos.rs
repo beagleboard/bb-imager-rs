@@ -164,35 +164,32 @@ trait DeviceDescriptorFromDiskDescription {
 
 impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
     fn from_disk_description(disk_bsd_name: String, disk_description: &CFDictionary) -> Self {
-        let device_protocol_key = unsafe { kDADiskDescriptionDeviceProtocolKey };
-        let device_protocol = disk_description.get_string(device_protocol_key);
+        let device_protocol =
+            disk_description.get_string(unsafe { kDADiskDescriptionDeviceProtocolKey });
+        let block_size =
+            disk_description.get_number(unsafe { kDADiskDescriptionMediaBlockSizeKey });
 
-        let block_size_key = unsafe { kDADiskDescriptionMediaBlockSizeKey };
-        let block_size = disk_description.get_number(block_size_key);
-
-        let internal_key = unsafe { kDADiskDescriptionDeviceInternalKey };
         let is_internal = disk_description
-            .get_number(internal_key)
+            .get_number(unsafe { kDADiskDescriptionDeviceInternalKey })
             .map(|n| n.boolValue())
             .unwrap_or(false);
 
-        let removable_key = unsafe { kDADiskDescriptionMediaRemovableKey };
         let is_removable = disk_description
-            .get_number(removable_key)
+            .get_number(unsafe { kDADiskDescriptionMediaRemovableKey })
             .map(|n| n.boolValue())
             .unwrap_or(false);
 
-        let ejectable_key = unsafe { kDADiskDescriptionMediaEjectableKey };
         let is_ejectable = disk_description
-            .get_number(ejectable_key)
+            .get_number(unsafe { kDADiskDescriptionMediaEjectableKey })
             .map(|n| n.boolValue())
             .unwrap_or(false);
 
         let mut device = DeviceDescriptor::default();
 
         // Determine partition table type
-        let content_key = unsafe { kDADiskDescriptionMediaContentKey };
-        if let Some(media_content) = disk_description.get_string(content_key) {
+        if let Some(media_content) =
+            disk_description.get_string(unsafe { kDADiskDescriptionMediaContentKey })
+        {
             let guid_partition = NSString::from_str("GUID_partition_scheme");
             let fdisk_partition = NSString::from_str("FDisk_partition_scheme");
 
@@ -207,22 +204,13 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         device.bus_type = device_protocol.as_ref().map(|s| s.to_string());
         device.bus_version = None;
         device.device = format!("/dev/{}", disk_bsd_name);
-
-        let bus_path_key = unsafe { kDADiskDescriptionBusPathKey };
-        device.device_path = disk_description.get_string(bus_path_key).map(|p| unsafe {
-            let utf8 = p.UTF8String();
-            if utf8.is_null() {
-                String::new()
-            } else {
-                CStr::from_ptr(utf8).to_string_lossy().into_owned()
-            }
-        });
-
+        device.device_path = disk_description
+            .get_string(unsafe { kDADiskDescriptionBusPathKey })
+            .map(|p| p.to_string());
         device.raw = format!("/dev/r{}", disk_bsd_name);
 
-        let name_key = unsafe { kDADiskDescriptionMediaNameKey };
         device.description = disk_description
-            .get_string(name_key)
+            .get_string(unsafe { kDADiskDescriptionMediaNameKey })
             .map(|desc| unsafe {
                 let utf8 = desc.UTF8String();
                 if utf8.is_null() {
@@ -247,15 +235,13 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
             device.logical_block_size = block_size_value;
         }
 
-        let size_key = unsafe { kDADiskDescriptionMediaSizeKey };
         device.size = disk_description
-            .get_number(size_key)
+            .get_number(unsafe { kDADiskDescriptionMediaSizeKey })
             .map(|n| n.unsignedLongValue())
             .unwrap_or(0);
 
-        let writable_key = unsafe { kDADiskDescriptionMediaWritableKey };
         device.is_readonly = !disk_description
-            .get_number(writable_key)
+            .get_number(unsafe { kDADiskDescriptionMediaWritableKey })
             .map(|n| n.boolValue())
             .unwrap_or(false);
 
@@ -272,9 +258,8 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         device.is_removable = is_removable || is_ejectable;
 
         // Check if it's an SD card by examining the media icon
-        let icon_key = unsafe { kDADiskDescriptionMediaIconKey };
         device.is_card = disk_description
-            .get_cfdict(icon_key)
+            .get_cfdict(unsafe { kDADiskDescriptionMediaIconKey })
             .and_then(|media_icon_dict| {
                 let key = CFString::from_str("IOBundleResourceFile");
                 media_icon_dict.get_cfstring(&key)
@@ -373,16 +358,19 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
     };
 
     for path in &volume_paths {
-        let disk = match unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) } {
-            Some(d) => d,
-            None => continue,
-        };
+        let disk =
+            match unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) }
+            {
+                Some(d) => d,
+                None => continue,
+            };
 
         let bsdname_char = unsafe { disk.bsd_name() };
         if bsdname_char.is_null() {
             continue;
         }
-        let partition_bsdname = unsafe { CStr::from_ptr(bsdname_char).to_string_lossy().into_owned() };
+        let partition_bsdname =
+            unsafe { CStr::from_ptr(bsdname_char).to_string_lossy().into_owned() };
 
         let disk_len = partition_bsdname[5..]
             .find('s')
@@ -405,7 +393,7 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
             path.getResourceValue_forKey_error(&mut volume_name, NSURLVolumeLocalizedNameKey)
         };
         if success.is_err() {
-           continue;
+            continue;
         }
 
         let name_any = match volume_name {
@@ -423,7 +411,10 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
             CStr::from_ptr(utf8).to_string_lossy().to_string()
         };
 
-        if let Some(dd) = device_list.iter_mut().find(|dd| dd.device == format!("/dev/{}", disk_bsdname)) {
+        if let Some(dd) = device_list
+            .iter_mut()
+            .find(|dd| dd.device == format!("/dev/{}", disk_bsdname))
+        {
             dd.mountpoints.push(MountPoint::new(mount_path));
             dd.mountpoint_labels.push(label);
         }
