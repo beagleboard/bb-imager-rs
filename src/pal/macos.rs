@@ -8,7 +8,6 @@ use objc2::runtime::AnyObject;
 use objc2::{rc::Retained, sel};
 use objc2_core_foundation::{
     kCFAllocatorDefault, kCFRunLoopDefaultMode, CFDictionary, CFRetained, CFRunLoop, CFString,
-    CFURL,
 };
 use objc2_disk_arbitration::{
     kDADiskDescriptionBusPathKey, kDADiskDescriptionDeviceInternalKey,
@@ -372,6 +371,7 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
 
     let volume_keys =
         unsafe { NSArray::from_slice(&[NSURLVolumeNameKey, NSURLVolumeLocalizedNameKey]) };
+
     let Some(volume_paths) = NSFileManager::defaultManager()
         .mountedVolumeURLsIncludingResourceValuesForKeys_options(
             Some(&volume_keys),
@@ -382,50 +382,59 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
     };
 
     for path in &volume_paths {
-        let path_cf = &path as *const _ as *const CFURL;
-        let Some(disk) =
-            (unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, &*path_cf) })
-        else {
-            continue;
+        let disk = match unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) } {
+            Some(d) => d,
+            None => continue,
         };
 
         let bsdname_char = unsafe { disk.bsd_name() };
         if bsdname_char.is_null() {
             continue;
         }
+        let partition_bsdname = unsafe { CStr::from_ptr(bsdname_char).to_string_lossy().into_owned() };
 
-        let mut volume_name: Option<Retained<AnyObject>> = Some(NSString::new().into());
-        let _ = unsafe {
-            path.getResourceValue_forKey_error(&mut volume_name, NSURLVolumeLocalizedNameKey)
-        };
-
-        let partition_bsdname =
-            unsafe { CStr::from_ptr(bsdname_char).to_string_lossy().into_owned() };
-        let disk_bsdname = partition_bsdname[..partition_bsdname[5..]
+        let disk_len = partition_bsdname[5..]
             .find('s')
             .map(|i| i + 5)
-            .unwrap_or(partition_bsdname.len())]
-            .to_string();
+            .unwrap_or(partition_bsdname.len());
 
-        for dd in &mut device_list {
-            if dd.device == format!("/dev/{}", disk_bsdname) {
-                let mount_path = unsafe {
-                    let Some(path_str) = path.path() else {
-                        continue;
-                    };
-                    let utf8 = path_str.UTF8String();
-                    CStr::from_ptr(utf8).to_string_lossy().into_owned()
-                };
-                dd.mountpoints.push(MountPoint::new(mount_path));
+        let disk_bsdname = partition_bsdname[..disk_len].to_string();
 
-                let label = unsafe {
-                    let name_str: Retained<NSString> = volume_name.unwrap().downcast().unwrap();
-                    let utf8 = name_str.UTF8String();
-                    CStr::from_ptr(utf8).to_string_lossy().into_owned()
-                };
-                dd.mountpoint_labels.push(label);
-                break;
-            }
+        let mount_path = unsafe {
+            let Some(path_str) = path.path() else {
+                continue;
+            };
+            let utf8 = path_str.UTF8String();
+            CStr::from_ptr(utf8).to_string_lossy().to_string()
+        };
+
+        let mut volume_name: Option<Retained<AnyObject>> = None;
+
+        let success = unsafe {
+            path.getResourceValue_forKey_error(&mut volume_name, NSURLVolumeLocalizedNameKey)
+        };
+        if success.is_err() {
+           continue;
+        }
+
+        let name_any = match volume_name {
+            Some(n) => n,
+            None => continue,
+        };
+
+        let name_str = match name_any.downcast::<NSString>() {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let label = unsafe {
+            let utf8 = name_str.UTF8String();
+            CStr::from_ptr(utf8).to_string_lossy().to_string()
+        };
+
+        if let Some(dd) = device_list.iter_mut().find(|dd| dd.device == format!("/dev/{}", disk_bsdname)) {
+            dd.mountpoints.push(MountPoint::new(mount_path));
+            dd.mountpoint_labels.push(label);
         }
     }
 
