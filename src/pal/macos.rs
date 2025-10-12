@@ -23,84 +23,7 @@ use objc2_foundation::{
     NSURLVolumeLocalizedNameKey, NSURLVolumeNameKey, NSVolumeEnumerationOptions,
 };
 
-// DISKLIST
-
-unsafe extern "C-unwind" fn append_disk(disk: NonNull<DADisk>, context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-
-    let disks = context.cast::<NSMutableArray<NSString>>();
-    let bsd_name = unsafe { disk.as_ref().bsd_name() };
-
-    if bsd_name.is_null() {
-        return;
-    }
-
-    let Ok(name) = unsafe { CStr::from_ptr(bsd_name) }.to_str() else {
-        return;
-    };
-
-    let string = NSString::from_str(name);
-
-    unsafe {
-        disks.as_ref().unwrap().addObject(&*string);
-    }
-}
-
-struct DiskList {
-    disks: Retained<NSMutableArray<NSString>>,
-}
-
-impl DiskList {
-    fn new() -> Self {
-        let disks: Retained<NSMutableArray<NSString>> = NSMutableArray::new();
-        let mut disk_list = Self { disks };
-        disk_list.populate_disks_blocking();
-        disk_list.sort_disks();
-        disk_list
-    }
-
-    fn sort_disks(&mut self) {
-        unsafe {
-            self.disks
-                .sortUsingSelector(sel!(localizedStandardCompare:));
-        }
-    }
-
-    fn populate_disks_blocking(&mut self) {
-        unsafe {
-            let Some(session) = DASession::new(kCFAllocatorDefault) else {
-                return;
-            };
-
-            let callback =
-                Some(append_disk as unsafe extern "C-unwind" fn(NonNull<DADisk>, *mut c_void));
-            let array_ptr = NonNull::from(&*self.disks).as_ptr() as *mut c_void;
-
-            DARegisterDiskAppearedCallback(&session, None, callback, array_ptr);
-
-            let Some(run_loop) = CFRunLoop::current() else {
-                return;
-            };
-
-            let Some(mode) = kCFRunLoopDefaultMode else {
-                return;
-            };
-
-            DASession::schedule_with_run_loop(&session, &run_loop, mode);
-
-            run_loop.stop();
-            CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, 0.05, false);
-
-            let callback_ptr = NonNull::new_unchecked(callback.unwrap() as *mut c_void);
-            DAUnregisterCallback(&session, callback_ptr, array_ptr);
-            // session is released automatically when going out of scope
-        }
-    }
-}
-
-// DRIVELIST
+// UTILS
 
 /// Extension trait for CFDictionary to get typed values
 trait CFDictionaryExt {
@@ -158,6 +81,97 @@ impl CFDictionaryExt for CFDictionary {
     }
 }
 
+// Extension trait for *const c_char to convert to a Rust String.
+// Provides to_string() which returns Option<String> (None for null pointers).
+trait CCharPtrExt {
+    fn to_string(self) -> Option<String>;
+}
+
+impl CCharPtrExt for *const c_char {
+    fn to_string(self) -> Option<String> {
+        if self.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(self).to_string_lossy().into_owned() })
+        }
+    }
+}
+
+// DISKLIST
+
+unsafe extern "C-unwind" fn append_disk(disk: NonNull<DADisk>, context: *mut c_void) {
+    if context.is_null() {
+        return;
+    }
+
+    let disks = context.cast::<NSMutableArray<NSString>>();
+    let bsd_name = unsafe { disk.as_ref().bsd_name() };
+    let Some(bsd_name_str) = bsd_name.to_string() else {
+        return;
+    };
+
+    unsafe {
+        disks
+            .as_ref()
+            .unwrap()
+            .addObject(&NSString::from_str(&bsd_name_str));
+    }
+}
+
+struct DiskList {
+    disks: Retained<NSMutableArray<NSString>>,
+}
+
+impl DiskList {
+    fn new() -> Self {
+        let disks: Retained<NSMutableArray<NSString>> = NSMutableArray::new();
+        let mut disk_list = Self { disks };
+        disk_list.populate_disks_blocking();
+        disk_list.sort_disks();
+        disk_list
+    }
+
+    fn sort_disks(&mut self) {
+        unsafe {
+            self.disks
+                .sortUsingSelector(sel!(localizedStandardCompare:));
+        }
+    }
+
+    fn populate_disks_blocking(&mut self) {
+        unsafe {
+            let Some(session) = DASession::new(kCFAllocatorDefault) else {
+                return;
+            };
+
+            let callback =
+                Some(append_disk as unsafe extern "C-unwind" fn(NonNull<DADisk>, *mut c_void));
+            let array_ptr = NonNull::from(&*self.disks).as_ptr() as *mut c_void;
+
+            DARegisterDiskAppearedCallback(&session, None, callback, array_ptr);
+
+            let Some(run_loop) = CFRunLoop::current() else {
+                return;
+            };
+
+            let Some(mode) = kCFRunLoopDefaultMode else {
+                return;
+            };
+
+            DASession::schedule_with_run_loop(&session, &run_loop, mode);
+
+            run_loop.stop();
+            CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, 0.05, false);
+
+            let callback_ptr = NonNull::new_unchecked(callback.unwrap() as *mut c_void);
+            DAUnregisterCallback(&session, callback_ptr, array_ptr);
+            // session is released automatically when going out of scope
+        }
+    }
+}
+
+// DRIVELIST
+
 trait DeviceDescriptorFromDiskDescription {
     fn from_disk_description(disk_bsd_name: String, disk_description: &CFDictionary) -> Self;
 }
@@ -211,14 +225,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
 
         device.description = disk_description
             .get_string(unsafe { kDADiskDescriptionMediaNameKey })
-            .map(|desc| unsafe {
-                let utf8 = desc.UTF8String();
-                if utf8.is_null() {
-                    String::new()
-                } else {
-                    CStr::from_ptr(utf8).to_string_lossy().into_owned()
-                }
-            })
+            .map(|desc| desc.to_string())
             .unwrap_or_default();
 
         device.error = None;
@@ -334,10 +341,8 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
             continue;
         };
 
-        let disk_name_string = unsafe {
-            CStr::from_ptr(disk_bsd_name_utf8)
-                .to_string_lossy()
-                .into_owned()
+        let Some(disk_name_string) = disk_bsd_name_utf8.to_string() else {
+            continue;
         };
 
         let device = DeviceDescriptor::from_disk_description(disk_name_string, &disk_description);
@@ -358,19 +363,15 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
     };
 
     for path in &volume_paths {
-        let disk =
-            match unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) }
-            {
-                Some(d) => d,
-                None => continue,
-            };
-
-        let bsdname_char = unsafe { disk.bsd_name() };
-        if bsdname_char.is_null() {
+        let Some(disk) =
+            (unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) })
+        else {
             continue;
-        }
-        let partition_bsdname =
-            unsafe { CStr::from_ptr(bsdname_char).to_string_lossy().into_owned() };
+        };
+
+        let Some(partition_bsdname) = unsafe { disk.bsd_name() }.to_string() else {
+            continue;
+        };
 
         let disk_len = partition_bsdname[5..]
             .find('s')
@@ -392,23 +393,21 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
         let success = unsafe {
             path.getResourceValue_forKey_error(&mut volume_name, NSURLVolumeLocalizedNameKey)
         };
+
         if success.is_err() {
             continue;
         }
 
-        let name_any = match volume_name {
-            Some(n) => n,
-            None => continue,
+        let Some(name_any) = volume_name else {
+            continue;
         };
 
-        let name_str = match name_any.downcast::<NSString>() {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(name_str) = name_any.downcast::<NSString>() else {
+            continue;
         };
 
-        let label = unsafe {
-            let utf8 = name_str.UTF8String();
-            CStr::from_ptr(utf8).to_string_lossy().to_string()
+        let Some(label) = name_str.UTF8String().to_string() else {
+            continue;
         };
 
         if let Some(dd) = device_list
