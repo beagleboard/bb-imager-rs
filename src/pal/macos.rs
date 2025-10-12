@@ -384,12 +384,8 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
 
             let disk_bsdname = partition_bsdname[..disk_len].to_string();
 
-            let mount_path = unsafe {
-                let Some(path_str) = path.path() else {
-                    continue;
-                };
-                let utf8 = path_str.UTF8String();
-                CStr::from_ptr(utf8).to_string_lossy().to_string()
+            let Some(mount_path) = path.path().and_then(|it| it.UTF8String().to_string()) else {
+                continue;
             };
 
             let mut volume_name: Option<Retained<AnyObject>> = None;
