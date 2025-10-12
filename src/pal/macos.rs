@@ -5,7 +5,6 @@ use std::ptr::NonNull;
 
 use crate::device::DeviceDescriptor;
 use crate::MountPoint;
-use objc2::rc::autoreleasepool;
 use objc2::runtime::AnyObject;
 use objc2::{rc::Retained, sel};
 use objc2_core_foundation::{
@@ -136,13 +135,8 @@ impl DiskList {
         let disks: Retained<NSMutableArray<NSString>> = NSMutableArray::new();
         let mut disk_list = Self { disks };
 
-        autoreleasepool(|_| {
-            disk_list.populate_disks_blocking();
-        });
-
-        autoreleasepool(|_| {
-            disk_list.sort_disks();
-        });
+        disk_list.populate_disks_blocking();
+        disk_list.sort_disks();
 
         disk_list
     }
@@ -159,11 +153,8 @@ impl DiskList {
             return;
         };
 
-        let callback =
-            Some(append_disk as unsafe extern "C-unwind" fn(NonNull<DADisk>, *mut c_void));
-        let array_ptr = NonNull::from(&*self.disks).as_ptr() as *mut c_void;
-
-        unsafe { DARegisterDiskAppearedCallback(&session, None, callback, array_ptr) };
+        let disks_ptr = &*self.disks as *const _ as *mut c_void;
+        unsafe { DARegisterDiskAppearedCallback(&session, None, Some(append_disk), disks_ptr) };
 
         let Some(run_loop) = CFRunLoop::current() else {
             return;
@@ -175,13 +166,13 @@ impl DiskList {
 
         unsafe { DASession::schedule_with_run_loop(&session, &run_loop, mode) };
         run_loop.stop();
-
         CFRunLoop::run_in_mode(unsafe { kCFRunLoopDefaultMode }, 0.05, false);
-        let Some(callback_ptr) = NonNull::new(callback.unwrap() as *mut c_void) else {
-            return;
-        };
 
-        unsafe { DAUnregisterCallback(&session, callback_ptr, array_ptr) };
+        // For God knows why the callback function signature in DAUnregisterCallback is different than the
+        // DARegisterDiskAppearedCallback
+        let callback_ptr =
+            unsafe { NonNull::new_unchecked(&append_disk as *const _ as *mut c_void) };
+        unsafe { DAUnregisterCallback(&session, callback_ptr, disks_ptr) };
     }
 }
 
@@ -304,128 +295,115 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
 }
 
 pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
-    autoreleasepool(|_| {
-        let Some(session) = (unsafe { DASession::new(kCFAllocatorDefault) }) else {
-            anyhow::bail!("Failed to create DiskArbitration session");
+    let Some(session) = (unsafe { DASession::new(kCFAllocatorDefault) }) else {
+        anyhow::bail!("Failed to create DiskArbitration session");
+    };
+
+    let disk_list = DiskList::new();
+    let mut device_list: Vec<DeviceDescriptor> = Vec::with_capacity(disk_list.disks.len());
+    let mut device_map: HashMap<String, usize> = HashMap::with_capacity(disk_list.disks.len());
+
+    let predicate_format = NSString::from_str("SELF MATCHES %@");
+    let argument = NSString::from_str(r"^disk\d+s\d+$");
+    let arguments: Retained<NSArray> = NSArray::from_slice(&[&argument]);
+    let partition_regex = unsafe {
+        NSPredicate::predicateWithFormat_argumentArray(&predicate_format, Some(&arguments))
+    };
+
+    for disk_bsd_name in &disk_list.disks {
+        let is_disk_partition = unsafe { partition_regex.evaluateWithObject(Some(&disk_bsd_name)) };
+
+        if is_disk_partition {
+            continue;
+        }
+
+        let disk_bsd_name_utf8 = disk_bsd_name.UTF8String();
+
+        let Some(disk) = (unsafe {
+            let name_ptr = NonNull::new(disk_bsd_name_utf8 as *mut c_char);
+            name_ptr.and_then(|ptr| DADisk::from_bsd_name(kCFAllocatorDefault, &session, ptr))
+        }) else {
+            continue;
         };
 
-        let disk_list = DiskList::new();
-        let mut device_list: Vec<DeviceDescriptor> = Vec::with_capacity(disk_list.disks.len());
-        let mut device_map: HashMap<String, usize> = HashMap::with_capacity(disk_list.disks.len());
-
-        let predicate_format = NSString::from_str("SELF MATCHES %@");
-        let argument = NSString::from_str(r"^disk\d+s\d+$");
-        let arguments: Retained<NSArray> = NSArray::from_slice(&[&argument]);
-        let partition_regex = unsafe {
-            NSPredicate::predicateWithFormat_argumentArray(&predicate_format, Some(&arguments))
+        let Some(disk_description) = (unsafe { disk.description() }) else {
+            continue;
         };
 
-        autoreleasepool(|_| {
-            for disk_bsd_name in &disk_list.disks {
-                let is_disk_partition =
-                    unsafe { partition_regex.evaluateWithObject(Some(&disk_bsd_name)) };
+        let Some(disk_name_string) = disk_bsd_name_utf8.to_string() else {
+            continue;
+        };
 
-                if is_disk_partition {
-                    continue;
-                }
+        let device = DeviceDescriptor::from_disk_description(disk_name_string, &disk_description);
 
-                let disk_bsd_name_utf8 = disk_bsd_name.UTF8String();
+        // Map device path to its index in device_list for O(1) lookups later.
+        let next_idx = device_list.len();
+        device_map.insert(device.device.clone(), next_idx);
 
-                let Some(disk) = (unsafe {
-                    let name_ptr = NonNull::new(disk_bsd_name_utf8 as *mut c_char);
-                    name_ptr
-                        .and_then(|ptr| DADisk::from_bsd_name(kCFAllocatorDefault, &session, ptr))
-                }) else {
-                    continue;
-                };
+        device_list.push(device);
+    }
 
-                let Some(disk_description) = (unsafe { disk.description() }) else {
-                    continue;
-                };
+    let volume_keys =
+        unsafe { NSArray::from_slice(&[NSURLVolumeNameKey, NSURLVolumeLocalizedNameKey]) };
 
-                let Some(disk_name_string) = disk_bsd_name_utf8.to_string() else {
-                    continue;
-                };
+    let Some(volume_paths) = NSFileManager::defaultManager()
+        .mountedVolumeURLsIncludingResourceValuesForKeys_options(
+            Some(&volume_keys),
+            NSVolumeEnumerationOptions(0),
+        )
+    else {
+        return Ok(device_list);
+    };
 
-                let device =
-                    DeviceDescriptor::from_disk_description(disk_name_string, &disk_description);
-
-                // Map device path to its index in device_list for O(1) lookups later.
-                let next_idx = device_list.len();
-                device_map.insert(device.device.clone(), next_idx);
-
-                device_list.push(device);
-            }
-        });
-
-        let volume_keys =
-            unsafe { NSArray::from_slice(&[NSURLVolumeNameKey, NSURLVolumeLocalizedNameKey]) };
-
-        let Some(volume_paths) = NSFileManager::defaultManager()
-            .mountedVolumeURLsIncludingResourceValuesForKeys_options(
-                Some(&volume_keys),
-                NSVolumeEnumerationOptions(0),
-            )
+    for path in &volume_paths {
+        let Some(disk) =
+            (unsafe { DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref()) })
         else {
-            return Ok(device_list);
+            continue;
         };
 
-        autoreleasepool(|_| {
-            for path in &volume_paths {
-                let Some(disk) = (unsafe {
-                    DADisk::from_volume_path(kCFAllocatorDefault, &session, path.as_ref())
-                }) else {
-                    continue;
-                };
+        let Some(partition_bsdname) = unsafe { disk.bsd_name() }.to_string() else {
+            continue;
+        };
 
-                let Some(partition_bsdname) = unsafe { disk.bsd_name() }.to_string() else {
-                    continue;
-                };
+        let disk_len = partition_bsdname[5..]
+            .find('s')
+            .map(|i| i + 5)
+            .unwrap_or(partition_bsdname.len());
 
-                let disk_len = partition_bsdname[5..]
-                    .find('s')
-                    .map(|i| i + 5)
-                    .unwrap_or(partition_bsdname.len());
+        let disk_bsdname = partition_bsdname[..disk_len].to_string();
 
-                let disk_bsdname = partition_bsdname[..disk_len].to_string();
+        let Some(mount_path) = path.path().and_then(|it| it.UTF8String().to_string()) else {
+            continue;
+        };
 
-                let Some(mount_path) = path.path().and_then(|it| it.UTF8String().to_string())
-                else {
-                    continue;
-                };
+        let mut volume_name: Option<Retained<AnyObject>> = None;
 
-                let mut volume_name: Option<Retained<AnyObject>> = None;
+        let Ok(_) = (unsafe {
+            path.getResourceValue_forKey_error(&mut volume_name, NSURLVolumeLocalizedNameKey)
+        }) else {
+            continue;
+        };
 
-                let Ok(_) = (unsafe {
-                    path.getResourceValue_forKey_error(
-                        &mut volume_name,
-                        NSURLVolumeLocalizedNameKey,
-                    )
-                }) else {
-                    continue;
-                };
+        let Some(name_any) = volume_name else {
+            continue;
+        };
 
-                let Some(name_any) = volume_name else {
-                    continue;
-                };
+        let Ok(name_str) = name_any.downcast::<NSString>() else {
+            continue;
+        };
 
-                let Ok(name_str) = name_any.downcast::<NSString>() else {
-                    continue;
-                };
+        let Some(label) = name_str.UTF8String().to_string() else {
+            continue;
+        };
 
-                let Some(label) = name_str.UTF8String().to_string() else {
-                    continue;
-                };
+        if let Some(&idx) = device_map.get(&format!("/dev/{}", disk_bsdname)) {
+            device_list[idx]
+                .mountpoints
+                .push(MountPoint::new(mount_path));
+            device_list[idx].mountpoint_labels.push(label);
+        }
+    }
 
-                if let Some(&idx) = device_map.get(&format!("/dev/{}", disk_bsdname)) {
-                    device_list[idx]
-                        .mountpoints
-                        .push(MountPoint::new(mount_path));
-                    device_list[idx].mountpoint_labels.push(label);
-                }
-            }
-        });
-
-        Ok(device_list)
-    })
+    Ok(device_list)
 }
