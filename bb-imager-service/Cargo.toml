@@ -8,7 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
 zbus = { version = "5.12", default-features = false, features = ["tokio"] }
 zbus_polkit = "5.0"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0" , features = ["serde", "zvariant"] }
