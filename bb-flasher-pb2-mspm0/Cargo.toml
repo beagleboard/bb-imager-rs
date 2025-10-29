@@ -12,7 +12,7 @@ keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
 [dependencies]
 serde = { version = "1.0", optional = true, features = ["derive"] }
 thiserror = "2.0"
-tokio = { version = "1.47", features = ["fs", "io-util", "sync"] }
+tokio = { version = "1.48", features = ["fs", "io-util", "sync"] }
 zvariant = { version = "5.7", optional = true }
 
 [features]
