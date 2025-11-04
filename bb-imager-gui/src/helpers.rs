@@ -291,7 +291,7 @@ pub(crate) enum BoardImage {
     SdFormat,
     Image {
         flasher: config::Flasher,
-        init_format: Option<config::InitFormat>,
+        init_format: config::InitFormat,
         img: SelectedImage,
         bmap: Option<Bmap>,
         info_text: Option<String>,
@@ -305,7 +305,7 @@ impl BoardImage {
             bmap: None,
             flasher,
             // Do not try to apply customization for local images
-            init_format: None,
+            init_format: config::InitFormat::None,
             info_text: None,
         }
     }
@@ -341,10 +341,10 @@ impl BoardImage {
         }
     }
 
-    pub(crate) const fn init_format(&self) -> Option<config::InitFormat> {
+    pub(crate) const fn init_format(&self) -> config::InitFormat {
         match self {
             BoardImage::Image { init_format, .. } => *init_format,
-            BoardImage::SdFormat => None,
+            BoardImage::SdFormat => config::InitFormat::None,
         }
     }
 
@@ -755,7 +755,7 @@ impl FlashingCustomization {
         app_config: &crate::persistance::GuiConfiguration,
     ) -> Self {
         match flasher {
-            config::Flasher::SdCard if img.init_format() == Some(config::InitFormat::Sysconf) => {
+            config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => {
                 Self::LinuxSdSysconfig(
                     app_config
                         .sd_customization()
