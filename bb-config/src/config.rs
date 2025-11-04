@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_with::{VecSkipError, serde_as};
 use url::Url;
@@ -40,8 +39,6 @@ pub struct Config {
 #[serde_as]
 #[derive(Deserialize, Serialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Imager {
-    /// Latest BeagleBoard Imaging Utility version
-    pub latest_version: Option<Version>,
     /// A list of remote config files
     #[serde(default)]
     pub remote_configs: HashSet<Url>,
@@ -192,11 +189,6 @@ pub enum Flasher {
 impl Extend<Self> for Config {
     fn extend<T: IntoIterator<Item = Self>>(&mut self, iter: T) {
         for config in iter.into_iter() {
-            // Overwrite version if present
-            if let Some(v) = config.imager.latest_version {
-                self.imager.latest_version = Some(v);
-            }
-
             self.imager
                 .remote_configs
                 .extend(config.imager.remote_configs);

@@ -263,7 +263,6 @@ impl From<config::Config> for Boards {
     fn from(value: config::Config) -> Self {
         let filtered = config::Config {
             imager: config::Imager {
-                latest_version: value.imager.latest_version,
                 remote_configs: value.imager.remote_configs,
                 devices: value
                     .imager
