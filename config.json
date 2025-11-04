@@ -4,7 +4,8 @@
 		"remote_configs": [
 			"https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json",
 			"https://github.com/beagleboard/micropython-builder/releases/download/continuous-release/os_list.json",
-			"https://github.com/beagleboard/bb-armbian-watcher/releases/download/continuous-release/os_list.json"
+			"https://github.com/beagleboard/bb-armbian-watcher/releases/download/continuous-release/os_list.json",
+			"https://raw.githubusercontent.com/FalconChristmas/fpp/refs/heads/master/rpi-imager/rpi-imager_falcon_player.json"
 		],
 		"devices": [
 			{

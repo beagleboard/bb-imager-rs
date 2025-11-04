@@ -1,6 +1,7 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
 use bb_helper::file_stream::ReaderFileStream;
+use rc_zip_sync::{ReadZip, ReadZipStreaming};
 use std::{
     io::{Read, Seek, SeekFrom},
     path::Path,
@@ -13,7 +14,9 @@ pub struct OsImage {
 
 pub(crate) enum OsImageReader {
     Xz(liblzma::read::XzDecoder<std::fs::File>),
+    Zip(rc_zip_sync::StreamingEntryReader<std::fs::File>),
     XzPiped(liblzma::read::XzDecoder<ReaderFileStream>),
+    ZipPiped(rc_zip_sync::StreamingEntryReader<ReaderFileStream>),
     Uncompressed(std::io::BufReader<std::fs::File>),
     UncompressedPiped(std::io::BufReader<ReaderFileStream>),
 }
@@ -39,6 +42,21 @@ impl OsImage {
                     img: OsImageReader::Xz(img),
                 })
             }
+            [0x50, 0x4b, 0x03, 0x04, _, _] => {
+                let temp = file.read_zip()?;
+                if temp.entries().count() != 1 {
+                    return Err(std::io::Error::other(
+                        "Zip image should only have single file",
+                    ));
+                }
+
+                let img = file.stream_zip_entries_throwing_caution_to_the_wind()?;
+
+                Ok(Self {
+                    size: img.entry().uncompressed_size,
+                    img: OsImageReader::Zip(img),
+                })
+            }
             _ => {
                 let size = size(&file.metadata()?);
 
@@ -60,6 +78,12 @@ impl OsImage {
                 size,
                 img: OsImageReader::XzPiped(liblzma::read::XzDecoder::new_parallel(img)),
             }),
+            [0x50, 0x4b, 0x03, 0x04, _, _] => Ok(Self {
+                size,
+                img: OsImageReader::ZipPiped(
+                    img.stream_zip_entries_throwing_caution_to_the_wind()?,
+                ),
+            }),
             _ => Ok(Self {
                 size,
                 img: OsImageReader::UncompressedPiped(std::io::BufReader::new(img)),
@@ -79,6 +103,8 @@ impl std::io::Read for OsImage {
             OsImageReader::Uncompressed(x) => x.read(buf),
             OsImageReader::XzPiped(x) => x.read(buf),
             OsImageReader::UncompressedPiped(x) => x.read(buf),
+            OsImageReader::ZipPiped(x) => x.read(buf),
+            OsImageReader::Zip(x) => x.read(buf),
         }
     }
 }

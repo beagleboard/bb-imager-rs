@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_with::{VecSkipError, serde_as};
 use url::Url;
@@ -26,6 +25,7 @@ use url::Url;
 #[serde_as]
 #[derive(Deserialize, Serialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Config {
+    #[serde(default)]
     pub imager: Imager,
     #[serde_as(as = "VecSkipError<_>")]
     /// List of OS images for the boards
@@ -39,8 +39,6 @@ pub struct Config {
 #[serde_as]
 #[derive(Deserialize, Serialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Imager {
-    /// Latest BeagleBoard Imaging Utility version
-    pub latest_version: Option<Version>,
     /// A list of remote config files
     #[serde(default)]
     pub remote_configs: HashSet<Url>,
@@ -69,14 +67,16 @@ pub struct Device {
     /// Link to board documentation
     pub documentation: Option<Url>,
     /// Special Instructions for flashing board.
-    pub instructions: Option<String>
+    pub instructions: Option<String>,
 }
 
 /// Types of customization Initialization formats
-#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[non_exhaustive]
 #[serde(rename_all = "lowercase")]
 pub enum InitFormat {
+    #[default]
+    None,
     /// Sysconfig based customization
     Sysconf,
     /// Armbian base customization
@@ -163,11 +163,12 @@ pub struct OsImage {
     #[serde(default)]
     pub tags: HashSet<String>,
     /// Initialization Format. Currently only used by SD Card Images
-    pub init_format: Option<InitFormat>,
+    #[serde(default)]
+    pub init_format: InitFormat,
     /// Bmap file for the image
     pub bmap: Option<Url>,
     /// Special Instructions for flashing board.
-    pub info_text: Option<String>
+    pub info_text: Option<String>,
 }
 
 /// Types of flashers Os Image(s) support
@@ -188,11 +189,6 @@ pub enum Flasher {
 impl Extend<Self> for Config {
     fn extend<T: IntoIterator<Item = Self>>(&mut self, iter: T) {
         for config in iter.into_iter() {
-            // Overwrite version if present
-            if let Some(v) = config.imager.latest_version {
-                self.imager.latest_version = Some(v);
-            }
-
             self.imager
                 .remote_configs
                 .extend(config.imager.remote_configs);
