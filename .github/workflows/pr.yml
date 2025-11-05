@@ -29,3 +29,21 @@ jobs:
       run: make check
     - name: Run tests
       run: make test
+
+  cargo-deny:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+
+    # Do not break CI for advisories. This is useful since even if I create a PR to fix things 
+    # upstream, it will take a while to get merged. In most cases, it is fine to wait.
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v2
+      with:
+        command: check ${{ matrix.checks }}
