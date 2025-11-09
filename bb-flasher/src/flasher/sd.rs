@@ -4,7 +4,7 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
-use std::{fmt::Display, path::PathBuf};
+use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
 use futures::StreamExt;
@@ -57,8 +57,8 @@ impl BBFlasherTarget for Target {
         true
     }
 
-    fn path(&self) -> &std::path::Path {
-        &self.0.path
+    fn identifier(&self) -> Cow<'_, str> {
+        self.0.path.to_string_lossy()
     }
 }
 

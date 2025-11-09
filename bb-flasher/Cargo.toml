@@ -27,6 +27,7 @@ cfg-if = "1.0"
 tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper", features = ["file_stream", "resolvable"] }
 rc-zip-sync = "4.3"
+bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
@@ -40,6 +41,7 @@ bcf = ["bb-flasher-bcf/cc1352p7"]
 bcf_msp430 = ["bb-flasher-bcf/msp430"]
 pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
 pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json", "dep:thiserror"]
+dfu = ["bb-flasher-dfu"]
 
 [package.metadata.docs.rs]
 all-features = true

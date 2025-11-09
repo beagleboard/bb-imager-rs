@@ -1,0 +1,14 @@
+[package]
+name = "bb-flasher-dfu"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+dfu-libusb = "0.5"
+rusb = "0.9"
+bb-helper = { path = "../bb-helper", features = ["resolvable"] }
+tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread"] }
+tokio-util = { version = "0.7" }
