@@ -19,6 +19,8 @@ PB2_MSPM0 ?= 0
 BCF_CC1352P7 ?= 0
 ## variable: BCF_MSP430: Enable support for BeagleConnect Freedom MSP430
 BCF_MSP430 ?= 0
+## variable: DFU: Enable support for DFU
+DFU ?= 0
 ## variable: VERBOSE: Enable verbose logging. Useful in CI
 VERBOSE ?= 0
 ## variable: TARGET: Package Target platform. Defaults to Host target.
@@ -42,6 +44,12 @@ ifeq (${BCF_CC1352P7}, 1)
 endif
 ifeq (${BCF_MSP430}, 1)
 	_RUST_ARGS_CLI_GUI+=-F bcf_msp430
+endif
+
+_RUST_ARGS_CLI = ${_RUST_ARGS_CLI_GUI}
+
+ifeq (${DFU}, 1)
+	_RUST_ARGS_CLI+=-F dfu
 endif
 
 ## housekeeping: help: Display this help message
@@ -102,7 +110,7 @@ ifeq (${NO_BUILD}, 1)
 	$(info "Skip Building CLI")
 else
 	$(info "Building CLI")
-	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS_CLI_GUI}
+	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS_CLI}
 endif
 
 ## run: run-cli: Run CLI for quick testing on host.
@@ -128,7 +136,7 @@ build-cli-manpage:
 	$(info "Generate CLI Manpages")
 	rm -rf bb-imager-cli/dist/.target/man
 	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-man bb-imager-cli/dist/.target/man/
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-man bb-imager-cli/dist/.target/man/
 	gzip bb-imager-cli/dist/.target/man/*
 
 
@@ -138,8 +146,8 @@ build-cli-shell-comp:
 	$(info "Generate CLI completion")
 	rm -rf bb-imager-cli/dist/.target/shell-comp
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI_GUI} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
 
 ## package: package-gui-linux-appimage: Build AppImage package for GUI.
 .PHONY: package-gui-linux-appimage

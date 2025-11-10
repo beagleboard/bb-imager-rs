@@ -169,6 +169,27 @@ async fn flash_internal(
                 .flash(chan)
                 .await
         }
+        #[cfg(feature = "dfu")]
+        TargetCommands::Dfu { identifier, imgs } => {
+            if imgs.len() % 2 == 1 {
+                panic!("Failed to parse input images");
+            }
+
+            let img_list = imgs
+                .chunks_exact(2)
+                .map(|x| {
+                    (
+                        x[0].to_string(),
+                        LocalImage::new(PathBuf::from(&x[1]).into()),
+                    )
+                })
+                .collect();
+
+            bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
+                .unwrap()
+                .flash(chan)
+                .await
+        }
     }
 }
 
@@ -189,7 +210,7 @@ async fn no_frills_list_destinations<T: BBFlasherTarget>() {
     let dsts = T::destinations().await;
 
     for d in dsts {
-        term.write_line(&d.path().to_string_lossy()).unwrap();
+        term.write_line(&d.identifier()).unwrap();
     }
 }
 
@@ -197,6 +218,10 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
     if no_frills {
         match target {
             DestinationsTarget::Sd => no_frills_list_destinations::<bb_flasher::sd::Target>().await,
+            #[cfg(feature = "dfu")]
+            DestinationsTarget::Dfu => {
+                no_frills_list_destinations::<bb_flasher::dfu::Target>().await
+            }
             #[cfg(feature = "bcf_cc1352p7")]
             DestinationsTarget::Bcf => {
                 no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>().await
@@ -228,7 +253,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
                 .map(|x| {
                     (
                         x.to_string().trim().to_string(),
-                        x.path().to_string_lossy().to_string(),
+                        x.identifier().to_string(),
                         (x.size() / BYTES_IN_GB).to_string(),
                     )
                 })
@@ -278,6 +303,87 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool) {
                     console::pad_str(&d.0, max_name_len, console::Alignment::Left, None),
                     console::pad_str(&d.1, max_path_len, console::Alignment::Left, None),
                     console::pad_str(&d.2, max_size_len, console::Alignment::Right, None)
+                ))
+                .unwrap();
+            }
+
+            term.write_line(&table_border).unwrap();
+        }
+        #[cfg(feature = "dfu")]
+        DestinationsTarget::Dfu => {
+            const NAME_HEADER: &str = "Device";
+            const BUS_NUMBER_HEADER: &str = "Bus Number";
+            const ADDRESS_HEADER: &str = "Addresss";
+            const VENDOR_ID_HEADER: &str = "Vendor Id";
+            const PRODUCT_ID_HEADER: &str = "Product Id";
+
+            let dsts_str: Vec<_> = bb_flasher::dfu::Target::destinations()
+                .await
+                .into_iter()
+                .map(|x| {
+                    (
+                        x.to_string().trim().to_string(),
+                        format!("{:#04x}", x.bus_number()),
+                        format!("{:#04x}", x.port_num()),
+                        format!("{:#06x}", x.vendor_id()),
+                        format!("{:#06x}", x.product_id()),
+                    )
+                })
+                .collect();
+
+            let max_name_len = dsts_str
+                .iter()
+                .map(|x| x.0.len())
+                .chain([NAME_HEADER.len()])
+                .max()
+                .unwrap();
+
+            let table_border = format!(
+                "+-{}-+-{}-+-{}-+-{}-+-{}-+",
+                std::iter::repeat_n('-', max_name_len).collect::<String>(),
+                std::iter::repeat_n('-', BUS_NUMBER_HEADER.len()).collect::<String>(),
+                std::iter::repeat_n('-', ADDRESS_HEADER.len()).collect::<String>(),
+                std::iter::repeat_n('-', VENDOR_ID_HEADER.len()).collect::<String>(),
+                std::iter::repeat_n('-', PRODUCT_ID_HEADER.len()).collect::<String>(),
+            );
+
+            term.write_line(&table_border).unwrap();
+
+            term.write_line(&format!(
+                "| {} | {} | {} | {} | {} |",
+                console::pad_str(NAME_HEADER, max_name_len, console::Alignment::Left, None),
+                BUS_NUMBER_HEADER,
+                ADDRESS_HEADER,
+                VENDOR_ID_HEADER,
+                PRODUCT_ID_HEADER,
+            ))
+            .unwrap();
+
+            term.write_line(&table_border).unwrap();
+
+            for d in dsts_str {
+                term.write_line(&format!(
+                    "| {} | {} | {} | {} | {} |",
+                    console::pad_str(&d.0, max_name_len, console::Alignment::Left, None),
+                    console::pad_str(
+                        &d.1,
+                        BUS_NUMBER_HEADER.len(),
+                        console::Alignment::Right,
+                        None
+                    ),
+                    console::pad_str(&d.2, ADDRESS_HEADER.len(), console::Alignment::Right, None),
+                    console::pad_str(
+                        &d.3,
+                        VENDOR_ID_HEADER.len(),
+                        console::Alignment::Right,
+                        None
+                    ),
+                    console::pad_str(
+                        &d.4,
+                        PRODUCT_ID_HEADER.len(),
+                        console::Alignment::Right,
+                        None
+                    ),
                 ))
                 .unwrap();
             }

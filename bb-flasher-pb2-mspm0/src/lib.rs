@@ -4,7 +4,7 @@
 //! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 //! [Linux Firmware Upload API]: https://docs.kernel.org/driver-api/firmware/fw_upload.html
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 use tokio::{
     fs::File,
@@ -239,7 +239,7 @@ async fn flash_fw_api(
 pub fn device() -> Device {
     Device {
         name: DEVICE.to_string(),
-        path: PathBuf::from(PATH),
+        path: PATH.to_string(),
         flash_size: FIRMWARE_SIZE,
     }
 }
@@ -257,6 +257,6 @@ pub enum Status {
 #[cfg_attr(feature = "zvariant", derive(zvariant::Type))]
 pub struct Device {
     pub name: String,
-    pub path: PathBuf,
+    pub path: String,
     pub flash_size: usize,
 }

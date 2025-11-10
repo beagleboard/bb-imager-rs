@@ -526,6 +526,7 @@ name = "bb-flasher"
 version = "0.1.0"
 dependencies = [
  "bb-flasher-bcf",
+ "bb-flasher-dfu",
  "bb-flasher-pb2-mspm0",
  "bb-flasher-sd",
  "bb-helper",
@@ -554,6 +555,17 @@ dependencies = [
  "serialport",
  "thiserror 2.0.17",
  "tracing",
+]
+
+[[package]]
+name = "bb-flasher-dfu"
+version = "0.0.15"
+dependencies = [
+ "bb-helper",
+ "dfu-libusb",
+ "rusb",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1421,6 +1433,30 @@ name = "detect-desktop-environment"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21d8ad60dd5b13a4ee6bd8fa2d5d88965c597c67bce32b5fc49c94f55cb50810"
+
+[[package]]
+name = "dfu-core"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fb2ba9f64688f3ef95762dfdaadaee8efb06c2d6097ee18ca022c306d366f2a"
+dependencies = [
+ "bytes",
+ "displaydoc",
+ "log",
+ "pretty-hex",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "dfu-libusb"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a29db4afdda78fd7ffed0ad064aa0d57f65d49b42f06ad079def5d28b6dc9905"
+dependencies = [
+ "dfu-core",
+ "rusb",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "digest"
@@ -3158,6 +3194,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "libusb1-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da050ade7ac4ff1ba5379af847a10a10a8e284181e060105bf8d86960ce9ce0f"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4434,6 +4482,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
 
 [[package]]
+name = "pretty-hex"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6fa0831dd7cc608c38a5e323422a0077678fa5744aa2be4ad91c4ece8eec8d5"
+
+[[package]]
 name = "proc-macro-crate"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4982,6 +5036,16 @@ name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
+
+[[package]]
+name = "rusb"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab9f9ff05b63a786553a4c02943b74b34a988448671001e9a27e2f0565cc05a4"
+dependencies = [
+ "libc",
+ "libusb1-sys",
+]
 
 [[package]]
 name = "rust-ini"

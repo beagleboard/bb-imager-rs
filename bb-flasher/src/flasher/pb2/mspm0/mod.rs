@@ -14,6 +14,7 @@ cfg_if::cfg_if! {
     }
 }
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Read;
 
@@ -26,7 +27,7 @@ use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Target {
     name: String,
-    path: std::path::PathBuf,
+    path: String,
 }
 
 impl BBFlasherTarget for Target {
@@ -44,8 +45,8 @@ impl BBFlasherTarget for Target {
         false
     }
 
-    fn path(&self) -> &std::path::Path {
-        &self.path
+    fn identifier(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.path)
     }
 }
 

@@ -1,9 +1,8 @@
 use futures::channel::mpsc;
-use std::path::PathBuf;
 
 use bb_flasher_pb2_mspm0::Error;
 
-pub(crate) async fn destinations() -> (String, PathBuf) {
+pub(crate) async fn destinations() -> (String, String) {
     let d = bb_flasher_pb2_mspm0::device();
     (d.name, d.path)
 }

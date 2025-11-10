@@ -3,7 +3,7 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [CC1352P7]: https://www.ti.com/product/CC1352P7
 
-use std::{fmt::Display, io::Read, sync::Arc};
+use std::{borrow::Cow, fmt::Display, io::Read, sync::Arc};
 
 use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 use bb_flasher_bcf::cc1352p7::Error;
@@ -35,8 +35,8 @@ impl BBFlasherTarget for Target {
         true
     }
 
-    fn path(&self) -> &std::path::Path {
-        std::path::Path::new(&self.0)
+    fn identifier(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.0)
     }
 }
 

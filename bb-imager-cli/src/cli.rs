@@ -133,6 +133,15 @@ pub enum TargetCommands {
         #[arg(long)]
         no_eeprom: bool,
     },
+    #[cfg(feature = "dfu")]
+    Dfu {
+        /// Identifer is in the following format: `{bus_num}:{address}:{vendor_id}:{product_id}`.
+        /// All fields are in hex.
+        identifier: String,
+        /// Format {name} followed by {path}. Any number of firmware can be specified, which will
+        /// be flashed in a sequential order.
+        imgs: Vec<String>,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -148,4 +157,7 @@ pub enum DestinationsTarget {
     /// Pocketbeagle2 MSPM0
     #[cfg(feature = "pb2_mspm0")]
     Pb2Mspm0,
+    /// USB DFU Target
+    #[cfg(feature = "dfu")]
+    Dfu,
 }

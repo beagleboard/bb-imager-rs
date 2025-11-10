@@ -45,11 +45,11 @@ pub(crate) trait Pocketbeagle2Mspm0 {
     fn status(&self, message: &str) -> zbus::Result<()>;
 }
 
-pub(crate) async fn destinations() -> (String, PathBuf) {
+pub(crate) async fn destinations() -> (String, String) {
     if let Ok(connection) = zbus::Connection::system().await {
         if let Ok(proxy) = Pocketbeagle2Mspm0Proxy::new(&connection).await {
             if let Ok((name, path, _)) = proxy.device().await {
-                return (name, PathBuf::from(path));
+                return (name, path);
             }
         }
     }

@@ -37,6 +37,7 @@ jobs:
       PB2_MSPM0: ${{ matrix.platform.pb2 }}
       BCF_CC1352P7: 1
       BCF_MSP430: 1
+      DFU: 1
       TARGET: ${{ matrix.platform.target }}
     steps:
     - name: Checkout
@@ -131,7 +132,7 @@ jobs:
       with:
         command: build
         target: armv7-unknown-linux-gnueabihf
-        args: "--locked --release -F bcf_msp430 -F bcf_cc1352p7 -p bb-imager-cli"
+        args: "--locked --release -F bcf_msp430 -F bcf_cc1352p7 -F dfu -p bb-imager-cli"
         strip: true
 
     - name: Install packaging deps

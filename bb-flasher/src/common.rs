@@ -1,6 +1,6 @@
 //! Stuff common to all the flashers
 
-use std::{collections::HashSet, path::Path};
+use std::{borrow::Cow, collections::HashSet};
 
 use futures::channel::mpsc;
 
@@ -46,6 +46,6 @@ where
     /// Check if destination can be selected
     fn is_destination_selectable() -> bool;
 
-    /// Local path to the target
-    fn path(&self) -> &Path;
+    /// A sort of device ID (mostly a Path).
+    fn identifier<'a>(&'a self) -> Cow<'a, str>;
 }

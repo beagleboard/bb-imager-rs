@@ -4,7 +4,7 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
-use std::{ffi::CString, fmt::Display, io::Read};
+use std::{ffi::CString, fmt::Display, io::Read, borrow::Cow};
 
 use futures::StreamExt;
 
@@ -49,8 +49,8 @@ impl BBFlasherTarget for Target {
         true
     }
 
-    fn path(&self) -> &std::path::Path {
-        std::path::Path::new(&self.display_path)
+    fn identifier(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.display_path)
     }
 }
 
