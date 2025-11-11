@@ -7,7 +7,6 @@
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
-use futures::StreamExt;
 
 use bb_flasher_sd::Error;
 
@@ -174,23 +173,19 @@ where
         let customization = self.customization.customization;
         let dst = self.dst;
 
-        if let Some(chan) = chan {
-            let (tx, rx) = futures::channel::mpsc::channel(20);
+        if let Some(mut chan) = chan {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
 
             let t = tokio::spawn(async move {
                 // Should run until tx is dropped, i.e. flasher task is done.
                 // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                let _ = rx
-                    .map(|x| {
-                        if x == 0.0 {
-                            DownloadFlashingStatus::Preparing
-                        } else {
-                            DownloadFlashingStatus::FlashingProgress(x)
-                        }
-                    })
-                    .map(Ok)
-                    .forward(chan)
-                    .await;
+                while let Some(x) = rx.recv().await {
+                    let _ = chan.try_send(if x == 0.0 {
+                        DownloadFlashingStatus::Preparing
+                    } else {
+                        DownloadFlashingStatus::FlashingProgress(x)
+                    });
+                }
             });
 
             let resp = bb_flasher_sd::flash(

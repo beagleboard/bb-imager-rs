@@ -2,7 +2,7 @@ use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use futures::channel::mpsc;
+use tokio::sync::mpsc;
 
 use crate::Result;
 use crate::customization::Customization;

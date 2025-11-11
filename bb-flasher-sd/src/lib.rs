@@ -24,12 +24,11 @@
 //! async fn main() {
 //!     let dst = PathBuf::from("/tmp/dummy").into();
 //!     let img = bb_helper::resolvable::LocalFile::new(PathBuf::from("/tmp/image").into());
-//!     let (tx, rx) = futures::channel::mpsc::channel(20);
+//!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 //!
 //!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<bb_helper::resolvable::LocalStringFile>, dst, Some(tx), None, None).await });
 //!
-//!     let msgs = futures::executor::block_on_stream(rx);
-//!     for m in msgs {
+//!     while let Some(m) = rx.recv().await {
 //!         println!("{:?}", m);
 //!     }
 //!

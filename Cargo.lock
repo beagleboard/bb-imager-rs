@@ -581,7 +581,6 @@ dependencies = [
  "bb-helper",
  "fatfs",
  "fscommon",
- "futures",
  "gpt",
  "libc",
  "mbrman",
