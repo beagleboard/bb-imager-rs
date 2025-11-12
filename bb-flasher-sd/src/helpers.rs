@@ -1,6 +1,6 @@
 use std::io;
 
-use futures::channel::mpsc;
+use tokio::sync::mpsc;
 
 use crate::Result;
 

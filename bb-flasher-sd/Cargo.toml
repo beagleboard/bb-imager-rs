@@ -11,7 +11,6 @@ keywords = ["flasher", "beagle", "sd-card"]
 categories = ["development-tools", "embedded", "filesystem", "os"]
 
 [dependencies]
-futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
 bb-drivelist = "0.3"
