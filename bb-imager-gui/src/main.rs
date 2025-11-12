@@ -42,6 +42,8 @@ fn main() -> iced::Result {
         .try_init()
         .expect("Failed to register tracing_subscriber");
 
+    tracing::info!("Resolved GUI keymap: {:?}", helpers::system_keymap());
+
     let icon = iced::window::icon::from_file_data(
         constants::WINDOW_ICON,
         Some(iced::advanced::graphics::image::image_rs::ImageFormat::Png),

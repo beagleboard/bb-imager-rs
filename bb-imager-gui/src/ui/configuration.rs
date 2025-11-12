@@ -274,7 +274,11 @@ fn keymap_form<'a>(
         widget::toggler(config.keymap.is_some())
             .label("Set Keymap")
             .on_toggle(|t| {
-                let keymap = if t { Some(String::from("us")) } else { None };
+                let keymap = if t {
+                    Some(helpers::system_keymap())
+                } else {
+                    None
+                };
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_keymap(keymap),
                 ))

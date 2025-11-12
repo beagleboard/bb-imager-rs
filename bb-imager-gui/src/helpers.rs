@@ -376,6 +376,32 @@ pub(crate) fn system_timezone() -> Option<&'static String> {
     (*SYSTEM_TIMEZONE).as_ref()
 }
 
+pub(crate) fn system_keymap() -> String {
+    static SYSTEM_KEYMAP: LazyLock<Option<String>> = LazyLock::new(|| {
+        let lang = whoami::langs().ok()?.next()?;
+        let lang_str = lang.to_string();
+
+        let base = lang_str.split('.').next().unwrap_or(&lang_str);
+        let mut parts = base.split(|c| c == '-' || c == '_' || c == '/');
+
+        parts.next(); 
+        if let Some(region) = parts.next() {
+            let region = region.split('@').next().unwrap_or(region).trim();
+            if !region.is_empty() {
+                if let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
+                    .iter()
+                    .find(|k| k.eq_ignore_ascii_case(region))
+                {
+                    return Some(canon.to_string());
+                }
+            }
+        }
+
+        None
+    });
+    (*SYSTEM_KEYMAP).as_ref().cloned().unwrap_or_else(|| String::from("us"))
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
     name: Box<str>,
