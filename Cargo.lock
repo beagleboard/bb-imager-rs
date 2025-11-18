@@ -4815,9 +4815,9 @@ dependencies = [
 
 [[package]]
 name = "rc-zip"
-version = "5.3.6"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9821aa8f639caa568fb12e6ca7a0a92eb3e77fa8729d19e10a5f43a536a14f62"
+checksum = "ce8ebfb800e06440eb1859dea4772e4f46bcbd9ed9ab5d8e6cfdb00f7bcbd9df"
 dependencies = [
  "chardetng",
  "chrono",
@@ -4827,16 +4827,16 @@ dependencies = [
  "oem_cp",
  "oval",
  "ownable",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "tracing",
  "winnow 0.5.40",
 ]
 
 [[package]]
 name = "rc-zip-sync"
-version = "4.3.5"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f483942032cdaa3d926b3da1e031c97a2b890dd1d2ced85b13b282a96d6629"
+checksum = "62e8727f87062e05ed4c5e3b239746bf1d50c93acf512bb4239e63c407bfabbc"
 dependencies = [
  "oval",
  "positioned-io",
