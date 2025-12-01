@@ -12,7 +12,7 @@ iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "l
 rfd = { version = "0.15.4", default-features = false, features = ["tokio", "file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-tracing = "0.1.41"
+tracing = "0.1.43"
 iced_aw = { version = "0.12.0", default-features = false, features = ["badge", "tabs"] }
 image = "0.25"
 tokio = { version = "1.48", default-features = false, features = ["macros"] }
