@@ -4833,9 +4833,9 @@ dependencies = [
 
 [[package]]
 name = "rc-zip-sync"
-version = "4.4.1"
+version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee57434f484158d05836c560cee321e2c40f0a3ca587f58684ee8ec6c7589890"
+checksum = "caa6adff915a3efce163d0d8a06d7e72ac6fa5a9da0c76e979895eca0c6ac000"
 dependencies = [
  "oval",
  "positioned-io",
