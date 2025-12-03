@@ -382,24 +382,26 @@ pub(crate) fn system_keymap() -> String {
         let lang_str = lang.to_string();
 
         let base = lang_str.split('.').next().unwrap_or(&lang_str);
-        let mut parts = base.split(|c| c == '-' || c == '_' || c == '/');
+        let mut parts = base.split(['-', '_', '/']);
 
-        parts.next(); 
+        parts.next();
         if let Some(region) = parts.next() {
             let region = region.split('@').next().unwrap_or(region).trim();
-            if !region.is_empty() {
-                if let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
+            if !region.is_empty()
+                && let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
                     .iter()
                     .find(|k| k.eq_ignore_ascii_case(region))
-                {
-                    return Some(canon.to_string());
-                }
+            {
+                return Some(canon.to_string());
             }
         }
 
         None
     });
-    (*SYSTEM_KEYMAP).as_ref().cloned().unwrap_or_else(|| String::from("us"))
+    (*SYSTEM_KEYMAP)
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| String::from("us"))
 }
 
 #[derive(Debug, Clone)]
