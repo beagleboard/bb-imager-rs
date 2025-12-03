@@ -9,7 +9,7 @@ license.workspace = true
 
 [dependencies]
 iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "lazy"] }
-rfd = { version = "0.15.4", default-features = false, features = ["tokio", "file-handle-inner"] }
+rfd = { version = "0.16.0", default-features = false, features = ["tokio", "file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing = "0.1.43"
@@ -37,7 +37,7 @@ embed-resource = "3.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
-rfd = { version = "0.15.4", default-features = false, features = ["xdg-portal", "tokio", "file-handle-inner"] }
+rfd = { version = "0.16.0", default-features = false, features = ["xdg-portal", "tokio", "file-handle-inner"] }
 ashpd = "0.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
