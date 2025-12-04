@@ -6,6 +6,7 @@
 			"https://github.com/beagleboard/micropython-builder/releases/download/continuous-release/os_list.json",
 			"https://github.com/beagleboard/bb-armbian-watcher/releases/download/continuous-release/os_list.json",
 			"https://raw.githubusercontent.com/FalconChristmas/fpp/refs/heads/master/rpi-imager/rpi-imager_falcon_player.json",
+			"https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list.json",
 			"https://github.com/beagleboard/bb-zephyr-images/releases/download/continuous-release/os_list.json"
 		],
 		"devices": [
@@ -90,44 +91,6 @@
 		]
 	},
 	"os_list": [
-		{
-			"name": "MicroBlocks",
-			"description": "MicroBlocks is a blocks programming language for physical computing inspired by Scratch.",
-			"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
-			"flasher": "BeagleConnectFreedom",
-			"subitems": [
-				{
-					"name": "MicroBlocks Stable Builds",
-					"description": "Latest stable MicroBlocks Release",
-					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
-					"flasher": "BeagleConnectFreedom",
-					"devices": [
-						"beagleconnect-freedom"
-					],
-					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_stable.json"
-				},
-				{
-					"name": "MicroBlocks Pilot Builds",
-					"description": "Explore upcoming MicroBlocks release",
-					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
-					"flasher": "BeagleConnectFreedom",
-					"devices": [
-						"beagleconnect-freedom"
-					],
-					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_pilot.json"
-				},
-				{
-					"name": "MicroBlocks Development Builds",
-					"description": "Cutting edge MicroBlocks builds. Do not use in Production",
-					"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/os/microblocks.svg",
-					"flasher": "BeagleConnectFreedom",
-					"devices": [
-						"beagleconnect-freedom"
-					],
-					"subitems_url": "https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list_dev.json"
-				}
-			]
-		},
 		{
 			"name": "MSPM0 Firmware",
 			"description": "Firmware for internal MSPM0L1105",
