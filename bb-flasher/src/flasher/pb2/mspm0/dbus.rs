@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use futures::{StreamExt, channel::mpsc};
 use thiserror::Error;
 use zbus::proxy;
