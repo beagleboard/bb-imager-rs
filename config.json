@@ -7,6 +7,7 @@
 			"https://github.com/beagleboard/bb-armbian-watcher/releases/download/continuous-release/os_list.json",
 			"https://raw.githubusercontent.com/FalconChristmas/fpp/refs/heads/master/rpi-imager/rpi-imager_falcon_player.json",
 			"https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list.json",
+			"https://github.com/beagleboard/mspm0-adc-eeprom/releases/download/os-list/os_list.json",
 			"https://github.com/beagleboard/bb-zephyr-images/releases/download/continuous-release/os_list.json"
 		],
 		"devices": [
@@ -90,28 +91,5 @@
 			}
 		]
 	},
-	"os_list": [
-		{
-			"name": "MSPM0 Firmware",
-			"description": "Firmware for internal MSPM0L1105",
-			"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-			"flasher": "Pb2Mspm0",
-			"subitems": [
-				{
-					"name": "MSPM0 ADC EEPROM",
-					"description": "Emulates EEPROM and ADC",
-					"icon": "https://upload.wikimedia.org/wikipedia/commons/6/67/USB_icon.svg",
-					"url": "http://pocketbeagle.beagleboard.io/-/mspm0-adc-eeprom/-/jobs/42684/artifacts/pcu_pocketbeagle2.txt",
-					"release_date": "2024-11-05",
-					"image_download_sha256": "f6f85213743371ec52d2631b7eee0294bbd170f36feabb4ca54e801cdcd9f110",
-					"devices": [
-						"pocketbeagle2-am62"
-					],
-					"tags": [
-						"freertos"
-					]
-				}
-			]
-		}
-	]
+	"os_list": []
 }
