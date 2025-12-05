@@ -112,6 +112,11 @@ where
 
         flash(bin, chan, self.persist_eeprom)
             .await
-            .map_err(std::io::Error::other)
+            .map_err(|e| {
+                // Log the technical error for debugging
+                tracing::error!("PB2 MSPM0 flashing error: {:?}", e);
+                // Return user-friendly message for GUI
+                std::io::Error::other(e.user_message())
+            })
     }
 }
