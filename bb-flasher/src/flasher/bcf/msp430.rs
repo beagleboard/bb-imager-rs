@@ -4,9 +4,7 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
-use std::{ffi::CString, fmt::Display, io::Read, borrow::Cow};
-
-use futures::StreamExt;
+use std::{borrow::Cow, ffi::CString, fmt::Display, io::Read};
 
 use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 
@@ -114,15 +112,17 @@ where
             resp
         };
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, rx) = futures::channel::mpsc::channel(20);
+        let flasher_task = if let Some(mut chan) = chan {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
             let flasher_task = tokio::task::spawn_blocking(move || {
                 bb_flasher_bcf::msp430::flash(&img, &dst, Some(tx))
             });
 
             // Should run until tx is dropped, i.e. flasher task is done.
             // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            let _ = rx.map(Into::into).map(Ok).forward(chan).await;
+            while let Some(x) = rx.recv().await {
+                let _ = chan.try_send(x.into());
+            }
 
             flasher_task
         } else {

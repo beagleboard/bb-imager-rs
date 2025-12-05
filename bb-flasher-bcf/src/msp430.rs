@@ -12,8 +12,8 @@
 
 use std::{ffi::CString, time::Duration};
 
-use futures::channel::mpsc;
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 use crate::{
     Status,

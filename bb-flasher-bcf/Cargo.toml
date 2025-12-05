@@ -12,12 +12,13 @@ categories = ["development-tools", "embedded", "hardware-support"]
 
 [dependencies]
 crc32fast = "1.5"
-futures = "0.3"
 thiserror = "2.0"
 tracing = "0.1"
 bin_file = "0.1"
 serialport = { version = "4.7", optional = true, default-features = false }
 hidapi = { version = "2.6", optional = true }
+tokio = { version = "1.48", default-features = false, features = ["sync"] }
+tokio-util = { version = "0.7" }
 
 [features]
 default = ["cc1352p7"]

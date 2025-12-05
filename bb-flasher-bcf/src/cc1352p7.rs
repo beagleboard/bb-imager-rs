@@ -9,9 +9,9 @@
 
 use std::{io, time::Duration};
 
-use futures::channel::mpsc;
 use serialport::SerialPort;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -260,9 +260,9 @@ const fn progress(off: usize) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
+fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
     match cancel {
-        Some(x) if x.strong_count() == 0 => Err(Error::Aborted),
+        Some(x) if x.is_cancelled() => Err(Error::Aborted),
         _ => Ok(()),
     }
 }
@@ -289,7 +289,7 @@ pub fn flash(
     port: &str,
     verify: bool,
     mut chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<std::sync::Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidImage)?;
 
@@ -302,7 +302,7 @@ pub fn flash(
     let mut bcf = BeagleConnectFreedom::new(port)?;
     info!("BeagleConnectFreedom Connected");
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
 
     let img_crc32 = crc32fast::hash(
@@ -315,13 +315,13 @@ pub fn flash(
         return Ok(());
     }
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     info!("Erase Flash");
     bcf.send_bank_erase()?;
 
     info!("Start Flashing");
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     for (start_address, data) in firmware_bin.segments_list() {
         let mut offset = 0;
 
@@ -336,7 +336,7 @@ pub fn flash(
                 chan.as_mut(),
                 Status::Flashing(progress(start_address + offset)),
             );
-            check_arc(cancel.as_ref())?;
+            check_token(cancel.as_ref())?;
         }
     }
 

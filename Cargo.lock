@@ -579,10 +579,11 @@ version = "1.0.2"
 dependencies = [
  "bin_file",
  "crc32fast",
- "futures",
  "hidapi",
  "serialport",
  "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
