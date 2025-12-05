@@ -3,11 +3,10 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [CC1352P7]: https://www.ti.com/product/CC1352P7
 
-use std::{borrow::Cow, fmt::Display, io::Read, sync::Arc};
+use std::{borrow::Cow, fmt::Display, io::Read};
 
 use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 use bb_flasher_bcf::cc1352p7::Error;
-use futures::StreamExt;
 
 /// BeagleConnect Freedom target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -53,22 +52,29 @@ impl Display for Target {
 /// - Ti-TXT
 /// - iHex
 /// - xz: Xz compressed files for any of the above
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Clone)]
 pub struct Flasher<I: Resolvable> {
     img: I,
     port: String,
     verify: bool,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 impl<I> Flasher<I>
 where
     I: Resolvable,
 {
-    pub fn new(img: I, port: Target, verify: bool) -> Self {
+    pub fn new(
+        img: I,
+        port: Target,
+        verify: bool,
+        cancel: Option<tokio_util::sync::CancellationToken>,
+    ) -> Self {
         Self {
             img,
             port: port.0,
             verify,
+            cancel,
         }
     }
 }
@@ -81,9 +87,6 @@ where
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> std::io::Result<()> {
-        let cancle = Arc::new(());
-
-        let cancel_weak = Arc::downgrade(&cancle);
         let port = self.port;
         let verify = self.verify;
         let img = {
@@ -108,25 +111,27 @@ where
             resp
         };
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, rx) = futures::channel::mpsc::channel(20);
+        let flasher_task = if let Some(mut chan) = chan {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
             let flasher_task = tokio::task::spawn_blocking(move || {
-                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, Some(tx), Some(cancel_weak))
+                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, Some(tx), self.cancel)
             });
 
             // Should run until tx is dropped, i.e. flasher task is done.
             // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            let _ = rx.map(Into::into).map(Ok).forward(chan).await;
+            while let Some(x) = rx.recv().await {
+                let _ = chan.try_send(x.into());
+            }
 
             flasher_task
         } else {
             tokio::task::spawn_blocking(move || {
-                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, None, Some(cancel_weak))
+                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, None, self.cancel)
             })
         };
 
         flasher_task.await.unwrap().map_err(|e| match e {
-            Error::IoError(error) => error,
+            Error::IoError { source } => source,
             _ => std::io::Error::other(e),
         })
     }

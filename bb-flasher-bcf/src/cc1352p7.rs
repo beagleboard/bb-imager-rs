@@ -9,9 +9,9 @@
 
 use std::{io, time::Duration};
 
-use futures::channel::mpsc;
 use serialport::SerialPort;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -39,34 +39,33 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// Errors for CC1352P7
 pub enum Error {
     /// Status for failing flash erase or program operation
-    #[error("Status for failing flash erase or program operation")]
+    #[error("Status for failing flash erase or program operation.")]
     FlashFail,
     /// Bootloader sent unexpected response
-    #[error("Bootloader sent unexpected response")]
+    #[error("Bootloader sent unexpected response.")]
     UnknownResponse,
     /// Bootloader Responded with Nack
-    #[error("Bootloader Responded with Nack")]
+    #[error("Bootloader Responded with Nack.")]
     Nack,
     /// Failed to start Bootloader
-    #[error("Failed to start Bootloader")]
+    #[error("Failed to start Bootloader.")]
     FailedToStartBootloader,
     /// Flashed image is not valid
-    #[error("Flashed image is not valid")]
+    #[error("Flashed image is not valid.")]
     InvalidImage,
     /// Failed to open serial port
-    #[error("Failed to open serial port")]
+    #[error("Failed to open serial port.")]
     FailedToOpenPort,
     /// Aborted before completing
-    #[error("Aborted before completing")]
+    #[error("Aborted before completing.")]
     Aborted,
-    #[error("IO Error: {0}")]
-    IoError(io::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
+    /// Unknown error occured during IO.
+    #[error("Unknown Error during IO. Please check logs for more information.")]
+    IoError {
+        #[from]
+        #[source]
+        source: io::Error,
+    },
 }
 
 struct BeagleConnectFreedom<S: SerialPort> {
@@ -261,9 +260,9 @@ const fn progress(off: usize) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-fn check_arc(cancel: Option<&std::sync::Weak<()>>) -> Result<()> {
+fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
     match cancel {
-        Some(x) if x.strong_count() == 0 => Err(Error::Aborted),
+        Some(x) if x.is_cancelled() => Err(Error::Aborted),
         _ => Ok(()),
     }
 }
@@ -290,7 +289,7 @@ pub fn flash(
     port: &str,
     verify: bool,
     mut chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<std::sync::Weak<()>>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidImage)?;
 
@@ -303,32 +302,32 @@ pub fn flash(
     let mut bcf = BeagleConnectFreedom::new(port)?;
     info!("BeagleConnectFreedom Connected");
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
 
     let img_crc32 = crc32fast::hash(
         &firmware_bin
             .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xff))
-            .unwrap(),
+            .expect("Unexpected error"),
     );
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
         return Ok(());
     }
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     info!("Erase Flash");
     bcf.send_bank_erase()?;
 
     info!("Start Flashing");
 
-    check_arc(cancel.as_ref())?;
+    check_token(cancel.as_ref())?;
     for (start_address, data) in firmware_bin.segments_list() {
         let mut offset = 0;
 
         bcf.send_download(
-            start_address.try_into().unwrap(),
-            data.len().try_into().unwrap(),
+            start_address.try_into().expect("Unexpected error"),
+            data.len().try_into().expect("Unexpected error"),
         )?;
         while offset < data.len() {
             offset += bcf.send_data(&data[offset..])?;
@@ -337,7 +336,7 @@ pub fn flash(
                 chan.as_mut(),
                 Status::Flashing(progress(start_address + offset)),
             );
-            check_arc(cancel.as_ref())?;
+            check_token(cancel.as_ref())?;
         }
     }
 

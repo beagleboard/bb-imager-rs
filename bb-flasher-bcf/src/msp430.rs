@@ -12,8 +12,8 @@
 
 use std::{ffi::CString, time::Duration};
 
-use futures::channel::mpsc;
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 use crate::{
     Status,
@@ -46,14 +46,33 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for MSP430F5503
 pub enum Error {
-    #[error("Failed to Write: {0}")]
-    FailedToWrite(String),
-    #[error("Failed to Read: {0}")]
-    FailedToRead(String),
-    #[error("Failed to open MSP430: {0}")]
-    FailedToOpenDestination(String),
+    /// Could not unlock the BSL. Maybe a custom password is being used.
+    #[error("Failed to unlock BSL.")]
+    UnlockFail,
+    /// Failed to erase flash.
+    #[error("Failed to perform mass erase.")]
+    MassEraseFail,
+    /// LOAD PC instruction to jump to full BSL in RAM failed.
+    #[error("Failed to start full BSL.")]
+    BSLJumpFail,
+    /// BSL version request failed.
+    #[error("Failed to read BSL Version.")]
+    BslVersionFail,
+    // Firmware is not valid.
     #[error("Firmware is not valid")]
     InvalidFirmware,
+    /// Failed while sending firmware to BSL.
+    #[error("Failed to write firmware. See logs for more info.")]
+    FirmwareWriteFail {
+        #[source]
+        source: hidapi::HidError,
+    },
+    /// Failed to open MSP430.
+    #[error("Failed to open MSP430")]
+    FailedToOpenDestination {
+        #[source]
+        source: hidapi::HidError,
+    },
 }
 
 struct MSP430(hidapi::HidDevice);
@@ -66,27 +85,19 @@ impl MSP430 {
             .collect()
     }
 
-    fn cmd_no_resp(&self, cmd: u8, data: &[u8]) -> Result<()> {
+    fn cmd_no_resp(&self, cmd: u8, data: &[u8]) -> hidapi::HidResult<()> {
         let req = Self::request(cmd, data);
 
-        self.0
-            .write(&req)
-            .map(|_| ())
-            .map_err(|e| Error::FailedToWrite(e.to_string()))
+        self.0.write(&req).map(|_| ())
     }
 
-    fn cmd(&self, cmd: u8, data: &[u8]) -> Result<Vec<u8>> {
+    fn cmd(&self, cmd: u8, data: &[u8]) -> hidapi::HidResult<Vec<u8>> {
         let mut ans = [0u8; 256];
 
         let req = Self::request(cmd, data);
-        self.0
-            .write(&req)
-            .map_err(|e| Error::FailedToWrite(e.to_string()))?;
+        self.0.write(&req)?;
 
-        let _ = self
-            .0
-            .read(&mut ans)
-            .map_err(|e| Error::FailedToRead(e.to_string()))?;
+        let _ = self.0.read(&mut ans)?;
 
         assert_eq!(ans[0], USB_MSG_HEADER);
         let length = ans[1];
@@ -95,14 +106,16 @@ impl MSP430 {
     }
 
     fn mass_erase(&self) -> Result<()> {
-        let ans = self.cmd(
-            CMD_RX_PASSWORD,
-            &[
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                0xff, 0xff, 0, 0,
-            ],
-        )?;
+        let ans = self
+            .cmd(
+                CMD_RX_PASSWORD,
+                &[
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0, 0,
+                ],
+            )
+            .map_err(|_| Error::MassEraseFail)?;
 
         assert_eq!(ans.len(), 2);
         assert_ne!(ans[1], 0);
@@ -111,7 +124,9 @@ impl MSP430 {
     }
 
     fn unlock(&self) -> Result<()> {
-        let ans = self.cmd(CMD_RX_PASSWORD, &[0xffu8; 32])?;
+        let ans = self
+            .cmd(CMD_RX_PASSWORD, &[0xffu8; 32])
+            .map_err(|_| Error::UnlockFail)?;
 
         assert_eq!(ans.len(), 2);
         assert_eq!(ans[1], 0);
@@ -121,10 +136,13 @@ impl MSP430 {
 
     fn load_pc(&self) -> Result<()> {
         self.cmd_no_resp(CMD_LOAD_PC, &BSL_START_ADDR)
+            .map_err(|_| Error::BSLJumpFail)
     }
 
     fn bsl_version(&self) -> Result<()> {
-        let resp = self.cmd(CMD_TX_BSL_VERSION, &[])?;
+        let resp = self
+            .cmd(CMD_TX_BSL_VERSION, &[])
+            .map_err(|_| Error::BslVersionFail)?;
 
         assert_eq!(resp[0], 0x3a);
         assert_eq!(resp[1..], BSL_VERSION);
@@ -141,7 +159,8 @@ impl MSP430 {
             .chain(block[..bytes_to_write].iter().cloned())
             .collect();
 
-        self.cmd_no_resp(CMD_RX_DATA_BLOCK_FAST, &data)?;
+        self.cmd_no_resp(CMD_RX_DATA_BLOCK_FAST, &data)
+            .map_err(|e| Error::FirmwareWriteFail { source: e })?;
 
         Ok(bytes_to_write)
     }
@@ -237,7 +256,7 @@ pub fn devices() -> std::collections::HashSet<CString> {
 
 fn open_hidraw(dst: &std::ffi::CStr) -> Result<hidapi::HidDevice> {
     hidapi::HidApi::new()
-        .map_err(|e| Error::FailedToOpenDestination(e.to_string()))?
+        .map_err(|source| Error::FailedToOpenDestination { source })?
         .open_path(dst)
-        .map_err(|e| Error::FailedToOpenDestination(e.to_string()))
+        .map_err(|source| Error::FailedToOpenDestination { source })
 }

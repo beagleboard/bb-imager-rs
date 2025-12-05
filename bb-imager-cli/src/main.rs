@@ -153,9 +153,14 @@ async fn flash_internal(
             dst,
             no_verify,
         } => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(LocalImage::new(img), dst.into(), !no_verify)
-                .flash(chan)
-                .await
+            bb_flasher::bcf::cc1352p7::Flasher::new(
+                LocalImage::new(img),
+                dst.into(),
+                !no_verify,
+                None,
+            )
+            .flash(chan)
+            .await
         }
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {

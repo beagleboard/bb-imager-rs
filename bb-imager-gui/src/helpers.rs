@@ -628,7 +628,7 @@ pub(crate) async fn flash(
             FlashingCustomization::Bcf(customization),
             Some(Destination::BeagleConnectFreedom(t)),
         ) => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify)
+            bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify, Some(cancel))
                 .flash(Some(chan))
                 .await
         }

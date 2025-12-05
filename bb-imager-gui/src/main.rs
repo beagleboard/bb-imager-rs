@@ -338,10 +338,8 @@ impl BBImager {
                     BBImagerMessage::StopFlashing(ProgressBarState::FLASHING_SUCCESS)
                 }
                 Err(e) => {
-                    tracing::error!("Flashing failed with error: {e}");
-                    BBImagerMessage::StopFlashing(ProgressBarState::fail(format!(
-                        "Flashing Failed {e}"
-                    )))
+                    tracing::error!("Flashing failed with error: {:#?}", e);
+                    BBImagerMessage::StopFlashing(ProgressBarState::fail(e.to_string()))
                 }
             };
 
