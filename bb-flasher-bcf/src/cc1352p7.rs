@@ -39,34 +39,33 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// Errors for CC1352P7
 pub enum Error {
     /// Status for failing flash erase or program operation
-    #[error("Status for failing flash erase or program operation")]
+    #[error("Status for failing flash erase or program operation.")]
     FlashFail,
     /// Bootloader sent unexpected response
-    #[error("Bootloader sent unexpected response")]
+    #[error("Bootloader sent unexpected response.")]
     UnknownResponse,
     /// Bootloader Responded with Nack
-    #[error("Bootloader Responded with Nack")]
+    #[error("Bootloader Responded with Nack.")]
     Nack,
     /// Failed to start Bootloader
-    #[error("Failed to start Bootloader")]
+    #[error("Failed to start Bootloader.")]
     FailedToStartBootloader,
     /// Flashed image is not valid
-    #[error("Flashed image is not valid")]
+    #[error("Flashed image is not valid.")]
     InvalidImage,
     /// Failed to open serial port
-    #[error("Failed to open serial port")]
+    #[error("Failed to open serial port.")]
     FailedToOpenPort,
     /// Aborted before completing
-    #[error("Aborted before completing")]
+    #[error("Aborted before completing.")]
     Aborted,
-    #[error("IO Error: {0}")]
-    IoError(io::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
+    /// Unknown error occured during IO.
+    #[error("Unknown Error during IO. Please check logs for more information.")]
+    IoError {
+        #[from]
+        #[source]
+        source: io::Error,
+    },
 }
 
 struct BeagleConnectFreedom<S: SerialPort> {
@@ -309,7 +308,7 @@ pub fn flash(
     let img_crc32 = crc32fast::hash(
         &firmware_bin
             .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xff))
-            .unwrap(),
+            .expect("Unexpected error"),
     );
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
@@ -327,8 +326,8 @@ pub fn flash(
         let mut offset = 0;
 
         bcf.send_download(
-            start_address.try_into().unwrap(),
-            data.len().try_into().unwrap(),
+            start_address.try_into().expect("Unexpected error"),
+            data.len().try_into().expect("Unexpected error"),
         )?;
         while offset < data.len() {
             offset += bcf.send_data(&data[offset..])?;
