@@ -151,5 +151,6 @@ where
             self.cancel,
         )
         .await
+        .map_err(std::io::Error::other)
     }
 }
