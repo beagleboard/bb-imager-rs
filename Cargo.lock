@@ -612,6 +612,7 @@ dependencies = [
 name = "bb-flasher-sd"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "bb-bmap-parser",
  "bb-drivelist",
  "bb-helper",

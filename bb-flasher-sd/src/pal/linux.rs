@@ -13,75 +13,87 @@ use std::{
 
 #[cfg(feature = "udev")]
 pub(crate) async fn format(dst: &Path) -> Result<()> {
-    let dbus_client = udisks2::Client::new().await.map_err(Error::from)?;
+    async fn format_inner(dst: &Path) -> io::Result<()> {
+        let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
-    let devs = dbus_client
-        .manager()
-        .resolve_device(
-            HashMap::from([("path", dst.to_str().unwrap().into())]),
-            HashMap::new(),
+        let devs = dbus_client
+            .manager()
+            .resolve_device(
+                HashMap::from([("path", dst.to_str().unwrap().into())]),
+                HashMap::new(),
+            )
+            .await
+            .map_err(io::Error::other)?;
+
+        let block = devs
+            .first()
+            .ok_or(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Block device not found",
+            ))?
+            .to_owned();
+
+        let obj = dbus_client
+            .object(block)
+            .expect("Unexpected error")
+            .block()
+            .await
+            .map_err(io::Error::other)?;
+
+        obj.format(
+            "vfat",
+            HashMap::from([("update-partition-type", true.into())]),
         )
         .await
-        .map_err(Error::from)?;
+        .map_err(io::Error::other)?;
 
-    let block = devs
-        .first()
-        .ok_or(Error::FailedToOpenDestination(
-            dst.to_string_lossy().to_string(),
-        ))?
-        .to_owned();
+        Ok(())
+    }
 
-    let obj = dbus_client
-        .object(block)
-        .expect("Unexpected error")
-        .block()
+    format_inner(dst)
         .await
-        .map_err(Error::from)?;
-
-    obj.format(
-        "vfat",
-        HashMap::from([("update-partition-type", true.into())]),
-    )
-    .await
-    .map_err(Error::from)?;
-
-    Ok(())
+        .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[cfg(feature = "udev")]
 pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
-    let dbus_client = udisks2::Client::new().await?;
+    async fn open_inner(dst: &Path) -> anyhow::Result<LinuxDrive> {
+        let dbus_client = udisks2::Client::new().await?;
 
-    let devs = dbus_client
-        .manager()
-        .resolve_device(
-            HashMap::from([("path", dst.to_str().unwrap().into())]),
-            HashMap::new(),
-        )
-        .await?;
+        let devs = dbus_client
+            .manager()
+            .resolve_device(
+                HashMap::from([("path", dst.to_str().unwrap().into())]),
+                HashMap::new(),
+            )
+            .await?;
 
-    let block = devs
-        .first()
-        .ok_or(Error::FailedToOpenDestination(
-            dst.to_string_lossy().to_string(),
-        ))?
-        .to_owned();
+        let block = devs
+            .first()
+            .ok_or(anyhow::anyhow!("Block device not found",))?
+            .to_owned();
 
-    let obj = dbus_client
-        .object(block)
-        .expect("Unexpected error")
-        .block()
-        .await?;
+        let obj = dbus_client
+            .object(block)
+            .expect("Unexpected error")
+            .block()
+            .await?;
 
-    let fd = obj
-        .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
-        .await?;
-    let file = unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
+        let fd = obj
+            .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
+            .await?;
+        let file =
+            unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
-    Ok(LinuxDrive {
-        file,
-        drive: dst.to_path_buf(),
-    })
+        Ok(LinuxDrive {
+            file,
+            drive: dst.to_path_buf(),
+        })
+    }
+
+    open_inner(dst)
+        .await
+        .map_err(|e| Error::FailedToOpenDestination { source: e })
 }
 
 #[cfg(not(feature = "udev"))]
@@ -104,18 +116,22 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
 
 #[cfg(not(feature = "udev"))]
 pub(crate) async fn format(dst: &Path) -> Result<()> {
-    let output = tokio::process::Command::new("mkfs.vfat")
-        .arg(dst)
-        .output()
-        .await?;
+    async fn format_inner(dst: &Path) -> io::Result<()> {
+        let output = tokio::process::Command::new("mkfs.vfat")
+            .arg(dst)
+            .output()
+            .await?;
 
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(Error::FailedToFormat(
-            String::from_utf8(output.stderr).unwrap(),
-        ))
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(io::Error::other(format!("Status: {}", output.status)))
+        }
     }
+
+    format_inner(dst)
+        .await
+        .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[derive(Debug)]
@@ -127,8 +143,8 @@ pub(crate) struct LinuxDrive {
 #[cfg(feature = "udev")]
 impl Eject for LinuxDrive {
     fn eject(self) -> io::Result<()> {
-        async fn inner(dst: PathBuf) -> Result<()> {
-            let dbus_client = udisks2::Client::new().await?;
+        async fn inner(dst: PathBuf) -> io::Result<()> {
+            let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
             let devs = dbus_client
                 .manager()
@@ -136,12 +152,14 @@ impl Eject for LinuxDrive {
                     HashMap::from([("path", dst.to_str().unwrap().into())]),
                     HashMap::new(),
                 )
-                .await?;
+                .await
+                .map_err(io::Error::other)?;
 
             let obj_path = devs
                 .first()
-                .ok_or(Error::FailedToOpenDestination(
-                    dst.to_string_lossy().to_string(),
+                .ok_or(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Block device not found",
                 ))?
                 .to_owned();
 
@@ -149,15 +167,18 @@ impl Eject for LinuxDrive {
                 .object(obj_path)
                 .expect("Unexpected error")
                 .block()
-                .await?;
+                .await
+                .map_err(io::Error::other)?;
 
             dbus_client
-                .object(block.drive().await?)
+                .object(block.drive().await.map_err(io::Error::other)?)
                 .expect("Unexpected error")
                 .drive()
-                .await?
+                .await
+                .map_err(io::Error::other)?
                 .eject(HashMap::new())
-                .await?;
+                .await
+                .map_err(io::Error::other)?;
 
             Ok(())
         }

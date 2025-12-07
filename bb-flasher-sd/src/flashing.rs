@@ -208,11 +208,11 @@ pub async fn flash<R: Read + Send + 'static>(
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
-) -> std::io::Result<()> {
+) -> Result<()> {
     if let Some(x) = &customization
         && !x.validate()
     {
-        return Err(crate::Error::InvalidCustomizaton.into());
+        return Err(crate::Error::InvalidCustomizaton);
     }
 
     tracing::info!("Opening Destination");
@@ -232,10 +232,11 @@ pub async fn flash<R: Read + Send + 'static>(
     let (img, img_size) = img.resolve(&mut tasks).await?;
 
     let cancel_child = cancel.as_ref().map(|x| x.child_token());
-    tasks.spawn_blocking(move || {
+    let res = tokio::task::spawn_blocking(move || {
         flash_internal(img, img_size, bmap, sd, chan, customization, cancel_child)
-            .map_err(Into::into)
-    });
+    })
+    .await
+    .unwrap();
 
     // Cancel all tasks on drop
     let _drop_guard = cancel.map(|x| x.drop_guard());
@@ -243,11 +244,11 @@ pub async fn flash<R: Read + Send + 'static>(
     while let Some(t) = tasks.join_next().await {
         if let Err(e) = t.unwrap() {
             tasks.abort_all();
-            return Err(e);
+            return Err(e.into());
         }
     }
 
-    Ok(())
+    res
 }
 
 fn flash_internal(

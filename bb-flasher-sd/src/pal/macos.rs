@@ -7,7 +7,7 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
     tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
         .await
         .unwrap()
-        .map_err(|e| Error::FailedToFormat(e.to_string()))
+        .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[cfg(not(feature = "macos_authopen"))]
@@ -17,7 +17,8 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
         .write(true)
         .create(false)
         .open(dst)
-        .await?
+        .await
+        .map_err(|e| Error::FailedToOpenDestination { source: e })?
         .into_std()
         .await;
 
@@ -26,7 +27,7 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
 
 #[cfg(feature = "macos_authopen")]
 pub(crate) async fn open(dst: &Path) -> Result<File> {
-    fn inner(dst: std::path::PathBuf) -> Result<File> {
+    fn inner(dst: std::path::PathBuf) -> anyhow::Result<File> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
         use security_framework::authorization::{
@@ -60,15 +61,13 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
 
         let _ = Command::new("diskutil")
             .args(["unmountDisk", dst.to_str().unwrap()])
-            .output()
-            .map_err(|_| Error::FailedToOpenDestination("Failed to unmount disk".to_string()))?;
+            .output()?;
 
         let mut cmd = Command::new("/usr/libexec/authopen")
             .args(["-stdoutpipe", "-extauth", "-o", "2", dst.to_str().unwrap()])
             .stdin(Stdio::piped())
             .stdout(OwnedFd::from(pipe1))
-            .spawn()
-            .map_err(|_| Error::FailedToOpenDestination("Failed to open disk".to_string()))?;
+            .spawn()?;
 
         // Send authorization form
         let mut stdin = cmd.stdin.take().expect("Missing stdin");
@@ -111,14 +110,15 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
 
         let _ = cmd.wait();
 
-        Err(Error::FailedToOpenDestination(
-            "Authopen failed to open the file".to_string(),
-        ))
+        Err(anyhow::anyhow!("Authopen failed to open the SD Card"))
     }
 
     let p = dst.to_owned();
     // TODO: Make this into a real async function
-    tokio::task::spawn_blocking(move || inner(p)).await.unwrap()
+    tokio::task::spawn_blocking(move || inner(p))
+        .await
+        .unwrap()
+        .map_err(|e| Error::FailedToOpenDestination { source: e })
 }
 
 /// TODO: Implement real eject
