@@ -55,49 +55,58 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for this crate
 pub enum Error {
-    #[error("Invalid customization")]
+    /// Provided customization options are not valid for the current image.
+    #[error("Invalid customization options.")]
     InvalidCustomizaton,
-    #[error("Failed to customize flashed image {0}")]
-    Customization(String),
-    #[error("IO Error: {0}")]
-    IoError(#[from] io::Error),
+    /// The partition table of image invalid.
+    #[error("Partition table of image not valid.")]
+    InvalidPartitionTable,
+    #[error("Only FAT BOOT partitions are supported.")]
+    InvalidBootPartition,
+    #[error("Failed to create sysconf.txt")]
+    SysconfCreateFail {
+        #[source]
+        source: io::Error,
+    },
+    #[error("Failed to write {field} to sysconf.txt.")]
+    SysconfWriteFail {
+        #[source]
+        source: io::Error,
+        field: &'static str,
+    },
+    #[error("Failed to setup WiFi.")]
+    WifiSetupFail {
+        #[source]
+        source: io::Error,
+    },
+    /// Unknown error occured during IO.
+    #[error("Unknown Error during IO. Please check logs for more information.")]
+    IoError {
+        #[from]
+        #[source]
+        source: io::Error,
+    },
     /// Aborted before completing
-    #[error("Aborted before completing")]
+    #[error("Aborted before completing.")]
     Aborted,
-    #[error("Failed to format SD Card: {0}")]
-    FailedToFormat(String),
-    #[error("Failed to open {0}")]
-    FailedToOpenDestination(String),
-    #[error("Invalid bmap")]
+    #[error("Failed to format SD Card.")]
+    FailedToFormat {
+        #[source]
+        source: io::Error,
+    },
+    #[error("Failed to open SD Card.")]
+    FailedToOpenDestination {
+        #[source]
+        source: anyhow::Error,
+    },
+    #[error("Invalid bmap for the image.")]
     InvalidBmap,
-
-    #[error("Udisks2 Error: {0}")]
-    #[cfg(all(feature = "udev", target_os = "linux"))]
-    Udisks(#[from] udisks2::Error),
-
-    #[cfg(windows)]
-    #[error("Drive path is not valid")]
-    InvalidDrive,
-    #[cfg(windows)]
-    #[error("Failed to find the drive {0}")]
-    DriveNotFound(String),
-    #[cfg(windows)]
-    #[error("Windows Error: {0}")]
-    WindowsError(#[from] windows::core::Error),
-    #[cfg(windows)]
-    #[error("Failed to clear SD Card: {0:?}")]
-    WindowsCleanError(std::process::Output),
-    #[error("Writer thread has been closed")]
+    #[error("Writer thread has been closed.")]
     WriterClosed,
-}
 
-impl From<Error> for std::io::Error {
-    fn from(value: Error) -> Self {
-        match value {
-            Error::IoError(e) => e,
-            _ => Self::other(value),
-        }
-    }
+    #[cfg(windows)]
+    #[error("Failed to clear SD Card.")]
+    WindowsCleanError(std::process::Output),
 }
 
 /// Enumerate all SD Cards in system

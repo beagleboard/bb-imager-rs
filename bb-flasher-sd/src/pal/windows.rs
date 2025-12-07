@@ -1,6 +1,6 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, Seek, SeekFrom, Write},
+    io::{self, Read, Seek, SeekFrom, Write},
     os::windows::io::AsRawHandle,
     path::Path,
     process::Stdio,
@@ -24,7 +24,7 @@ const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
 const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
 
 impl WinDrive {
-    pub(crate) async fn open(path: &Path) -> Result<Self> {
+    pub(crate) async fn open(path: &Path) -> anyhow::Result<Self> {
         tracing::info!("Trying to find {}", path.display());
         let vol_path = physical_drive_to_volume(path)?;
 
@@ -75,7 +75,7 @@ impl Drop for WinDrive {
     }
 }
 
-fn open_and_lock_volume(path: &str) -> Result<File> {
+fn open_and_lock_volume(path: &str) -> anyhow::Result<File> {
     let volume = OpenOptions::new().read(true).write(true).open(path)?;
 
     unsafe {
@@ -105,19 +105,22 @@ fn open_and_lock_volume(path: &str) -> Result<File> {
     Ok(volume)
 }
 
-fn physical_drive_to_volume(drive: &Path) -> Result<Option<String>> {
+fn physical_drive_to_volume(drive: &Path) -> anyhow::Result<Option<String>> {
     let desc = bb_drivelist::drive_list()
         .expect("Unexpected error")
         .into_iter()
         .find(|x| x.device == drive.to_str().unwrap())
-        .ok_or(Error::DriveNotFound(drive.to_string_lossy().to_string()))?;
+        .ok_or(anyhow::anyhow!("Drive not found"))?;
 
     tracing::info!("Drive desc {:#?}", desc);
 
     if let Some(mount) = desc.mountpoints.first() {
         let mount_path = format!(
             "\\\\.\\{}",
-            mount.path.strip_suffix("\\").ok_or(Error::InvalidDrive)?
+            mount
+                .path
+                .strip_suffix("\\")
+                .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?
         );
 
         Ok(Some(mount_path))
@@ -131,7 +134,7 @@ async fn diskpart_clean(path: &Path) -> Result<()> {
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
-        .ok_or(Error::InvalidDrive)?;
+        .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?;
 
     let resp = tokio::process::Command::new("powershell")
         .args(&[
@@ -152,12 +155,12 @@ async fn diskpart_clean(path: &Path) -> Result<()> {
     }
 }
 
-async fn diskpart_format(path: &Path) -> Result<()> {
+async fn diskpart_format(path: &Path) -> io::Result<()> {
     let disk_num = path
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
-        .ok_or(Error::InvalidDrive)?;
+        .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?;
 
     let mut cmd = tokio::process::Command::new("diskpart")
         .stderr(Stdio::null())
@@ -181,44 +184,48 @@ async fn diskpart_format(path: &Path) -> Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(Error::FailedToFormat(format!("Status: {}", status)))
+        Err(io::Error::other(format!("Status: {status}")))
     }
 }
 
 impl Read for WinDrive {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.drive.read(buf)
     }
 }
 
 impl Write for WinDrive {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.drive.write(buf)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         self.drive.flush()
     }
 }
 
 impl Seek for WinDrive {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.drive.seek(pos)
     }
 }
 
 /// TODO: Implement real eject
 impl crate::helpers::Eject for WinDrive {
-    fn eject(self) -> std::io::Result<()> {
+    fn eject(self) -> io::Result<()> {
         let _ = self.drive.sync_all();
         Ok(())
     }
 }
 
 pub(crate) async fn format(dst: &Path) -> Result<()> {
-    diskpart_format(dst).await
+    diskpart_format(dst)
+        .await
+        .map_err(|source| Error::FailedToFormat { source })
 }
 
 pub(crate) async fn open(dst: &Path) -> Result<WinDrive> {
-    WinDrive::open(dst).await
+    WinDrive::open(dst)
+        .await
+        .map_err(|e| Error::FailedToOpenDestination { source: e })
 }

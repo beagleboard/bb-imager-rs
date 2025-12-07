@@ -45,61 +45,58 @@ impl SysconfCustomization {
         let boot_partition = {
             let (start_off, end_off) = customization_partition(&mut dst)?;
             let slice = fscommon::StreamSlice::new(dst, start_off, end_off)
-                .map_err(|_| Error::Customization("Failed to read partition".to_string()))?;
+                .map_err(|_| Error::InvalidPartitionTable)?;
             let boot_stream = fscommon::BufStream::new(slice);
             fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new())
-                .map_err(|e| Error::Customization(format!("Failed to open boot partition: {e}")))?
+                .map_err(|_| Error::InvalidBootPartition)?
         };
 
         let boot_root = boot_partition.root_dir();
 
         let mut conf = boot_root
             .create_file("sysconf.txt")
-            .map_err(|e| Error::Customization(format!("Failed to create sysconf.txt: {e}")))?;
-        conf.seek(SeekFrom::End(0)).map_err(|e| {
-            Error::Customization(format!("Failed to seek to end of sysconf.txt: {e}"))
-        })?;
+            .map_err(|source| Error::SysconfCreateFail { source })?;
+        conf.seek(SeekFrom::End(0))
+            .expect("Failed to seek to end of sysconf.txt");
 
         if let Some(h) = &self.hostname {
-            sysconf_w(&mut conf, &format!("hostname={h}\n"))?;
+            sysconf_w(&mut conf, "hostname", h)?;
         }
 
         if let Some(tz) = &self.timezone {
-            sysconf_w(&mut conf, &format!("timezone={tz}\n"))?;
+            sysconf_w(&mut conf, "timezone", tz)?;
         }
 
         if let Some(k) = &self.keymap {
-            sysconf_w(&mut conf, &format!("keymap={k}\n"))?;
+            sysconf_w(&mut conf, "keymap", k)?;
         }
 
         if let Some((u, p)) = &self.user {
-            sysconf_w(&mut conf, &format!("user_name={u}\n"))?;
-            sysconf_w(&mut conf, &format!("user_password={p}\n"))?;
+            sysconf_w(&mut conf, "user_name", u)?;
+            sysconf_w(&mut conf, "user_password", p)?;
         }
 
         if let Some(x) = &self.ssh {
-            sysconf_w(&mut conf, &format!("user_authorized_key={x}"))?;
+            sysconf_w(&mut conf, "user_authorized_key", x)?;
         }
 
         if Some(true) == self.usb_enable_dhcp {
-            sysconf_w(&mut conf, "usb_enable_dhcp=yes")?;
+            sysconf_w(&mut conf, "usb_enable_dhcp", "yes")?;
         }
 
         if let Some((ssid, psk)) = &self.wifi {
-            sysconf_w(&mut conf, &format!("iwd_psk_file={ssid}.psk\n"))?;
-
             let mut wifi_file = boot_root
                 .create_file(format!("services/{ssid}.psk").as_str())
-                .map_err(|e| Error::Customization(format!("Failed to create iwd_psk_file: {e}")))?;
+                .map_err(|e| Error::WifiSetupFail { source: e })?;
 
             wifi_file
                 .write_all(
                     format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
                         .as_bytes(),
                 )
-                .map_err(|e| {
-                    Error::Customization(format!("Failed to write to iwd_psk_file: {e}"))
-                })?;
+                .map_err(|e| Error::WifiSetupFail { source: e })?;
+
+            sysconf_w(&mut conf, "iwd_psk_file", &format!("{ssid}.psk"))?;
         }
 
         Ok(())
@@ -124,11 +121,13 @@ impl SysconfCustomization {
     }
 }
 
-fn sysconf_w(mut sysconf: impl Write, data: &str) -> Result<()> {
+fn sysconf_w(mut sysconf: impl Write, key: &'static str, value: &str) -> Result<()> {
     sysconf
-        .write_all(data.as_bytes())
-        .map_err(|e| Error::Customization(format!("Failed to write {data} to sysconf.txt: {e}")))?;
-    Ok(())
+        .write_all(format!("{key}={value}\n").as_bytes())
+        .map_err(|e| Error::SysconfWriteFail {
+            source: e,
+            field: key,
+        })
 }
 
 fn customization_partition(
@@ -147,12 +146,10 @@ fn customization_partition(
 
         Ok((start_offset, end_offset))
     } else {
-        let mbr = mbrman::MBRHeader::read_from(&mut dst)
-            .map_err(|e| Error::Customization(format!("Failed to read mbr: {e}")))?;
+        let mbr =
+            mbrman::MBRHeader::read_from(&mut dst).map_err(|_| Error::InvalidPartitionTable)?;
 
-        let boot_part = mbr.get(1).ok_or(Error::Customization(
-            "Failed to get boot partition".to_string(),
-        ))?;
+        let boot_part = mbr.get(1).ok_or(Error::InvalidPartitionTable)?;
         let start_offset: u64 = (boot_part.starting_lba * 512).into();
         let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
 

@@ -118,7 +118,7 @@ impl BBFlasher for FormatFlasher {
         bb_flasher_sd::format(p.as_path())
             .await
             .map_err(|e| match e {
-                Error::IoError(error) => error,
+                Error::IoError { source } => source,
                 _ => std::io::Error::other(e.to_string()),
             })
     }
@@ -212,5 +212,9 @@ where
             )
             .await
         }
+        .map_err(|e| match e {
+            Error::IoError { source } => source,
+            _ => std::io::Error::other(e.to_string()),
+        })
     }
 }
