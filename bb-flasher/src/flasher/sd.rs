@@ -8,8 +8,6 @@ use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
 
-use bb_flasher_sd::Error;
-
 /// SD Card
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Target(bb_flasher_sd::Device);
@@ -113,14 +111,9 @@ impl BBFlasher for FormatFlasher {
     async fn flash(
         self,
         _: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<()> {
+    ) -> anyhow::Result<()> {
         let p = self.0;
-        bb_flasher_sd::format(p.as_path())
-            .await
-            .map_err(|e| match e {
-                Error::IoError { source } => source,
-                _ => std::io::Error::other(e.to_string()),
-            })
+        bb_flasher_sd::format(p.as_path()).await.map_err(Into::into)
     }
 }
 
@@ -169,7 +162,7 @@ where
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<()> {
+    ) -> anyhow::Result<()> {
         let customization = self.customization.customization;
         let dst = self.dst;
 
@@ -212,9 +205,6 @@ where
             )
             .await
         }
-        .map_err(|e| match e {
-            Error::IoError { source } => source,
-            _ => std::io::Error::other(e.to_string()),
-        })
+        .map_err(Into::into)
     }
 }

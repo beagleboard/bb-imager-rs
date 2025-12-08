@@ -3,6 +3,16 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use futures::channel::mpsc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub(crate) enum FlasherError {
+    #[error("Failed to fetch image.")]
+    ImageResolvingError {
+        #[source]
+        source: std::io::Error,
+    },
+}
 
 /// Enum to denote the Flashing progress.
 ///
@@ -26,7 +36,7 @@ pub trait BBFlasher {
     fn flash(
         self,
         chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = std::io::Result<()>>;
+    ) -> impl Future<Output = anyhow::Result<()>>;
 }
 
 /// A trait for modeling flasher targets.

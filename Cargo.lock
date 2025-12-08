@@ -554,6 +554,7 @@ dependencies = [
 name = "bb-flasher"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bb-flasher-bcf",
  "bb-flasher-dfu",
  "bb-flasher-pb2-mspm0",
@@ -644,6 +645,7 @@ dependencies = [
 name = "bb-imager-cli"
 version = "0.0.16"
 dependencies = [
+ "anyhow",
  "bb-flasher",
  "bb-helper",
  "clap",
@@ -660,6 +662,7 @@ dependencies = [
 name = "bb-imager-gui"
 version = "0.0.16"
 dependencies = [
+ "anyhow",
  "ashpd 0.12.0",
  "bb-config",
  "bb-downloader",

@@ -14,7 +14,7 @@ categories = ["development-tools", "embedded", "hardware-support"]
 liblzma = { version = "0.4", features = ["static", "parallel"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
-thiserror = { version = "2.0", optional = true }
+thiserror = { version = "2.0" }
 tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
 tracing = "0.1"
 futures = "0.3"
@@ -28,6 +28,7 @@ tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper", features = ["file_stream", "resolvable"] }
 rc-zip-sync = "4.4"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
+anyhow = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
@@ -40,7 +41,7 @@ sd_macos_authopen = ["bb-flasher-sd/macos_authopen"]
 bcf = ["bb-flasher-bcf/cc1352p7"]
 bcf_msp430 = ["bb-flasher-bcf/msp430"]
 pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
-pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json", "dep:thiserror"]
+pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json"]
 dfu = ["bb-flasher-dfu"]
 
 [package.metadata.docs.rs]

@@ -6,7 +6,6 @@
 use std::{borrow::Cow, fmt::Display, io::Read};
 
 use crate::{BBFlasher, BBFlasherTarget, Resolvable};
-use bb_flasher_bcf::cc1352p7::Error;
 
 /// BeagleConnect Freedom target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -86,12 +85,15 @@ where
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
-    ) -> std::io::Result<()> {
+    ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
         let img = {
             let mut tasks = tokio::task::JoinSet::new();
-            let (mut img, _) = self.img.resolve(&mut tasks).await?;
+            let (mut img, _) =
+                self.img.resolve(&mut tasks).await.map_err(|source| {
+                    crate::common::FlasherError::ImageResolvingError { source }
+                })?;
 
             let resp = tokio::task::spawn_blocking(move || {
                 let mut data = Vec::new();
@@ -99,12 +101,13 @@ where
                 Ok::<Vec<u8>, std::io::Error>(data)
             })
             .await
-            .unwrap()?;
+            .unwrap()
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
             while let Some(t) = tasks.join_next().await {
                 if let Err(e) = t.unwrap() {
                     tasks.abort_all();
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
 
@@ -130,9 +133,6 @@ where
             })
         };
 
-        flasher_task.await.unwrap().map_err(|e| match e {
-            Error::IoError { source } => source,
-            _ => std::io::Error::other(e),
-        })
+        flasher_task.await.unwrap().map_err(Into::into)
     }
 }

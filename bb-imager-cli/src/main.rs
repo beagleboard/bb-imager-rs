@@ -108,7 +108,7 @@ async fn flash(target: TargetCommands, quite: bool) {
 async fn flash_internal(
     target: TargetCommands,
     chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-) -> std::io::Result<()> {
+) -> anyhow::Result<()> {
     match target {
         TargetCommands::Sd {
             dst,
