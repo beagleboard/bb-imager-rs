@@ -4,7 +4,7 @@
 //! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 //! [Linux Firmware Upload API]: https://docs.kernel.org/driver-api/firmware/fw_upload.html
 
-use std::path::Path;
+use std::{io, path::Path};
 use thiserror::Error;
 use tokio::{
     fs::File,
@@ -20,22 +20,31 @@ const FIRMWARE_SIZE: usize = 32 * 1024;
 /// Errors for this crate
 pub enum Error {
     /// Failed to open a sysfs entry.
-    #[error("Failed to open {0}")]
-    FailedToOpen(&'static str),
+    #[error("Failed to open {fname}.")]
+    FailedToOpen {
+        fname: &'static str,
+        #[source]
+        source: io::Error,
+    },
     /// Failed to read sysfs entry
-    #[error("Failed to read {0}")]
-    FailedToRead(&'static str),
+    #[error("Failed to read {fname}.")]
+    FailedToRead {
+        fname: &'static str,
+        #[source]
+        source: io::Error,
+    },
     /// Failed to write to a sysfs entry
-    #[error("Failed to write to {0}")]
-    FailedToWrite(&'static str),
-    /// Failed to Seek to start for a sysfs entry
-    #[error("Failed to seek {0}")]
-    FailedToSeek(&'static str),
+    #[error("Failed to write to {fname}.")]
+    FailedToWrite {
+        fname: &'static str,
+        #[source]
+        source: io::Error,
+    },
     /// Flashing failed
-    #[error("Failed to flash at {stage} due to {code}")]
+    #[error("Failed to flash at {stage}.")]
     FlashingError { stage: String, code: String },
     /// Invalid firmware
-    #[error("Invalid firmware")]
+    #[error("Provided firmware is not valid.")]
     InvalidFirmware,
 }
 
@@ -62,30 +71,43 @@ pub async fn flash(
     if persist_eeprom {
         let mut eeprom = File::open(EEPROM)
             .await
-            .map_err(|_| Error::FailedToOpen("EEPROM"))?;
+            .map_err(|source| Error::FailedToOpen {
+                source,
+                fname: "EEPROM",
+            })?;
         eeprom
             .read_to_end(&mut eeprom_contents)
             .await
-            .map_err(|_| Error::FailedToRead("EEPROM"))?;
+            .map_err(|source| Error::FailedToRead {
+                source,
+                fname: "EEPROM",
+            })?;
     }
 
     flash_fw_api(Path::new(PATH), firmware, chan).await?;
 
     // Write back EEPROM contents
     if persist_eeprom {
-        let mut eeprom = sysfs_w_open(Path::new(EEPROM))
-            .await
-            .map_err(|_| Error::FailedToOpen("EEPROM"))?;
+        let mut eeprom =
+            sysfs_w_open(Path::new(EEPROM))
+                .await
+                .map_err(|source| Error::FailedToOpen {
+                    source,
+                    fname: "EEPROM",
+                })?;
         eeprom
             .write_all(&eeprom_contents)
             .await
-            .map_err(|_| Error::FailedToWrite("EEPROM"))?;
+            .map_err(|source| Error::FailedToWrite {
+                source,
+                fname: "EEPROM",
+            })?;
     }
 
     Ok(())
 }
 
-async fn sysfs_w_open(path: &Path) -> std::io::Result<File> {
+async fn sysfs_w_open(path: &Path) -> io::Result<File> {
     tokio::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -107,15 +129,18 @@ pub async fn check() -> Result<()> {
     Ok(())
 }
 
-async fn check_file(name: &'static str, path: &Path) -> Result<()> {
+async fn check_file(fname: &'static str, path: &Path) -> Result<()> {
     let temp = tokio::fs::try_exists(path)
         .await
-        .map_err(|_| Error::FailedToOpen(name))?;
+        .map_err(|source| Error::FailedToOpen { source, fname })?;
 
     if temp {
         Ok(())
     } else {
-        Err(Error::FailedToOpen(name))
+        Err(Error::FailedToOpen {
+            fname,
+            source: io::Error::new(io::ErrorKind::NotFound, "sysfs file not found"),
+        })
     }
 }
 
@@ -134,44 +159,71 @@ async fn flash_fw_api(
 
     // Initial firmware upload
     {
-        let mut loading_file = sysfs_w_open(&loading_path)
-            .await
-            .map_err(|_| Error::FailedToOpen("loading"))?;
+        let mut loading_file =
+            sysfs_w_open(&loading_path)
+                .await
+                .map_err(|source| Error::FailedToOpen {
+                    source,
+                    fname: "loading",
+                })?;
         loading_file
             .write_all(b"1")
             .await
-            .map_err(|_| Error::FailedToWrite("loading"))?;
+            .map_err(|source| Error::FailedToWrite {
+                source,
+                fname: "loading",
+            })?;
         loading_file
             .flush()
             .await
-            .map_err(|_| Error::FailedToWrite("loading"))?;
+            .map_err(|source| Error::FailedToWrite {
+                source,
+                fname: "loading",
+            })?;
 
-        let mut data_file = sysfs_w_open(&data_path)
-            .await
-            .map_err(|_| Error::FailedToOpen("data"))?;
+        let mut data_file =
+            sysfs_w_open(&data_path)
+                .await
+                .map_err(|source| Error::FailedToOpen {
+                    source,
+                    fname: "data",
+                })?;
         data_file
             .write_all(firmware)
             .await
-            .map_err(|_| Error::FailedToWrite("data"))?;
+            .map_err(|source| Error::FailedToWrite {
+                source,
+                fname: "data",
+            })?;
 
         loading_file
             .write_all(b"0")
             .await
-            .map_err(|_| Error::FailedToWrite("loading"))?;
+            .map_err(|source| Error::FailedToWrite {
+                source,
+                fname: "loading",
+            })?;
     }
 
     // Wait for flashing to finish
     loop {
         // sysfs entries cause weird stuff if kept open after a single read/write
-        let mut status_file = File::open(&status_path)
-            .await
-            .map_err(|_| Error::FailedToOpen("status"))?;
+        let mut status_file =
+            File::open(&status_path)
+                .await
+                .map_err(|source| Error::FailedToOpen {
+                    source,
+                    fname: "status",
+                })?;
 
         inp.clear();
         status_file
             .read_to_string(&mut inp)
             .await
-            .map_err(|_| Error::FailedToRead("status"))?;
+            .map_err(|source| Error::FailedToRead {
+                source,
+                fname: "status",
+            })?;
 
         match inp.trim() {
             "idle" => break,
@@ -180,13 +232,19 @@ async fn flash_fw_api(
             }
             "transferring" => {
                 let mut prog = String::with_capacity(3);
-                let mut size_file = File::open(&remaining_size_path)
-                    .await
-                    .map_err(|_| Error::FailedToOpen("remaining_size"))?;
+                let mut size_file = File::open(&remaining_size_path).await.map_err(|source| {
+                    Error::FailedToOpen {
+                        source,
+                        fname: "remaining_size",
+                    }
+                })?;
                 size_file
                     .read_to_string(&mut prog)
                     .await
-                    .map_err(|_| Error::FailedToRead("remaining_size"))?;
+                    .map_err(|source| Error::FailedToRead {
+                        source,
+                        fname: "remaining_size",
+                    })?;
 
                 if let Ok(p) = prog.trim().parse::<usize>() {
                     let _ = chan.try_send(Status::Flashing(
@@ -203,15 +261,22 @@ async fn flash_fw_api(
 
     // Check for error
     {
-        let mut error_file = File::open(&error_path)
-            .await
-            .map_err(|_| Error::FailedToOpen("error"))?;
+        let mut error_file =
+            File::open(&error_path)
+                .await
+                .map_err(|source| Error::FailedToOpen {
+                    source,
+                    fname: "error",
+                })?;
 
         inp.clear();
         error_file
             .read_to_string(&mut inp)
             .await
-            .map_err(|_| Error::FailedToRead("error"))?;
+            .map_err(|source| Error::FailedToRead {
+                source,
+                fname: "error",
+            })?;
 
         let temp = inp.trim();
         match temp {
