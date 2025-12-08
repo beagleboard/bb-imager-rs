@@ -2,12 +2,43 @@ mod flashing;
 mod helpers;
 
 use std::{collections::HashSet, io};
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 use flashing::dfu_write;
-use helpers::{check_token, dfu_to_io_error, is_dfu_device};
+use helpers::{check_token, is_dfu_device};
 
 use crate::helpers::ReaderWithProgress;
+
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to open device.")]
+    FailedToOpen {
+        #[source]
+        source: dfu_libusb::Error,
+    },
+    #[error("Failed to download {img}.")]
+    DownloadFail {
+        img: String,
+        #[source]
+        source: dfu_libusb::Error,
+    },
+    /// Unknown error occured during image resolution.
+    #[error("Failed to fetch firmware image.")]
+    ImgResolveFail {
+        #[from]
+        #[source]
+        source: io::Error,
+    },
+    #[error("USB device not found.")]
+    UsbDevNotFound,
+    #[error("DFU interface not found.")]
+    DfuIntfNotFound,
+    #[error("Aborted before completing.")]
+    Aborted,
+}
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Device {
@@ -51,7 +82,7 @@ pub async fn flash<R, I>(
     port_num: u8,
     chan: Option<mpsc::Sender<f32>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
-) -> io::Result<()>
+) -> Result<()>
 where
     R: bb_helper::resolvable::Resolvable<ResolvedType = (I, u64)>,
     I: io::Read + Send + 'static,
@@ -63,7 +94,11 @@ where
         check_token(cancel.as_ref())?;
 
         let name = img.0.clone();
-        let (img_reader, size) = img.1.resolve(&mut tasks).await?;
+        let (img_reader, size) = img
+            .1
+            .resolve(&mut tasks)
+            .await
+            .map_err(|e| Error::ImgResolveFail { source: e })?;
 
         let res = match chan.clone() {
             Some(c) => {
@@ -113,13 +148,11 @@ where
         // For some reason tiboot3 does not exit properly. So need to ignore errors.
         if img.0.as_str() != "tiboot3.bin" {
             match res {
-                Err(dfu_libusb::Error::Io(e)) if e.kind() == io::ErrorKind::NotFound => {
-                    return Err(e);
-                }
-                _ => {}
+                Err(Error::DownloadFail { .. }) => {}
+                _ => return res,
             }
         } else {
-            res.map_err(dfu_to_io_error)?;
+            res?;
         }
 
         check_token(cancel.as_ref())?;

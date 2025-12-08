@@ -12,3 +12,4 @@ rusb = "0.9"
 bb-helper = { path = "../bb-helper", features = ["resolvable"] }
 tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread"] }
 tokio-util = { version = "0.7" }
+thiserror = "2.0"
