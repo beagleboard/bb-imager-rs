@@ -594,10 +594,10 @@ pub(crate) async fn flash(
     dst: Option<Destination>,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
     cancel: tokio_util::sync::CancellationToken,
-) -> std::io::Result<()> {
+) -> anyhow::Result<()> {
     match (img, customization, dst) {
         (Some(BoardImage::Image { img, .. }), _, Some(Destination::LocalFile(f))) => {
-            img.save(&f, chan).await
+            img.save(&f, chan).await.map_err(Into::into)
         }
         (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
             bb_flasher::sd::FormatFlasher::new(t)

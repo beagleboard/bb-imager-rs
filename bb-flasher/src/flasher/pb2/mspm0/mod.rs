@@ -85,10 +85,13 @@ where
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
-    ) -> std::io::Result<()> {
+    ) -> anyhow::Result<()> {
         let bin = {
             let mut tasks = tokio::task::JoinSet::new();
-            let (mut img, _) = self.img.resolve(&mut tasks).await?;
+            let (mut img, _) =
+                self.img.resolve(&mut tasks).await.map_err(|source| {
+                    crate::common::FlasherError::ImageResolvingError { source }
+                })?;
 
             let resp = tokio::task::spawn_blocking(move || {
                 let mut data = String::new();
@@ -98,12 +101,13 @@ where
                 })
             })
             .await
-            .unwrap()?;
+            .unwrap()
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
             while let Some(t) = tasks.join_next().await {
                 if let Err(e) = t.unwrap() {
                     tasks.abort_all();
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
 
@@ -112,6 +116,6 @@ where
 
         flash(bin, chan, self.persist_eeprom)
             .await
-            .map_err(std::io::Error::other)
+            .map_err(Into::into)
     }
 }

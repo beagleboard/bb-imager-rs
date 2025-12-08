@@ -121,10 +121,7 @@ impl<R> BBFlasher for Flasher<R>
 where
     R: Resolvable<ResolvedType = (crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
-        self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> std::io::Result<()> {
+    async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let c = if let Some(mut c) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(2);
 
@@ -151,6 +148,6 @@ where
             self.cancel,
         )
         .await
-        .map_err(std::io::Error::other)
+        .map_err(Into::into)
     }
 }

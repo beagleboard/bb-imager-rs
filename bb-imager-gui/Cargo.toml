@@ -31,6 +31,7 @@ bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-util = { version = "0.7" }
 semver = "1.0.27"
+anyhow = "1.0"
 
 [build-dependencies]
 embed-resource = "3.0"

@@ -18,6 +18,7 @@ const-hex = "1.17"
 clap_complete = "4.5"
 futures = "0.3"
 bb-helper = { path = "../bb-helper", features = ["resolvable"] }
+anyhow = "1.0"
 
 [features]
 default = []
