@@ -4,16 +4,33 @@ use zbus::proxy;
 
 #[derive(Error, Debug)]
 pub(crate) enum Error {
-    #[error("{0}")]
-    ZbusError(zbus::Error),
-    #[error("Image is not valid")]
+    #[error("Failed to create dbus connection.")]
+    DbusFail {
+        #[source]
+        source: zbus::Error,
+    },
+    #[error("Failed to connect to BeagleBoard Imaging service.")]
+    Pb2ServiceConnectionFail {
+        #[source]
+        source: zbus::Error,
+    },
+    #[error("Flashing not supported. Please check logs.")]
+    CheckFail {
+        #[source]
+        source: zbus::Error,
+    },
+    #[error("Flashing failed. Please check logs.")]
+    FlashFail {
+        #[source]
+        source: zbus::Error,
+    },
+    #[error("No supported target found.")]
+    TargetNotFound {
+        #[source]
+        source: zbus::Error,
+    },
+    #[error("Image is not valid.")]
     InvalidImage,
-}
-
-impl From<zbus::Error> for Error {
-    fn from(value: zbus::Error) -> Self {
-        Self::ZbusError(value)
-    }
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -60,14 +77,22 @@ pub(crate) async fn flash(
     chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     persist_eeprom: bool,
 ) -> Result<(), Error> {
-    let connection = zbus::Connection::system().await?;
+    let connection = zbus::Connection::system()
+        .await
+        .map_err(|source| Error::DbusFail { source })?;
     let proxy = Pocketbeagle2Mspm0Proxy::new(&connection)
         .await
-        .map_err(Error::from)?;
+        .map_err(|source| Error::Pb2ServiceConnectionFail { source })?;
 
-    proxy.check().await?;
+    proxy
+        .check()
+        .await
+        .map_err(|source| Error::CheckFail { source })?;
 
-    let (_, _, flash_size) = proxy.device().await?;
+    let (_, _, flash_size) = proxy
+        .device()
+        .await
+        .map_err(|source| Error::TargetNotFound { source })?;
     let firmware = img
         .to_bytes(0..(flash_size as usize), None)
         .map_err(|_| Error::InvalidImage)?;
@@ -86,7 +111,10 @@ pub(crate) async fn flash(
         }
     });
 
-    proxy.flash(&firmware, persist_eeprom).await?;
+    proxy
+        .flash(&firmware, persist_eeprom)
+        .await
+        .map_err(|source| Error::FlashFail { source })?;
 
     progress_task.abort();
 
