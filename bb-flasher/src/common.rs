@@ -3,9 +3,11 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use futures::channel::mpsc;
+#[cfg(any(feature = "bcf", feature = "bcf_msp430", feature = "pb2_mspm0"))]
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[cfg(any(feature = "bcf", feature = "bcf_msp430", feature = "pb2_mspm0"))]
 pub(crate) enum FlasherError {
     #[error("Failed to fetch image.")]
     ImageResolvingError {
