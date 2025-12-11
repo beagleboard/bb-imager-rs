@@ -56,3 +56,19 @@ pub(crate) fn home_btn_text<'a>(
     .padding(8)
     .style(move |_, _| style(active))
 }
+
+pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u32) -> Element<'a, BBImagerMessage> {
+    let img = std::fs::read(path).expect("Failed to open image");
+
+    match image::guess_format(&img) {
+        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
+            .width(width)
+            .height(width)
+            .into(),
+
+        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
+            .width(width)
+            .height(width)
+            .into(),
+    }
+}

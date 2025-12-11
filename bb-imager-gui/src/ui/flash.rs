@@ -54,7 +54,7 @@ pub(crate) fn view(state: &FlashingState, running: bool) -> Element<'_, BBImager
 
 fn about(documentation: &str) -> widget::Scrollable<'_, BBImagerMessage> {
     widget::scrollable(widget::rich_text![
-        widget::span(constants::BEAGLE_BOARD_ABOUT)
+        widget::span::<'_, BBImagerMessage, _>(constants::BEAGLE_BOARD_ABOUT)
             .link(BBImagerMessage::OpenUrl(
                 "https://www.beagleboard.org/about".into()
             ))

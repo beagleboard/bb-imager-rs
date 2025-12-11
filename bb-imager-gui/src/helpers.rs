@@ -90,13 +90,14 @@ impl ProgressBarState {
                     .width(Length::Fill)
                     .height(8.0)
                     .cycle_duration(std::time::Duration::from_millis(1000))
-                    .color(Color::from_rgb(0.0, 0.5, 1.0)),
+                    // TODO: Add back color
+                    // .color(Color::from_rgb(0.0, 0.5, 1.0)),
             ]
         } else {
             widget::column![
                 text(self.label.clone()).color(Color::WHITE),
                 progress_bar(RANGE, self.progress)
-                    .height(8)
+                    .girth(8)
                     .style(self.state.style()),
             ]
         }

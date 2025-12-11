@@ -7,8 +7,9 @@ use iced::{
 };
 
 use crate::{BBImagerMessage, constants, helpers, pages};
+use crate::ui::helpers::img_or_svg;
 
-const ICON_WIDTH: u16 = 60;
+const ICON_WIDTH: u32 = 60;
 
 pub(crate) struct ExtraImageEntry {
     label: &'static str,
@@ -71,7 +72,7 @@ pub(crate) fn view<'a>(
             // a bad state
             state.idx().is_empty()
         ),
-        widget::horizontal_rule(2),
+        widget::rule::horizontal(2),
         row3
     ]
     .spacing(10)
@@ -87,7 +88,7 @@ fn entry_subitem<'a>(
     let row3 = widget::row(
         [
             text(image.release_date.to_string()).into(),
-            widget::horizontal_space().into(),
+            widget::space::horizontal().into(),
         ]
         .into_iter()
         .chain(image.tags.iter().map(|t| iced_aw::badge(t.as_str()).into())),
@@ -154,7 +155,7 @@ fn entry<'a>(
             widget::row![
                 icon,
                 widget::column![text(name).size(18), text(description)].padding(5),
-                widget::horizontal_space(),
+                widget::space::horizontal(),
                 tail
             ]
             .align_y(iced::Alignment::Center)
@@ -209,22 +210,6 @@ fn custom_btn<'a>(
     .width(iced::Length::Fill)
     .on_press(msg)
     .style(widget::button::secondary)
-}
-
-pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).expect("Failed to open image");
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
-    }
 }
 
 pub(crate) fn search_bar<'a>(
