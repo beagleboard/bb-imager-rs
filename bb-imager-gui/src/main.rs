@@ -44,9 +44,12 @@ fn main() -> iced::Result {
 
     tracing::info!("Resolved GUI keymap: {:?}", helpers::system_keymap());
 
+    // Force using the low power gpu since this is not a GPU intensive application
+    unsafe { std::env::set_var("WGPU_POWER_PREF", "low") };
+
     let icon = iced::window::icon::from_file_data(
         constants::WINDOW_ICON,
-        Some(iced::advanced::graphics::image::image_rs::ImageFormat::Png),
+        Some(image::ImageFormat::Png),
     )
     .ok();
     assert!(icon.is_some());
@@ -55,22 +58,21 @@ fn main() -> iced::Result {
     // HACK: mac_notification_sys set application name (not an option in notify-rust)
     let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
-    let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
-
     let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
         ..Default::default()
     };
 
-    iced::application(app_title, message::update, ui::view)
+    iced::application(BBImager::new, message::update, ui::view)
+        .title(app_title)
         .subscription(BBImager::subscription)
         .theme(BBImager::theme)
         .window(settings)
         .font(constants::FONT_REGULAR_BYTES)
         .font(constants::FONT_BOLD_BYTES)
         .default_font(constants::FONT_REGULAR)
-        .run_with(move || BBImager::new(app_config))
+        .run()
 }
 
 fn app_title(_: &BBImager) -> String {
@@ -99,7 +101,9 @@ struct BBImager {
 }
 
 impl BBImager {
-    fn new(app_config: persistance::GuiConfiguration) -> (Self, Task<BBImagerMessage>) {
+    fn new() -> (Self, Task<BBImagerMessage>) {
+        let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
+
         let downloader = bb_downloader::Downloader::new(
             directories::ProjectDirs::from(
                 PACKAGE_QUALIFIER.0,
@@ -309,7 +313,7 @@ impl BBImager {
 
         let cancel = tokio_util::sync::CancellationToken::new();
 
-        let s = iced::stream::channel(20, move |mut chan| async move {
+        let s = iced::stream::channel(20, async move |mut chan| {
             let _ = chan
                 .send(BBImagerMessage::ProgressBar(ProgressBarState::PREPARING))
                 .await;
@@ -372,15 +376,16 @@ impl BBImager {
                     .is_destination_selection()
             {
                 tracing::debug!("Refresh destinations for {:?}", flasher);
-                let stream = iced::futures::stream::unfold(flasher, move |f| async move {
-                    let mut dsts = helpers::destinations(flasher).await;
-                    dsts.sort_by_key(|a| a.size());
-                    let dsts = BBImagerMessage::Destinations(dsts);
-                    Some((dsts, f))
-                })
-                .throttle(Duration::from_secs(1));
 
-                return Subscription::run_with_id(flasher, stream);
+                return Subscription::run_with(flasher, |flasher| {
+                    iced::futures::stream::unfold(flasher.clone(), move |f| async move {
+                        let mut dsts = helpers::destinations(f.clone()).await;
+                        dsts.sort_by_key(|a| a.size());
+                        let dsts = BBImagerMessage::Destinations(dsts);
+                        Some((dsts, f))
+                    })
+                    .throttle(Duration::from_secs(1))
+                });
             }
         }
 

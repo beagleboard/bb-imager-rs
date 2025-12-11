@@ -73,10 +73,10 @@ fn about_page() -> Element<'static, BBImagerMessage> {
         .align_x(iced::Center);
 
         widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
+            widget::space::vertical().height(2),
+            widget::rule::horizontal(2),
             widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
+            widget::rule::horizontal(2),
             home_btn_text("BACK", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
@@ -120,10 +120,10 @@ fn global_settings(
         .spacing(5);
 
         widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
+            widget::space::vertical().height(2),
+            widget::rule::horizontal(2),
             widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
+            widget::rule::horizontal(2),
             home_btn_text("BACK", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
@@ -150,12 +150,12 @@ fn customization_page<'a>(
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
                 .on_press(BBImagerMessage::ResetCustomization),
-            widget::horizontal_space().width(iced::Length::FillPortion(3)),
+            widget::space::horizontal().width(iced::Length::FillPortion(3)),
             home_btn_text("ABORT", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
                 .on_press(BBImagerMessage::CancelCustomization),
-            widget::horizontal_space().width(iced::Length::FillPortion(3)),
+            widget::space::horizontal().width(iced::Length::FillPortion(3)),
             home_btn_text("SAVE", true, iced::Length::Fill)
                 .style(widget::button::secondary)
                 .width(iced::Length::FillPortion(1))
@@ -202,10 +202,10 @@ fn customization_page<'a>(
         .spacing(5);
 
         widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
+            widget::space::vertical().height(2),
+            widget::rule::horizontal(2),
             widget::scrollable(form).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
+            widget::rule::horizontal(2),
             action_btn_row,
         ]
         .spacing(10)
@@ -283,7 +283,7 @@ fn keymap_form<'a>(
                     config.clone().update_keymap(keymap),
                 ))
             }),
-        widget::horizontal_space()
+        widget::space::horizontal()
     ];
 
     if let Some(keymap) = &config.keymap {
@@ -317,7 +317,7 @@ fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBIma
                     config.clone().update_hostname(hostname),
                 ))
             }),
-        widget::horizontal_space()
+        widget::space::horizontal()
     ];
 
     if let Some(hostname) = config.hostname.as_ref() {
@@ -351,7 +351,7 @@ fn timezone_form<'a>(
                     config.clone().update_timezone(tz.cloned()),
                 ))
             }),
-        widget::horizontal_space()
+        widget::space::horizontal()
     ];
 
     if let Some(tz) = config.timezone.as_ref() {
@@ -505,7 +505,7 @@ pub(crate) fn element_with_label<'a>(
     label: &'static str,
     el: Element<'a, BBImagerMessage>,
 ) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![text(label), widget::horizontal_space(), el]
+    widget::row![text(label), widget::space::horizontal(), el]
         .padding(10)
         .spacing(10)
         .align_y(iced::Alignment::Center)

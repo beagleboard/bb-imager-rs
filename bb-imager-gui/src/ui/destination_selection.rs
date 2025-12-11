@@ -70,7 +70,7 @@ where
         search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
             crate::pages::Screen::DestinationSelection(crate::pages::SearchState::new(x))
         )),
-        widget::horizontal_rule(2),
+        widget::rule::horizontal(2),
         row3
     ]
     .spacing(10)
