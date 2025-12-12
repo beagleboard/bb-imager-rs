@@ -9,7 +9,7 @@ use iced::widget::canvas;
 use iced::window;
 use iced::{Background, Color, Element, Event, Length, Radians, Rectangle, Renderer, Size, Vector};
 
-use crate::easing::{self, Easing};
+use super::easing::{self, Easing};
 
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -18,7 +18,6 @@ const MIN_ANGLE: Radians = Radians(PI / 8.0);
 const WRAP_ANGLE: Radians = Radians(2.0 * PI - PI / 4.0);
 const BASE_ROTATION_SPEED: u32 = u32::MAX / 80;
 
-#[allow(missing_debug_implementations)]
 pub struct Circular<'a, Theme>
 where
     Theme: StyleSheet,
@@ -234,7 +233,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         _tree: &mut Tree,
         _renderer: &Renderer,
         limits: &layout::Limits,
@@ -242,30 +241,27 @@ where
         layout::atomic(limits, self.size, self.size)
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: Event,
+        event: &Event,
         _layout: Layout<'_>,
         _cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
-    ) -> iced::event::Status {
+    ) {
         let state = tree.state.downcast_mut::<State>();
 
         if let Event::Window(window::Event::RedrawRequested(now)) = event {
             state.animation =
                 state
                     .animation
-                    .timed_transition(self.cycle_duration, self.rotation_duration, now);
+                    .timed_transition(self.cycle_duration, self.rotation_duration, *now);
 
             state.cache.clear();
-            shell.request_redraw(iced::window::RedrawRequest::At(now));
-            iced::event::Status::Captured
-        } else {
-            iced::event::Status::Ignored
+            shell.request_redraw();
         }
     }
 

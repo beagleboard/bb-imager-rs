@@ -106,9 +106,9 @@ pub(crate) fn view<'a>(
 
         let action_btn_row = widget::row![
             reset_btn,
-            widget::horizontal_space(),
+            widget::space::horizontal(),
             config_btn,
-            widget::horizontal_space(),
+            widget::space::horizontal(),
             next_btn
         ]
         .width(iced::Length::Fill)
@@ -159,9 +159,9 @@ pub(crate) fn home_btn_svg<'a>(
     icon: &'static [u8],
     active: bool,
 ) -> widget::Button<'a, BBImagerMessage> {
-    const ICON_SIZE: u16 = 32;
+    const ICON_SIZE: u32 = 32;
     const PADDING: u16 = 4;
-    const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
+    const RADIUS: u32 = (ICON_SIZE + (PADDING as u32) * 2) / 2;
 
     fn svg_style(active: bool) -> widget::svg::Style {
         if active {
