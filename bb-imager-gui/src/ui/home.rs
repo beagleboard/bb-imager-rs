@@ -9,6 +9,7 @@ use super::helpers::home_btn_text;
 use crate::pages::Screen;
 
 pub(crate) fn view<'a>(
+    banner: &'a widget::image::Handle,
     selected_board: Option<&'a bb_config::config::Device>,
     selected_image: Option<&'a helpers::BoardImage>,
     selected_dst: Option<&'a helpers::Destination>,
@@ -106,9 +107,9 @@ pub(crate) fn view<'a>(
 
         let action_btn_row = widget::row![
             reset_btn,
-            widget::horizontal_space(),
+            widget::space::horizontal(),
             config_btn,
-            widget::horizontal_space(),
+            widget::space::horizontal(),
             next_btn
         ]
         .width(iced::Length::Fill)
@@ -136,7 +137,7 @@ pub(crate) fn view<'a>(
 
         widget::column![
             widget::container(
-                widget::image(widget::image::Handle::from_bytes(constants::BB_BANNER))
+                widget::image(banner)
                     .width(size.width * 0.45)
                     .height(size.height / 4.0),
             )
@@ -159,9 +160,9 @@ pub(crate) fn home_btn_svg<'a>(
     icon: &'static [u8],
     active: bool,
 ) -> widget::Button<'a, BBImagerMessage> {
-    const ICON_SIZE: u16 = 32;
+    const ICON_SIZE: u32 = 32;
     const PADDING: u16 = 4;
-    const RADIUS: u16 = (ICON_SIZE + PADDING * 2) / 2;
+    const RADIUS: u32 = (ICON_SIZE + (PADDING as u32) * 2) / 2;
 
     fn svg_style(active: bool) -> widget::svg::Style {
         if active {

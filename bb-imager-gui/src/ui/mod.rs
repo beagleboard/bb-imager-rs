@@ -15,6 +15,7 @@ pub(crate) fn view(state: &BBImager) -> Element<'_, BBImagerMessage> {
 
     match state.screen.last().expect("No Screen") {
         Screen::Home => home::view(
+            &state.bb_banner,
             state.selected_device(),
             state.selected_image(),
             state.selected_destination(),
@@ -60,6 +61,7 @@ pub(crate) fn view(state: &BBImager) -> Element<'_, BBImagerMessage> {
         Screen::Flashing(s) => flash::view(s, state.is_flashing()),
         Screen::FlashingConfirmation => {
             let base = home::view(
+                &state.bb_banner,
                 state.selected_device(),
                 state.selected_image(),
                 state.selected_destination(),

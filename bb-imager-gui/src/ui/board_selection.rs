@@ -5,8 +5,7 @@ use iced::{
 };
 
 use crate::{BBImagerMessage, constants, pages};
-
-use super::helpers::search_bar;
+use crate::ui::helpers::{img_or_svg, search_bar};
 
 pub(crate) fn view<'a>(
     devices: impl Iterator<Item = (usize, &'a config::Device)>,
@@ -36,7 +35,7 @@ pub(crate) fn view<'a>(
                     image,
                     widget::column![
                         text(&dev.name).size(18),
-                        widget::horizontal_space(),
+                        widget::space::horizontal(),
                         text(dev.description.as_str())
                     ]
                     .padding(5)
@@ -54,7 +53,7 @@ pub(crate) fn view<'a>(
         search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
             pages::Screen::BoardSelection(pages::SearchState::new(x))
         )),
-        widget::horizontal_rule(2),
+        widget::rule::horizontal(2),
         widget::scrollable(widget::column(items).spacing(10))
     ]
     .spacing(10)
@@ -62,18 +61,3 @@ pub(crate) fn view<'a>(
     .into()
 }
 
-pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).expect("Failed to open image");
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
-    }
-}
