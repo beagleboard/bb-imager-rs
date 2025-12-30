@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-tempfile = "3.21"
+tempfile = "3.24"
 tokio = { version = "1.48", default-features = false }
 
 [features]
