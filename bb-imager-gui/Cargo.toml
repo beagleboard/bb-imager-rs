@@ -8,7 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-iced = { version = "0.13.1", features = ["image", "svg", "tokio", "advanced", "lazy"] }
+iced = { version = "0.14.0", features = ["image", "svg", "tokio", "advanced", "lazy"] }
 rfd = { version = "0.16.0", default-features = false, features = ["tokio", "file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
