@@ -1,0 +1,9 @@
+= BeagleBoard Imaging Utility
+
+The *BeagleBoard Imaging Utility* (bb-imager) is an official tool from BeagleBoard.org for preparing bootable storage media for BeagleBoard hardware. It simplifies the process of selecting, downloading, and flashing operating system images to SD cards and other removable devices.
+
+bb-imager is designed to work well for both new users and experienced developers. It provides a clean graphical interface for interactive use, as well as a command-line interface for automation, scripting, and headless workflows. The tool handles common tasks such as device detection, image verification, and safe flashing, reducing the chances of user error.
+
+In addition to writing images, bb-imager supports basic pre-boot configuration for supported operating systems. This can include setting usernames and passwords, hostnames, and network configuration before the first boot, making it easier to get a board up and running quickly.
+
+Built in Rust, bb-imager is fast, reliable, and cross-platform, with support for Linux, Windows, and macOS. It plays a similar role to other popular imaging tools, but is tailored specifically for BeagleBoard platforms and the operating systems recommended by BeagleBoard.org.
