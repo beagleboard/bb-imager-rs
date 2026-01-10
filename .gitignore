@@ -3,3 +3,5 @@
 /release
 */dist
 .DS_Store
+build/
+node_modules/

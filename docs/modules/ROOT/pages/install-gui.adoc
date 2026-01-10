@@ -1,0 +1,118 @@
+= Install BeagleBoard Imaging Utility (GUI)
+
+:base-download-url: https://github.com/beagleboard/bb-imager-rs/releases/download/{page-component-version}
+:gui-url-prefix: {base-download-url}/bb-imager-gui_{page-component-version}
+
+This page explains how to install the graphical version of the BeagleBoard Imaging Utility.  
+Most users should choose one of the prebuilt options listed below.
+
+== Recommended Downloads
+
+Choose the option that best matches your operating system.
+
+[cols="1,2,3,2",options="header"]
+|===
+| Platform | Package Type | Notes | Link
+
+| Windows
+| Installer (`.msi` / `.exe`)
+| Standard Windows installer with Start Menu integration.
+| {gui-url-prefix}_x64_en-US.msi[x86_64]
+
+| macOS
+| Application bundle
+| Drag-and-drop install into the Applications folder.
+| {gui-url-prefix}_aarch64.dmg[aarch64], {gui-url-prefix}_x64.dmg[x86_64]
+
+.2+| Linux
+| Flatpak
+| Recommended for most Linux users. Sandboxed, automatic updates.
+| https://flathub.org/en/apps/org.beagleboard.imagingutility[Flathub]
+
+| AppImage
+| Portable single-file download. No installation required.
+| {gui-url-prefix}_aarch64.AppImage[aarch64], {gui-url-prefix}_x86_64.AppImage[x86_64]
+
+|===
+
+== Installation Instructions
+
+=== Windows
+
+. Download the Windows installer.
+. Double-click the installer.
+. Follow the on-screen instructions.
+
+After installation, launch the application from the Start Menu.
+
+==== Windows Security Notes
+
+[IMPORTANT]
+====
+Flashing images requires low-level access to removable storage devices.
+
+On Windows:
+
+* You may be prompted by User Account Control (UAC) to allow elevated permissions.
+* Some antivirus or endpoint security software may temporarily flag disk-writing tools.
+
+These prompts are expected and required for the imaging process. Always ensure you downloaded the installer from an official BeagleBoard source.
+====
+
+=== macOS
+
+. Open the downloaded application or disk image.
+. Drag *BeagleBoard Imaging Utility* into the *Applications* folder.
+. Launch it from *Applications* or Spotlight.
+
+[NOTE]
+====
+macOS may ask for permission to access removable volumes the first time you run the application. Granting this access is required to write images to SD cards.
+====
+
+=== Linux (Flatpak – Recommended)
+
+Flatpak provides a sandboxed installation and automatic updates via Flathub.
+
+[source,shell]
+----
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install flathub org.beagleboard.imagingutility
+----
+
+To run the application:
+
+[source,shell]
+----
+flatpak run org.beagleboard.imagingutility
+----
+
+==== Flatpak Permissions and Security Notes
+
+[IMPORTANT]
+====
+Writing disk images requires access to removable storage devices.
+
+When installed via Flatpak, the BeagleBoard Imaging Utility requests permissions to:
+
+* Access removable drives
+* Perform raw device writes
+
+Your desktop environment may prompt you to approve these permissions the first time you run the application.  
+These permissions are required to flash SD cards and USB storage devices and are limited to what the application needs to function.
+====
+
+=== Linux (AppImage)
+
+AppImage is useful if you prefer a portable, self-contained executable.
+
+[source,shell]
+----
+chmod +x bb-imager-*.AppImage
+./bb-imager-*.AppImage
+----
+
+[NOTE]
+====
+On some Linux distributions, you may need to run the AppImage from a desktop session that allows access to removable media.
+====
