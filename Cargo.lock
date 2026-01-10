@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-dfu"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "bb-helper",
  "dfu-libusb",
@@ -635,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "bb-helper"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "tempfile",
  "tokio",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "anyhow",
  "bb-flasher",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "anyhow",
  "ashpd 0.12.0",
@@ -692,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-service"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "bb-flasher-pb2-mspm0",
  "serde_json",
@@ -2575,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "iced-loading"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "iced",
  "lyon_algorithms",
@@ -7758,7 +7758,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "cargo_toml",
  "clap",
