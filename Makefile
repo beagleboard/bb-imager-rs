@@ -255,7 +255,7 @@ endif
 	sed -i "s/^VITE_BB_IMAGER_VERSION=.*/VITE_BB_IMAGER_VERSION=${VERSION}/" website/.env
 	sed -i '/<releases>/a \
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
-\t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/v$(VERSION)</url>\
+\t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/$(VERSION)</url>\
 \t\t</release>' bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
 	cargo build
 	$(info Showing Diff)
@@ -266,4 +266,4 @@ endif
 	[ $$CONTINUE = "y" ] || [ $$CONTINUE = "Y" ] || (echo "Aborting."; exit 1;)
 	git add Cargo.toml Cargo.lock bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml website/.env
 	git commit -s -m "Bump version to ${VERSION}"
-	git tag v${VERSION}
+	git tag ${VERSION}

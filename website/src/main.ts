@@ -6,28 +6,28 @@ const LATEST_BUILDS = [
   {
     name: "Windows (Installer)",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x64_en-US.msi` }
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x64_en-US.msi` }
     ]
   },
   {
     name: "Windows (Portable)",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.exe` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.exe` }
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.exe` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.exe` }
     ]
   },
   {
     name: "MacOS (DMG)",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/BeagleBoard.Imaging.Utility_${BB_IMAGER_VERSION}_x64.dmg` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/BeagleBoard.Imaging.Utility_${BB_IMAGER_VERSION}_aarch64.dmg` }
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/BeagleBoard.Imaging.Utility_${BB_IMAGER_VERSION}_x64.dmg` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/BeagleBoard.Imaging.Utility_${BB_IMAGER_VERSION}_aarch64.dmg` }
     ]
   },
   {
     name: "Linux (AppImage)",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.AppImage` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.AppImage` }
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.AppImage` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.AppImage` }
     ]
   }
 ]
@@ -39,17 +39,17 @@ const LINUX_BUILDS_MORE = [
   {
     name: "Debian Linux Package",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_amd64.deb` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_arm64.deb` },
-      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_armhf.deb` },
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_amd64.deb` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_arm64.deb` },
+      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_armhf.deb` },
     ]
   },
   {
     name: "Generic Linux Package",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.tar.gz` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.tar.gz` },
-      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_armhf.tar.gz` },
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_x86_64.tar.gz` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_aarch64.tar.gz` },
+      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-gui_${BB_IMAGER_VERSION}_armhf.tar.gz` },
     ]
   }
 ]
@@ -57,17 +57,17 @@ const CLI_BUILDS = [
   {
     name: "Debian Linux Package",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_amd64.deb` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_arm64.deb` },
-      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_armhf.deb` },
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_amd64.deb` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_arm64.deb` },
+      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_armhf.deb` },
     ]
   },
   {
     name: "Generic Linux Package",
     packages: [
-      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_x86_64.tar.gz` },
-      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_aarch64.tar.gz` },
-      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/v${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_armhf.tar.gz` },
+      { name: "x64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_x86_64.tar.gz` },
+      { name: "ARM64", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_aarch64.tar.gz` },
+      { name: "ARM", url: `https://github.com/beagleboard/bb-imager-rs/releases/download/${BB_IMAGER_VERSION}/bb-imager-cli_${BB_IMAGER_VERSION}_armhf.tar.gz` },
     ]
   }
 ]
