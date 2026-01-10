@@ -52,6 +52,7 @@ ignore = [
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
     # https://github.com/gfx-rs/metal-rs/issues/349
     { id = "RUSTSEC-2024-0436", reason = "metal has stated that paste is more or less complete with no real nead of replacement." },
+    { id = "RUSTSEC-2025-0141", reason = "Need to update mbrman" }
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
