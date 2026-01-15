@@ -82,5 +82,5 @@ While creating new issues for bugs, please attach logs from the application. Log
 
 Log file locations by platform:
 - **Linux**: `$HOME/.cache/org.beagleboard.imagingutility.log`
-- **Windows**: `C:\Users\ayush\AppData\Local\beagleboard\imagingutility\org.beagleboard.imagingutility.log`
+- **Windows**: `%USERPROFILE%\AppData\Local\beagleboard\imagingutility\org.beagleboard.imagingutility.log`
 - **macOS**: `$HOME/Library/Caches/org.beagleboard.imagingutility.log`
