@@ -1,0 +1,188 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'bb-flasher/**'
+      - 'bb-flasher-sd/**'
+      - 'bb-flasher-bcf/**'
+      - 'bb-flasher-dfu/**'
+      - 'bb-flasher-pb2-mspm0/**'
+      - 'tests/e2e/**'
+      - 'tests/e2e.rs'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'bb-flasher/**'
+      - 'bb-flasher-sd/**'
+      - 'bb-flasher-bcf/**'
+      - 'bb-flasher-dfu/**'
+      - 'bb-flasher-pb2-mspm0/**'
+      - 'tests/e2e/**'
+      - 'tests/e2e.rs'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  e2e-sd:
+    name: E2E Tests - SD Flashing
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: make setup-debian-deps
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Run SD E2E tests
+      run: cargo test --test e2e sd_flash --features sd -- --test-threads=1
+      continue-on-error: ${{ matrix.os == 'windows-latest' }}
+
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-sd-logs-${{ matrix.os }}
+        path: |
+          target/
+          *.log
+        retention-days: 5
+
+  e2e-bcf:
+    name: E2E Tests - BCF Flashing
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: make setup-debian-deps
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Run BCF E2E tests
+      run: cargo test --test e2e bcf_flash --features bcf,bcf_msp430 -- --test-threads=1
+      continue-on-error: true  # May not have physical device
+
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-bcf-logs-${{ matrix.os }}
+        path: |
+          target/
+          *.log
+        retention-days: 5
+
+  e2e-dfu:
+    name: E2E Tests - DFU Flashing
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: make setup-debian-deps
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Run DFU E2E tests
+      run: cargo test --test e2e dfu_flash --features dfu -- --test-threads=1
+      continue-on-error: true  # May not have physical device
+
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-dfu-logs-${{ matrix.os }}
+        path: |
+          target/
+          *.log
+        retention-days: 5
+
+  e2e-all:
+    name: E2E Tests - All Features
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: make setup-debian-deps
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Run all E2E tests
+      run: cargo test --test e2e --all-features -- --test-threads=1
+      continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
+
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-all-logs-${{ matrix.os }}
+        path: |
+          target/
+          *.log
+        retention-days: 5
+

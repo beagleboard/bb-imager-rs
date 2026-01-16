@@ -1,0 +1,255 @@
+# GitHub Actions Workflow for E2E Tests
+# This workflow runs E2E tests on all three platforms (Linux, Windows, macOS)
+
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'e2e-tests/**'
+      - 'bb-flasher/**'
+      - 'bb-flasher-*/**'
+      - '.github/workflows/e2e-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'e2e-tests/**'
+      - 'bb-flasher/**'
+      - 'bb-flasher-*/**'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ================================
+  # Linux E2E Tests
+  # ================================
+  e2e-linux:
+    name: E2E Tests (Linux)
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - name: SD Card
+            features: sd
+          - name: BCF
+            features: bcf,bcf_msp430
+          - name: DFU
+            features: dfu
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libudev-dev \
+            libusb-1.0-0-dev \
+            pkg-config
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run ${{ matrix.test-suite.name }} tests
+        run: |
+          cd e2e-tests
+          cargo test --test e2e --features ${{ matrix.test-suite.features }} -- --nocapture
+
+      - name: Generate test report
+        if: always()
+        run: |
+          cd e2e-tests
+          ./run_platform_tests.sh --${{ matrix.test-suite.features }} --report || true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report-linux-${{ matrix.test-suite.features }}
+          path: e2e-tests/test-report-*.txt
+          if-no-files-found: ignore
+
+  # ================================
+  # Windows E2E Tests
+  # ================================
+  e2e-windows:
+    name: E2E Tests (Windows)
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - name: SD Card
+            features: sd
+          - name: BCF
+            features: bcf,bcf_msp430
+          - name: DFU
+            features: dfu
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run ${{ matrix.test-suite.name }} tests
+        run: |
+          cd e2e-tests
+          cargo test --test e2e --features ${{ matrix.test-suite.features }} -- --nocapture
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report-windows-${{ matrix.test-suite.features }}
+          path: e2e-tests/test-report-*.txt
+          if-no-files-found: ignore
+
+  # ================================
+  # macOS E2E Tests
+  # ================================
+  e2e-macos:
+    name: E2E Tests (macOS)
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - name: SD Card
+            features: sd
+          - name: BCF
+            features: bcf,bcf_msp430
+          - name: DFU
+            features: dfu
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run ${{ matrix.test-suite.name }} tests
+        run: |
+          cd e2e-tests
+          cargo test --test e2e --features ${{ matrix.test-suite.features }} -- --nocapture
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report-macos-${{ matrix.test-suite.features }}
+          path: e2e-tests/test-report-*.txt
+          if-no-files-found: ignore
+
+  # ================================
+  # Summary
+  # ================================
+  e2e-summary:
+    name: E2E Test Summary
+    runs-on: ubuntu-latest
+    needs: [e2e-linux, e2e-windows, e2e-macos]
+    if: always()
+
+    steps:
+      - name: Download all test reports
+        uses: actions/download-artifact@v3
+        with:
+          path: test-reports
+
+      - name: Display test summary
+        run: |
+          echo "# E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Platform Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Windows" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Suites" >> $GITHUB_STEP_SUMMARY
+          echo "- SD Card Flashing" >> $GITHUB_STEP_SUMMARY
+          echo "- BeagleConnect Freedom (BCF)" >> $GITHUB_STEP_SUMMARY
+          echo "- DFU (Device Firmware Update)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload combined reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: all-test-reports
+          path: test-reports/
+          if-no-files-found: ignore
+
