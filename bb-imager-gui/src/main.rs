@@ -49,7 +49,6 @@ fn main() -> iced::Result {
         Some(iced::advanced::graphics::image::image_rs::ImageFormat::Png),
     )
     .ok();
-    assert!(icon.is_some());
 
     #[cfg(target_os = "macos")]
     // HACK: mac_notification_sys set application name (not an option in notify-rust)
@@ -60,6 +59,7 @@ fn main() -> iced::Result {
     let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
+        icon,
         ..Default::default()
     };
 
@@ -138,7 +138,7 @@ impl BBImager {
             customization: Default::default(),
         };
 
-        ans.screen.push(Screen::Home);
+        ans.screen.push(Screen::BoardSelection(Default::default()));
 
         // Fetch all board images
         let board_image_task = ans.fetch_board_images();
