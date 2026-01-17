@@ -111,13 +111,116 @@ pub enum Error {
 
 /// Enumerate all SD Cards in system
 pub fn devices() -> std::collections::HashSet<Device> {
-    bb_drivelist::drive_list()
-        .expect("Unsupported OS for Sd Card")
-        .into_iter()
-        .filter(|x| x.is_removable)
-        .filter(|x| !x.is_virtual)
-        .map(|x| Device::new(x.description, x.raw.into(), x.size))
-        .collect()
+    let mut devices = std::collections::HashSet::new();
+
+    // Primary method: use bb-drivelist
+    if let Ok(drives) = bb_drivelist::drive_list() {
+        for drive in drives {
+            if drive.is_removable && !drive.is_virtual {
+                devices.insert(Device::new(
+                    drive.description,
+                    drive.raw.into(),
+                    drive.size,
+                ));
+            }
+        }
+    }
+
+    // Fallback for macOS: use diskutil to detect external drives
+    // This helps with macOS Tahoe 26.1+ where bb-drivelist may miss drives
+    // due to new security restrictions
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(diskutil_devices) = get_devices_from_diskutil() {
+            for device in diskutil_devices {
+                devices.insert(device);
+            }
+        }
+    }
+
+    devices
+}
+
+#[cfg(target_os = "macos")]
+fn get_devices_from_diskutil() -> Result<std::collections::HashSet<Device>, io::Error> {
+    use std::process::Command;
+
+    let mut devices = std::collections::HashSet::new();
+
+    // Run diskutil list to get all disks in plist format
+    let output = Command::new("diskutil")
+        .args(["list", "-plist"])
+        .output()?;
+
+    if !output.status.success() {
+        return Ok(devices);
+    }
+
+    // Parse plist output
+    let plist_data = output.stdout;
+    if let Ok(plist) = plist::Value::from_reader(&plist_data[..]) {
+        if let Some(dict) = plist.as_dictionary() {
+            if let Some(disks) = dict.get("AllDisksAndPartitions") {
+                if let Some(disk_array) = disks.as_array() {
+                    for disk in disk_array {
+                        if let Some(disk_dict) = disk.as_dictionary() {
+                            // Check if it's an external/removable disk
+                            // Internal disks have "Internal" = true, external have false or missing
+                            let is_internal = disk_dict
+                                .get("Internal")
+                                .and_then(|v| v.as_boolean())
+                                .unwrap_or(false);
+
+                            if !is_internal {
+                                // Get device identifier (e.g., disk2)
+                                if let Some(device_identifier) = disk_dict
+                                    .get("DeviceIdentifier")
+                                    .and_then(|v| v.as_string())
+                                {
+                                    // Skip if it's a partition (partitions have numbers like disk2s1)
+                                    if device_identifier.contains('s') {
+                                        continue;
+                                    }
+
+                                    // Get size
+                                    let size = disk_dict
+                                        .get("Size")
+                                        .and_then(|v| v.as_integer())
+                                        .unwrap_or(0) as u64;
+
+                                    // Get volume name or use device identifier
+                                    let name = disk_dict
+                                        .get("VolumeName")
+                                        .and_then(|v| v.as_string())
+                                        .map(|s| s.to_string())
+                                        .unwrap_or_else(|| {
+                                            format!("External Disk {}", device_identifier)
+                                        });
+
+                                    // Construct path: /dev/rdiskX for raw access
+                                    let disk_num = device_identifier
+                                        .strip_prefix("disk")
+                                        .and_then(|s| s.parse::<u32>().ok())
+                                        .unwrap_or(0);
+
+                                    if disk_num > 0 {
+                                        let path = PathBuf::from(format!("/dev/rdisk{}", disk_num));
+
+                                        // Verify the device exists and is accessible
+                                        if path.exists() {
+                                            devices.insert(Device::new(name, path, size));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(devices)
 }
 
 #[derive(Hash, Debug, PartialEq, Eq, Clone)]
