@@ -87,6 +87,30 @@ test:
 	$(info "Run workspace tests")
 	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS}
 
+## housekeeping: test-e2e: Run end-to-end style integration tests (all flashers)
+.PHONY: test-e2e
+test-e2e:
+	$(info "Run E2E-style integration tests")
+	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::
+
+## housekeeping: test-e2e-sd: Run E2E-style tests for SD card flashing
+.PHONY: test-e2e-sd
+test-e2e-sd:
+	$(info "Run SD card E2E-style tests")
+	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::sd
+
+## housekeeping: test-e2e-bcf: Run E2E-style tests for BCF flashing
+.PHONY: test-e2e-bcf
+test-e2e-bcf:
+	$(info "Run BCF E2E-style tests")
+	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::bcf
+
+## housekeeping: test-e2e-dfu: Run E2E-style tests for DFU flashing
+.PHONY: test-e2e-dfu
+test-e2e-dfu:
+	$(info "Run DFU E2E-style tests")
+	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::dfu
+
 ## build: build-gui: Build GUI. Target platform can be changed using TARGET env variable.
 .PHONY: build-gui
 build-gui:

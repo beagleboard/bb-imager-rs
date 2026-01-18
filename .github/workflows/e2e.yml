@@ -9,8 +9,7 @@ on:
       - 'bb-flasher-bcf/**'
       - 'bb-flasher-dfu/**'
       - 'bb-flasher-pb2-mspm0/**'
-      - 'tests/e2e/**'
-      - 'tests/e2e.rs'
+      - 'e2e-tests/**'
       - '.github/workflows/e2e.yml'
   push:
     branches: [ "main" ]
@@ -20,8 +19,7 @@ on:
       - 'bb-flasher-bcf/**'
       - 'bb-flasher-dfu/**'
       - 'bb-flasher-pb2-mspm0/**'
-      - 'tests/e2e/**'
-      - 'tests/e2e.rs'
+      - 'e2e-tests/**'
       - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
@@ -56,7 +54,7 @@ jobs:
         cache-on-failure: true
 
     - name: Run SD E2E tests
-      run: cargo test --test e2e sd_flash --features sd -- --test-threads=1
+      run: cargo test -p e2e-tests sd_flash --features sd -- --test-threads=1
       continue-on-error: ${{ matrix.os == 'windows-latest' }}
 
     - name: Upload test results
@@ -95,7 +93,7 @@ jobs:
         cache-on-failure: true
 
     - name: Run BCF E2E tests
-      run: cargo test --test e2e bcf_flash --features bcf,bcf_msp430 -- --test-threads=1
+      run: cargo test -p e2e-tests bcf_flash --features bcf,bcf_msp430 -- --test-threads=1
       continue-on-error: true  # May not have physical device
 
     - name: Upload test results
@@ -134,7 +132,7 @@ jobs:
         cache-on-failure: true
 
     - name: Run DFU E2E tests
-      run: cargo test --test e2e dfu_flash --features dfu -- --test-threads=1
+      run: cargo test -p e2e-tests dfu_flash --features dfu -- --test-threads=1
       continue-on-error: true  # May not have physical device
 
     - name: Upload test results
@@ -173,7 +171,7 @@ jobs:
         cache-on-failure: true
 
     - name: Run all E2E tests
-      run: cargo test --test e2e --all-features -- --test-threads=1
+      run: cargo test -p e2e-tests --features all -- --test-threads=1
       continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
 
     - name: Upload test results
