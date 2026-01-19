@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 tempfile = "3.24"
-tokio = { version = "1.48", default-features = false }
+tokio = { version = "1.49", default-features = false }
 
 [features]
 file_stream = ["tokio/fs", "tokio/io-util"]

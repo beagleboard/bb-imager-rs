@@ -17,7 +17,7 @@ tracing = "0.1"
 bin_file = "0.1"
 serialport = { version = "4.7", optional = true, default-features = false }
 hidapi = { version = "2.6", optional = true }
-tokio = { version = "1.48", default-features = false, features = ["sync"] }
+tokio = { version = "1.49", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.7" }
 
 [features]

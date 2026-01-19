@@ -19,7 +19,7 @@ fscommon = "0.1"
 mbrman = "0.6"
 gpt = "4.1"
 bb-bmap-parser = "0.1"
-tokio = { version = "1.48", default-features = false, features = ["rt-multi-thread"] }
+tokio = { version = "1.49", default-features = false, features = ["rt-multi-thread"] }
 tokio-util = { version = "0.7" }
 bb-helper = { path = "../bb-helper", features = ["resolvable"] }
 anyhow = "1.0"
@@ -27,7 +27,7 @@ anyhow = "1.0"
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
 libc = "0.2"
-tokio = { version = "1.47", default-features = false, features = ["rt-multi-thread", "process"] }
+tokio = { version = "1.49", default-features = false, features = ["rt-multi-thread", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
