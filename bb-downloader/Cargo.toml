@@ -11,7 +11,7 @@ keywords = ["downloader", "beagle"]
 categories = ["asynchronous", "filesystem", "caching", "network-programming"]
 
 [dependencies]
-reqwest = { version = "0.12", features = ["stream"] }
+reqwest = { version = "0.13", features = ["stream"] }
 sha2 = "0.10"
 futures = "0.3"
 tracing = "0.1"
