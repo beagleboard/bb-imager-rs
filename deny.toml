@@ -88,7 +88,8 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-    { allow = ["LGPL-2.1"], crate = "udisks2" }
+    { allow = ["LGPL-2.1"], crate = "udisks2" },
+    { allow = ["OpenSSL"], crate = "aws-lc-sys" }
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
