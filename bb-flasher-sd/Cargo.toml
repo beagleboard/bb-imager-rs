@@ -13,7 +13,7 @@ categories = ["development-tools", "embedded", "filesystem", "os"]
 [dependencies]
 thiserror = "2.0"
 tracing = "0.1"
-bb-drivelist = "0.3"
+bb-drivelist = { path = "../bb-drivelist" }
 fatfs = "0.3"
 fscommon = "0.1"
 mbrman = "0.6"

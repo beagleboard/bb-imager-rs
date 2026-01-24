@@ -6,6 +6,7 @@ members = [
 	"bb-imager-cli", "bb-flasher-pb2-mspm0",
 	"bb-imager-gui", "bb-imager-service",
 	"xtask", "bb-flasher-bcf", "bb-flasher-sd", "iced-loading", "bb-downloader", "bb-config", "bb-helper", "bb-flasher-dfu",
+	"bb-drivelist"
 ]
 
 [profile.release]
