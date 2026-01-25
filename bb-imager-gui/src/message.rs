@@ -255,7 +255,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 let old_set: HashSet<_> = state.destinations.iter().collect();
                 !x.iter().all(|item| old_set.contains(item))
             };
-            
             if changed {
                 if !state.is_destionation_selectable() {
                     assert_eq!(x.len(), 1);
