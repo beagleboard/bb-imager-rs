@@ -79,10 +79,28 @@ where
     fn new(port: S) -> Result<Self> {
         let mut bcf = BeagleConnectFreedom { port };
 
-        bcf.invoke_bootloader()?;
-        bcf.send_sync()?;
-
-        Ok(bcf)
+        const MAX_RETRIES: usize = 3;
+        let mut last_error = None;
+        
+        for attempt in 1..=MAX_RETRIES {
+            info!("Bootloader invocation attempt {}/{}", attempt, MAX_RETRIES);
+            
+            match bcf.invoke_bootloader().and_then(|_| bcf.send_sync()) {
+                Ok(_) => {
+                    info!("Successfully started bootloader on attempt {}", attempt);
+                    return Ok(bcf);
+                }
+                Err(e) => {
+                    warn!("Bootloader invocation attempt {} failed: {:?}", attempt, e);
+                    last_error = Some(e);
+                    if attempt < MAX_RETRIES {
+                        std::thread::sleep(Duration::from_millis(500));
+                    }
+                }
+            }
+        }
+        
+        Err(last_error.unwrap_or(Error::FailedToStartBootloader))
     }
 
     fn wait_for_ack(&mut self) -> Result<()> {
@@ -243,7 +261,9 @@ where
     }
 
     fn verify(&mut self, crc32: u32) -> Result<bool> {
-        self.crc32().map(|x| x == crc32)
+        let actual_crc32 = self.crc32()?;
+        info!("CRC32 verification: expected={:08x}, actual={:08x}", crc32, actual_crc32);
+        Ok(actual_crc32 == crc32)
     }
 }
 
@@ -296,7 +316,7 @@ pub fn flash(
     chan_send(chan.as_mut(), Status::Preparing);
 
     let port = serialport::new(port, 115200)
-        .timeout(Duration::from_millis(500))
+        .timeout(Duration::from_millis(2000))
         .open_native()
         .map_err(|_| Error::FailedToOpenPort)?;
     let mut bcf = BeagleConnectFreedom::new(port)?;
@@ -342,6 +362,8 @@ pub fn flash(
 
     if verify {
         chan_send(chan.as_mut(), Status::Verifying);
+        // small delay to ensure flash operations are fully complete
+        std::thread::sleep(Duration::from_millis(100));
         if bcf.verify(img_crc32)? {
             info!("Flashing Successful");
             Ok(())

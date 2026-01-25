@@ -201,6 +201,9 @@ jobs:
   macos-job:
     name: Build MacOS Artifacts
     runs-on: macos-latest
+    env:
+      BCF_CC1352P7: 1
+      BCF_MSP430: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
