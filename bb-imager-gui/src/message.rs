@@ -249,11 +249,20 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
         }
         BBImagerMessage::Destinations(x) => {
-            if !state.is_destionation_selectable() {
-                assert_eq!(x.len(), 1);
-                state.selected_dst = Some(x[0].clone());
+            let changed = if x.len() != state.destinations.len() {
+                true
+            } else {
+                let old_set: HashSet<_> = state.destinations.iter().collect();
+                !x.iter().all(|item| old_set.contains(item))
+            };
+            
+            if changed {
+                if !state.is_destionation_selectable() {
+                    assert_eq!(x.len(), 1);
+                    state.selected_dst = Some(x[0].clone());
+                }
+                state.destinations = x;
             }
-            state.destinations = x;
         }
         BBImagerMessage::UpdateFlashConfig(x) => state.customization = Some(x),
         BBImagerMessage::OpenUrl(x) => {
