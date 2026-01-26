@@ -19,7 +19,7 @@ tokio = { version = "1.49", default-features = false, features = ["macros"] }
 webbrowser = "1.0.6"
 notify-rust = "4.11.5"
 url = "2.5.4"
-whoami = "1.6"
+whoami = "2.0"
 localzone = "0.3.1"
 tokio-stream = "0.1.18"
 iced-loading = { path = "../iced-loading" }
