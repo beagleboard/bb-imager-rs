@@ -8,29 +8,70 @@ use crate::MountPoint;
 use objc2::runtime::AnyObject;
 use objc2::{rc::Retained, sel};
 use objc2_core_foundation::{
-    kCFAllocatorDefault, kCFRunLoopDefaultMode, CFDictionary, CFRetained, CFRunLoop, CFString,
+    CFBoolean, CFDictionary, CFNumber, CFRetained, CFRunLoop, CFString, CFType,
+    kCFAllocatorDefault, kCFRunLoopDefaultMode,
 };
 use objc2_disk_arbitration::{
+    DADisk, DARegisterDiskAppearedCallback, DASession, DAUnregisterCallback,
     kDADiskDescriptionBusPathKey, kDADiskDescriptionDeviceInternalKey,
     kDADiskDescriptionDeviceProtocolKey, kDADiskDescriptionMediaBlockSizeKey,
     kDADiskDescriptionMediaContentKey, kDADiskDescriptionMediaEjectableKey,
     kDADiskDescriptionMediaIconKey, kDADiskDescriptionMediaNameKey,
     kDADiskDescriptionMediaRemovableKey, kDADiskDescriptionMediaSizeKey,
-    kDADiskDescriptionMediaWritableKey, DADisk, DARegisterDiskAppearedCallback, DASession,
-    DAUnregisterCallback,
+    kDADiskDescriptionMediaWritableKey,
 };
 use objc2_foundation::{
-    NSArray, NSFileManager, NSMutableArray, NSNumber, NSPredicate, NSString,
-    NSURLVolumeLocalizedNameKey, NSURLVolumeNameKey, NSVolumeEnumerationOptions,
+    NSArray, NSFileManager, NSMutableArray, NSNumber, NSString, NSURLVolumeLocalizedNameKey,
+    NSURLVolumeNameKey, NSVolumeEnumerationOptions,
 };
 
 // UTILS
 
-static SCSI_TYPE_NAMES: [&str; 5] = ["SATA", "SCSI", "ATA", "IDE", "PCI"];
+// Cached NSStrings for constant comparisons (avoids repeated allocations).
+// Use thread-local storage since NSString/Retained are not Sync.
+thread_local! {
+    static SCSI_SATA: Retained<NSString> = NSString::from_str("SATA");
+    static SCSI_SCSI: Retained<NSString> = NSString::from_str("SCSI");
+    static SCSI_ATA: Retained<NSString> = NSString::from_str("ATA");
+    static SCSI_IDE: Retained<NSString> = NSString::from_str("IDE");
+    static SCSI_PCI: Retained<NSString> = NSString::from_str("PCI");
+
+    static GUID_PARTITION_SCHEME: Retained<NSString> =
+        NSString::from_str("GUID_partition_scheme");
+    static FDISK_PARTITION_SCHEME: Retained<NSString> =
+        NSString::from_str("FDisk_partition_scheme");
+    static VIRTUAL_INTERFACE: Retained<NSString> = NSString::from_str("Virtual Interface");
+    static IO_BUNDLE_RESOURCE_FILE: CFRetained<CFString> =
+        CFString::from_str("IOBundleResourceFile");
+}
 
 /// Check if a given NSString matches any of the known SCSI type names.
+/// Uses cached NSStrings to avoid String allocation per call.
 fn scsi_type_matches(s: &NSString) -> bool {
-    SCSI_TYPE_NAMES.contains(&s.to_string().as_str())
+    SCSI_SATA.with(|sata| s.isEqualToString(sata))
+        || SCSI_SCSI.with(|scsi| s.isEqualToString(scsi))
+        || SCSI_ATA.with(|ata| s.isEqualToString(ata))
+        || SCSI_IDE.with(|ide| s.isEqualToString(ide))
+        || SCSI_PCI.with(|pci| s.isEqualToString(pci))
+}
+
+/// Check if a BSD name matches the partition pattern (e.g., "disk0s1", "disk1s2").
+/// Replaces NSPredicate regex with pure Rust for better performance.
+fn is_partition_name(name: &NSString) -> bool {
+    let s = name.to_string();
+    let Some(rest) = s.strip_prefix("disk") else {
+        return false;
+    };
+    let Some(s_pos) = rest.find('s') else {
+        return false;
+    };
+    // Must have digits before 's' and digits after 's'
+    let before_s = &rest[..s_pos];
+    let after_s = &rest[s_pos + 1..];
+    !before_s.is_empty()
+        && before_s.chars().all(|c| c.is_ascii_digit())
+        && !after_s.is_empty()
+        && after_s.chars().all(|c| c.is_ascii_digit())
 }
 
 /// Extension trait for CFDictionary to get typed values
@@ -46,11 +87,11 @@ impl CFDictionaryExt for CFDictionary {
         unsafe {
             let value = self.value(key as *const _ as *const c_void);
             if value.is_null() {
-                None
-            } else {
-                let ptr = NonNull::new_unchecked(value as *mut CFDictionary);
-                Some(CFRetained::retain(ptr))
+                return None;
             }
+            let cf = (value as *const CFType).as_ref()?;
+            let dict = cf.downcast_ref::<CFDictionary>()?;
+            Some(CFRetained::retain(NonNull::from(dict)))
         }
     }
 
@@ -58,11 +99,11 @@ impl CFDictionaryExt for CFDictionary {
         unsafe {
             let value = self.value(key as *const _ as *const c_void);
             if value.is_null() {
-                None
-            } else {
-                let ptr = NonNull::new_unchecked(value as *mut CFString);
-                Some(CFRetained::retain(ptr))
+                return None;
             }
+            let cf = (value as *const CFType).as_ref()?;
+            let s = cf.downcast_ref::<CFString>()?;
+            Some(CFRetained::retain(NonNull::from(s)))
         }
     }
 
@@ -72,6 +113,12 @@ impl CFDictionaryExt for CFDictionary {
             if value.is_null() {
                 None
             } else {
+                let cf = (value as *const CFType).as_ref()?;
+                if cf.downcast_ref::<CFNumber>().is_none()
+                    && cf.downcast_ref::<CFBoolean>().is_none()
+                {
+                    return None;
+                }
                 Some(Retained::retain(value as *mut NSNumber)?)
             }
         }
@@ -83,6 +130,10 @@ impl CFDictionaryExt for CFDictionary {
             if value.is_null() {
                 None
             } else {
+                let cf = (value as *const CFType).as_ref()?;
+                if cf.downcast_ref::<CFString>().is_none() {
+                    return None;
+                }
                 Some(Retained::retain(value as *mut NSString)?)
             }
         }
@@ -112,22 +163,48 @@ unsafe extern "C-unwind" fn append_disk(disk: NonNull<DADisk>, context: *mut c_v
         return;
     }
 
-    let disks = context.cast::<NSMutableArray<NSString>>();
+    let disks = context as *const Retained<NSMutableArray<NSString>>;
+    let disks = unsafe { &*disks };
+
     let bsd_name = unsafe { disk.as_ref().bsd_name() };
     let Some(bsd_name_str) = bsd_name.to_string() else {
         return;
     };
 
-    unsafe {
-        disks
-            .as_ref()
-            .unwrap()
-            .addObject(&NSString::from_str(&bsd_name_str));
+    let bsd_name_nsstring = NSString::from_str(&bsd_name_str);
+
+    if !disks.containsObject(&bsd_name_nsstring) {
+        disks.addObject(&bsd_name_nsstring);
     }
 }
 
 struct DiskList {
     disks: Retained<NSMutableArray<NSString>>,
+}
+
+struct DiskAppearedCallbackGuard<'a> {
+    session: &'a DASession,
+    context: *mut c_void,
+    callback: NonNull<c_void>,
+}
+
+impl<'a> DiskAppearedCallbackGuard<'a> {
+    fn register(session: &'a DASession, context: *mut c_void) -> Self {
+        let callback = NonNull::new(append_disk as *const () as *mut c_void)
+            .expect("append_disk callback pointer is non-null");
+        unsafe { DARegisterDiskAppearedCallback(session, None, Some(append_disk), context) };
+        Self {
+            session,
+            context,
+            callback,
+        }
+    }
+}
+
+impl Drop for DiskAppearedCallbackGuard<'_> {
+    fn drop(&mut self) {
+        unsafe { DAUnregisterCallback(self.session, self.callback, self.context) };
+    }
 }
 
 impl DiskList {
@@ -153,8 +230,8 @@ impl DiskList {
             return;
         };
 
-        let disks_ptr = &*self.disks as *const _ as *mut c_void;
-        unsafe { DARegisterDiskAppearedCallback(&session, None, Some(append_disk), disks_ptr) };
+        let disks_ptr = &self.disks as *const _ as *mut c_void;
+        let _callback_guard = DiskAppearedCallbackGuard::register(&session, disks_ptr);
 
         let Some(run_loop) = CFRunLoop::current() else {
             return;
@@ -167,12 +244,6 @@ impl DiskList {
         unsafe { DASession::schedule_with_run_loop(&session, &run_loop, mode) };
         run_loop.stop();
         CFRunLoop::run_in_mode(unsafe { kCFRunLoopDefaultMode }, 0.05, false);
-
-        // For God knows why the callback function signature in DAUnregisterCallback is different than the
-        // DARegisterDiskAppearedCallback
-        let callback_ptr =
-            unsafe { NonNull::new_unchecked(&append_disk as *const _ as *mut c_void) };
-        unsafe { DAUnregisterCallback(&session, callback_ptr, disks_ptr) };
     }
 }
 
@@ -210,12 +281,9 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         if let Some(media_content) =
             disk_description.get_string(unsafe { kDADiskDescriptionMediaContentKey })
         {
-            let guid_partition = NSString::from_str("GUID_partition_scheme");
-            let fdisk_partition = NSString::from_str("FDisk_partition_scheme");
-
-            if media_content.isEqualToString(&guid_partition) {
+            if GUID_PARTITION_SCHEME.with(|scheme| media_content.isEqualToString(scheme)) {
                 device.partition_table_type = Some("gpt".to_string());
-            } else if media_content.isEqualToString(&fdisk_partition) {
+            } else if FDISK_PARTITION_SCHEME.with(|scheme| media_content.isEqualToString(scheme)) {
                 device.partition_table_type = Some("mbr".to_string());
             }
         }
@@ -262,10 +330,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
 
         device.is_virtual = device_protocol
             .as_ref()
-            .map(|p| {
-                let virtual_interface = NSString::from_str("Virtual Interface");
-                p.isEqualToString(&virtual_interface)
-            })
+            .map(|p| VIRTUAL_INTERFACE.with(|vi| p.isEqualToString(vi)))
             .unwrap_or(false);
 
         device.is_removable = is_removable || is_ejectable;
@@ -274,8 +339,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         device.is_card = disk_description
             .get_cfdict(unsafe { kDADiskDescriptionMediaIconKey })
             .and_then(|media_icon_dict| {
-                let key = CFString::from_str("IOBundleResourceFile");
-                media_icon_dict.get_cfstring(&key)
+                IO_BUNDLE_RESOURCE_FILE.with(|key| media_icon_dict.get_cfstring(key))
             })
             .map(|icon| icon.to_string() == "SD.icns")
             .unwrap_or(false);
@@ -303,17 +367,9 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
     let mut device_list: Vec<DeviceDescriptor> = Vec::with_capacity(disk_list.disks.len());
     let mut device_map: HashMap<String, usize> = HashMap::with_capacity(disk_list.disks.len());
 
-    let predicate_format = NSString::from_str("SELF MATCHES %@");
-    let argument = NSString::from_str(r"^disk\d+s\d+$");
-    let arguments: Retained<NSArray> = NSArray::from_slice(&[&argument]);
-    let partition_regex = unsafe {
-        NSPredicate::predicateWithFormat_argumentArray(&predicate_format, Some(&arguments))
-    };
-
     for disk_bsd_name in &disk_list.disks {
-        let is_disk_partition = unsafe { partition_regex.evaluateWithObject(Some(&disk_bsd_name)) };
-
-        if is_disk_partition {
+        // Use Rust string check instead of NSPredicate regex for better performance
+        if is_partition_name(&disk_bsd_name) {
             continue;
         }
 
@@ -366,12 +422,15 @@ pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
             continue;
         };
 
-        let disk_len = partition_bsdname[5..]
-            .find('s')
-            .map(|i| i + 5)
-            .unwrap_or(partition_bsdname.len());
-
-        let disk_bsdname = partition_bsdname[..disk_len].to_string();
+        // Safely extract disk name from partition name (e.g., "disk0s1" -> "disk0")
+        // Uses strip_prefix to avoid panics on unexpected BSD names
+        let disk_bsdname = if let Some(rest) = partition_bsdname.strip_prefix("disk") {
+            let disk_num_len = rest.find('s').unwrap_or(rest.len());
+            format!("disk{}", &rest[..disk_num_len])
+        } else {
+            // Fallback: use the whole name if it doesn't match expected pattern
+            partition_bsdname.clone()
+        };
 
         let Some(mount_path) = path.path().and_then(|it| it.UTF8String().to_string()) else {
             continue;
