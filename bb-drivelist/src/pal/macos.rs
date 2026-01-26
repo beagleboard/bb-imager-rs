@@ -21,38 +21,27 @@ use objc2_disk_arbitration::{
     kDADiskDescriptionMediaWritableKey,
 };
 use objc2_foundation::{
-    NSArray, NSFileManager, NSMutableArray, NSNumber, NSString, NSURLVolumeLocalizedNameKey,
-    NSURLVolumeNameKey, NSVolumeEnumerationOptions,
+    ns_string, NSArray, NSFileManager, NSMutableArray, NSNumber, NSString,
+    NSURLVolumeLocalizedNameKey, NSURLVolumeNameKey, NSVolumeEnumerationOptions,
 };
 
 // UTILS
 
-// Cached NSStrings for constant comparisons (avoids repeated allocations).
-// Use thread-local storage since NSString/Retained are not Sync.
+// Cached CFString for CFDictionary lookups.
+// Use thread-local storage since CFRetained is not Sync.
 thread_local! {
-    static SCSI_SATA: Retained<NSString> = NSString::from_str("SATA");
-    static SCSI_SCSI: Retained<NSString> = NSString::from_str("SCSI");
-    static SCSI_ATA: Retained<NSString> = NSString::from_str("ATA");
-    static SCSI_IDE: Retained<NSString> = NSString::from_str("IDE");
-    static SCSI_PCI: Retained<NSString> = NSString::from_str("PCI");
-
-    static GUID_PARTITION_SCHEME: Retained<NSString> =
-        NSString::from_str("GUID_partition_scheme");
-    static FDISK_PARTITION_SCHEME: Retained<NSString> =
-        NSString::from_str("FDisk_partition_scheme");
-    static VIRTUAL_INTERFACE: Retained<NSString> = NSString::from_str("Virtual Interface");
     static IO_BUNDLE_RESOURCE_FILE: CFRetained<CFString> =
         CFString::from_str("IOBundleResourceFile");
 }
 
 /// Check if a given NSString matches any of the known SCSI type names.
-/// Uses cached NSStrings to avoid String allocation per call.
+/// Uses ns_string! constants to avoid String allocation per call.
 fn scsi_type_matches(s: &NSString) -> bool {
-    SCSI_SATA.with(|sata| s.isEqualToString(sata))
-        || SCSI_SCSI.with(|scsi| s.isEqualToString(scsi))
-        || SCSI_ATA.with(|ata| s.isEqualToString(ata))
-        || SCSI_IDE.with(|ide| s.isEqualToString(ide))
-        || SCSI_PCI.with(|pci| s.isEqualToString(pci))
+    s.isEqualToString(ns_string!("SATA"))
+        || s.isEqualToString(ns_string!("SCSI"))
+        || s.isEqualToString(ns_string!("ATA"))
+        || s.isEqualToString(ns_string!("IDE"))
+        || s.isEqualToString(ns_string!("PCI"))
 }
 
 /// Check if a BSD name matches the partition pattern (e.g., "disk0s1", "disk1s2").
@@ -281,9 +270,9 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
         if let Some(media_content) =
             disk_description.get_string(unsafe { kDADiskDescriptionMediaContentKey })
         {
-            if GUID_PARTITION_SCHEME.with(|scheme| media_content.isEqualToString(scheme)) {
+            if media_content.isEqualToString(ns_string!("GUID_partition_scheme")) {
                 device.partition_table_type = Some("gpt".to_string());
-            } else if FDISK_PARTITION_SCHEME.with(|scheme| media_content.isEqualToString(scheme)) {
+            } else if media_content.isEqualToString(ns_string!("FDisk_partition_scheme")) {
                 device.partition_table_type = Some("mbr".to_string());
             }
         }
@@ -330,7 +319,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
 
         device.is_virtual = device_protocol
             .as_ref()
-            .map(|p| VIRTUAL_INTERFACE.with(|vi| p.isEqualToString(vi)))
+            .map(|p| p.isEqualToString(ns_string!("Virtual Interface")))
             .unwrap_or(false);
 
         device.is_removable = is_removable || is_ejectable;
