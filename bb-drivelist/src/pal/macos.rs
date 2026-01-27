@@ -1,10 +1,10 @@
 use core::ffi::c_void;
 use std::collections::HashMap;
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 use std::ptr::NonNull;
 
-use crate::device::DeviceDescriptor;
 use crate::MountPoint;
+use crate::device::DeviceDescriptor;
 use objc2::runtime::AnyObject;
 use objc2::{rc::Retained, sel};
 use objc2_core_foundation::{
@@ -21,17 +21,16 @@ use objc2_disk_arbitration::{
     kDADiskDescriptionMediaWritableKey,
 };
 use objc2_foundation::{
-    ns_string, NSArray, NSFileManager, NSMutableArray, NSNumber, NSString,
-    NSURLVolumeLocalizedNameKey, NSURLVolumeNameKey, NSVolumeEnumerationOptions,
+    NSArray, NSFileManager, NSMutableArray, NSNumber, NSString, NSURLVolumeLocalizedNameKey,
+    NSURLVolumeNameKey, NSVolumeEnumerationOptions, ns_string,
 };
 
 // UTILS
 
 // Cached CFString for CFDictionary lookups.
-// Use thread-local storage since CFRetained is not Sync.
+// Use thread-local storage since CFString is not Sync.
 thread_local! {
-    static IO_BUNDLE_RESOURCE_FILE: CFRetained<CFString> =
-        CFString::from_str("IOBundleResourceFile");
+    static IO_BUNDLE_RESOURCE_FILE: CFRetained<CFString> = CFString::from_static_str("IOBundleResourceFile");
 }
 
 /// Check if a given NSString matches any of the known SCSI type names.
