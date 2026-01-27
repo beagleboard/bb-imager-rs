@@ -25,25 +25,12 @@ impl Screen {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SearchState {
-    search_string: String,
-}
-
-impl SearchState {
-    pub(crate) const fn new(search_string: String) -> Self {
-        Self { search_string }
-    }
-
-    pub(crate) fn search_str(&self) -> &str {
-        &self.search_string
-    }
-}
+pub(crate) struct SearchState;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct ImageSelectionState {
     flasher: bb_config::config::Flasher,
     idx: Vec<usize>,
-    search_string: String,
 }
 
 impl ImageSelectionState {
@@ -51,12 +38,7 @@ impl ImageSelectionState {
         Self {
             flasher,
             idx: Vec::new(),
-            search_string: String::new(),
         }
-    }
-
-    pub(crate) fn search_str(&self) -> &str {
-        &self.search_string
     }
 
     pub(crate) fn idx(&self) -> &[usize] {
@@ -65,11 +47,6 @@ impl ImageSelectionState {
 
     pub(crate) fn flasher(&self) -> bb_config::config::Flasher {
         self.flasher
-    }
-
-    pub(crate) fn with_search_string(mut self, search_str: String) -> Self {
-        self.search_string = search_str;
-        self
     }
 
     pub(crate) fn with_added_id(mut self, id: usize) -> Self {

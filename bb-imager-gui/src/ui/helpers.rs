@@ -4,23 +4,27 @@ use crate::constants;
 
 use super::BBImagerMessage;
 
-pub(crate) fn search_bar<'a>(
-    cur_search: &'a str,
-    f: impl Fn(String) -> BBImagerMessage + 'a,
-) -> Element<'a, BBImagerMessage> {
-    widget::row![
-        widget::button(
-            widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22)
-        )
-        .on_press(BBImagerMessage::PopScreen)
-        .style(widget::button::secondary),
-        widget::button(widget::svg(widget::svg::Handle::from_memory(constants::REFRESH)).width(22))
+pub(crate) fn nav_header<'a>(refresh: bool) -> Element<'a, BBImagerMessage> {
+    let back_btn = widget::button(
+        widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22),
+    )
+    .on_press(BBImagerMessage::PopScreen)
+    .style(widget::button::secondary);
+
+    if refresh {
+        widget::row![
+            back_btn,
+            widget::button(
+                widget::svg(widget::svg::Handle::from_memory(constants::REFRESH)).width(22)
+            )
             .on_press(BBImagerMessage::RefreshConfig)
             .style(widget::button::secondary),
-        widget::text_input("Search", cur_search).on_input(f)
-    ]
-    .spacing(10)
-    .into()
+        ]
+        .spacing(10)
+        .into()
+    } else {
+        widget::row![back_btn].into()
+    }
 }
 
 pub(crate) fn home_btn_text<'a>(

@@ -3,12 +3,10 @@ use iced::{
     widget::{self, button, text},
 };
 
-use super::helpers::search_bar;
 use crate::{BBImagerMessage, constants, helpers};
 
 pub(crate) fn view<'a, D>(
     destinations: D,
-    search_str: &'a str,
     file_name: Option<String>,
 ) -> Element<'a, BBImagerMessage>
 where
@@ -16,11 +14,6 @@ where
 {
     let items = destinations
         .into_iter()
-        .filter(|x| {
-            x.to_string()
-                .to_lowercase()
-                .contains(&search_str.to_lowercase())
-        })
         .map(|x| {
             let mut row2 = widget::column![text(x.to_string())];
 
@@ -67,9 +60,7 @@ where
     let row3: iced::Element<_> = widget::scrollable(col.spacing(10)).into();
 
     widget::column![
-        search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
-            crate::pages::Screen::DestinationSelection(crate::pages::SearchState::new(x))
-        )),
+        super::helpers::nav_header(false),
         widget::horizontal_rule(2),
         row3
     ]

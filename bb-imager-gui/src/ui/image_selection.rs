@@ -36,11 +36,6 @@ pub(crate) fn view<'a>(
     let row3: Element<_> = if let Some(imgs) = images {
         let items = imgs
             .into_iter()
-            .filter(|(_, x)| {
-                x.name()
-                    .to_lowercase()
-                    .contains(&state.search_str().to_lowercase())
-            })
             .map(|(id, x)| entry(state, x, downloader, id))
             .chain(
                 extra_entries
@@ -62,15 +57,7 @@ pub(crate) fn view<'a>(
     };
 
     widget::column![
-        search_bar(
-            state.search_str(),
-            |x| BBImagerMessage::ReplaceScreen(pages::Screen::ImageSelection(
-                state.clone().with_search_string(x)
-            )),
-            // Only show refresh button on the initial page. Refreshing from a submenu can lead to
-            // a bad state
-            state.idx().is_empty()
-        ),
+        super::helpers::nav_header(state.idx().is_empty()),
         widget::horizontal_rule(2),
         row3
     ]
@@ -225,33 +212,4 @@ pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a
             .height(width)
             .into(),
     }
-}
-
-pub(crate) fn search_bar<'a>(
-    cur_search: &'a str,
-    f: impl Fn(String) -> BBImagerMessage + 'a,
-    refresh: bool,
-) -> Element<'a, BBImagerMessage> {
-    let back_btn = widget::button(
-        widget::svg(widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON)).width(22),
-    )
-    .on_press(BBImagerMessage::PopScreen)
-    .style(widget::button::secondary);
-    let search_bar = widget::text_input("Search", cur_search).on_input(f);
-
-    if refresh {
-        widget::row![
-            back_btn,
-            widget::button(
-                widget::svg(widget::svg::Handle::from_memory(constants::REFRESH)).width(22)
-            )
-            .on_press(BBImagerMessage::RefreshConfig)
-            .style(widget::button::secondary),
-            search_bar
-        ]
-    } else {
-        widget::row![back_btn, search_bar]
-    }
-    .spacing(10)
-    .into()
 }

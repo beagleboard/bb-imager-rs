@@ -46,6 +46,8 @@ pub(crate) enum BBImagerMessage {
 
     /// Navigation
     ///
+    /// Jump to a specific step in the linear flow (0-based index)
+    JumpToStep(usize),
     /// Clear page stack and switch to new page
     SwitchScreen(Screen),
     /// Replace current page with new page
@@ -113,8 +115,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 )
             });
 
-            // Close Board selection page
-            state.screen.pop();
+            // Linear Flow: Push ImageSelection instead of Popping
+            let dev = state.boards.device(x);
+            state.screen.push(Screen::ImageSelection(
+                crate::pages::ImageSelectionState::new(dev.flasher),
+            ));
 
             return Task::batch(jobs.chain([remote_image_jobs]));
         }
@@ -129,8 +134,12 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::SelectImage(x) => {
             tracing::info!("Selected Image: {}", x);
             state.selected_image = Some(x);
-            state.screen.clear();
-            state.screen.push(Screen::Home);
+            // Linear Flow: Push DestinationSelection
+            state.selected_dst.take();
+            state
+                .screen
+                .push(Screen::DestinationSelection(Default::default()));
+
             state.customization = Some(state.config());
         }
         BBImagerMessage::SelectLocalImage(flasher) => {
@@ -166,13 +175,23 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::SelectPort(x) => {
             state.selected_dst = Some(x);
-            state.screen.pop();
+            // Linear Flow: Push Home (Review)
+            state.screen.push(Screen::Home);
         }
         BBImagerMessage::Reset => {
             state.selected_dst.take();
             state.selected_image.take();
             state.selected_board.take();
             state.destinations.clear();
+            state.screen.clear();
+            state.screen.push(Screen::BoardSelection(Default::default()));
+        }
+        BBImagerMessage::JumpToStep(step) => {
+            // This only handles backward navigation by truncating the screen stack.
+            // Forward jumps are ignored to maintain the linear wizard flow stability.
+            if step < state.screen.len() {
+                state.screen.truncate(step + 1);
+            }
         }
         BBImagerMessage::SwitchScreen(x) => {
             state.screen.clear();

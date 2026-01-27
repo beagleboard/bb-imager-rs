@@ -21,8 +21,8 @@ pub(crate) fn view(state: &BBImager) -> Element<'_, BBImagerMessage> {
             state.is_destionation_selectable(),
             state.is_download_action(),
         ),
-        Screen::BoardSelection(p) => {
-            board_selection::view(state.devices(), p.search_str(), state.downloader())
+        Screen::BoardSelection(_p) => {
+            board_selection::view(state.devices(), state.downloader(), state.screen.len() > 1)
         }
         Screen::ImageSelection(page) => {
             let mut extra_entries = Vec::from([image_selection::ExtraImageEntry::new(
@@ -45,9 +45,8 @@ pub(crate) fn view(state: &BBImager) -> Element<'_, BBImagerMessage> {
                 extra_entries,
             )
         }
-        Screen::DestinationSelection(s) => destination_selection::view(
+        Screen::DestinationSelection(_s) => destination_selection::view(
             state.destinations(),
-            s.search_str(),
             state.selected_image().unwrap().file_name(),
         ),
         Screen::ExtraConfiguration(id) => configuration::view(

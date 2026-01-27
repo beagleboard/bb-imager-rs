@@ -4,17 +4,14 @@ use iced::{
     widget::{self, button, text},
 };
 
-use crate::{BBImagerMessage, constants, pages};
-
-use super::helpers::search_bar;
+use crate::{BBImagerMessage, constants};
 
 pub(crate) fn view<'a>(
     devices: impl Iterator<Item = (usize, &'a config::Device)>,
-    search_str: &'a str,
     downloader: &'a bb_downloader::Downloader,
+    enable_back: bool,
 ) -> Element<'a, BBImagerMessage> {
     let items = devices
-        .filter(|(_, x)| x.name.to_lowercase().contains(&search_str.to_lowercase()))
         .map(|(id, dev)| {
             let image: Element<BBImagerMessage> = match &dev.icon {
                 Some(url) => match downloader.clone().check_cache_from_url(url.clone()) {
@@ -50,16 +47,16 @@ pub(crate) fn view<'a>(
         })
         .map(Into::into);
 
-    widget::column![
-        search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
-            pages::Screen::BoardSelection(pages::SearchState::new(x))
-        )),
-        widget::horizontal_rule(2),
-        widget::scrollable(widget::column(items).spacing(10))
-    ]
-    .spacing(10)
-    .padding(10)
-    .into()
+    let mut col = widget::column![];
+    if enable_back {
+        col = col.push(super::helpers::nav_header(false));
+        col = col.push(widget::horizontal_rule(2));
+    }
+
+    col.push(widget::scrollable(widget::column(items).spacing(10)))
+        .spacing(10)
+        .padding(10)
+        .into()
 }
 
 pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {

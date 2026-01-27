@@ -1,6 +1,7 @@
 use iced::color;
 
-pub(crate) const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/beagleboard/bb-imager-rs/releases/latest";
+pub(crate) const LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/beagleboard/bb-imager-rs/releases/latest";
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
