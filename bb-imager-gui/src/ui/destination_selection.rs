@@ -3,96 +3,116 @@ use iced::{
     widget::{self, button, text},
 };
 
-use super::helpers::search_bar;
-use crate::{BBImagerMessage, constants, helpers};
+use crate::{
+    BBImagerMessage, constants,
+    ui::helpers::{card_btn_style, detail_entry, page_type1, svg_icon_style},
+};
 
-pub(crate) fn view<'a, D>(
-    destinations: D,
-    search_str: &'a str,
-    file_name: Option<String>,
-) -> Element<'a, BBImagerMessage>
-where
-    D: Iterator<Item = &'a helpers::Destination>,
-{
-    let items = destinations
-        .into_iter()
-        .filter(|x| {
-            x.to_string()
-                .to_lowercase()
-                .contains(&search_str.to_lowercase())
-        })
-        .map(|x| {
-            let mut row2 = widget::column![text(x.to_string())];
+const ICON_WIDTH: u32 = 60;
 
-            if let Some(size) = x.size() {
-                row2 = row2.push(text(format_size(size)));
+pub(crate) fn view<'a>(state: &'a crate::ChooseDestState) -> Element<'a, BBImagerMessage> {
+    page_type1(
+        &state.common,
+        dest_list_pane(state),
+        dest_view_pane(state),
+        [
+            widget::button("BACK")
+                .on_press(BBImagerMessage::Back)
+                .style(widget::button::secondary),
+            widget::button("NEXT")
+                .on_press_maybe(state.selected_dest().map(|_| BBImagerMessage::Next)),
+        ],
+    )
+}
+
+fn dest_list_pane<'a>(state: &'a crate::ChooseDestState) -> Element<'a, BBImagerMessage> {
+    let items = state
+        .destinations()
+        .map(|dest| {
+            let is_selected = state
+                .selected_dest
+                .as_ref()
+                .map(|x| dest.is_selected(x))
+                .unwrap_or(false);
+
+            let icon: Element<BBImagerMessage> = match dest {
+                crate::DestinationItem::SaveToFile(_) => {
+                    widget::svg(state.file_save_icon().clone())
+                }
+                crate::DestinationItem::Destination(_) => widget::svg(state.usb_svg().clone()),
             }
+            .height(ICON_WIDTH)
+            .width(ICON_WIDTH)
+            .style(svg_icon_style)
+            .into();
 
+            let row = widget::row![
+                icon,
+                text(dest.to_string()).size(18).width(iced::Length::Fill)
+            ];
             button(
-                widget::row![
-                    widget::svg(widget::svg::Handle::from_memory(constants::USB_ICON)).width(40),
-                    row2
-                ]
-                .align_y(iced::Alignment::Center)
-                .spacing(10),
+                row.spacing(12)
+                    .padding(8)
+                    .align_y(iced::alignment::Vertical::Center),
             )
-            .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::SelectPort(x.clone()))
-            .style(widget::button::secondary)
+            .on_press(dest.msg())
+            .style(move |theme, status| card_btn_style(theme, status, is_selected))
         })
         .map(Into::into);
 
-    let col = match file_name {
-        Some(fname) => widget::column(
-            items.chain([button(
-                widget::row![
-                    widget::svg(widget::svg::Handle::from_memory(constants::FILE_SAVE_ICON))
-                        .width(40),
-                    widget::column![
-                        text("Save to File"),
-                        text("Save the image to a local file without flashing")
-                    ]
-                ]
-                .align_y(iced::Alignment::Center)
-                .spacing(10),
-            )
-            .width(iced::Length::Fill)
-            .on_press(BBImagerMessage::SelectDestinationFile(fname))
-            .style(widget::button::secondary)
-            .into()]),
-        ),
-        None => widget::column(items),
-    };
-
-    let row3: iced::Element<_> = widget::scrollable(col.spacing(10)).into();
-
-    widget::column![
-        search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
-            crate::pages::Screen::DestinationSelection(crate::pages::SearchState::new(x))
-        )),
-        widget::horizontal_rule(2),
-        row3
-    ]
-    .spacing(10)
-    .padding(10)
-    .into()
+    widget::scrollable(widget::column(items).padding(iced::Padding::ZERO.right(12))).into()
 }
 
-pub(crate) fn format_size(size: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = 1024.0 * KB;
-    const GB: f64 = 1024.0 * MB;
-    const TB: f64 = 1024.0 * GB;
+fn dest_view_pane<'a>(state: &'a crate::ChooseDestState) -> Element<'a, BBImagerMessage> {
+    match state.selected_dest() {
+        Some(dest) => {
+            let icon: Element<BBImagerMessage> = widget::svg(state.usb_svg().clone())
+                .height(100)
+                .width(iced::Fill)
+                .style(svg_icon_style)
+                .into();
 
-    if size < KB as u64 {
-        format!("{size} B")
-    } else if size < MB as u64 {
-        format!("{:.2} KB", size as f64 / KB)
-    } else if size < GB as u64 {
-        format!("{:.2} MB", size as f64 / MB)
-    } else if size < TB as u64 {
-        format!("{:.2} GB", size as f64 / GB)
-    } else {
-        format!("{:.2} TB", size as f64 / TB)
+            let col = widget::column![
+                icon,
+                text(dest.to_string())
+                    .size(24)
+                    .align_x(iced::alignment::Alignment::Center)
+                    .width(iced::Length::Fill),
+            ]
+            .spacing(16);
+
+            let col = col.extend(
+                dest.details()
+                    .into_iter()
+                    .map(|(k, v)| detail_entry(k, v))
+                    .map(Into::into),
+            );
+
+            widget::scrollable(col).into()
+        }
+        None => {
+            let col = widget::column![
+                text("Please Select a Destination")
+                    .size(28)
+                    .width(iced::Fill)
+                    .align_x(iced::Center)
+                    .font(constants::FONT_BOLD)
+            ]
+            .spacing(16);
+
+            let col = match state.instruction() {
+                Some(x) => col.extend([
+                    widget::rule::horizontal(2).into(),
+                    text("Special instructions")
+                        .size(16)
+                        .font(constants::FONT_BOLD)
+                        .into(),
+                    text(x).into(),
+                ]),
+                None => col,
+            };
+
+            widget::center(widget::scrollable(col)).into()
+        }
     }
 }

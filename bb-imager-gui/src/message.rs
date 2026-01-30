@@ -1,239 +1,142 @@
 //! Global GUI Messages
 
-use std::{borrow::Cow, collections::HashSet};
-
 use iced::Task;
 
-use crate::{
-    BBImager,
-    helpers::{self, BoardImage, Destination, FlashingCustomization, ProgressBarState},
-    pages::Screen,
-};
+use crate::{BBImager, helpers};
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
+    /// Messages to ignore
+    Null,
+
     ExtendConfig(bb_config::Config),
     ResolveRemoteSubitemItem {
         item: Vec<bb_config::config::OsListItem>,
         target: Vec<usize>,
     },
-    SelectBoard(usize),
-    SelectImage(BoardImage),
-    SelectLocalImage(bb_config::config::Flasher),
-    SelectPort(Destination),
-    SelectDestinationFile(String),
-    ProgressBar(ProgressBarState),
-    Destinations(Vec<Destination>),
-    RefreshConfig,
-    Reset,
-
-    StartFlashing,
-    StartFlashingWithoutConfiguraton,
-    CancelFlashing,
-    StopFlashing(ProgressBarState),
-    UpdateFlashConfig(FlashingCustomization),
-
-    /// Actions for App Settings
-    UpdateSettings(crate::persistance::AppSettings),
-
-    /// Write button was pressed
-    WriteBtn,
-
-    OpenUrl(Cow<'static, str>),
-
-    /// Messages to ignore
-    Null,
-
-    /// Navigation
-    ///
-    /// Clear page stack and switch to new page
-    SwitchScreen(Screen),
-    /// Replace current page with new page
-    ReplaceScreen(Screen),
-    /// Push new page to the stack
-    PushScreen(Screen),
-    /// Pop page from stack
-    PopScreen,
-
-    /// Customization
-    ///
-    /// Save customization to disk
-    SaveCustomization,
-    /// Drop any customization changes that have not been saved
-    CancelCustomization,
-    /// Reset customization to default state
-    ResetCustomization,
 
     /// A new version of application is available
     UpdateAvailable(semver::Version),
+
+    /// Select a board by index. Can only be used in Board selection page.
+    SelectBoard(usize),
+
+    /// ChooseOs Page
+    SelectOs(crate::OsImageId),
+    SelectLocalOs((Vec<usize>, helpers::BoardImage)),
+    GotoOsListParent,
+
+    /// Choose Destination page
+    SelectDest(helpers::Destination),
+    SelectFileDest(String),
+
+    // Customization Page
+    UpdateFlashConfig(crate::helpers::FlashingCustomization),
+
+    // Review Page
+    FlashStart,
+
+    // Flashing Page
+    FlashProgress(bb_flasher::DownloadFlashingStatus),
+    FlashSuccess,
+    FlashCancel,
+    FlashFail(String),
+
+    // Reset to start from beginning.
+    Restart,
+
+    /// Open URL in browser
+    OpenUrl(url::Url),
+
+    /// Next button pressed
+    Next,
+    /// Back button pressed
+    Back,
+
+    /// Add image to cache
+    ResolveImage(url::Url, std::path::PathBuf),
+
+    Destinations(Vec<helpers::Destination>),
+
+    EditorEvent(iced::widget::text_editor::Action),
+
+    AppInfo,
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
     match message {
-        BBImagerMessage::ExtendConfig(c) => {
-            state.boards.merge(c);
-            tracing::debug!("Update Config: {:#?}", state.boards);
-            return state.fetch_board_images();
-        }
-        BBImagerMessage::RefreshConfig => {
-            state.boards = Default::default();
-            return helpers::refresh_config_task(state.downloader.clone(), &state.boards);
-        }
-        BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
-            state.boards.resolve_remote_subitem(item, &target);
-        }
-        BBImagerMessage::SelectBoard(x) => {
-            // Reset any previously selected values
-            state.selected_dst.take();
-            state.selected_image.take();
-            state.destinations.clear();
-            state.customization.take();
-
-            let os_images = state
-                .boards
-                .images(x, &[])
-                .expect("Initial image list can never be None");
-
-            let remote_image_jobs = state.fetch_remote_subitems(x, &[]);
-            let icons: HashSet<url::Url> = os_images.iter().map(|(_, x)| x.icon()).collect();
-            state.selected_board = Some(x);
-
-            let jobs = icons.into_iter().map(|x| {
-                let downloader = state.downloader.clone();
-                let x_clone = x.clone();
-                Task::perform(
-                    async move { downloader.download_no_cache(x_clone, None).await },
-                    move |p| match p {
-                        Ok(_path) => BBImagerMessage::Null,
-                        Err(e) => {
-                            tracing::warn!("Failed to download image {x} with error {e}");
-                            BBImagerMessage::Null
-                        }
-                    },
-                )
-            });
-
-            // Close Board selection page
-            state.screen.pop();
-
-            return Task::batch(jobs.chain([remote_image_jobs]));
-        }
-        BBImagerMessage::ProgressBar(x) => {
-            if let Some(screen) = state.screen.pop() {
-                match screen {
-                    Screen::Flashing(s) => state.screen.push(Screen::Flashing(s.update(x))),
-                    _ => state.screen.push(screen),
+        BBImagerMessage::SelectBoard(id) => match state {
+            BBImager::ChooseBoard(inner) => {
+                inner.selected_board = Some(id);
+            }
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::SelectOs(id) => match state {
+            BBImager::ChooseOs(inner) => match id {
+                crate::OsImageId::Format(_) => {
+                    inner.selected_image = Some((id, helpers::BoardImage::format()))
                 }
-            }
-        }
-        BBImagerMessage::SelectImage(x) => {
-            tracing::info!("Selected Image: {}", x);
-            state.selected_image = Some(x);
-            state.screen.clear();
-            state.screen.push(Screen::Home);
-            state.customization = Some(state.config());
-        }
-        BBImagerMessage::SelectLocalImage(flasher) => {
-            let extensions = helpers::file_filter(flasher);
-            return Task::perform(
-                async move {
-                    rfd::AsyncFileDialog::new()
-                        .add_filter("image", extensions)
-                        .pick_file()
-                        .await
-                        .map(|x| x.inner().to_path_buf())
-                },
-                move |x| match x {
-                    Some(y) => BBImagerMessage::SelectImage(helpers::BoardImage::local(y, flasher)),
-                    None => BBImagerMessage::Null,
-                },
-            );
-        }
-        BBImagerMessage::SelectDestinationFile(x) => {
-            return Task::perform(
-                async move {
-                    rfd::AsyncFileDialog::new()
-                        .set_file_name(x)
-                        .save_file()
-                        .await
-                        .map(|x| x.inner().to_path_buf())
-                },
-                move |y| match y {
-                    Some(z) => BBImagerMessage::SelectPort(helpers::Destination::LocalFile(z)),
-                    None => BBImagerMessage::Null,
-                },
-            );
-        }
-        BBImagerMessage::SelectPort(x) => {
-            state.selected_dst = Some(x);
-            state.screen.pop();
-        }
-        BBImagerMessage::Reset => {
-            state.selected_dst.take();
-            state.selected_image.take();
-            state.selected_board.take();
-            state.destinations.clear();
-        }
-        BBImagerMessage::SwitchScreen(x) => {
-            state.screen.clear();
-            return state.push_page(x);
-        }
-        BBImagerMessage::ReplaceScreen(x) => {
-            state.screen.pop();
-            return state.push_page(x);
-        }
-        BBImagerMessage::PushScreen(x) => {
-            tracing::debug!("Push Page: {:?}", x);
-            return state.push_page(x);
-        }
-        BBImagerMessage::PopScreen => {
-            tracing::debug!("Pop screen");
-            state.screen.pop();
-        }
-        BBImagerMessage::CancelFlashing => {
-            if let Some(task) = state.cancel_flashing.take() {
-                task.abort();
-            }
+                crate::OsImageId::Local(parent) => {
+                    let flasher = inner.flasher();
+                    let extensions = helpers::file_filter(flasher);
 
-            match state.screen.last().unwrap() {
-                Screen::Flashing(s) => {
-                    if let Some(y) = s.progress().cancel() {
-                        return Task::done(BBImagerMessage::StopFlashing(y));
+                    return Task::perform(
+                        async move {
+                            rfd::AsyncFileDialog::new()
+                                .add_filter("image", extensions)
+                                .pick_file()
+                                .await
+                                .map(|x| x.inner().to_path_buf())
+                        },
+                        move |x| match x {
+                            Some(y) => BBImagerMessage::SelectLocalOs((
+                                parent,
+                                helpers::BoardImage::local(y, flasher),
+                            )),
+                            None => BBImagerMessage::Null,
+                        },
+                    );
+                }
+                crate::OsImageId::Remote(target) => {
+                    if let bb_config::config::OsListItem::Image(x) = inner.image(&target) {
+                        inner.selected_image = Some((
+                            crate::OsImageId::Remote(target),
+                            helpers::BoardImage::remote(
+                                x.clone(),
+                                inner.flasher(),
+                                inner.downloader().clone(),
+                            ),
+                        ))
+                    } else {
+                        inner.pos = target
                     }
                 }
-                _ => unreachable!(),
+            },
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::SelectLocalOs((parent, image)) => match state {
+            BBImager::ChooseOs(inner) => {
+                inner.selected_image = Some((crate::OsImageId::Local(parent), image))
             }
-        }
-        BBImagerMessage::WriteBtn => {
-            let skip_confirmation = state.app_settings().skip_confirmation == Some(true);
-            let downloading = state.is_download_action();
-            return match state.customization() {
-                Some(x) if x.need_confirmation() && !skip_confirmation && !downloading => {
-                    state.push_page(Screen::FlashingConfirmation)
-                }
-                Some(x) => state.start_flashing(Some(x.clone())),
-                None => state.start_flashing(None),
-            };
-        }
-        BBImagerMessage::StartFlashing => {
-            return state.start_flashing(state.customization.clone());
-        }
-        BBImagerMessage::StartFlashingWithoutConfiguraton => {
-            return state.start_flashing(None);
-        }
-        BBImagerMessage::StopFlashing(x) => {
-            let _ = state.cancel_flashing.take();
-            let content = x.content();
-
-            let progress_task = Task::done(BBImagerMessage::ProgressBar(x));
-            let notification_task = Task::future(async move {
-                let res = helpers::show_notification(content).await;
-
-                tracing::debug!("Notification response {res:?}");
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::OpenUrl(x) => {
+            return Task::future(async move {
+                let res = webbrowser::open(x.as_str());
+                tracing::debug!("Open Url Resp {res:?}");
                 BBImagerMessage::Null
             });
-
-            return Task::batch([progress_task, notification_task]);
+        }
+        BBImagerMessage::Next => return state.next(),
+        BBImagerMessage::Back => state.back(),
+        BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
+        BBImagerMessage::ExtendConfig(c) => {
+            tracing::debug!("Update Config: {:#?}", c);
+            state.boards_merge(c);
+            return state.fetch_board_images();
+        }
+        BBImagerMessage::ResolveRemoteSubitemItem { item, target } => {
+            state.resolve_remote_subitem(item, &target)
         }
         BBImagerMessage::UpdateAvailable(x) => {
             return Task::future(async move {
@@ -242,88 +145,117 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     x
                 ))
                 .await;
-
                 tracing::debug!("Notification response {res:?}");
-
                 BBImagerMessage::Null
             });
         }
+        BBImagerMessage::GotoOsListParent => match state {
+            BBImager::ChooseOs(inner) => {
+                inner.pos.pop();
+            }
+            _ => panic!("Unexpected message"),
+        },
         BBImagerMessage::Destinations(x) => {
-            let changed = if x.len() != state.destinations.len() {
-                true
-            } else {
-                let old_set: HashSet<_> = state.destinations.iter().collect();
-                !x.iter().all(|item| old_set.contains(item))
+            if let BBImager::ChooseDest(inner) = state
+                && x != inner.destinations
+            {
+                inner.destinations = x;
+            }
+        }
+        BBImagerMessage::SelectDest(x) => match state {
+            BBImager::ChooseDest(inner) => {
+                inner.selected_dest = Some(x);
+            }
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::SelectFileDest(x) => {
+            return Task::perform(
+                async move {
+                    rfd::AsyncFileDialog::new()
+                        .set_file_name(x)
+                        .save_file()
+                        .await
+                        .map(|x| x.inner().to_path_buf())
+                },
+                move |x| match x {
+                    Some(y) => BBImagerMessage::SelectDest(helpers::Destination::LocalFile(y)),
+                    None => BBImagerMessage::Null,
+                },
+            );
+        }
+        BBImagerMessage::UpdateFlashConfig(x) => match state {
+            BBImager::Customize(inner) => {
+                inner.customization = x;
+            }
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::FlashCancel => {
+            *state = match std::mem::take(state) {
+                BBImager::Flashing(inner) => {
+                    inner.cancel_flashing.abort();
+
+                    BBImager::FlashingCancel(crate::FlashingFinishState {
+                        common: inner.common,
+                        selected_board: inner.selected_board,
+                    })
+                }
+                _ => panic!("Unexpected message"),
             };
-            if changed {
-                if !state.is_destionation_selectable() {
-                    assert_eq!(x.len(), 1);
-                    state.selected_dst = Some(x[0].clone());
+        }
+        BBImagerMessage::Restart => {
+            state.restart();
+        }
+        BBImagerMessage::FlashFail(err) => {
+            *state = match std::mem::take(state) {
+                BBImager::Flashing(inner) => {
+                    let logs = std::fs::read_to_string(helpers::log_file_path())
+                        .expect("Failed to read logs");
+                    let logs = iced::widget::text_editor::Content::with_text(&logs);
+
+                    BBImager::FlashingFail(crate::FlashingFailState {
+                        common: inner.common,
+                        err,
+                        logs,
+                    })
                 }
-                state.destinations = x;
+                _ => panic!("Unexpected message"),
+            };
+        }
+        BBImagerMessage::FlashProgress(x) => match state {
+            BBImager::Flashing(inner) => {
+                inner.progress_update(x);
+            }
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::FlashStart => {
+            return state.start_flashing();
+        }
+        BBImagerMessage::FlashSuccess => {
+            *state = match std::mem::take(state) {
+                BBImager::Flashing(inner) => {
+                    BBImager::FlashingSuccess(crate::FlashingFinishState {
+                        common: inner.common,
+                        selected_board: inner.selected_board,
+                    })
+                }
+                _ => panic!("Unexpected message"),
             }
         }
-        BBImagerMessage::UpdateFlashConfig(x) => state.customization = Some(x),
-        BBImagerMessage::OpenUrl(x) => {
-            return Task::future(async move {
-                let res = webbrowser::open(&x);
-                tracing::debug!("Open Url Resp {res:?}");
-                BBImagerMessage::Null
-            });
+        BBImagerMessage::EditorEvent(evt) => match evt {
+            iced::widget::text_editor::Action::Edit(_) => {}
+            _ => match state {
+                BBImager::FlashingFail(x) => x.logs.perform(evt),
+                BBImager::AppInfo(x) => x.license.perform(evt),
+                _ => panic!("Unexpected message"),
+            },
+        },
+        BBImagerMessage::AppInfo => {
+            *state = BBImager::AppInfo(crate::OverlayState::new(
+                std::mem::take(state).try_into().expect("Unexpected page"),
+            ));
         }
-        BBImagerMessage::SaveCustomization => {
-            match state.customization.clone().unwrap() {
-                FlashingCustomization::LinuxSdSysconfig(c) => {
-                    let mut temp = state
-                        .app_config
-                        .sd_customization()
-                        .cloned()
-                        .unwrap_or_default();
-                    temp.update_sysconfig(c);
-                    state.app_config.update_sd_customization(temp)
-                }
-                FlashingCustomization::Bcf(c) => state.app_config.update_bcf_customization(c),
-                FlashingCustomization::Msp430 | FlashingCustomization::NoneSd => {}
-                #[cfg(feature = "pb2_mspm0")]
-                FlashingCustomization::Pb2Mspm0(_) => {}
-            }
-
-            let config = state.app_config.clone();
-
-            // Since we have a cache of config, no need to wait for disk persistance.
-            state.screen.pop();
-
-            return Task::future(async move {
-                if let Err(e) = config.save().await {
-                    tracing::error!("Failed to save config: {e}");
-                }
-                BBImagerMessage::Null
-            });
-        }
-        BBImagerMessage::UpdateSettings(s) => {
-            state.app_config.update_app_settings(s);
-
-            let config = state.app_config.clone();
-            return Task::future(async move {
-                if let Err(e) = config.save().await {
-                    tracing::error!("Failed to save config: {e}");
-                }
-                BBImagerMessage::Null
-            });
-        }
-        BBImagerMessage::ResetCustomization => {
-            if let Some(customization) = state.customization.clone() {
-                state.customization = Some(customization.reset());
-            }
-        }
-        BBImagerMessage::CancelCustomization => {
-            state.screen.pop();
-            if state.customization.is_some() {
-                state.customization = Some(state.config());
-            }
-        }
-        BBImagerMessage::Null => {}
-    };
+        _ => {}
+    }
 
     Task::none()
 }

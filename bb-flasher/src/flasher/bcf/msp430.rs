@@ -15,6 +15,12 @@ pub struct Target {
     display_path: String,
 }
 
+impl Target {
+    pub fn path(&self) -> &str {
+        self.display_path.as_str()
+    }
+}
+
 impl Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display_path.fmt(f)
@@ -41,10 +47,6 @@ impl BBFlasherTarget for Target {
                 raw_path: x,
             })
             .collect()
-    }
-
-    fn is_destination_selectable() -> bool {
-        true
     }
 
     fn identifier(&self) -> Cow<'_, str> {

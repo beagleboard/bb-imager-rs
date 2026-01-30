@@ -25,7 +25,6 @@ pub enum DownloadFlashingStatus {
     DownloadingProgress(f32),
     FlashingProgress(f32),
     Verifying,
-    VerifyingProgress(f32),
     Customizing,
 }
 
@@ -51,12 +50,10 @@ where
     /// File types (extensions) supported by the flasher. Can be used for filtering local files in
     /// applications
     const FILE_TYPES: &[&str];
+    const IS_DESTINATION_SELECTABLE: bool = true;
 
     /// A list of possible flasher targets
     fn destinations() -> impl Future<Output = HashSet<Self>>;
-
-    /// Check if destination can be selected
-    fn is_destination_selectable() -> bool;
 
     /// A sort of device ID (mostly a Path).
     fn identifier<'a>(&'a self) -> Cow<'a, str>;

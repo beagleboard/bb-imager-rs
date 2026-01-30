@@ -88,7 +88,12 @@
 				"description": "PocketBeagle 2 and other boards based on TI AM62",
 				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/pocket2.png",
 				"flasher": "SdCard",
-				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle-2/index.html"
+				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle-2/index.html",
+				"specification": {
+					"Processor": "Texas Instruments AM6254",
+					"ARM Cores": "4 x 1.4GHz Cortex-A53 (64-bit)",
+					"RAM": "512MB DDR4"
+				}
 			}
 		]
 	},

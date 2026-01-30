@@ -21,6 +21,10 @@ impl Target {
     pub const fn size(&self) -> u64 {
         self.0.size
     }
+
+    pub fn path(&self) -> &std::path::Path {
+        &self.0.path
+    }
 }
 
 impl Display for Target {
@@ -48,10 +52,6 @@ impl BBFlasherTarget for Target {
 
     async fn destinations() -> std::collections::HashSet<Self> {
         Self::destinations_internal()
-    }
-
-    fn is_destination_selectable() -> bool {
-        true
     }
 
     fn identifier(&self) -> Cow<'_, str> {

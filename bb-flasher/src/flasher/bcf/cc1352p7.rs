@@ -11,6 +11,12 @@ use crate::{BBFlasher, BBFlasherTarget, Resolvable};
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct Target(String);
 
+impl Target {
+    pub fn path(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl From<String> for Target {
     fn from(value: String) -> Self {
         Self(value)
@@ -27,10 +33,6 @@ impl BBFlasherTarget for Target {
             .collect();
 
         std::future::ready(temp)
-    }
-
-    fn is_destination_selectable() -> bool {
-        true
     }
 
     fn identifier(&self) -> Cow<'_, str> {

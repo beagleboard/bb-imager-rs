@@ -1,165 +1,10 @@
-use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration};
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config::{self, OsListItem};
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
-use iced::{
-    Color, Length, futures,
-    widget::{self, Column, progress_bar, text},
-};
-use iced_loading::Linear;
+use iced::{futures, widget};
 use url::Url;
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct ProgressBarState {
-    label: Cow<'static, str>,
-    progress: f32,
-    state: ProgressBarStatus,
-    inner_state: Option<DownloadFlashingStatus>,
-}
-
-impl ProgressBarState {
-    pub(crate) const FLASHING_SUCCESS: Self =
-        Self::const_new("Flashing Successful", 1.0, ProgressBarStatus::Success, None);
-    pub(crate) const PREPARING: Self =
-        Self::loading("Preparing...", DownloadFlashingStatus::Preparing);
-    pub(crate) const VERIFYING: Self =
-        Self::loading("Verifying...", DownloadFlashingStatus::Verifying);
-    pub(crate) const CUSTOMIZING: Self =
-        Self::loading("Customizing...", DownloadFlashingStatus::Customizing);
-
-    const fn const_new(
-        label: &'static str,
-        progress: f32,
-        state: ProgressBarStatus,
-        inner_state: Option<DownloadFlashingStatus>,
-    ) -> Self {
-        Self {
-            label: Cow::Borrowed(label),
-            progress,
-            state,
-            inner_state,
-        }
-    }
-
-    pub(crate) fn content(&self) -> String {
-        self.label.to_string()
-    }
-
-    fn new(
-        label: impl Into<Cow<'static, str>>,
-        progress: f32,
-        state: ProgressBarStatus,
-        inner_state: Option<DownloadFlashingStatus>,
-    ) -> Self {
-        Self {
-            label: label.into(),
-            progress,
-            state,
-            inner_state,
-        }
-    }
-
-    /// Progress should be between 0 to 1.0
-    fn progress(prefix: &'static str, progress: f32, inner_state: DownloadFlashingStatus) -> Self {
-        Self::new(
-            format!("{prefix}... {}%", (progress * 100.0).round() as usize),
-            progress,
-            ProgressBarStatus::Normal,
-            Some(inner_state),
-        )
-    }
-
-    const fn loading(label: &'static str, inner_state: DownloadFlashingStatus) -> Self {
-        Self::const_new(label, 0.5, ProgressBarStatus::Loading, Some(inner_state))
-    }
-
-    pub(crate) fn fail(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::new(label, 1.0, ProgressBarStatus::Fail, None)
-    }
-
-    pub(crate) fn bar(&self) -> Column<'_, BBImagerMessage> {
-        use std::ops::RangeInclusive;
-
-        const RANGE: RangeInclusive<f32> = (0.0)..=1.0;
-
-        if self.state == ProgressBarStatus::Loading {
-            widget::column![
-                text(self.label.clone()).color(Color::WHITE),
-                Linear::new()
-                    .width(Length::Fill)
-                    .height(8.0)
-                    .cycle_duration(std::time::Duration::from_millis(1000))
-                    .color(Color::from_rgb(0.0, 0.5, 1.0)),
-            ]
-        } else {
-            widget::column![
-                text(self.label.clone()).color(Color::WHITE),
-                progress_bar(RANGE, self.progress)
-                    .height(8)
-                    .style(self.state.style()),
-            ]
-        }
-        .align_x(iced::Alignment::Center)
-        .spacing(12)
-    }
-
-    pub(crate) fn cancel(&self) -> Option<Self> {
-        let x = match self.inner_state? {
-            DownloadFlashingStatus::Preparing => Self::fail("Preparation cancelled by user"),
-            DownloadFlashingStatus::DownloadingProgress(_) => {
-                Self::fail("Downloading cancelled by user")
-            }
-            DownloadFlashingStatus::FlashingProgress(_) => Self::fail("Flashing cancelled by user"),
-            DownloadFlashingStatus::Verifying | DownloadFlashingStatus::VerifyingProgress(_) => {
-                Self::fail("Verification cancelled by user")
-            }
-            DownloadFlashingStatus::Customizing => Self::fail("Customization cancelled by user"),
-        };
-        Some(x)
-    }
-}
-
-impl From<DownloadFlashingStatus> for ProgressBarState {
-    fn from(value: DownloadFlashingStatus) -> Self {
-        match value {
-            DownloadFlashingStatus::Preparing => Self::PREPARING,
-            DownloadFlashingStatus::DownloadingProgress(p) => Self::progress(
-                "Downloading Image",
-                p,
-                DownloadFlashingStatus::DownloadingProgress(0.0),
-            ),
-            DownloadFlashingStatus::FlashingProgress(p) => {
-                Self::progress("Flashing", p, DownloadFlashingStatus::FlashingProgress(0.0))
-            }
-            DownloadFlashingStatus::Verifying => Self::VERIFYING,
-            DownloadFlashingStatus::VerifyingProgress(p) => {
-                Self::progress("Verifying", p, DownloadFlashingStatus::Verifying)
-            }
-            DownloadFlashingStatus::Customizing => Self::CUSTOMIZING,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum ProgressBarStatus {
-    #[default]
-    Normal,
-    Success,
-    Fail,
-    Loading,
-}
-
-impl ProgressBarStatus {
-    fn style(&self) -> impl Fn(&widget::Theme) -> widget::progress_bar::Style {
-        match self {
-            ProgressBarStatus::Normal => widget::progress_bar::primary,
-            ProgressBarStatus::Success => widget::progress_bar::success,
-            ProgressBarStatus::Fail => widget::progress_bar::danger,
-            ProgressBarStatus::Loading => widget::progress_bar::primary,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub(crate) struct Boards {
@@ -199,7 +44,7 @@ impl Boards {
         &self,
         board_idx: usize,
         subitems: &[usize],
-    ) -> Option<Vec<(usize, &OsListItem)>> {
+    ) -> Option<impl Iterator<Item = (usize, &OsListItem)>> {
         let mut res = &self.config.os_list;
 
         for i in subitems {
@@ -222,8 +67,7 @@ impl Boards {
                     OsListItem::RemoteSubList(item) => flasher_supported(item.flasher),
                     OsListItem::SubList(item) => flasher_supported(item.flasher),
                     _ => true,
-                })
-                .collect(),
+                }),
         )
     }
 
@@ -257,10 +101,8 @@ impl Boards {
             tracing::warn!("Unexpected item")
         }
     }
-}
 
-impl From<config::Config> for Boards {
-    fn from(value: config::Config) -> Self {
+    pub(crate) fn from_config(value: config::Config) -> Self {
         let filtered = config::Config {
             imager: config::Imager {
                 remote_configs: value.imager.remote_configs,
@@ -273,32 +115,50 @@ impl From<config::Config> for Boards {
             },
             os_list: value.os_list,
         };
+
         Self { config: filtered }
     }
-}
 
-impl Default for Boards {
-    fn default() -> Self {
-        serde_json::from_slice::<config::Config>(crate::constants::DEFAULT_CONFIG)
-            .expect("Failed to parse config")
-            .into()
+    pub(crate) fn new() -> Self {
+        let cfg = serde_json::from_slice::<config::Config>(crate::constants::DEFAULT_CONFIG)
+            .expect("Failed to parse config");
+
+        Self::from_config(cfg)
     }
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum BoardImageIcon {
+    Remote(url::Url),
+    Local,
+    Format,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum BoardImage {
-    SdFormat,
+    SdFormat {
+        details: Vec<(&'static str, String)>,
+    },
     Image {
         flasher: config::Flasher,
         init_format: config::InitFormat,
         img: SelectedImage,
         bmap: Option<Bmap>,
         info_text: Option<String>,
+        description: Option<String>,
+        icon: BoardImageIcon,
+        details: Vec<(&'static str, String)>,
     },
 }
 
 impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
+        let metadata = std::fs::metadata(&path).expect("File does not exist");
+        let details = vec![
+            ("Path", path.to_string_lossy().to_string()),
+            ("Size", metadata.len().to_string()),
+        ];
+
         Self::Image {
             img: bb_flasher::LocalImage::new(path.into()).into(),
             bmap: None,
@@ -306,6 +166,9 @@ impl BoardImage {
             // Do not try to apply customization for local images
             init_format: config::InitFormat::None,
             info_text: None,
+            description: None,
+            icon: BoardImageIcon::Local,
+            details,
         }
     }
 
@@ -314,6 +177,15 @@ impl BoardImage {
         flasher: config::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
+        let mut details = vec![
+            ("Release Date", image.release_date.to_string()),
+            ("Image Size", pretty_bytes(image.extract_size)),
+        ];
+
+        if let Some(x) = image.image_download_size {
+            details.push(("Download Size", pretty_bytes(x)))
+        }
+
         Self::Image {
             img: RemoteImage::new(
                 image.name.into(),
@@ -330,12 +202,35 @@ impl BoardImage {
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
+            description: Some(image.description),
+            icon: BoardImageIcon::Remote(image.icon),
+            details,
+        }
+    }
+
+    pub(crate) fn format() -> Self {
+        Self::SdFormat {
+            details: vec![("Format", "FAT32".to_string())],
+        }
+    }
+
+    pub(crate) fn description(&self) -> Option<&str> {
+        match self {
+            BoardImage::SdFormat { .. } => Some("Format a SD Card to FAT32 for reuse."),
+            BoardImage::Image { description, .. } => description.as_ref().map(|x| x.as_str()),
+        }
+    }
+
+    pub(crate) fn icon(&self) -> &BoardImageIcon {
+        match self {
+            BoardImage::SdFormat { .. } => &BoardImageIcon::Format,
+            BoardImage::Image { icon, .. } => icon,
         }
     }
 
     pub(crate) const fn flasher(&self) -> config::Flasher {
         match self {
-            BoardImage::SdFormat => config::Flasher::SdCard,
+            BoardImage::SdFormat { .. } => config::Flasher::SdCard,
             BoardImage::Image { flasher, .. } => *flasher,
         }
     }
@@ -343,21 +238,28 @@ impl BoardImage {
     pub(crate) const fn init_format(&self) -> config::InitFormat {
         match self {
             BoardImage::Image { init_format, .. } => *init_format,
-            BoardImage::SdFormat => config::InitFormat::None,
+            BoardImage::SdFormat { .. } => config::InitFormat::None,
         }
     }
 
-    pub(crate) fn info_text(&self) -> Option<String> {
+    pub(crate) fn info_text(&self) -> Option<&str> {
         match self {
-            BoardImage::Image { info_text, .. } => info_text.clone(),
-            BoardImage::SdFormat => None,
+            BoardImage::Image { info_text, .. } => info_text.as_ref().map(|x| x.as_str()),
+            BoardImage::SdFormat { .. } => None,
         }
     }
 
     pub(crate) fn file_name(&self) -> Option<String> {
         match self {
-            Self::SdFormat => None,
+            Self::SdFormat { .. } => None,
             Self::Image { img, .. } => Some(img.file_name()),
+        }
+    }
+
+    pub(crate) fn details(&self) -> &[(&'static str, String)] {
+        match self {
+            BoardImage::SdFormat { details } => details,
+            BoardImage::Image { details, .. } => details,
         }
     }
 }
@@ -365,7 +267,7 @@ impl BoardImage {
 impl std::fmt::Display for BoardImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardImage::SdFormat => write!(f, "Format SD Card"),
+            BoardImage::SdFormat { .. } => write!(f, "Format SD Card"),
             BoardImage::Image { img: image, .. } => image.fmt(f),
         }
     }
@@ -589,34 +491,34 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 }
 
 pub(crate) async fn flash(
-    img: Option<BoardImage>,
+    img: BoardImage,
     customization: FlashingCustomization,
-    dst: Option<Destination>,
+    dst: Destination,
     chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
     cancel: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
-        (Some(BoardImage::Image { img, .. }), _, Some(Destination::LocalFile(f))) => {
+        (BoardImage::Image { img, .. }, _, Destination::LocalFile(f)) => {
             img.save(&f, chan).await.map_err(Into::into)
         }
-        (Some(BoardImage::SdFormat), _, Some(Destination::SdCard(t))) => {
+        (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
             bb_flasher::sd::FormatFlasher::new(t)
                 .flash(Some(chan))
                 .await
         }
         (
-            Some(BoardImage::Image { img, bmap, .. }),
+            BoardImage::Image { img, bmap, .. },
             FlashingCustomization::LinuxSdSysconfig(customization),
-            Some(Destination::SdCard(t)),
+            Destination::SdCard(t),
         ) => {
             bb_flasher::sd::Flasher::new(img, bmap, t, customization.into(), Some(cancel))
                 .flash(Some(chan))
                 .await
         }
         (
-            Some(BoardImage::Image { img, bmap, .. }),
+            BoardImage::Image { img, bmap, .. },
             FlashingCustomization::NoneSd,
-            Some(Destination::SdCard(t)),
+            Destination::SdCard(t),
         ) => {
             bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none(), Some(cancel))
                 .flash(Some(chan))
@@ -624,26 +526,26 @@ pub(crate) async fn flash(
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (
-            Some(BoardImage::Image { img, .. }),
+            BoardImage::Image { img, .. },
             FlashingCustomization::Bcf(customization),
-            Some(Destination::BeagleConnectFreedom(t)),
+            Destination::BeagleConnectFreedom(t),
         ) => {
             bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify, Some(cancel))
                 .flash(Some(chan))
                 .await
         }
         #[cfg(feature = "bcf_msp430")]
-        (
-            Some(BoardImage::Image { img, .. }),
-            FlashingCustomization::Msp430,
-            Some(Destination::Msp430(t)),
-        ) => {
+        (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
             bb_flasher::bcf::msp430::Flasher::new(img, t)
                 .flash(Some(chan))
                 .await
         }
         #[cfg(feature = "pb2_mspm0")]
-        (Some(BoardImage::Image { img, .. }), FlashingCustomization::Pb2Mspm0(x), _) => {
+        (
+            BoardImage::Image { img, .. },
+            FlashingCustomization::Pb2Mspm0(x),
+            Destination::Pb2Mspm0,
+        ) => {
             bb_flasher::pb2::mspm0::Flasher::new(img, x.persist_eeprom)
                 .flash(Some(chan))
                 .await
@@ -661,20 +563,20 @@ pub(crate) enum Destination {
     #[cfg(feature = "bcf_msp430")]
     Msp430(bb_flasher::bcf::msp430::Target),
     #[cfg(feature = "pb2_mspm0")]
-    Pb2Mspm0(bb_flasher::pb2::mspm0::Target),
+    Pb2Mspm0,
 }
 
 impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Destination::LocalFile(x) => x.display().fmt(f),
+            Destination::LocalFile(_) => write!(f, "Save To File"),
             Destination::SdCard(target) => target.fmt(f),
             #[cfg(feature = "bcf_cc1352p7")]
             Destination::BeagleConnectFreedom(target) => target.fmt(f),
             #[cfg(feature = "bcf_msp430")]
             Destination::Msp430(target) => target.fmt(f),
             #[cfg(feature = "pb2_mspm0")]
-            Destination::Pb2Mspm0(target) => target.fmt(f),
+            Destination::Pb2Mspm0 => write!(f, "PocketBeagle 2 MSPM0"),
         }
     }
 }
@@ -692,6 +594,21 @@ impl Destination {
     /// Download instead of flashing
     pub(crate) fn is_download_action(&self) -> bool {
         matches!(self, Self::LocalFile(_))
+    }
+
+    pub(crate) fn details(&self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::LocalFile(p) => vec![("Path", p.to_string_lossy().to_string())],
+            Self::SdCard(t) => vec![
+                ("Path", t.path().to_string_lossy().to_string()),
+                ("Size", pretty_bytes(t.size())),
+            ],
+            #[cfg(feature = "bcf_cc1352p7")]
+            Self::BeagleConnectFreedom(t) => vec![("Path", t.path().to_string())],
+            #[cfg(feature = "bcf_msp430")]
+            Self::Msp430(t) => vec![("Path", t.path().to_string())],
+            _ => Vec::new(),
+        }
     }
 }
 
@@ -715,26 +632,7 @@ pub(crate) async fn destinations(flasher: config::Flasher) -> Vec<Destination> {
             .map(Destination::Msp430)
             .collect(),
         #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::destinations()
-            .await
-            .into_iter()
-            .map(Destination::Pb2Mspm0)
-            .collect(),
-        _ => unimplemented!(),
-    }
-}
-
-pub(crate) fn is_destination_selectable(flasher: config::Flasher) -> bool {
-    match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::is_destination_selectable(),
-        #[cfg(feature = "bcf_cc1352p7")]
-        config::Flasher::BeagleConnectFreedom => {
-            bb_flasher::bcf::cc1352p7::Target::is_destination_selectable()
-        }
-        #[cfg(feature = "bcf_msp430")]
-        config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::is_destination_selectable(),
-        #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::is_destination_selectable(),
+        config::Flasher::Pb2Mspm0 => vec![Destination::Pb2Mspm0],
         _ => unimplemented!(),
     }
 }
@@ -904,9 +802,123 @@ pub(crate) fn project_dirs() -> Option<directories::ProjectDirs> {
 }
 
 pub(crate) fn log_file_path() -> PathBuf {
-    let dirs = crate::helpers::project_dirs().unwrap();
+    let dirs = project_dirs().unwrap();
     dirs.cache_dir().with_file_name(format!(
         "{}.{}.{}.log",
         PACKAGE_QUALIFIER.0, PACKAGE_QUALIFIER.1, PACKAGE_QUALIFIER.2
     ))
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct ImageHandleCache(HashMap<url::Url, ImageHandleCacheValue>);
+
+#[derive(Debug)]
+pub(crate) enum ImageHandleCacheValue {
+    Svg(widget::svg::Handle),
+    Img(widget::image::Handle),
+}
+
+impl From<PathBuf> for ImageHandleCacheValue {
+    fn from(value: PathBuf) -> Self {
+        let img = std::fs::read(&value).expect("Failed to open image");
+        match image::guess_format(&img) {
+            Ok(_) => Self::Img(widget::image::Handle::from_path(value)),
+            Err(_) => Self::Svg(widget::svg::Handle::from_memory(img)),
+        }
+    }
+}
+
+impl ImageHandleCacheValue {
+    pub(crate) fn view<'a>(
+        &'a self,
+        width: impl Into<iced::Length>,
+        height: impl Into<iced::Length>,
+    ) -> iced::Element<'a, BBImagerMessage> {
+        match self {
+            ImageHandleCacheValue::Svg(handle) => widget::svg(handle.clone())
+                .width(width)
+                .height(height)
+                .into(),
+            ImageHandleCacheValue::Img(handle) => {
+                widget::image(handle).width(width).height(height).into()
+            }
+        }
+    }
+}
+
+impl ImageHandleCache {
+    pub(crate) fn get(&self, u: &url::Url) -> Option<&ImageHandleCacheValue> {
+        self.0.get(u)
+    }
+
+    pub(crate) fn insert(&mut self, u: url::Url, path: PathBuf) {
+        self.0.insert(u, path.into());
+    }
+}
+
+impl Extend<(url::Url, PathBuf)> for ImageHandleCache {
+    fn extend<T: IntoIterator<Item = (url::Url, PathBuf)>>(&mut self, iter: T) {
+        self.0.extend(iter.into_iter().map(|(k, p)| (k, p.into())))
+    }
+}
+
+impl FromIterator<(url::Url, PathBuf)> for ImageHandleCache {
+    fn from_iter<T: IntoIterator<Item = (url::Url, PathBuf)>>(iter: T) -> Self {
+        Self(HashMap::from_iter(
+            iter.into_iter().map(|(k, p)| (k, p.into())),
+        ))
+    }
+}
+
+pub(crate) fn pretty_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+
+    let mut size = bytes as f64;
+    let mut unit = 0;
+
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+
+    if unit == 0 {
+        format!("{} {}", bytes, UNITS[unit])
+    } else {
+        format!("{:.2} {}", size, UNITS[unit])
+    }
+}
+
+pub(crate) const fn static_destination(flasher: config::Flasher) -> Option<Destination> {
+    match flasher {
+        #[cfg(feature = "pb2_mspm0")]
+        config::Flasher::Pb2Mspm0 => Some(Destination::Pb2Mspm0),
+        _ => None,
+    }
+}
+
+/// Return customization enum variant for cases where no customization is present
+pub(crate) fn no_customization(
+    flasher: config::Flasher,
+    img: &BoardImage,
+) -> Option<FlashingCustomization> {
+    match flasher {
+        config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => None,
+        config::Flasher::SdCard => Some(FlashingCustomization::NoneSd),
+        config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
+        _ => None,
+    }
+}
+
+pub(crate) fn pretty_duration(d: Duration) -> String {
+    let secs = d.as_secs();
+
+    if secs >= 60 {
+        format!("{}:{:02}", secs / 60, secs % 60)
+    } else {
+        format!("{}s", secs)
+    }
 }
