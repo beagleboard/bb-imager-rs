@@ -309,7 +309,7 @@ fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBIma
             .label("Set Hostname")
             .on_toggle(|t| {
                 let hostname = if t {
-                    whoami::fallible::hostname().ok()
+                    whoami::hostname().ok()
                 } else {
                     None
                 };
