@@ -235,7 +235,7 @@ impl SdCustomizationUser {
 
 impl Default for SdCustomizationUser {
     fn default() -> Self {
-        Self::new(whoami::username(), String::new())
+        Self::new(whoami::username().unwrap_or(String::new()), String::new())
     }
 }
 
