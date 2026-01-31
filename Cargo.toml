@@ -6,7 +6,7 @@ members = [
 	"bb-imager-cli", "bb-flasher-pb2-mspm0",
 	"bb-imager-gui", "bb-imager-service",
 	"xtask", "bb-flasher-bcf", "bb-flasher-sd", "iced-loading", "bb-downloader", "bb-config", "bb-helper", "bb-flasher-dfu",
-	# removed non-standard e2e-tests crate; E2E-style tests will live under tests/e2e
+	"bb-drivelist"
 ]
 
 [profile.release]
@@ -14,7 +14,7 @@ strip = true
 lto = "thin"
 
 [workspace.package]
-version = "0.0.18"
+version = "0.0.19"
 edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://openbeagle.org/ayush1325/bb-imager-rs"

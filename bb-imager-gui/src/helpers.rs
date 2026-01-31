@@ -378,7 +378,7 @@ pub(crate) fn system_timezone() -> Option<&'static String> {
 
 pub(crate) fn system_keymap() -> String {
     static SYSTEM_KEYMAP: LazyLock<Option<String>> = LazyLock::new(|| {
-        let lang = whoami::langs().ok()?.next()?;
+        let lang = whoami::lang_prefs().ok()?.message_langs().next()?;
         let lang_str = lang.to_string();
 
         let base = lang_str.split('.').next().unwrap_or(&lang_str);

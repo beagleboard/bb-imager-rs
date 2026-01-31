@@ -3,3 +3,10 @@ version: true
 title: BeagleBoard Imaging Utility
 nav:
 - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    description: >
+      Offers an easy-to-use GUI and a powerful CLI to download, configure, and 
+      safely flash OS images for BeagleBoard hardware, with cross-platform 
+      support on Linux, Windows, and macOS.

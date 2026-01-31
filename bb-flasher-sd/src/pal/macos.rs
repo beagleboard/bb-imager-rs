@@ -18,7 +18,7 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
         .create(false)
         .open(dst)
         .await
-        .map_err(|e| Error::FailedToOpenDestination { source: e })?
+        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?
         .into_std()
         .await;
 
