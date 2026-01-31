@@ -76,56 +76,6 @@ Options:
 ❯ bb-imager-cli flash --quiet bcf $IMG_PATH /dev/ttyACM0
 ```
 
-# Testing
-
-BeagleBoard Imager includes comprehensive testing for all flashing workflows.
-
-## Unit Tests
-
-Run unit tests for all workspace crates:
-
-```bash
-make test
-# Or directly:
-cargo test --workspace
-```
-
-## End-to-End Style Integration Tests
-
-E2E-style tests validate complete flashing workflows across all platforms (Linux, Windows, macOS) using standard Rust integration tests under `tests/e2e`.
-
-### Run all E2E-style tests
-
-```bash
-make test-e2e
-# Or directly (runs all e2e::* tests):
-cargo test --tests -- --test-threads=1 e2e::
-```
-
-### Run flasher-specific tests
-
-```bash
-# SD card flashing tests
-make test-e2e-sd
-# Or: cargo test --tests -- --test-threads=1 e2e::sd
-
-# BCF flashing tests
-make test-e2e-bcf
-# Or: cargo test --tests -- --test-threads=1 e2e::bcf
-
-# DFU flashing tests
-make test-e2e-dfu
-# Or: cargo test --tests -- --test-threads=1 e2e::dfu
-```
-
-### Run tests in serial (recommended for device-related tests)
-
-```bash
-cargo test --tests -- --test-threads=1 e2e::
-```
-
-For detailed E2E testing documentation, see [docs/E2E_TESTING.md](docs/E2E_TESTING.md).
-
 # Creating Issues
 
 While creating new issues for bugs, please attach logs from the application. Log files are created automatically by the GUI from v0.0.12.
