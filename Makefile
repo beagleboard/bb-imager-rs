@@ -91,25 +91,25 @@ test:
 .PHONY: test-e2e
 test-e2e:
 	$(info "Run E2E-style integration tests")
-	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::
+	$(CARGO_PATH) test -p bb-flasher --tests -- --test-threads=1
 
 ## housekeeping: test-e2e-sd: Run E2E-style tests for SD card flashing
 .PHONY: test-e2e-sd
 test-e2e-sd:
 	$(info "Run SD card E2E-style tests")
-	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::sd
+	$(CARGO_PATH) test -p bb-flasher --test e2e_sd --features sd -- --test-threads=1
 
 ## housekeeping: test-e2e-bcf: Run E2E-style tests for BCF flashing
 .PHONY: test-e2e-bcf
 test-e2e-bcf:
 	$(info "Run BCF E2E-style tests")
-	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::bcf
+	$(CARGO_PATH) test -p bb-flasher --tests --features bcf -- --test-threads=1
 
 ## housekeeping: test-e2e-dfu: Run E2E-style tests for DFU flashing
 .PHONY: test-e2e-dfu
 test-e2e-dfu:
 	$(info "Run DFU E2E-style tests")
-	$(CARGO_PATH) test --tests -- --test-threads=1 e2e::dfu
+	$(CARGO_PATH) test -p bb-flasher --tests --features dfu -- --test-threads=1
 
 ## build: build-gui: Build GUI. Target platform can be changed using TARGET env variable.
 .PHONY: build-gui
