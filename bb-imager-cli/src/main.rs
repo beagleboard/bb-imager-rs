@@ -127,6 +127,47 @@ async fn flash_internal(
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
+            #[cfg(target_os = "macos")]
+            let dst = if dst.to_string_lossy().starts_with("/dev/disk")
+                && !dst.to_string_lossy().starts_with("/dev/rdisk")
+            {
+                let rdisk = dst.to_string_lossy().replace("/dev/disk", "/dev/rdisk");
+                if std::path::Path::new(&rdisk).exists() {
+                    let term = console::Term::stderr();
+                    let _ = term.write_line(&format!(
+                        "{} You are using a buffered device path: {}\n\
+                         {} For significantly faster flashing, use the raw device path: {}\n",
+                        console::style("Warning:").yellow().bold(),
+                        dst.display(),
+                        console::style("Tip:").green().bold(),
+                        rdisk
+                    ));
+
+                    let _ = term.write_str(&format!(
+                        "Do you want to switch to {}? [Y/n] ",
+                        console::style(&rdisk).bold()
+                    ));
+
+                    // Simple stdin read since we don't have dialoguer
+                    let mut input = String::new();
+                    if std::io::stdin().read_line(&mut input).is_ok() {
+                        let input = input.trim().to_lowercase();
+                        if input.is_empty() || input == "y" || input == "yes" {
+                            let _ = term.write_line(&format!("Switching to {}\n", rdisk));
+                            PathBuf::from(rdisk)
+                        } else {
+                            dst
+                        }
+                    } else {
+                        dst
+                    }
+                } else {
+                    dst
+                }
+            } else {
+                dst
+            };
+
             let customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
                 hostname,
                 timezone,

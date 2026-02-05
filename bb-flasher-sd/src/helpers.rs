@@ -140,7 +140,7 @@ where
     }
 }
 
-#[repr(align(512))]
+#[repr(align(4096))]
 #[derive(Debug)]
 pub(crate) struct DirectIoBuffer<const N: usize>([u8; N]);
 
