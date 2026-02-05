@@ -312,7 +312,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
         }
         BBImagerMessage::ResetCustomization => {
-            state.customization = Some(state.customization.clone().unwrap().reset());
+            if let Some(customization) = state.customization.clone() {
+                state.customization = Some(customization.reset());
+            }
         }
         BBImagerMessage::CancelCustomization => {
             state.screen.pop();
