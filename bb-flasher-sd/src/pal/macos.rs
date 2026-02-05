@@ -1,4 +1,4 @@
-use std::{fs::File, path::Path};
+use std::{fs::File, path::{Path, PathBuf}};
 
 use crate::{Error, Result};
 
@@ -11,7 +11,7 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 }
 
 #[cfg(not(feature = "macos_authopen"))]
-pub(crate) async fn open(dst: &Path) -> Result<File> {
+pub(crate) async fn open(dst: &Path) -> Result<MacOsDrive> {
     let f = tokio::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -22,12 +22,15 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
         .into_std()
         .await;
 
-    Ok(f)
+    Ok(MacOsDrive {
+        file: f,
+        drive: dst.to_path_buf(),
+    })
 }
 
 #[cfg(feature = "macos_authopen")]
-pub(crate) async fn open(dst: &Path) -> Result<File> {
-    fn inner(dst: std::path::PathBuf) -> anyhow::Result<File> {
+pub(crate) async fn open(dst: &Path) -> Result<MacOsDrive> {
+    fn inner(dst: std::path::PathBuf) -> anyhow::Result<(File, PathBuf)> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
         use security_framework::authorization::{
@@ -98,7 +101,7 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
                     if let ControlMessageOwned::ScmRights(scm_rights) = msg {
                         if let Some(fd) = scm_rights.into_iter().next() {
                             tracing::debug!("receive file descriptor");
-                            return Ok(unsafe { File::from_raw_fd(fd) });
+                            return Ok((unsafe { File::from_raw_fd(fd) }, dst.clone()));
                         }
                     }
                 }
@@ -115,16 +118,58 @@ pub(crate) async fn open(dst: &Path) -> Result<File> {
 
     let p = dst.to_owned();
     // TODO: Make this into a real async function
-    tokio::task::spawn_blocking(move || inner(p))
+    let (file, drive) = tokio::task::spawn_blocking(move || inner(p))
         .await
         .unwrap()
-        .map_err(|e| Error::FailedToOpenDestination { source: e })
+        .map_err(|e| Error::FailedToOpenDestination { source: e })?;
+    
+    Ok(MacOsDrive { file, drive })
 }
 
-/// TODO: Implement real eject
-impl crate::helpers::Eject for std::fs::File {
+#[derive(Debug)]
+pub(crate) struct MacOsDrive {
+    file: File,
+    drive: PathBuf,
+}
+
+impl crate::helpers::Eject for MacOsDrive {
     fn eject(self) -> std::io::Result<()> {
-        let _ = self.sync_all();
-        Ok(())
+        let _ = self.file.sync_all();
+        let drive = self.drive.clone();
+        std::mem::drop(self);
+
+        let output = std::process::Command::new("diskutil")
+            .args(["eject", drive.to_str().unwrap()])
+            .output()?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(
+                String::from_utf8(output.stderr).unwrap_or_else(|_| "Failed to eject".to_string()),
+            ))
+        }
+    }
+}
+
+impl std::io::Read for MacOsDrive {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.file.read(buf)
+    }
+}
+
+impl std::io::Seek for MacOsDrive {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.file.seek(pos)
+    }
+}
+
+impl std::io::Write for MacOsDrive {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.file.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush()
     }
 }
