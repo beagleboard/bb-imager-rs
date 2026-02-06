@@ -8,6 +8,7 @@
 			"https://raw.githubusercontent.com/FalconChristmas/fpp/refs/heads/master/rpi-imager/rpi-imager_falcon_player.json",
 			"https://github.com/beagleboard/microblocks-zephyr/releases/download/os-list/os_list.json",
 			"https://github.com/beagleboard/mspm0-adc-eeprom/releases/download/os-list/os_list.json",
+			"https://raw.githubusercontent.com/BelaPlatform/bela-distros/refs/heads/main/os_list.json",
 			"https://github.com/beagleboard/bb-zephyr-images/releases/download/continuous-release/os_list.json"
 		],
 		"devices": [
