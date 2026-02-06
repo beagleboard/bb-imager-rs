@@ -31,7 +31,12 @@ bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 
 [dev-dependencies]
+# Keep in sync with workspace tokio; needed for #[tokio::test] in integration tests
 tokio = { version = "1.49", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
+
+# Used by integration test helpers
+uuid = { version = "1", features = ["v4"] }
+tempfile = "3"
 
 [features]
 default = ["sd"]
