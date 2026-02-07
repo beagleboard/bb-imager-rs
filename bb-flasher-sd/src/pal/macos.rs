@@ -59,12 +59,10 @@ impl crate::helpers::Eject for MacOSFile {
 
 pub(crate) async fn format(dst: &Path) -> Result<()> {
     let sd = open(dst).await?;
-    tokio::task::spawn_blocking(move || {
-        fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default())
-    })
-    .await
-    .unwrap()
-    .map_err(|source| Error::FailedToFormat { source })
+    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
+        .await
+        .unwrap()
+        .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[cfg(not(feature = "macos_authopen"))]
