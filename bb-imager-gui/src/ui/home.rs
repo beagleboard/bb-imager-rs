@@ -3,7 +3,7 @@ use iced::{
     widget::{self, text},
 };
 
-use crate::{BBImagerMessage, constants, helpers, pages::ImageSelectionState};
+use crate::{BBImagerMessage, constants, helpers};
 
 use super::helpers::home_btn_text;
 use crate::pages::Screen;
@@ -21,20 +21,14 @@ pub(crate) fn view<'a>(
             None => home_btn_text("CHOOSE DEVICE", true, iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press(BBImagerMessage::PushScreen(Screen::BoardSelection(
-            Default::default(),
-        )));
+        .on_press(BBImagerMessage::JumpToStep(0));
 
         let choose_image_btn = match selected_image {
             Some(x) => home_btn_text(x.to_string(), true, iced::Length::Fill),
             None => home_btn_text("CHOOSE IMAGE", selected_board.is_some(), iced::Length::Fill),
         }
         .width(iced::Length::Fill)
-        .on_press_maybe(selected_board.map(|board| {
-            BBImagerMessage::PushScreen(Screen::ImageSelection(ImageSelectionState::new(
-                board.flasher,
-            )))
-        }));
+        .on_press_maybe(selected_board.map(|_board| BBImagerMessage::JumpToStep(1)));
 
         let choose_dst_btn = match selected_dst {
             Some(x) => {
@@ -53,9 +47,7 @@ pub(crate) fn view<'a>(
         .on_press_maybe(if selected_image.is_none() || !destination_selectable {
             None
         } else {
-            Some(BBImagerMessage::PushScreen(Screen::DestinationSelection(
-                Default::default(),
-            )))
+            Some(BBImagerMessage::JumpToStep(2))
         });
 
         let reset_btn = home_btn_text("RESET", true, iced::Length::Fill)
