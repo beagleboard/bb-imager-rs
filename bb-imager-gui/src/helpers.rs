@@ -386,11 +386,10 @@ pub(crate) fn system_keymap() -> String {
 
         parts.next();
         if let Some(region) = parts.next() {
-            let region = region.split('@').next().unwrap_or(region).trim();
-            if !region.is_empty()
-                && let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
-                    .iter()
-                    .find(|k| k.eq_ignore_ascii_case(region))
+            // Keep this stable (no let-chains like `&& let Some(...) = ...`).
+            if let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
+                .iter()
+                .find(|k| k.eq_ignore_ascii_case(region))
             {
                 return Some(canon.to_string());
             }

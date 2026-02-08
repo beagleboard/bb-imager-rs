@@ -209,10 +209,11 @@ pub async fn flash<R: Read + Send + 'static>(
     customization: Option<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
-    if let Some(x) = &customization
-        && !x.validate()
-    {
-        return Err(crate::Error::InvalidCustomizaton);
+    // Keep this stable (no let-chains / nightly-only helpers).
+    if let Some(x) = customization.as_ref() {
+        if !x.validate() {
+            return Err(crate::Error::InvalidCustomizaton);
+        }
     }
 
     tracing::info!("Opening Destination");
