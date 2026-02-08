@@ -32,6 +32,7 @@ pub struct Target {
 
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["hex", "txt", "xz"];
+    const IS_DESTINATION_SELECTABLE: bool = false;
 
     async fn destinations() -> HashSet<Self> {
         let temp = destinations().await;
@@ -39,10 +40,6 @@ impl BBFlasherTarget for Target {
             name: temp.0,
             path: temp.1,
         }])
-    }
-
-    fn is_destination_selectable() -> bool {
-        false
     }
 
     fn identifier(&self) -> Cow<'_, str> {

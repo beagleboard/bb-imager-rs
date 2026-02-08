@@ -1,67 +1,50 @@
-use iced::{Element, widget};
+use iced::{
+    Element,
+    widget::{self, button},
+};
 
-use crate::{BBImagerMessage, Screen, constants, pages::FlashingState};
+use crate::{
+    BBImagerMessage, FlashingState, constants,
+    ui::helpers::{self, ProgressCircle, detail_entry, page_type1},
+};
 
-use super::helpers::home_btn_text;
-
-pub(crate) fn view(state: &FlashingState, running: bool) -> Element<'_, BBImagerMessage> {
-    widget::responsive(move |size| {
-        const FOOTER_HEIGHT: f32 = 150.0;
-        let banner_height = size.height / 4.0;
-
-        let prog_bar = state.progress().bar().spacing(12);
-
-        let btn = if running {
-            home_btn_text("CANCEL", true, iced::Length::Shrink)
-                .on_press(BBImagerMessage::CancelFlashing)
-        } else {
-            home_btn_text("HOME", true, iced::Length::Shrink)
-                .on_press(BBImagerMessage::SwitchScreen(Screen::Home))
-        };
-
-        let bottom = widget::container(
-            widget::column![
-                about(state.documentation()).height(size.height - FOOTER_HEIGHT - banner_height),
-                btn,
-                prog_bar
-            ]
-            .padding(16)
-            .spacing(12)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .align_x(iced::Alignment::Center),
-        )
-        .style(|_| widget::container::background(constants::BEAGLE_BRAND_COLOR));
-
-        widget::column![
-            widget::container(
-                widget::image(widget::image::Handle::from_bytes(constants::BB_BANNER))
-                    .width(size.width * 0.45)
-                    .height(banner_height),
-            )
-            .padding(iced::Padding::new(0.0).left(40))
-            .width(iced::Length::Fill),
-            bottom
-        ]
-        .spacing(10)
-        .width(iced::Length::Fill)
-        .height(iced::Length::Fill)
-        .align_x(iced::Alignment::Center)
-        .into()
-    })
-    .into()
+pub(crate) fn view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
+    page_type1(
+        &state.common,
+        info_view(state),
+        progress_view(state),
+        [button("Cancel")
+            .style(widget::button::danger)
+            .on_press(BBImagerMessage::FlashCancel)],
+    )
 }
 
-fn about(documentation: &str) -> widget::Scrollable<'_, BBImagerMessage> {
-    widget::scrollable(widget::rich_text![
-        widget::span(constants::BEAGLE_BOARD_ABOUT)
-            .link(BBImagerMessage::OpenUrl(
-                "https://www.beagleboard.org/about".into()
-            ))
-            .color(iced::Color::WHITE),
-        widget::span("\n\n"),
-        widget::span("For more information, check out our documentation")
-            .link(BBImagerMessage::OpenUrl(documentation.to_string().into()))
-            .color(iced::Color::WHITE)
-    ])
+pub(crate) fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
+    let (prog, label) = match state.progress {
+        bb_flasher::DownloadFlashingStatus::Preparing => (0.0, "Preparing ..."),
+        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => (x, "Downloading ..."),
+        bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => (x, "Flashing Image ..."),
+        bb_flasher::DownloadFlashingStatus::Verifying => (0.99, "Verifying ..."),
+        bb_flasher::DownloadFlashingStatus::Customizing => (0.99, "Customizing ..."),
+    };
+
+    let progress = ProgressCircle::new(prog, 10.0, constants::TONGUE_ORANGE);
+
+    let col = widget::column![progress, widget::text(label)]
+        .align_x(iced::Center)
+        .padding(16);
+
+    let col = match state.time_remaining() {
+        Some(x) => col.push(detail_entry(
+            "Time Remaining",
+            crate::helpers::pretty_duration(x),
+        )),
+        None => col,
+    };
+
+    col.into()
+}
+
+pub(crate) fn info_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
+    helpers::board_view_pane(state.selected_board(), &state.common)
 }

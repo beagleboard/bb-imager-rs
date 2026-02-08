@@ -1,6 +1,7 @@
 use iced::color;
 
-pub(crate) const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/beagleboard/bb-imager-rs/releases/latest";
+pub(crate) const LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/beagleboard/bb-imager-rs/releases/latest";
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
@@ -14,37 +15,68 @@ pub(crate) const APP_RELEASE: &str = if option_env!("PRE_RELEASE").is_some() {
     env!("CARGO_PKG_VERSION")
 };
 pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
-pub(crate) const APP_WEBSITE: &str = "https://www.beagleboard.org/bb-imager";
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 // Icons
 pub(crate) const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
-pub(crate) const BB_BANNER: &[u8] = include_bytes!("../assets/icons/bb-banner.png");
 pub(crate) const ARROW_BACK_ICON: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
 pub(crate) const DOWNLOADING_ICON: &[u8] = include_bytes!("../assets/icons/downloading.svg");
 pub(crate) const FILE_ADD_ICON: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub(crate) const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
-pub(crate) const SETTINGS_ICON: &[u8] = include_bytes!("../assets/icons/settings.svg");
 pub(crate) const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
 pub(crate) const ARROW_FORWARD_IOS_ICON: &[u8] =
     include_bytes!("../assets/icons/arrow-forward-ios.svg");
-pub(crate) const REFRESH: &[u8] = include_bytes!("../assets/icons/refresh.svg");
 pub(crate) const FILE_SAVE_ICON: &[u8] = include_bytes!("../assets/icons/file-save.svg");
+pub(crate) const INFO_ICON: &[u8] = include_bytes!("../assets/icons/info.svg");
 
 // Font
-pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Roboto");
+pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");
 pub(crate) const FONT_BOLD: iced::Font = {
     let mut font = FONT_REGULAR;
     font.weight = iced::font::Weight::Bold;
 
     font
 };
-pub(crate) const FONT_REGULAR_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Regular.ttf");
-pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Roboto-Bold.ttf");
+
+// Base Fonts
+pub(crate) const FONT_EXTRA_LIGHT_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-ExtraLight.ttf");
+pub(crate) const FONT_LIGHT_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Light.ttf");
+pub(crate) const FONT_NORMAL_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Regular.ttf");
+pub(crate) const FONT_MEDIUM_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Medium.ttf");
+pub(crate) const FONT_SEMI_BOLD_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-SemiBold.ttf");
+pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold.ttf");
+pub(crate) const FONT_EXTRA_BOLD_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-ExtraBold.ttf");
+pub(crate) const FONT_BLACK_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Black.ttf");
+
+// Italic Fonts
+pub(crate) const FONT_EXTRA_LIGHT_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-ExtraLightItalic.ttf");
+pub(crate) const FONT_LIGHT_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-LightItalic.ttf");
+pub(crate) const FONT_NORMAL_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-Italic.ttf");
+pub(crate) const FONT_MEDIUM_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-MediumItalic.ttf");
+pub(crate) const FONT_SEMI_BOLD_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-SemiBoldItalic.ttf");
+pub(crate) const FONT_BOLD_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-BoldItalic.ttf");
+pub(crate) const FONT_EXTRA_BOLD_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-ExtraBoldItalic.ttf");
+pub(crate) const FONT_BLACK_ITALIC_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-BlackItalic.ttf");
 
 // Theme
-pub(crate) const BEAGLE_BRAND_COLOR: iced::Color = color!(170, 81, 55);
+pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
+pub(crate) const CHECK_MARK_GREEN: iced::Color = color!(142, 201, 105);
+pub(crate) const HAIR_LIGHT_BROWN: iced::Color = color!(171, 131, 60);
+pub(crate) const BACKGROUND: iced::Color = color!(30, 30, 30);
+pub(crate) const CARD: iced::Color = color!(45, 45, 45);
+pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",

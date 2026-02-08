@@ -51,7 +51,12 @@ impl Device {
             self.vendor.as_deref().unwrap_or_default(),
             self.model.as_deref().unwrap_or_default(),
         ]
-        .join(" ")
+        .into_iter()
+        .filter(|x| !x.is_empty())
+        .fold(String::new(), |mut acc, x| {
+            acc.push_str(x);
+            acc
+        })
     }
 
     fn is_virtual(&self) -> bool {

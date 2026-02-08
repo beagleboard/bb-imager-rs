@@ -1,79 +1,69 @@
-use bb_config::config;
 use iced::{
     Element,
-    widget::{self, button, text},
+    widget::{self, button, column, row, text},
 };
 
-use crate::{BBImagerMessage, constants, pages};
+use crate::{
+    BBImagerMessage,
+    ui::helpers::{self, svg_icon_style},
+};
+use crate::{
+    constants,
+    ui::helpers::{card_btn_style, page_type1},
+};
 
-use super::helpers::search_bar;
+const ICON_WIDTH: u32 = 100;
 
-pub(crate) fn view<'a>(
-    devices: impl Iterator<Item = (usize, &'a config::Device)>,
-    search_str: &'a str,
-    downloader: &'a bb_downloader::Downloader,
-) -> Element<'a, BBImagerMessage> {
-    let items = devices
-        .filter(|(_, x)| x.name.to_lowercase().contains(&search_str.to_lowercase()))
+pub(crate) fn view<'a>(state: &'a crate::ChooseBoardState) -> Element<'a, BBImagerMessage> {
+    page_type1(
+        &state.common,
+        board_list_pane(state),
+        board_view_pane(state),
+        [widget::button("NEXT")
+            .on_press_maybe(state.selected_board.map(|_| BBImagerMessage::Next))],
+    )
+}
+
+fn board_list_pane<'a>(state: &'a crate::ChooseBoardState) -> Element<'a, BBImagerMessage> {
+    let items = state
+        .devices()
         .map(|(id, dev)| {
-            let image: Element<BBImagerMessage> = match &dev.icon {
-                Some(url) => match downloader.clone().check_cache_from_url(url.clone()) {
-                    Some(y) => img_or_svg(y, 100),
-                    None => widget::svg(widget::svg::Handle::from_memory(
-                        constants::DOWNLOADING_ICON,
-                    ))
-                    .width(100)
-                    .into(),
+            let is_selected = state.selected_board.map(|x| x == id).unwrap_or(false);
+            let img: Element<BBImagerMessage> = match &dev.icon {
+                Some(u) => match state.image_handle_cache().get(u) {
+                    Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
+                    _ => widget::svg(state.downloading_svg().clone())
+                        .width(ICON_WIDTH)
+                        .style(svg_icon_style)
+                        .into(),
                 },
-                None => widget::svg(widget::svg::Handle::from_memory(constants::BOARD_ICON))
-                    .width(100)
-                    .height(60)
+                None => widget::svg(state.board_svg().clone())
+                    .width(ICON_WIDTH)
+                    .style(svg_icon_style)
                     .into(),
             };
-
             button(
-                widget::row![
-                    image,
-                    widget::column![
-                        text(&dev.name).size(18),
-                        widget::horizontal_space(),
-                        text(dev.description.as_str())
-                    ]
-                    .padding(5)
-                ]
-                .align_y(iced::Alignment::Center)
-                .spacing(10),
+                row![img, text(&dev.name).size(18).width(iced::Length::Fill)]
+                    .spacing(12)
+                    .padding(8)
+                    .align_y(iced::alignment::Vertical::Center),
             )
-            .width(iced::Length::Fill)
             .on_press(BBImagerMessage::SelectBoard(id))
-            .style(widget::button::secondary)
+            .style(move |theme, status| card_btn_style(theme, status, is_selected))
         })
         .map(Into::into);
 
-    widget::column![
-        search_bar(search_str, |x| BBImagerMessage::ReplaceScreen(
-            pages::Screen::BoardSelection(pages::SearchState::new(x))
-        )),
-        widget::horizontal_rule(2),
-        widget::scrollable(widget::column(items).spacing(10))
-    ]
-    .spacing(10)
-    .padding(10)
-    .into()
+    widget::scrollable(column(items).padding(iced::Padding::ZERO.right(12))).into()
 }
 
-pub(crate) fn img_or_svg<'a>(path: std::path::PathBuf, width: u16) -> Element<'a, BBImagerMessage> {
-    let img = std::fs::read(path).expect("Failed to open image");
-
-    match image::guess_format(&img) {
-        Ok(_) => widget::image(widget::image::Handle::from_bytes(img))
-            .width(width)
-            .height(width)
-            .into(),
-
-        Err(_) => widget::svg(widget::svg::Handle::from_memory(img))
-            .width(width)
-            .height(width)
-            .into(),
+fn board_view_pane<'a>(state: &'a crate::ChooseBoardState) -> Element<'a, BBImagerMessage> {
+    match state.selected_board() {
+        Some(dev) => helpers::board_view_pane(dev, &state.common),
+        None => widget::center(
+            text("Please Select a Board")
+                .font(constants::FONT_BOLD)
+                .size(28),
+        )
+        .into(),
     }
 }

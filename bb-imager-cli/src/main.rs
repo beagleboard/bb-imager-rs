@@ -56,16 +56,11 @@ async fn flash(target: TargetCommands, quite: bool) {
                     | (
                         DownloadFlashingStatus::FlashingProgress(p),
                         DownloadFlashingStatus::FlashingProgress(_),
-                    )
-                    | (
-                        DownloadFlashingStatus::VerifyingProgress(p),
-                        DownloadFlashingStatus::VerifyingProgress(_),
                     ) => {
                         last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
                     }
                     // Create new bar when stage has changed
                     (DownloadFlashingStatus::DownloadingProgress(p), _)
-                    | (DownloadFlashingStatus::VerifyingProgress(p), _)
                     | (DownloadFlashingStatus::FlashingProgress(p), _) => {
                         if let Some(b) = last_bar.take() {
                             b.finish();
@@ -461,9 +456,7 @@ const fn progress_msg(status: DownloadFlashingStatus) -> &'static str {
         DownloadFlashingStatus::Preparing => "Preparing  ",
         DownloadFlashingStatus::DownloadingProgress(_) => "Downloading",
         DownloadFlashingStatus::FlashingProgress(_) => "Flashing",
-        DownloadFlashingStatus::Verifying | DownloadFlashingStatus::VerifyingProgress(_) => {
-            "Verifying"
-        }
+        DownloadFlashingStatus::Verifying => "Verifying",
         DownloadFlashingStatus::Customizing => "Customizing",
     }
 }

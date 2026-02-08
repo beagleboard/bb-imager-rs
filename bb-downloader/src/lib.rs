@@ -126,7 +126,7 @@ impl Downloader {
     /// of the file to download is already known.
     pub fn check_cache_from_url<U: reqwest::IntoUrl>(&self, url: U) -> Option<PathBuf> {
         // Use hash of url for file name
-        let file_path = self.path_from_url(url.as_str());
+        let file_path = self.path_from_url(&url.into_url().ok()?);
         if file_path.exists() {
             Some(file_path)
         } else {
@@ -196,7 +196,7 @@ impl Downloader {
     ) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
-        let file_path = self.path_from_url(url.as_str());
+        let file_path = self.path_from_url(&url);
         chan_send(chan.as_mut(), 0.0);
 
         let mut cur_pos = 0;
@@ -380,14 +380,15 @@ impl Downloader {
         Ok(file_path)
     }
 
-    fn path_from_url(&self, url: &str) -> PathBuf {
+    fn path_from_url(&self, url: &reqwest::Url) -> PathBuf {
+        let fext = Path::new(url.path()).extension().expect("Invalid URL");
         let file_name: [u8; 32] = Sha256::new()
-            .chain_update(url)
+            .chain_update(url.as_str())
             .finalize()
             .as_slice()
             .try_into()
             .expect("SHA-256 is 32 bytes");
-        self.path_from_sha(file_name)
+        self.path_from_sha(file_name).with_extension(fext)
     }
 
     fn path_from_sha(&self, sha256: [u8; 32]) -> PathBuf {

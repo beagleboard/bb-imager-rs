@@ -46,10 +46,6 @@ impl BBFlasherTarget for Target {
         Self::destinations_internal().await
     }
 
-    fn is_destination_selectable() -> bool {
-        true
-    }
-
     fn identifier(&self) -> Cow<'_, str> {
         Cow::Owned(format!(
             "{:02x}:{:02x}:{:04x}:{:04x}",

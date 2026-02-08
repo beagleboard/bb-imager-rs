@@ -6,374 +6,52 @@ use iced::{
 use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
-    pages::ConfigurationId,
-    persistance::SdSysconfCustomization,
+    persistance,
+    ui::helpers::{element_with_element, element_with_label, page_type2},
 };
 
-use super::helpers::home_btn_text;
+const INPUT_WIDTH: u32 = 200;
 
-pub(crate) fn view<'a>(
-    app_settings: crate::persistance::AppSettings,
-    customization: Option<&'a FlashingCustomization>,
-    timezones: &'a widget::combo_box::State<String>,
-    keymaps: &'a widget::combo_box::State<String>,
-    page_id: ConfigurationId,
-) -> Element<'a, BBImagerMessage> {
-    widget::container(
-        iced_aw::Tabs::new_with_tabs(
-            [
-                (
-                    ConfigurationId::Customization,
-                    iced_aw::TabLabel::Text(String::from("Customization")),
-                    customization_page(customization, timezones, keymaps),
-                ),
-                (
-                    ConfigurationId::Settings,
-                    iced_aw::TabLabel::Text(String::from("Settings")),
-                    global_settings(app_settings),
-                ),
-                (
-                    ConfigurationId::About,
-                    iced_aw::TabLabel::Text(String::from("About")),
-                    about_page(),
-                ),
-            ],
-            |x| BBImagerMessage::ReplaceScreen(crate::Screen::ExtraConfiguration(x)),
-        )
-        .set_active_tab(&page_id),
+pub(crate) fn view<'a>(state: &'a crate::CustomizeState) -> Element<'a, BBImagerMessage> {
+    page_type2(
+        &state.common,
+        customization_pane(state),
+        [
+            widget::button("BACK")
+                .on_press(BBImagerMessage::Back)
+                .style(widget::button::secondary),
+            widget::button("NEXT").on_press(BBImagerMessage::Next),
+        ],
     )
-    .padding(10)
-    .height(iced::Length::Fill)
-    .into()
 }
 
-fn about_page() -> Element<'static, BBImagerMessage> {
-    widget::responsive(move |size| {
-        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
-
-        let mid_el = widget::column![
-            widget::image(widget::image::Handle::from_bytes(
-                crate::constants::WINDOW_ICON
-            )),
-            crate::constants::APP_NAME,
-            crate::constants::APP_RELEASE,
-            crate::constants::APP_DESC,
-            widget::button(text("Website").style(|_| widget::text::Style {
-                color: Some(iced::Color::from_rgb(0.0, 0.0, 1.0))
-            }))
-            .style(widget::button::text)
-            .on_press(BBImagerMessage::OpenUrl(
-                crate::constants::APP_WEBSITE.into()
-            )),
-            widget::container(crate::constants::APP_LINCESE)
-                .style(widget::container::bordered_box)
-                .padding(10)
-        ]
-        .spacing(2)
-        .align_x(iced::Center);
-
-        widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
-            widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
-            home_btn_text("BACK", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::CancelCustomization),
-        ]
-        .spacing(10)
-        .height(iced::Length::Fill)
-        .width(iced::Length::Fill)
-        .align_x(iced::Alignment::Center)
-        .into()
-    })
-    .into()
+fn customization_pane<'a>(state: &'a crate::CustomizeState) -> Element<'a, BBImagerMessage> {
+    match state.customization() {
+        FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card(state, inner),
+        FlashingCustomization::Bcf(inner) => bcf(inner),
+        _ => panic!("No customization"),
+    }
 }
 
-fn global_settings(
-    app_settings: crate::persistance::AppSettings,
-) -> Element<'static, BBImagerMessage> {
-    widget::responsive(move |size| {
-        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
-
-        let log_file_p = helpers::log_file_path().to_string_lossy().to_string();
-        let mid_el = widget::column![
-            widget::container(
-                widget::toggler(app_settings.skip_confirmation == Some(true))
-                    .label("Disable confirmation dialog")
-                    .on_toggle(move |t| BBImagerMessage::UpdateSettings(
-                        app_settings.update_skip_confirmation(Some(t))
-                    ))
-            )
-            .width(iced::Length::Fill)
-            .padding(10)
-            .style(widget::container::bordered_box),
-            widget::container(element_with_label(
-                "Log File",
-                widget::text_input(&log_file_p, &log_file_p)
-                    .on_input(|_| BBImagerMessage::Null)
-                    .into()
-            ))
-            .style(widget::container::bordered_box)
-        ]
-        .spacing(5);
-
-        widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
-            widget::scrollable(mid_el).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
-            home_btn_text("BACK", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::CancelCustomization),
-        ]
-        .spacing(10)
-        .height(iced::Length::Fill)
-        .width(iced::Length::Fill)
-        .into()
-    })
-    .into()
-}
-
-fn customization_page<'a>(
-    customization: Option<&'a FlashingCustomization>,
-    timezones: &'a widget::combo_box::State<String>,
-    keymaps: &'a widget::combo_box::State<String>,
-) -> Element<'a, BBImagerMessage> {
-    widget::responsive(move |size| {
-        const HEADER_FOOTER_HEIGHT: f32 = 90.0;
-
-        let action_btn_row = widget::row![
-            home_btn_text("RESET", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::ResetCustomization),
-            widget::horizontal_space().width(iced::Length::FillPortion(3)),
-            home_btn_text("ABORT", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press(BBImagerMessage::CancelCustomization),
-            widget::horizontal_space().width(iced::Length::FillPortion(3)),
-            home_btn_text("SAVE", true, iced::Length::Fill)
-                .style(widget::button::secondary)
-                .width(iced::Length::FillPortion(1))
-                .on_press_maybe({
-                    match customization {
-                        Some(customization) if customization.validate() => {
-                            Some(BBImagerMessage::SaveCustomization)
-                        }
-                        _ => None,
-                    }
-                }),
-        ]
-        .padding(4)
-        .width(iced::Length::Fill);
-
-        let form = match customization {
-            Some(customization) => match customization {
-                FlashingCustomization::LinuxSdSysconfig(x) => linux_sd_form(timezones, keymaps, x),
-                FlashingCustomization::Bcf(x) => widget::column![
-                    widget::toggler(!x.verify)
-                        .label("Skip Verification")
-                        .on_toggle(move |y| {
-                            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Bcf(
-                                x.clone().update_verify(!y),
-                            ))
-                        })
-                ],
-                #[cfg(feature = "pb2_mspm0")]
-                FlashingCustomization::Pb2Mspm0(x) => {
-                    widget::column![
-                        widget::toggler(x.persist_eeprom)
-                            .label("Persist EEPROM")
-                            .on_toggle(move |y| {
-                                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0(
-                                    x.clone().update_persist_eeprom(y),
-                                ))
-                            })
-                    ]
-                }
-                _ => widget::column([]),
-            },
-            _ => widget::column([]),
-        }
-        .spacing(5);
-
-        widget::column![
-            widget::vertical_space().height(2),
-            widget::horizontal_rule(2),
-            widget::scrollable(form).height(size.height - HEADER_FOOTER_HEIGHT),
-            widget::horizontal_rule(2),
-            action_btn_row,
-        ]
-        .spacing(10)
-        .height(iced::Length::Fill)
-        .width(iced::Length::Fill)
-        .align_x(iced::Alignment::Center)
-        .into()
-    })
-    .into()
-}
-
-fn linux_sd_form<'a>(
-    timezones: &'a widget::combo_box::State<String>,
-    keymaps: &'a widget::combo_box::State<String>,
-    config: &'a SdSysconfCustomization,
-) -> widget::Column<'a, BBImagerMessage> {
-    widget::column![
-        hostname_form(config).width(iced::Length::Fill),
-        timezone_form(timezones, config).width(iced::Length::Fill),
-        keymap_form(keymaps, config).width(iced::Length::Fill),
-        uname_pass_form(config).width(iced::Length::Fill),
-        wifi_form(config).width(iced::Length::Fill),
-        ssh_form(config).width(iced::Length::Fill),
-        usb_enable_dhcp_form(config)
-    ]
-}
-
-fn usb_enable_dhcp_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
-    let form = widget::toggler(config.usb_enable_dhcp == Some(true))
-        .label("Enable USB DHCP")
+fn bcf<'a>(state: &'a persistance::BcfCustomization) -> Element<'a, BBImagerMessage> {
+    widget::toggler(!state.verify)
+        .label("Skip Verification")
         .on_toggle(|x| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                config.clone().update_usb_enable_dhcp(Some(x)),
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Bcf(
+                state.clone().update_verify(!x),
             ))
         })
-        .width(iced::Length::Fill);
-
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
+        .into()
 }
 
-fn ssh_form<'a>(config: &'a SdSysconfCustomization) -> widget::Container<'a, BBImagerMessage> {
-    let form = widget::column![
-        widget::text("SSH authorization public key"),
-        widget::text_input("authorized key", config.ssh.as_deref().unwrap_or("")).on_input(|x| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                config
-                    .clone()
-                    .update_ssh(if x.is_empty() { None } else { Some(x) }),
-            ))
-        })
-    ]
-    .spacing(6);
+fn linux_sd_card<'a>(
+    state: &'a crate::CustomizeState,
+    config: &'a persistance::SdSysconfCustomization,
+) -> Element<'a, BBImagerMessage> {
+    let col = widget::column([]);
 
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
-}
-
-fn keymap_form<'a>(
-    keymaps: &'a widget::combo_box::State<String>,
-    config: &'a SdSysconfCustomization,
-) -> widget::Container<'a, BBImagerMessage> {
-    let mut form = widget::row![
-        widget::toggler(config.keymap.is_some())
-            .label("Set Keymap")
-            .on_toggle(|t| {
-                let keymap = if t {
-                    Some(helpers::system_keymap())
-                } else {
-                    None
-                };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_keymap(keymap),
-                ))
-            }),
-        widget::horizontal_space()
-    ];
-
-    if let Some(keymap) = &config.keymap {
-        let xc = config.clone();
-
-        let keymap_box = widget::combo_box(keymaps, "Keymap", Some(&keymap.to_owned()), move |t| {
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                xc.clone().update_keymap(Some(t)),
-            ))
-        })
-        .width(200);
-        form = form.push(keymap_box);
-    }
-
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
-}
-
-fn hostname_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
-    let mut form = widget::row![
-        widget::toggler(config.hostname.is_some())
-            .label("Set Hostname")
-            .on_toggle(|t| {
-                let hostname = if t {
-                    whoami::hostname().ok()
-                } else {
-                    None
-                };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_hostname(hostname),
-                ))
-            }),
-        widget::horizontal_space()
-    ];
-
-    if let Some(hostname) = config.hostname.as_ref() {
-        let xc = config.clone();
-
-        let hostname_box = widget::text_input("beagle", hostname)
-            .on_input(move |inp| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    xc.clone().update_hostname(Some(inp)),
-                ))
-            })
-            .width(200);
-        form = form.push(hostname_box);
-    }
-
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
-}
-
-fn timezone_form<'a>(
-    timezones: &'a widget::combo_box::State<String>,
-    config: &'a SdSysconfCustomization,
-) -> widget::Container<'a, BBImagerMessage> {
-    let mut form = widget::row![
-        widget::toggler(config.timezone.is_some())
-            .label("Set Timezone")
-            .on_toggle(|t| {
-                let tz = if t { helpers::system_timezone() } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_timezone(tz.cloned()),
-                ))
-            }),
-        widget::horizontal_space()
-    ];
-
-    if let Some(tz) = config.timezone.as_ref() {
-        let xc = config.clone();
-
-        let timezone_box =
-            widget::combo_box(timezones, "Timezone", Some(&tz.to_owned()), move |t| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    xc.clone().update_timezone(Some(t)),
-                ))
-            })
-            .width(200);
-        form = form.push(timezone_box);
-    }
-
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
-}
-
-fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
-    let mut form = widget::column![
+    // Username and Password
+    let col = col.push(
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
             .on_toggle(|t| {
@@ -381,11 +59,10 @@ fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBI
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_user(c),
                 ))
-            })
-    ];
-
-    if let Some(usr) = config.user.as_ref() {
-        form = form.extend([
+            }),
+    );
+    let col = match config.user.as_ref() {
+        Some(usr) => col.extend([
             input_with_label(
                 "Username",
                 "username",
@@ -414,16 +91,14 @@ fn uname_pass_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBI
                 false,
             )
             .into(),
-        ]);
-    }
+        ]),
+        None => col,
+    };
 
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
-}
+    let col = col.push(widget::rule::horizontal(2));
 
-fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerMessage> {
-    let mut form = widget::column![
+    // Wifi
+    let col = col.push(
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")
             .on_toggle(|t| {
@@ -431,11 +106,10 @@ fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerM
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                     config.clone().update_wifi(c),
                 ))
-            })
-    ];
-
-    if let Some(wifi) = config.wifi.as_ref() {
-        form = form.extend([
+            }),
+    );
+    let col = match config.wifi.as_ref() {
+        Some(wifi) => col.extend([
             input_with_label(
                 "SSID",
                 "SSID",
@@ -464,15 +138,144 @@ fn wifi_form(config: &SdSysconfCustomization) -> widget::Container<'_, BBImagerM
                 false,
             )
             .into(),
-        ]);
-    }
+        ]),
+        None => col,
+    };
 
-    widget::container(form)
-        .padding(10)
-        .style(widget::container::bordered_box)
+    let col = col.push(widget::rule::horizontal(2));
+
+    // Timezone
+    let toggle = widget::toggler(config.timezone.is_some())
+        .label("Set Timezone")
+        .on_toggle(|t| {
+            let tz = if t { helpers::system_timezone() } else { None };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                config.clone().update_timezone(tz.cloned()),
+            ))
+        });
+    let col = match config.timezone.as_ref() {
+        Some(tz) => {
+            let xc = config.clone();
+            col.push(element_with_element(
+                toggle.into(),
+                widget::combo_box(
+                    state.timezones(),
+                    "Timezone",
+                    Some(&tz.to_owned()),
+                    move |t| {
+                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                            xc.clone().update_timezone(Some(t)),
+                        ))
+                    },
+                )
+                .width(INPUT_WIDTH)
+                .into(),
+            ))
+        }
+        None => col.push(toggle),
+    };
+
+    let col = col.push(widget::rule::horizontal(2));
+
+    // Hostname
+    let toggle = widget::toggler(config.hostname.is_some())
+        .label("Set Hostname")
+        .on_toggle(|t| {
+            let hostname = if t { whoami::hostname().ok() } else { None };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                config.clone().update_hostname(hostname),
+            ))
+        });
+    let col = match config.hostname.as_ref() {
+        Some(hostname) => col.push(element_with_element(
+            toggle.into(),
+            widget::text_input("beagle", hostname)
+                .on_input(|inp| {
+                    BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                        config.clone().update_hostname(Some(inp)),
+                    ))
+                })
+                .width(INPUT_WIDTH)
+                .into(),
+        )),
+        None => col.push(toggle),
+    };
+
+    let col = col.push(widget::rule::horizontal(2));
+
+    // Keymap
+    let toggle = widget::toggler(config.keymap.is_some())
+        .label("Set Keymap")
+        .on_toggle(|t| {
+            let keymap = if t {
+                Some(helpers::system_keymap())
+            } else {
+                None
+            };
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                config.clone().update_keymap(keymap),
+            ))
+        });
+    let col = match config.keymap.as_ref() {
+        Some(keymap) => {
+            let xc = config.clone();
+
+            col.push(element_with_element(
+                toggle.into(),
+                widget::combo_box(
+                    state.keymaps(),
+                    "Keymap",
+                    Some(&keymap.to_owned()),
+                    move |t| {
+                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                            xc.clone().update_keymap(Some(t)),
+                        ))
+                    },
+                )
+                .width(INPUT_WIDTH)
+                .into(),
+            ))
+        }
+        None => col.push(toggle),
+    };
+
+    let col = col.push(widget::rule::horizontal(2));
+
+    // SSH Key
+    let col = col.extend([
+        text("SSH authorization public key").into(),
+        widget::center(
+            widget::text_input("authorized key", config.ssh.as_deref().unwrap_or("")).on_input(
+                |x| {
+                    BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                        config
+                            .clone()
+                            .update_ssh(if x.is_empty() { None } else { Some(x) }),
+                    ))
+                },
+            ),
+        )
+        .padding(iced::Padding::ZERO.horizontal(16))
+        .into(),
+    ]);
+
+    let col = col.push(widget::rule::horizontal(2));
+
+    // Enable USB DHCP
+    let col = col.push(
+        widget::toggler(config.usb_enable_dhcp == Some(true))
+            .label("Enable USB DHCP")
+            .on_toggle(|x| {
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                    config.clone().update_usb_enable_dhcp(Some(x)),
+                ))
+            }),
+    );
+
+    widget::scrollable(col.spacing(16)).into()
 }
 
-pub(crate) fn input_with_label<'a, F>(
+fn input_with_label<'a, F>(
     label: &'static str,
     placeholder: &'static str,
     val: &'a str,
@@ -490,23 +293,13 @@ where
                 let mut t = widget::text_input::default(theme, status);
 
                 if invalid_val {
-                    t.border = t.border.color(iced::Color::from_rgb(1.0, 0.0, 0.0));
+                    t.border = t.border.color(theme.palette().danger);
                     t
                 } else {
                     t
                 }
             })
-            .width(200)
+            .width(INPUT_WIDTH)
             .into(),
     )
-}
-
-pub(crate) fn element_with_label<'a>(
-    label: &'static str,
-    el: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![text(label), widget::horizontal_space(), el]
-        .padding(10)
-        .spacing(10)
-        .align_y(iced::Alignment::Center)
 }
