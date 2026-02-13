@@ -145,7 +145,14 @@ impl From<Child> for MountPoint {
 
 pub(crate) fn lsblk() -> anyhow::Result<Vec<DeviceDescriptor>> {
     let output = Command::new("lsblk")
-        .args(["-e7", "--bytes", "--all", "--json", "--paths", "--output-all"])
+        .args([
+            "-e7",
+            "--bytes",
+            "--all",
+            "--json",
+            "--paths",
+            "--output-all",
+        ])
         .output()?;
 
     if !output.status.success() {
