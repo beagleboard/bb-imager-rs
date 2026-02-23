@@ -1,0 +1,17 @@
+[package]
+name = "bb-flasher-mspm0"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+serialport = { version = "4.7", default-features = false }
+thiserror = "2.0"
+tracing = "0.1"
+zerocopy = { version = "0.8", features = ["std", "derive"] }
+tokio = { version = "1.49", default-features = false, features = ["sync"] }
+tokio-util = { version = "0.7" }
+bin_file = "0.1"
+crc-fast = "1.10"

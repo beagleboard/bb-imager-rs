@@ -13,7 +13,8 @@ members = [
 	"bb-config",
 	"bb-helper",
 	"bb-flasher-dfu",
-	"bb-drivelist"
+        "bb-drivelist", 
+        "bb-flasher-mspm0"
 ]
 
 [profile.release]
