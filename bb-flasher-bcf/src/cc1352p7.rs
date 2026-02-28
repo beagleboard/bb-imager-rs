@@ -299,14 +299,6 @@ fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<(
 /// - Raw binary
 /// - Ti-TXT
 /// - Intel Hex
-///
-/// # Aborting
-///
-/// The process can be aborted by dropping all strong references to the [`Arc`] that owns the
-/// [`Weak`] passed as `cancel`.
-///
-/// [`Arc`]: std::sync::Arc
-/// [`Weak`]: std::sync::Weak
 pub fn flash(
     firmware: &[u8],
     port: &str,
