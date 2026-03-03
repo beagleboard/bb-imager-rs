@@ -97,7 +97,7 @@ jobs:
           bb-imager-service/dist/*
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'pull_request'
       with:
         name: artifacts-${{ matrix.platform.target }}
@@ -168,7 +168,7 @@ jobs:
           bb-imager-service/dist/*
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'pull_request'
       with:
         name: artifacts-armv7-unknown-linux-gnueabihf
@@ -276,7 +276,7 @@ jobs:
           bb-imager-gui/dist/*
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'pull_request'
       with:
         name: artifacts-macos
@@ -346,7 +346,7 @@ jobs:
           bb-imager-gui/dist/*
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'pull_request'
       with:
         name: artifacts-windows
