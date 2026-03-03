@@ -38,7 +38,7 @@ embed-resource = "3.0"
 [target.'cfg(target_os = "linux")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
 rfd = { version = "0.16.0", default-features = false, features = ["xdg-portal", "tokio", "file-handle-inner"] }
-ashpd = "0.12"
+ashpd = "0.13"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
