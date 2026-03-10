@@ -34,7 +34,7 @@ windows = { version = "0.62", features = ["Win32", "Win32_Storage", "Win32_Stora
 tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "process", "io-util"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = { version = "3.6", optional = true }
+security-framework = { version = "3.7", optional = true }
 nix = { version = "0.31", features = ["socket", "uio"], optional = true }
 
 [features]
