@@ -93,6 +93,17 @@ impl FlashingSdLinuxConfig {
         }
     }
 
+    pub const fn generic(file_name: Box<str>, file_content: Option<Box<str>>) -> Self {
+        Self {
+            customization: Some(bb_flasher_sd::Customization::Generic(
+                bb_flasher_sd::GenericCustomization {
+                    file_name,
+                    file_content,
+                },
+            )),
+        }
+    }
+
     pub const fn none() -> Self {
         Self {
             customization: None,

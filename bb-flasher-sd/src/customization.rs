@@ -1,22 +1,26 @@
-use std::io::{Read, Seek, SeekFrom, Write};
-
 use crate::{Error, Result};
+use fatfs::FileSystem;
+use fscommon::{BufStream, StreamSlice};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Customization {
     Sysconf(SysconfCustomization),
+    Generic(GenericCustomization),
 }
 
 impl Customization {
     pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
         match self {
             Self::Sysconf(x) => x.customize(dst),
+            Self::Generic(x) => x.customize(dst),
         }
     }
 
     pub(crate) fn validate(&self) -> bool {
         match self {
             Self::Sysconf(x) => x.validate(),
+            Self::Generic(x) => x.validate(),
         }
     }
 }
@@ -42,15 +46,7 @@ impl SysconfCustomization {
             return Ok(());
         }
 
-        let boot_partition = {
-            let (start_off, end_off) = customization_partition(&mut dst)?;
-            let slice = fscommon::StreamSlice::new(dst, start_off, end_off)
-                .map_err(|_| Error::InvalidPartitionTable)?;
-            let boot_stream = fscommon::BufStream::new(slice);
-            fatfs::FileSystem::new(boot_stream, fatfs::FsOptions::new())
-                .map_err(|_| Error::InvalidBootPartition)?
-        };
-
+        let boot_partition = customization_partition(&mut dst)?;
         let boot_root = boot_partition.root_dir();
 
         let mut conf = boot_root
@@ -130,11 +126,51 @@ fn sysconf_w(mut sysconf: impl Write, key: &'static str, value: &str) -> Result<
         })
 }
 
-fn customization_partition(
-    mut dst: impl Write + Seek + Read + std::fmt::Debug,
-) -> Result<(u64, u64)> {
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+/// Post install customization options
+pub struct GenericCustomization {
+    pub file_name: Box<str>,
+    pub file_content: Option<Box<str>>,
+}
+
+impl GenericCustomization {
+    pub(crate) fn customize(
+        &self,
+        mut dst: impl Write + Seek + Read + std::fmt::Debug,
+    ) -> Result<()> {
+        let boot_partition = customization_partition(&mut dst)?;
+        let boot_root = boot_partition.root_dir();
+
+        let mut file =
+            boot_root
+                .create_file(&self.file_name)
+                .map_err(|source| Error::GenericCreateFail {
+                    source,
+                    file: self.file_name.clone(),
+                })?;
+        file.seek(SeekFrom::End(0))
+            .unwrap_or_else(|_| panic!("Failed to seek to end of {}", self.file_name));
+        if let Some(content) = &self.file_content {
+            file.write_all(content.as_bytes())
+                .map_err(|source| Error::GenericWriteFail {
+                    source,
+                    file: self.file_name.clone(),
+                })?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn validate(&self) -> bool {
+        !self.file_name.is_empty()
+    }
+}
+
+fn customization_partition<T: Write + Seek + Read + std::fmt::Debug>(
+    mut dst: T,
+) -> Result<FileSystem<BufStream<StreamSlice<T>>>> {
     // First try GPT partition table. If that fails, try MBR
-    if let Ok(disk) = gpt::GptConfig::new()
+    let (start_offset, end_offset) = if let Ok(disk) = gpt::GptConfig::new()
         .writable(false)
         .open_from_device(&mut dst)
     {
@@ -144,7 +180,7 @@ fn customization_partition(
         let start_offset: u64 = partition_2.first_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
         let end_offset: u64 = partition_2.last_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
 
-        Ok((start_offset, end_offset))
+        (start_offset, end_offset)
     } else {
         let mbr =
             mbrman::MBRHeader::read_from(&mut dst).map_err(|_| Error::InvalidPartitionTable)?;
@@ -153,6 +189,10 @@ fn customization_partition(
         let start_offset: u64 = (boot_part.starting_lba * 512).into();
         let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
 
-        Ok((start_offset, end_offset))
-    }
+        (start_offset, end_offset)
+    };
+    let slice = StreamSlice::new(dst, start_offset, end_offset)
+        .map_err(|_| Error::InvalidPartitionTable)?;
+    let boot_stream = BufStream::new(slice);
+    FileSystem::new(boot_stream, fatfs::FsOptions::new()).map_err(|_| Error::InvalidBootPartition)
 }
