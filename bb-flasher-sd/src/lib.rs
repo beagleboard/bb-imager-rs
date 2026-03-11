@@ -47,7 +47,7 @@ mod flashing;
 mod helpers;
 pub(crate) mod pal;
 
-pub use customization::{Customization, GenericCustomization, SysconfCustomization};
+pub use customization::{Customization, GenericFileCustomization, SysconfCustomization};
 pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
@@ -75,13 +75,13 @@ pub enum Error {
         field: &'static str,
     },
     #[error("Failed to create {file}")]
-    GenericCreateFail {
+    GenericFileCreateFail {
         #[source]
         source: io::Error,
         file: Box<str>,
     },
     #[error("Failed to write to {file}")]
-    GenericWriteFail {
+    GenericFileWriteFail {
         #[source]
         source: io::Error,
         file: Box<str>,

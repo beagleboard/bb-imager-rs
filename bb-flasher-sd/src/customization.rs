@@ -6,21 +6,21 @@ use std::io::{Read, Seek, SeekFrom, Write};
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Customization {
     Sysconf(SysconfCustomization),
-    Generic(GenericCustomization),
+    GenericFile(GenericFileCustomization),
 }
 
 impl Customization {
     pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
         match self {
             Self::Sysconf(x) => x.customize(dst),
-            Self::Generic(x) => x.customize(dst),
+            Self::GenericFile(x) => x.customize(dst),
         }
     }
 
     pub(crate) fn validate(&self) -> bool {
         match self {
             Self::Sysconf(x) => x.validate(),
-            Self::Generic(x) => x.validate(),
+            Self::GenericFile(x) => x.validate(),
         }
     }
 }
@@ -128,12 +128,12 @@ fn sysconf_w(mut sysconf: impl Write, key: &'static str, value: &str) -> Result<
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 /// Post install customization options
-pub struct GenericCustomization {
+pub struct GenericFileCustomization {
     pub file_name: Box<str>,
     pub file_content: Option<Box<str>>,
 }
 
-impl GenericCustomization {
+impl GenericFileCustomization {
     pub(crate) fn customize(
         &self,
         mut dst: impl Write + Seek + Read + std::fmt::Debug,
@@ -141,18 +141,17 @@ impl GenericCustomization {
         let boot_partition = customization_partition(&mut dst)?;
         let boot_root = boot_partition.root_dir();
 
-        let mut file =
-            boot_root
-                .create_file(&self.file_name)
-                .map_err(|source| Error::GenericCreateFail {
-                    source,
-                    file: self.file_name.clone(),
-                })?;
+        let mut file = boot_root.create_file(&self.file_name).map_err(|source| {
+            Error::GenericFileCreateFail {
+                source,
+                file: self.file_name.clone(),
+            }
+        })?;
         file.seek(SeekFrom::End(0))
             .unwrap_or_else(|_| panic!("Failed to seek to end of {}", self.file_name));
         if let Some(content) = &self.file_content {
             file.write_all(content.as_bytes())
-                .map_err(|source| Error::GenericWriteFail {
+                .map_err(|source| Error::GenericFileWriteFail {
                     source,
                     file: self.file_name.clone(),
                 })?;
