@@ -138,7 +138,7 @@ impl BBFlasher for FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone)]
-pub struct Flasher<I: Resolvable, B: Resolvable> {
+pub struct Flasher<I: Resolvable, B: Future> {
     img: I,
     bmap: Option<B>,
     dst: PathBuf,
@@ -149,7 +149,7 @@ pub struct Flasher<I: Resolvable, B: Resolvable> {
 impl<I, B> Flasher<I, B>
 where
     I: Resolvable,
-    B: Resolvable,
+    B: Future,
 {
     pub fn new(
         img: I,
@@ -168,10 +168,24 @@ where
     }
 }
 
+impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>>
+where
+    I: Resolvable,
+{
+    pub fn without_bmap(
+        img: I,
+        dst: Target,
+        customization: FlashingSdLinuxConfig,
+        cancel: Option<tokio_util::sync::CancellationToken>,
+    ) -> Self {
+        Self::new(img, None, dst, customization, cancel)
+    }
+}
+
 impl<I, B> BBFlasher for Flasher<I, B>
 where
     I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Send + 'static,
-    B: Resolvable<ResolvedType = Box<str>> + Send + 'static,
+    B: Future<Output = Result<Box<str>, std::io::Error>> + Send + 'static,
 {
     async fn flash(
         self,

@@ -417,16 +417,15 @@ pub(crate) struct Bmap {
     downloader: bb_downloader::Downloader,
 }
 
-impl bb_flasher::Resolvable for Bmap {
-    type ResolvedType = Box<str>;
+impl IntoFuture for Bmap {
+    type Output = std::io::Result<Box<str>>;
+    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
-    async fn resolve(
-        &self,
-        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
-    ) -> std::io::Result<Self::ResolvedType> {
-        let p = self.downloader.download(*self.url.clone(), None).await?;
-
-        tokio::fs::read_to_string(p).await.map(Into::into)
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move {
+            let p = self.downloader.download(*self.url.clone(), None).await?;
+            tokio::fs::read_to_string(p).await.map(Into::into)
+        })
     }
 }
 
@@ -512,18 +511,30 @@ pub(crate) async fn flash(
             FlashingCustomization::LinuxSdSysconfig(customization),
             Destination::SdCard(t),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, customization.into(), Some(cancel))
-                .flash(Some(chan))
-                .await
+            bb_flasher::sd::Flasher::new(
+                img,
+                bmap.map(IntoFuture::into_future),
+                t,
+                customization.into(),
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
         }
         (
             BoardImage::Image { img, bmap, .. },
             FlashingCustomization::NoneSd,
             Destination::SdCard(t),
         ) => {
-            bb_flasher::sd::Flasher::new(img, bmap, t, FlashingSdLinuxConfig::none(), Some(cancel))
-                .flash(Some(chan))
-                .await
+            bb_flasher::sd::Flasher::new(
+                img,
+                bmap.map(IntoFuture::into_future),
+                t,
+                FlashingSdLinuxConfig::none(),
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (

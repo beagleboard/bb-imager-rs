@@ -29,14 +29,12 @@ impl LocalStringFile {
     }
 }
 
-impl Resolvable for LocalStringFile {
-    type ResolvedType = Box<str>;
+impl IntoFuture for LocalStringFile {
+    type Output = std::io::Result<Box<str>>;
+    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
-    async fn resolve(
-        &self,
-        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
-    ) -> std::io::Result<Self::ResolvedType> {
-        tokio::fs::read_to_string(&self.0).await.map(Into::into)
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move { tokio::fs::read_to_string(&self.0).await.map(Into::into) })
     }
 }
 

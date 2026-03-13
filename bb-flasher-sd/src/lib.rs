@@ -25,7 +25,7 @@
 //!     let img = bb_helper::resolvable::LocalFile::new(PathBuf::from("/tmp/image").into());
 //!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 //!
-//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<bb_helper::resolvable::LocalStringFile>, dst, Some(tx), None, None).await });
+//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), None, None).await });
 //!
 //!     while let Some(m) = rx.recv().await {
 //!         println!("{:?}", m);

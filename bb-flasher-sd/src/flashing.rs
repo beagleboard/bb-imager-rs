@@ -203,7 +203,7 @@ fn write_sd(
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub async fn flash<R: Read + Send + 'static>(
     img: impl bb_helper::resolvable::Resolvable<ResolvedType = (R, u64)>,
-    bmap: Option<impl bb_helper::resolvable::Resolvable<ResolvedType = Box<str>>>,
+    bmap: Option<impl Future<Output = Result<Box<str>, std::io::Error>>>,
     dst: Box<Path>,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -223,10 +223,9 @@ pub async fn flash<R: Read + Send + 'static>(
 
     tracing::info!("Resolving Image");
     let bmap = match bmap {
-        Some(x) => Some(
-            bb_bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
-                .map_err(|_| crate::Error::InvalidBmap)?,
-        ),
+        Some(x) => {
+            Some(bb_bmap_parser::Bmap::from_xml(&x.await?).map_err(|_| crate::Error::InvalidBmap)?)
+        }
         None => None,
     };
     let (img, img_size) = img.resolve(&mut tasks).await?;
