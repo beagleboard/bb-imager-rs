@@ -1,7 +1,6 @@
 //! Library to flash SD cards with OS images. Powers sd card flashing in [BeagleBoard Imager].
 //!
-//! Also allows optional extra [Customization] for BeagleBoard images. Currently only supports
-//! sysconf based post-install configuration.
+//! Also allows optional extra [Customization] for BeagleBoard images.
 //!
 //! # Platform Support
 //!

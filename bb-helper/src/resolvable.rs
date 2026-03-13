@@ -1,11 +1,17 @@
 use std::path::Path;
 
-/// A trait to signify Os Images. Flashers in this crate can take any file as an input that
-/// implements this trait.
+/// A trait for resolvable image sources.
+///
+/// Types implementing this trait can resolve themselves to local file representations
+/// that flashers can use. This allows for various image sources like local files,
+/// remote URLs, or generated content.
 pub trait Resolvable {
     type ResolvedType;
 
-    /// Get the local path to an image. Network calls can be done here.
+    /// Resolves the image source to a local representation.
+    ///
+    /// This method may perform network requests or other I/O operations.
+    /// The `join_set` can be used to spawn background tasks if needed.
     fn resolve(
         &self,
         join_set: &mut tokio::task::JoinSet<std::io::Result<()>>,
@@ -13,6 +19,7 @@ pub trait Resolvable {
 }
 
 #[derive(Debug, Clone)]
+/// A resolvable that reads a local file as a string.
 pub struct LocalStringFile(Box<Path>);
 
 impl LocalStringFile {
@@ -34,6 +41,7 @@ impl Resolvable for LocalStringFile {
 }
 
 #[derive(Debug, Clone)]
+/// A resolvable that opens a local file and returns its handle with size.
 pub struct LocalFile(Box<Path>);
 
 impl LocalFile {
@@ -57,12 +65,14 @@ impl Resolvable for LocalFile {
 }
 
 #[cfg(unix)]
+/// Gets the file size from metadata on Unix systems.
 fn size(file: &std::fs::Metadata) -> u64 {
     use std::os::unix::fs::MetadataExt;
     file.size()
 }
 
 #[cfg(windows)]
+/// Gets the file size from metadata on Windows systems.
 fn size(file: &std::fs::Metadata) -> u64 {
     use std::os::windows::fs::MetadataExt;
     file.file_size()
