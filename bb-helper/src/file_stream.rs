@@ -13,6 +13,10 @@ use std::{
 
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
+/// Asynchronous writer half of a file-backed stream.
+///
+/// Writes data asynchronously to a temporary file. The data can be persisted
+/// to a permanent location using [`persist`](Self::persist).
 pub struct WriterFileStream {
     file: tokio::fs::File,
     writing: Arc<AtomicBool>,
@@ -23,6 +27,9 @@ impl WriterFileStream {
         Self { file, writing }
     }
 
+    /// Persists the written data to a permanent file location.
+    ///
+    /// Copies all data from the temporary file to the specified path.
     pub async fn persist(&mut self, path: &Path) -> io::Result<()> {
         let mut f = tokio::fs::File::create(path).await?;
         self.file.seek(io::SeekFrom::Start(0)).await?;
@@ -66,10 +73,10 @@ impl Drop for WriterFileStream {
     }
 }
 
-/// Reader half of FileStream.
+/// Synchronous reader half of a file-backed stream.
 ///
-/// While writing, this will return 0 (EOF) only if writer is closed. Else it will block the
-/// thread.
+/// Reads data from the same temporary file as the writer. While the writer
+/// is active, reading will block until data is available or the writer closes.
 pub struct ReaderFileStream {
     file: std::fs::File,
     writing: Arc<AtomicBool>,
@@ -101,6 +108,10 @@ impl std::io::Seek for ReaderFileStream {
     }
 }
 
+/// Creates a new file-backed stream with separate reader and writer halves.
+///
+/// Returns a tuple of (writer, reader) that share a temporary file.
+/// The writer can write asynchronously, while the reader provides synchronous access.
 pub fn file_stream() -> io::Result<(WriterFileStream, ReaderFileStream)> {
     let file = tempfile::NamedTempFile::new()?;
     let flag = Arc::new(AtomicBool::new(true));
