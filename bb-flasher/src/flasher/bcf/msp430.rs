@@ -6,7 +6,7 @@
 
 use std::{borrow::Cow, ffi::CString, fmt::Display, io::Read};
 
-use crate::{BBFlasher, BBFlasherTarget, Resolvable};
+use crate::{BBFlasher, BBFlasherTarget};
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -66,15 +66,12 @@ impl BBFlasherTarget for Target {
 /// [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 /// [MSP430]: https://www.ti.com/product/MSP430F5503
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Flasher<I: Resolvable> {
+pub struct Flasher<I> {
     img: I,
     port: std::ffi::CString,
 }
 
-impl<I> Flasher<I>
-where
-    I: Resolvable,
-{
+impl<I> Flasher<I> {
     pub fn new(img: I, port: Target) -> Self {
         Self {
             img,
@@ -85,7 +82,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Resolvable<ResolvedType = (crate::OsImage, u64)>,
+    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
 {
     async fn flash(
         self,
@@ -93,30 +90,20 @@ where
     ) -> anyhow::Result<()> {
         let dst = self.port;
         let img = {
-            let mut tasks = tokio::task::JoinSet::new();
-            let (mut img, _) =
-                self.img.resolve(&mut tasks).await.map_err(|source| {
-                    crate::common::FlasherError::ImageResolvingError { source }
-                })?;
+            let (mut img, _) = self
+                .img
+                .await
+                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-            let resp = tokio::task::spawn_blocking(move || {
+            tokio::task::spawn_blocking(move || {
                 let mut data = Vec::new();
                 img.read_to_end(&mut data)?;
                 Ok::<Vec<u8>, std::io::Error>(data)
             })
             .await
             .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            while let Some(t) = tasks.join_next().await {
-                if let Err(e) = t.unwrap() {
-                    tasks.abort_all();
-                    return Err(e.into());
-                }
-            }
-
-            resp
-        };
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
+        }?;
 
         let flasher_task = if let Some(mut chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);

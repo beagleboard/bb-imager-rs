@@ -361,47 +361,47 @@ impl RemoteImage {
     }
 }
 
-impl bb_flasher::Resolvable for RemoteImage {
-    type ResolvedType = (bb_flasher::OsImage, u64);
+impl IntoFuture for RemoteImage {
+    type Output = std::io::Result<(bb_flasher::OsImage, u64)>;
+    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
-    async fn resolve(
-        &self,
-        rt: &mut tokio::task::JoinSet<std::io::Result<()>>,
-    ) -> std::io::Result<Self::ResolvedType> {
-        if let Some(path) = self
-            .downloader
-            .check_cache_from_sha(self.extract_sha256)
-            .await
-        {
-            tracing::info!("Found the remote image in cache");
-            Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size))
-        } else {
-            tracing::info!("Remote image not found in cache. Downloading");
-            let (tx, rx) = bb_helper::file_stream::file_stream()?;
-            let downloader = self.downloader.clone();
-            let url = self.url.clone();
-            let sha = self.extract_sha256;
-            rt.spawn(async move {
-                downloader
-                    .download_to_stream(*url, sha, tx)
-                    .await
-                    .map_err(|e| {
-                        let msg = format!("Error while downloading Os Image: {e}");
-                        tracing::error!("{}", &msg);
-                        std::io::Error::other(msg)
-                    })?;
-                tracing::info!("Image download finished");
-                Ok(())
-            });
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move {
+            if let Some(path) = self
+                .downloader
+                .check_cache_from_sha(self.extract_sha256)
+                .await
+            {
+                tracing::info!("Found the remote image in cache");
+                Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size))
+            } else {
+                tracing::info!("Remote image not found in cache. Downloading");
+                let (tx, rx) = bb_helper::file_stream::file_stream()?;
+                let downloader = self.downloader.clone();
+                let url = self.url.clone();
+                let sha = self.extract_sha256;
+                let t: tokio::task::JoinHandle<std::io::Result<()>> = tokio::spawn(async move {
+                    downloader
+                        .download_to_stream(*url, sha, tx)
+                        .await
+                        .map_err(|e| {
+                            let msg = format!("Error while downloading Os Image: {e}");
+                            tracing::error!("{}", &msg);
+                            std::io::Error::other(msg)
+                        })?;
+                    tracing::info!("Image download finished");
+                    Ok(())
+                });
 
-            let extract_size = self.extract_size;
-            let img = tokio::task::spawn_blocking(move || {
-                bb_flasher::OsImage::from_piped(rx, extract_size)
-            })
-            .await
-            .unwrap()?;
-            Ok((img, self.extract_size))
-        }
+                let extract_size = self.extract_size;
+                let img = tokio::task::spawn_blocking(move || {
+                    bb_flasher::OsImage::from_piped(rx, t, extract_size)
+                })
+                .await
+                .unwrap()?;
+                Ok((img, self.extract_size))
+            }
+        })
     }
 }
 
@@ -455,16 +455,14 @@ impl SelectedImage {
     }
 }
 
-impl bb_flasher::Resolvable for SelectedImage {
-    type ResolvedType = (bb_flasher::OsImage, u64);
+impl IntoFuture for SelectedImage {
+    type Output = std::io::Result<(bb_flasher::OsImage, u64)>;
+    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
-    async fn resolve(
-        &self,
-        rt: &mut tokio::task::JoinSet<std::io::Result<()>>,
-    ) -> std::io::Result<Self::ResolvedType> {
+    fn into_future(self) -> Self::IntoFuture {
         match self {
-            SelectedImage::LocalImage(x) => x.resolve(rt).await,
-            SelectedImage::RemoteImage(x) => x.resolve(rt).await,
+            SelectedImage::LocalImage(x) => x.into_future(),
+            SelectedImage::RemoteImage(x) => x.into_future(),
         }
     }
 }
@@ -512,7 +510,7 @@ pub(crate) async fn flash(
             Destination::SdCard(t),
         ) => {
             bb_flasher::sd::Flasher::new(
-                img,
+                img.into_future(),
                 bmap.map(IntoFuture::into_future),
                 t,
                 customization.into(),
@@ -527,7 +525,7 @@ pub(crate) async fn flash(
             Destination::SdCard(t),
         ) => {
             bb_flasher::sd::Flasher::new(
-                img,
+                img.into_future(),
                 bmap.map(IntoFuture::into_future),
                 t,
                 FlashingSdLinuxConfig::none(),
@@ -542,13 +540,18 @@ pub(crate) async fn flash(
             FlashingCustomization::Bcf(customization),
             Destination::BeagleConnectFreedom(t),
         ) => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(img, t, customization.verify, Some(cancel))
-                .flash(Some(chan))
-                .await
+            bb_flasher::bcf::cc1352p7::Flasher::new(
+                img.into_future(),
+                t,
+                customization.verify,
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
         }
         #[cfg(feature = "bcf_msp430")]
         (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            bb_flasher::bcf::msp430::Flasher::new(img, t)
+            bb_flasher::bcf::msp430::Flasher::new(img.into_future(), t)
                 .flash(Some(chan))
                 .await
         }
@@ -558,7 +561,7 @@ pub(crate) async fn flash(
             FlashingCustomization::Pb2Mspm0(x),
             Destination::Pb2Mspm0,
         ) => {
-            bb_flasher::pb2::mspm0::Flasher::new(img, x.persist_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(img.into_future(), x.persist_eeprom)
                 .flash(Some(chan))
                 .await
         }

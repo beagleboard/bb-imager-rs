@@ -15,10 +15,19 @@ pub struct OsImage {
 pub(crate) enum OsImageReader {
     Xz(liblzma::read::XzDecoder<std::fs::File>),
     Zip(rc_zip_sync::StreamingEntryReader<std::fs::File>),
-    XzPiped(liblzma::read::XzDecoder<ReaderFileStream>),
-    ZipPiped(rc_zip_sync::StreamingEntryReader<ReaderFileStream>),
+    XzPiped {
+        reader: liblzma::read::XzDecoder<ReaderFileStream>,
+        _background: tokio_util::task::AbortOnDropHandle<std::io::Result<()>>,
+    },
+    ZipPiped {
+        reader: rc_zip_sync::StreamingEntryReader<ReaderFileStream>,
+        _background: tokio_util::task::AbortOnDropHandle<std::io::Result<()>>,
+    },
     Uncompressed(std::io::BufReader<std::fs::File>),
-    UncompressedPiped(std::io::BufReader<ReaderFileStream>),
+    UncompressedPiped {
+        reader: std::io::BufReader<ReaderFileStream>,
+        _background: tokio_util::task::AbortOnDropHandle<std::io::Result<()>>,
+    },
 }
 
 impl OsImage {
@@ -58,7 +67,7 @@ impl OsImage {
                 })
             }
             _ => {
-                let size = size(&file.metadata()?);
+                let size = file.metadata()?.len();
 
                 Ok(Self {
                     size,
@@ -68,7 +77,11 @@ impl OsImage {
         }
     }
 
-    pub fn from_piped(mut img: ReaderFileStream, size: u64) -> std::io::Result<Self> {
+    pub fn from_piped(
+        mut img: ReaderFileStream,
+        abort_handle: tokio::task::JoinHandle<std::io::Result<()>>,
+        size: u64,
+    ) -> std::io::Result<Self> {
         let mut magic = [0u8; 6];
         img.read_exact(&mut magic)?;
         img.seek(SeekFrom::Start(0))?;
@@ -76,17 +89,24 @@ impl OsImage {
         match magic {
             [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] => Ok(Self {
                 size,
-                img: OsImageReader::XzPiped(liblzma::read::XzDecoder::new_parallel(img)),
+                img: OsImageReader::XzPiped {
+                    reader: liblzma::read::XzDecoder::new_parallel(img),
+                    _background: tokio_util::task::AbortOnDropHandle::new(abort_handle),
+                },
             }),
             [0x50, 0x4b, 0x03, 0x04, _, _] => Ok(Self {
                 size,
-                img: OsImageReader::ZipPiped(
-                    img.stream_zip_entries_throwing_caution_to_the_wind()?,
-                ),
+                img: OsImageReader::ZipPiped {
+                    reader: img.stream_zip_entries_throwing_caution_to_the_wind()?,
+                    _background: tokio_util::task::AbortOnDropHandle::new(abort_handle),
+                },
             }),
             _ => Ok(Self {
                 size,
-                img: OsImageReader::UncompressedPiped(std::io::BufReader::new(img)),
+                img: OsImageReader::UncompressedPiped {
+                    reader: std::io::BufReader::new(img),
+                    _background: tokio_util::task::AbortOnDropHandle::new(abort_handle),
+                },
             }),
         }
     }
@@ -101,22 +121,10 @@ impl std::io::Read for OsImage {
         match &mut self.img {
             OsImageReader::Xz(x) => x.read(buf),
             OsImageReader::Uncompressed(x) => x.read(buf),
-            OsImageReader::XzPiped(x) => x.read(buf),
-            OsImageReader::UncompressedPiped(x) => x.read(buf),
-            OsImageReader::ZipPiped(x) => x.read(buf),
+            OsImageReader::XzPiped { reader, .. } => reader.read(buf),
+            OsImageReader::UncompressedPiped { reader, .. } => reader.read(buf),
+            OsImageReader::ZipPiped { reader, .. } => reader.read(buf),
             OsImageReader::Zip(x) => x.read(buf),
         }
     }
-}
-
-#[cfg(unix)]
-fn size(file: &std::fs::Metadata) -> u64 {
-    use std::os::unix::fs::MetadataExt;
-    file.size()
-}
-
-#[cfg(windows)]
-fn size(file: &std::fs::Metadata) -> u64 {
-    use std::os::windows::fs::MetadataExt;
-    file.file_size()
 }

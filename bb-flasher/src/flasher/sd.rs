@@ -6,7 +6,7 @@
 
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
+use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
 /// SD Card
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -138,7 +138,7 @@ impl BBFlasher for FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone)]
-pub struct Flasher<I: Resolvable, B: Future> {
+pub struct Flasher<I, B> {
     img: I,
     bmap: Option<B>,
     dst: PathBuf,
@@ -146,11 +146,7 @@ pub struct Flasher<I: Resolvable, B: Future> {
     cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
-impl<I, B> Flasher<I, B>
-where
-    I: Resolvable,
-    B: Future,
-{
+impl<I, B> Flasher<I, B> {
     pub fn new(
         img: I,
         bmap: Option<B>,
@@ -168,10 +164,7 @@ where
     }
 }
 
-impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>>
-where
-    I: Resolvable,
-{
+impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
     pub fn without_bmap(
         img: I,
         dst: Target,
@@ -184,8 +177,8 @@ where
 
 impl<I, B> BBFlasher for Flasher<I, B>
 where
-    I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Send + 'static,
-    B: Future<Output = Result<Box<str>, std::io::Error>> + Send + 'static,
+    I: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
+    B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
     async fn flash(
         self,

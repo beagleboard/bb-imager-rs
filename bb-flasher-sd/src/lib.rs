@@ -22,7 +22,11 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let dst = PathBuf::from("/tmp/dummy").into();
-//!     let img = bb_helper::resolvable::LocalFile::new(PathBuf::from("/tmp/image").into());
+//!     let img = async move {
+//!         let f = tokio::fs::File::open("/tmp/image").await?.into_std().await;
+//!         let size = f.metadata().unwrap().len();
+//!         Ok((f, size))
+//!     };
 //!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 //!
 //!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), None, None).await });

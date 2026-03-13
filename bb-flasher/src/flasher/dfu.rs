@@ -1,4 +1,4 @@
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, Resolvable};
+use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -59,7 +59,7 @@ impl BBFlasherTarget for Target {
     }
 }
 
-pub struct Flasher<R: Resolvable> {
+pub struct Flasher<R> {
     imgs: Vec<(String, R)>,
     vendor_id: u16,
     product_id: u16,
@@ -68,10 +68,7 @@ pub struct Flasher<R: Resolvable> {
     cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
-impl<R> Flasher<R>
-where
-    R: Resolvable,
-{
+impl<R> Flasher<R> {
     const fn new(
         imgs: Vec<(String, R)>,
         bus_num: u8,
@@ -120,7 +117,7 @@ where
 
 impl<R> BBFlasher for Flasher<R>
 where
-    R: Resolvable<ResolvedType = (crate::OsImage, u64)> + Send + 'static,
+    R: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let c = if let Some(mut c) = chan {
