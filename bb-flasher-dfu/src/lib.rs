@@ -84,10 +84,9 @@ pub async fn flash<R, I>(
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()>
 where
-    R: bb_helper::resolvable::Resolvable<ResolvedType = (I, u64)>,
+    R: Future<Output = std::io::Result<(I, u64)>>,
     I: io::Read + Send + 'static,
 {
-    let mut tasks = tokio::task::JoinSet::new();
     let imgs_count = imgs.len();
 
     for (idx, img) in imgs.into_iter().enumerate() {
@@ -96,7 +95,6 @@ where
         let name = img.0.clone();
         let (img_reader, size) = img
             .1
-            .resolve(&mut tasks)
             .await
             .map_err(|e| Error::ImgResolveFail { source: e })?;
 
@@ -104,7 +102,7 @@ where
             Some(c) => {
                 let (tx, mut rx) = tokio::sync::mpsc::channel::<f32>(1);
 
-                tasks.spawn(async move {
+                tokio::spawn(async move {
                     let partition: f32 = 1.0 / (imgs_count as f32);
                     let offset = idx as f32 * partition;
 
@@ -112,8 +110,6 @@ where
                         let res = offset + x * partition;
                         let _ = c.try_send(res);
                     }
-
-                    Ok(())
                 });
 
                 tokio::task::spawn_blocking(move || {

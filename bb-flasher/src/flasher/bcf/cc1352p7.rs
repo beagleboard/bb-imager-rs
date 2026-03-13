@@ -5,7 +5,7 @@
 
 use std::{borrow::Cow, fmt::Display, io::Read};
 
-use crate::{BBFlasher, BBFlasherTarget, Resolvable};
+use crate::{BBFlasher, BBFlasherTarget};
 
 /// BeagleConnect Freedom target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -54,17 +54,14 @@ impl Display for Target {
 /// - iHex
 /// - xz: Xz compressed files for any of the above
 #[derive(Debug, Clone)]
-pub struct Flasher<I: Resolvable> {
+pub struct Flasher<I> {
     img: I,
     port: String,
     verify: bool,
     cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
-impl<I> Flasher<I>
-where
-    I: Resolvable,
-{
+impl<I> Flasher<I> {
     pub fn new(
         img: I,
         port: Target,
@@ -82,7 +79,7 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Resolvable<ResolvedType = (crate::OsImage, u64)> + Sync,
+    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
 {
     async fn flash(
         self,
@@ -91,11 +88,10 @@ where
         let port = self.port;
         let verify = self.verify;
         let img = {
-            let mut tasks = tokio::task::JoinSet::new();
-            let (mut img, _) =
-                self.img.resolve(&mut tasks).await.map_err(|source| {
-                    crate::common::FlasherError::ImageResolvingError { source }
-                })?;
+            let (mut img, _) = self
+                .img
+                .await
+                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
             let resp = tokio::task::spawn_blocking(move || {
                 let mut data = Vec::new();
@@ -105,13 +101,6 @@ where
             .await
             .unwrap()
             .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            while let Some(t) = tasks.join_next().await {
-                if let Err(e) = t.unwrap() {
-                    tasks.abort_all();
-                    return Err(e.into());
-                }
-            }
 
             resp
         };

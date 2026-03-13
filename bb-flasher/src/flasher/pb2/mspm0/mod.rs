@@ -18,7 +18,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Read;
 
-use crate::{BBFlasher, BBFlasherTarget, Resolvable};
+use crate::{BBFlasher, BBFlasherTarget};
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -59,15 +59,12 @@ impl std::fmt::Display for Target {
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 /// [MSPM0L1105]: https://www.ti.com/product/MSPM0L1105
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Flasher<I: Resolvable> {
+pub struct Flasher<I> {
     img: I,
     persist_eeprom: bool,
 }
 
-impl<I> Flasher<I>
-where
-    I: Resolvable,
-{
+impl<I> Flasher<I> {
     pub const fn new(img: I, persist_eeprom: bool) -> Self {
         Self {
             img,
@@ -78,20 +75,19 @@ where
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Resolvable<ResolvedType = (crate::OsImage, u64)>,
+    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
 {
     async fn flash(
         self,
         chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let bin = {
-            let mut tasks = tokio::task::JoinSet::new();
-            let (mut img, _) =
-                self.img.resolve(&mut tasks).await.map_err(|source| {
-                    crate::common::FlasherError::ImageResolvingError { source }
-                })?;
+            let (mut img, _) = self
+                .img
+                .await
+                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-            let resp = tokio::task::spawn_blocking(move || {
+            tokio::task::spawn_blocking(move || {
                 let mut data = String::new();
                 img.read_to_string(&mut data)?;
                 data.parse().map_err(|_| {
@@ -100,17 +96,8 @@ where
             })
             .await
             .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            while let Some(t) = tasks.join_next().await {
-                if let Err(e) = t.unwrap() {
-                    tasks.abort_all();
-                    return Err(e.into());
-                }
-            }
-
-            resp
-        };
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
+        }?;
 
         flash(bin, chan, self.persist_eeprom)
             .await

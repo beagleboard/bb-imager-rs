@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::new(img, None::<bb_helper::resolvable::LocalStringFile>, target, customization, None)
+//!     let flasher = bb_flasher::sd::Flasher::without_bmap(img.into_future(), target, customization, None)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -43,7 +43,6 @@ mod img;
 
 use std::path::Path;
 
-pub use bb_helper::resolvable::Resolvable;
 pub use common::*;
 pub use flasher::*;
 pub use img::OsImage;
@@ -67,20 +66,20 @@ impl LocalImage {
     }
 }
 
-impl Resolvable for LocalImage {
-    type ResolvedType = (OsImage, u64);
+impl IntoFuture for LocalImage {
+    type Output = std::io::Result<(OsImage, u64)>;
+    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
-    async fn resolve(
-        &self,
-        _: &mut tokio::task::JoinSet<std::io::Result<()>>,
-    ) -> std::io::Result<Self::ResolvedType> {
-        let p = self.0.clone();
-        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
-            .await
-            .unwrap()?;
-        let size = img.size();
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move {
+            let p = self.0.clone();
+            let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
+                .await
+                .unwrap()?;
+            let size = img.size();
 
-        Ok((img, size))
+            Ok((img, size))
+        })
     }
 }
 

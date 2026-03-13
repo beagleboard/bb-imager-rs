@@ -1,10 +1,11 @@
 mod cli;
+mod helpers;
 
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
-use bb_helper::resolvable::LocalStringFile;
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use futures::StreamExt;
+use helpers::LocalStringFile;
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -139,8 +140,8 @@ async fn flash_internal(
             );
 
             bb_flasher::sd::Flasher::new(
-                LocalImage::new(img),
-                bmap.map(LocalStringFile::new),
+                LocalImage::new(img).into_future(),
+                bmap.map(LocalStringFile::new).map(IntoFuture::into_future),
                 dst.try_into().unwrap(),
                 customization,
                 None,
@@ -155,7 +156,7 @@ async fn flash_internal(
             no_verify,
         } => {
             bb_flasher::bcf::cc1352p7::Flasher::new(
-                LocalImage::new(img),
+                LocalImage::new(img).into_future(),
                 dst.into(),
                 !no_verify,
                 None,
@@ -165,13 +166,13 @@ async fn flash_internal(
         }
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {
-            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img), dst.into())
+            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_future(), dst.into())
                 .flash(chan)
                 .await
         }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img), !no_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_future(), !no_eeprom)
                 .flash(chan)
                 .await
         }
@@ -186,7 +187,7 @@ async fn flash_internal(
                 .map(|x| {
                     (
                         x[0].to_string(),
-                        LocalImage::new(PathBuf::from(&x[1]).into()),
+                        LocalImage::new(PathBuf::from(&x[1]).into()).into_future(),
                     )
                 })
                 .collect();

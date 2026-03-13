@@ -202,8 +202,8 @@ fn write_sd(
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub async fn flash<R: Read + Send + 'static>(
-    img: impl bb_helper::resolvable::Resolvable<ResolvedType = (R, u64)>,
-    bmap: Option<impl bb_helper::resolvable::Resolvable<ResolvedType = Box<str>>>,
+    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: Box<Path>,
     chan: Option<mpsc::Sender<f32>>,
     customization: Option<Customization>,
@@ -219,17 +219,14 @@ pub async fn flash<R: Read + Send + 'static>(
     let dst_clone = dst.to_path_buf();
     let sd = crate::pal::open(&dst_clone).await?;
 
-    let mut tasks = tokio::task::JoinSet::new();
-
     tracing::info!("Resolving Image");
     let bmap = match bmap {
-        Some(x) => Some(
-            bb_bmap_parser::Bmap::from_xml(&x.resolve(&mut tasks).await?)
-                .map_err(|_| crate::Error::InvalidBmap)?,
-        ),
+        Some(x) => {
+            Some(bb_bmap_parser::Bmap::from_xml(&x.await?).map_err(|_| crate::Error::InvalidBmap)?)
+        }
         None => None,
     };
-    let (img, img_size) = img.resolve(&mut tasks).await?;
+    let (img, img_size) = img.await?;
 
     let cancel_child = cancel.as_ref().map(|x| x.child_token());
     let res = tokio::task::spawn_blocking(move || {
@@ -240,13 +237,6 @@ pub async fn flash<R: Read + Send + 'static>(
 
     // Cancel all tasks on drop
     let _drop_guard = cancel.map(|x| x.drop_guard());
-
-    while let Some(t) = tasks.join_next().await {
-        if let Err(e) = t.unwrap() {
-            tasks.abort_all();
-            return Err(e.into());
-        }
-    }
 
     res
 }

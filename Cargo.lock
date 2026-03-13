@@ -588,7 +588,6 @@ dependencies = [
 name = "bb-flasher-dfu"
 version = "0.0.20"
 dependencies = [
- "bb-helper",
  "dfu-libusb",
  "rusb",
  "thiserror 2.0.18",
@@ -613,7 +612,6 @@ dependencies = [
  "anyhow",
  "bb-bmap-parser",
  "bb-drivelist",
- "bb-helper",
  "fatfs",
  "fscommon",
  "gpt",
@@ -643,7 +641,6 @@ version = "0.0.20"
 dependencies = [
  "anyhow",
  "bb-flasher",
- "bb-helper",
  "clap",
  "clap_complete",
  "console",
@@ -5934,6 +5931,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]
