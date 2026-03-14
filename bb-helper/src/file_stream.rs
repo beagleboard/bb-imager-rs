@@ -5,13 +5,12 @@
 use std::{
     io,
     path::Path,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Condvar, Mutex},
 };
 
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+
+type SharedState = Arc<(Mutex<bool>, Condvar)>;
 
 /// Asynchronous writer half of a file-backed stream.
 ///
@@ -19,11 +18,11 @@ use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 /// to a permanent location using [`persist`](Self::persist).
 pub struct WriterFileStream {
     file: tokio::fs::File,
-    writing: Arc<AtomicBool>,
+    writing: SharedState,
 }
 
 impl WriterFileStream {
-    const fn new(file: tokio::fs::File, writing: Arc<AtomicBool>) -> Self {
+    const fn new(file: tokio::fs::File, writing: SharedState) -> Self {
         Self { file, writing }
     }
 
@@ -49,14 +48,18 @@ impl tokio::io::AsyncWrite for WriterFileStream {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<Result<usize, io::Error>> {
-        std::pin::Pin::new(&mut self.file).poll_write(cx, buf)
+        let res = std::pin::Pin::new(&mut self.file).poll_write(cx, buf);
+        self.writing.1.notify_all();
+        res
     }
 
     fn poll_flush(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), io::Error>> {
-        std::pin::Pin::new(&mut self.file).poll_flush(cx)
+        let res = std::pin::Pin::new(&mut self.file).poll_flush(cx);
+        self.writing.1.notify_all();
+        res
     }
 
     fn poll_shutdown(
@@ -69,7 +72,10 @@ impl tokio::io::AsyncWrite for WriterFileStream {
 
 impl Drop for WriterFileStream {
     fn drop(&mut self) {
-        self.writing.store(false, Ordering::Relaxed);
+        let (lock, cvar) = &*self.writing;
+        let mut writing = lock.lock().unwrap();
+        *writing = false;
+        cvar.notify_all();
     }
 }
 
@@ -79,11 +85,11 @@ impl Drop for WriterFileStream {
 /// is active, reading will block until data is available or the writer closes.
 pub struct ReaderFileStream {
     file: std::fs::File,
-    writing: Arc<AtomicBool>,
+    writing: SharedState,
 }
 
 impl ReaderFileStream {
-    const fn new(file: std::fs::File, writing: Arc<AtomicBool>) -> Self {
+    const fn new(file: std::fs::File, writing: SharedState) -> Self {
         Self { file, writing }
     }
 }
@@ -93,11 +99,17 @@ impl std::io::Read for ReaderFileStream {
         loop {
             let count = self.file.read(buf)?;
 
-            if count == 0 && self.writing.load(Ordering::Relaxed) {
-                std::thread::yield_now();
-            } else {
-                return Ok(count);
+            if count == 0 {
+                let (lock, cvar) = &*self.writing;
+                let writing = lock.lock().unwrap();
+
+                if *writing {
+                    drop(cvar.wait(writing));
+                    continue;
+                }
             }
+
+            return Ok(count);
         }
     }
 }
@@ -114,7 +126,7 @@ impl std::io::Seek for ReaderFileStream {
 /// The writer can write asynchronously, while the reader provides synchronous access.
 pub fn file_stream() -> io::Result<(WriterFileStream, ReaderFileStream)> {
     let file = tempfile::NamedTempFile::new()?;
-    let flag = Arc::new(AtomicBool::new(true));
+    let flag = Arc::new((Mutex::new(true), Condvar::new()));
 
     let reader = ReaderFileStream::new(file.reopen()?, flag.clone());
     let writer = WriterFileStream::new(file.into_file().into(), flag);
