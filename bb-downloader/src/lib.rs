@@ -20,13 +20,13 @@
 //!     let url = "https://example.com/img.jpg";
 //!
 //!     // Download with just URL
-//!     downloader.download(url, None).await.unwrap();
+//!     downloader.download(url).await.unwrap();
 //!
 //!     // Check if the file is in cache
 //!     assert!(downloader.check_cache_from_url(url).is_some());
 //!
 //!     // Will fetch directly from cache instead of re-downloading
-//!     downloader.download(url, None).await.unwrap();
+//!     downloader.download(url).await.unwrap();
 //!
 //!     // Will fetch directly from cache instead of re-downloading
 //!     assert!(!downloader.check_cache_from_sha(sha).await.is_some());
@@ -157,15 +157,7 @@ impl Downloader {
     ///
     /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
     /// file is known in advance.
-    ///
-    /// # Progress
-    ///
-    /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
-    pub async fn download<U: reqwest::IntoUrl>(
-        &self,
-        url: U,
-        chan: Option<mpsc::Sender<f32>>,
-    ) -> io::Result<PathBuf> {
+    pub async fn download<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
         // Check cache
@@ -173,7 +165,7 @@ impl Downloader {
             return Ok(p);
         }
 
-        self.download_no_cache(url, chan).await
+        self.download_no_cache(url).await
     }
 
     /// Downloads the file without checking cache.
@@ -181,25 +173,15 @@ impl Downloader {
     /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
     /// file is known in advance.
     ///
-    /// # Progress
-    ///
-    /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
-    ///
     /// # Differences from [Self::download]
     ///
     /// This function does not check if the file is present in cache, and will ovewrite the old
     /// cached file. The file is still cached in the end.
-    pub async fn download_no_cache<U: reqwest::IntoUrl>(
-        &self,
-        url: U,
-        mut chan: Option<mpsc::Sender<f32>>,
-    ) -> io::Result<PathBuf> {
+    pub async fn download_no_cache<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
         let file_path = self.path_from_url(&url);
-        chan_send(chan.as_mut(), 0.0);
 
-        let mut cur_pos = 0;
         let mut file = AsyncTempFile::new()?;
         {
             let mut file = tokio::io::BufWriter::new(&mut file.0);
@@ -210,19 +192,11 @@ impl Downloader {
                 .send()
                 .await
                 .map_err(io::Error::other)?;
-            let response_size = response.content_length();
             let mut response_stream = response.bytes_stream();
-
-            let response_size = match response_size {
-                Some(x) => x as usize,
-                None => response_stream.size_hint().0,
-            };
 
             while let Some(x) = response_stream.next().await {
                 let mut data = x.map_err(io::Error::other)?;
-                cur_pos += data.len();
                 file.write_all_buf(&mut data).await?;
-                chan_send(chan.as_mut(), (cur_pos as f32) / (response_size as f32));
             }
 
             file.flush().await?
@@ -266,7 +240,6 @@ impl Downloader {
             let mut hasher = Sha256::new();
 
             while let Some(x) = response_stream.next().await {
-                tracing::debug!("Got buf");
                 let mut data = x.map_err(io::Error::other)?;
                 hasher.update(&data);
                 file.write_all_buf(&mut data).await?;
