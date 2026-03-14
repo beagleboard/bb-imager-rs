@@ -423,7 +423,7 @@ impl IntoFuture for Bmap {
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(async move {
-            let p = self.downloader.download(*self.url.clone(), None).await?;
+            let p = self.downloader.download(*self.url.clone()).await?;
             tokio::fs::read_to_string(p).await.map(Into::into)
         })
     }

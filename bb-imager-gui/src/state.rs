@@ -71,7 +71,7 @@ impl BBImagerCommon {
             let icon_clone = icon.clone();
             let icon_clone2 = icon.clone();
             Task::perform(
-                async move { downloader.download_no_cache(icon_clone, None).await },
+                async move { downloader.download_no_cache(icon_clone).await },
                 move |p| match p {
                     Ok(p) => BBImagerMessage::ResolveImage(icon_clone2, p),
                     Err(_) => {
