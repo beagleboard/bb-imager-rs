@@ -230,7 +230,7 @@ impl<Message> canvas::Program<Message> for ProgressCircle {
 }
 
 pub(crate) fn board_view_pane<'a>(
-    dev: &'a bb_config::config::Device,
+    dev: &'a crate::db::Board,
     state: &'a crate::BBImagerCommon,
 ) -> Element<'a, BBImagerMessage> {
     let img: Element<BBImagerMessage> = match &dev.icon {
@@ -277,7 +277,7 @@ pub(crate) fn board_view_pane<'a>(
     if let Some(x) = &dev.documentation {
         btns.push(
             widget::button(widget::text("DOCUMENTATION"))
-                .on_press(BBImagerMessage::OpenUrl(x.clone()))
+                .on_press(BBImagerMessage::OpenUrl(x.clone().into()))
                 .into(),
         );
     }

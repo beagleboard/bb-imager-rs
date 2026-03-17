@@ -1,140 +1,21 @@
-use std::{collections::HashMap, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration};
+use std::{
+    borrow::Cow, collections::HashMap, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration,
+};
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
-use bb_config::config::{self, OsListItem};
+use bb_config::config;
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
 use iced::{futures, widget};
 use url::Url;
 
-#[derive(Debug, Clone)]
-pub(crate) struct Boards {
-    config: config::Config,
-}
-
-impl Boards {
-    pub(crate) fn merge(&mut self, config: bb_config::Config) {
-        self.config.extend([config])
-    }
-
-    pub(crate) fn unrsolved_configs(&self) -> impl Iterator<Item = &Url> {
-        self.config.imager.remote_configs.iter()
-    }
-
-    pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &config::Device)> {
-        self.config.imager.devices.iter().enumerate()
-    }
-
-    pub(crate) fn image(&self, target: &[usize]) -> &OsListItem {
-        let mut res = &self.config.os_list;
-        let (last, rest) = target.split_last().unwrap();
-
-        for i in rest {
-            let item = res.get(*i).expect("No Subitem");
-            res = match item {
-                OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList(item) => &item.subitems,
-                OsListItem::RemoteSubList { .. } => panic!("No subitem"),
-            }
-        }
-
-        res.get(*last).unwrap()
-    }
-
-    pub(crate) fn images(
-        &self,
-        board_idx: usize,
-        subitems: &[usize],
-    ) -> Option<impl Iterator<Item = (usize, &OsListItem)>> {
-        let mut res = &self.config.os_list;
-
-        for i in subitems {
-            let item = res.get(*i).expect("No Subitem");
-            res = match item {
-                OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList(item) => &item.subitems,
-                OsListItem::RemoteSubList { .. } => return None,
-            }
-        }
-
-        let dev = self.device(board_idx);
-        let tags = &dev.tags;
-
-        Some(
-            res.iter()
-                .enumerate()
-                .filter(move |(_, x)| x.has_board_image(tags))
-                .filter(|(_, x)| match x {
-                    OsListItem::RemoteSubList(item) => flasher_supported(item.flasher),
-                    OsListItem::SubList(item) => flasher_supported(item.flasher),
-                    _ => true,
-                }),
-        )
-    }
-
-    pub(crate) fn device(&self, board_idx: usize) -> &config::Device {
-        self.config
-            .imager
-            .devices
-            .get(board_idx)
-            .expect("Board does not exist")
-    }
-
-    pub(crate) fn resolve_remote_subitem(&mut self, subitems: Vec<OsListItem>, target: &[usize]) {
-        assert!(!target.is_empty());
-
-        let mut res = &mut self.config.os_list;
-
-        let (last, rest) = target.split_last().unwrap();
-
-        for i in rest {
-            let item = res.get_mut(*i).expect("No Subitem");
-            res = match item {
-                OsListItem::Image(_) => panic!("No subitem"),
-                OsListItem::SubList(item) => &mut item.subitems,
-                OsListItem::RemoteSubList { .. } => panic!("No subitem"),
-            }
-        }
-
-        if let OsListItem::RemoteSubList(item) = res.get(*last).unwrap().clone() {
-            res[*last] = OsListItem::SubList(item.resolve(subitems))
-        } else {
-            tracing::warn!("Unexpected item")
-        }
-    }
-
-    pub(crate) fn from_config(value: config::Config) -> Self {
-        let filtered = config::Config {
-            imager: config::Imager {
-                remote_configs: value.imager.remote_configs,
-                devices: value
-                    .imager
-                    .devices
-                    .into_iter()
-                    .filter(|x| flasher_supported(x.flasher))
-                    .collect(),
-            },
-            os_list: value.os_list,
-        };
-
-        Self { config: filtered }
-    }
-
-    pub(crate) fn new() -> Self {
-        let cfg = serde_json::from_slice::<config::Config>(crate::constants::DEFAULT_CONFIG)
-            .expect("Failed to parse config");
-
-        Self::from_config(cfg)
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) enum BoardImageIcon {
     Remote(url::Url),
     Local,
     Format,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
     SdFormat {
@@ -174,37 +55,37 @@ impl BoardImage {
     }
 
     pub(crate) fn remote(
-        image: config::OsImage,
+        image: crate::db::OsImage,
         flasher: config::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
         let mut details = vec![
             ("Release Date", image.release_date.to_string()),
-            ("Image Size", pretty_bytes(image.extract_size)),
+            ("Image Size", pretty_bytes(image.extract_size as u64)),
         ];
 
         if let Some(x) = image.image_download_size {
-            details.push(("Download Size", pretty_bytes(x)))
+            details.push(("Download Size", pretty_bytes(x as u64)))
         }
 
         Self::Image {
             img: RemoteImage::new(
                 image.name.into(),
-                Box::new(image.url),
+                Box::new(image.url.into()),
                 image.image_download_sha256,
-                image.extract_size,
+                image.extract_size as u64,
                 downloader.clone(),
             )
             .into(),
             bmap: image.bmap.map(|url| Bmap {
-                url: Box::new(url),
+                url: Box::new(url.into()),
                 downloader,
             }),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
             description: Some(image.description),
-            icon: BoardImageIcon::Remote(image.icon),
+            icon: BoardImageIcon::Remote(image.icon.into()),
             details,
         }
     }
@@ -307,12 +188,14 @@ pub(crate) fn system_keymap() -> String {
         .unwrap_or_else(|| String::from("us"))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RemoteImage {
     name: Box<str>,
     url: Box<url::Url>,
+    #[serde(with = "const_hex")]
     extract_sha256: [u8; 32],
     extract_size: u64,
+    #[serde(skip)]
     downloader: bb_downloader::Downloader,
 }
 
@@ -411,9 +294,10 @@ impl std::fmt::Display for RemoteImage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct Bmap {
     url: Box<Url>,
+    #[serde(skip)]
     downloader: bb_downloader::Downloader,
 }
 
@@ -429,7 +313,7 @@ impl IntoFuture for Bmap {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) enum SelectedImage {
     LocalImage(bb_flasher::LocalImage),
     RemoteImage(RemoteImage),
@@ -668,7 +552,7 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     }
 }
 
-const fn flasher_supported(flasher: config::Flasher) -> bool {
+pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
         config::Flasher::SdCard => true,
         #[cfg(feature = "bcf_cc1352p7")]
@@ -746,34 +630,6 @@ impl FlashingCustomization {
             _ => true,
         }
     }
-}
-
-/// Fetches the main remote os_list file from `bb_config::DISTROS_URL` and merges it with the base
-/// config.
-async fn fetch_remote_os_list(
-    client: bb_downloader::Downloader,
-    url: Url,
-) -> std::io::Result<config::Config> {
-    client.download_json_no_cache(url).await
-}
-
-pub(crate) fn refresh_config_task(
-    client: bb_downloader::Downloader,
-    config: &Boards,
-) -> iced::Task<BBImagerMessage> {
-    let tasks = config.unrsolved_configs().map(|x| {
-        iced::Task::perform(
-            fetch_remote_os_list(client.clone(), x.clone()),
-            |x: std::io::Result<config::Config>| match x {
-                Ok(y) => BBImagerMessage::ExtendConfig(y),
-                Err(e) => {
-                    tracing::error!("Failed to fetch config: {e}");
-                    BBImagerMessage::Null
-                }
-            },
-        )
-    });
-    iced::Task::batch(tasks)
 }
 
 #[cfg(target_os = "linux")]
@@ -950,54 +806,66 @@ pub(crate) fn app_title(_: &crate::BBImager) -> String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OsImageId {
-    // Vec points to parent
-    Format(Vec<usize>),
-    // Vec points to parent
-    Local(Vec<usize>),
-    // Vec points to OsImage
-    Remote(Vec<usize>),
+    Format,
+    // points to parent
+    Local(config::Flasher),
+    // points to OsImage
+    OsImage(i64),
+    OsSublist(i64),
 }
 
-pub(crate) struct OsImageItem<'a> {
+#[derive(Debug, Clone)]
+pub(crate) struct OsImageItem {
     pub(crate) id: OsImageId,
-    pub(crate) icon: Option<&'a url::Url>,
-    pub(crate) label: &'a str,
-    pub(crate) is_sublist: bool,
+    pub(crate) icon: Option<url::Url>,
+    pub(crate) label: Cow<'static, str>,
 }
 
-impl<'a> OsImageItem<'a> {
-    pub(crate) fn format(parent: Vec<usize>, label: &'a str) -> Self {
+impl From<crate::db::OsImageListItem> for OsImageItem {
+    fn from(value: crate::db::OsImageListItem) -> Self {
         Self {
-            id: OsImageId::Format(parent),
+            id: OsImageId::OsImage(value.id),
+            icon: Some(value.icon.into()),
+            label: Cow::Owned(value.name),
+        }
+    }
+}
+
+impl From<crate::db::OsSublistListItem> for OsImageItem {
+    fn from(value: crate::db::OsSublistListItem) -> Self {
+        Self {
+            id: OsImageId::OsSublist(value.id),
+            icon: Some(value.icon.into()),
+            label: Cow::Owned(value.name),
+        }
+    }
+}
+
+impl OsImageItem {
+    pub(crate) fn format(label: Cow<'static, str>) -> Self {
+        Self {
+            id: OsImageId::Format,
             icon: None,
             label,
-            is_sublist: false,
         }
     }
 
-    pub(crate) fn local(parent: Vec<usize>) -> Self {
+    pub(crate) fn local(flasher: config::Flasher) -> Self {
         Self {
-            id: OsImageId::Local(parent),
+            id: OsImageId::Local(flasher),
             icon: None,
-            label: "Select Local Image",
-            is_sublist: false,
+            label: Cow::Borrowed("Select Local Image"),
         }
     }
 
-    pub(crate) fn remote(
-        id: Vec<usize>,
-        url: &'a url::Url,
-        label: &'a str,
-        is_sublist: bool,
-    ) -> Self {
-        Self {
-            id: OsImageId::Remote(id),
-            icon: Some(url),
-            label,
-            is_sublist,
-        }
+    pub(crate) const fn is_sublist(&self) -> bool {
+        matches!(self.id, OsImageId::OsSublist(_))
+    }
+
+    pub(crate) fn label(&self) -> &str {
+        &self.label
     }
 }
 
@@ -1030,4 +898,27 @@ impl<'a> DestinationItem<'a> {
             DestinationItem::Destination(d) => dst.eq(d),
         }
     }
+}
+
+pub(crate) fn fetch_images(
+    downloader: &bb_downloader::Downloader,
+    iter: impl IntoIterator<Item = url::Url>,
+) -> iced::Task<BBImagerMessage> {
+    let tasks = iter.into_iter().map(|icon| {
+        let downloader = downloader.clone();
+        let icon_clone = icon.clone();
+        let icon_clone2 = icon.clone();
+        iced::Task::perform(
+            async move { downloader.download_no_cache(icon_clone).await },
+            move |p| match p {
+                Ok(p) => BBImagerMessage::ResolveImage(icon_clone2, p),
+                Err(_) => {
+                    tracing::warn!("Failed to fetch image {}", icon);
+                    BBImagerMessage::Null
+                }
+            },
+        )
+    });
+
+    iced::Task::batch(tasks)
 }

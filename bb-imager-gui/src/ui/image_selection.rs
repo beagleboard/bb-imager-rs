@@ -30,101 +30,100 @@ pub(crate) fn view<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BB
 }
 
 fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBImagerMessage> {
-    match state.images() {
-        Some(imgs) => {
-            let items = imgs
-                .map(|img| {
-                    let is_selected = state
-                        .selected_image
-                        .as_ref()
-                        .map(|(x, _)| *x == img.id)
-                        .unwrap_or(false);
-
-                    let icon: Element<BBImagerMessage> = match img.id {
-                        crate::helpers::OsImageId::Format(_) => {
-                            widget::svg(state.format_svg().clone())
-                                .height(ICON_WIDTH)
-                                .width(ICON_WIDTH)
-                                .style(svg_icon_style)
-                                .into()
-                        }
-                        crate::helpers::OsImageId::Local(_) => {
-                            widget::svg(state.file_add_svg().clone())
-                                .height(ICON_WIDTH)
-                                .width(ICON_WIDTH)
-                                .style(svg_icon_style)
-                                .into()
-                        }
-                        crate::helpers::OsImageId::Remote(_) => {
-                            match state
-                                .image_handle_cache()
-                                .get(img.icon.expect("Missing Os Image icon"))
-                            {
-                                Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
-                                _ => widget::svg(state.downloading_svg().clone())
-                                    .height(ICON_WIDTH)
-                                    .width(ICON_WIDTH)
-                                    .style(svg_icon_style)
-                                    .into(),
-                            }
-                        }
-                    };
-
-                    let row =
-                        widget::row![icon, text(img.label).size(18).width(iced::Length::Fill)];
-                    let row = if img.is_sublist {
-                        row.push(
-                            widget::svg(state.arrow_forward_svg().clone())
-                                .height(20)
-                                .width(iced::Shrink)
-                                .style(svg_icon_style),
-                        )
-                    } else {
-                        row
-                    };
-
-                    button(
-                        row.spacing(12)
-                            .padding(8)
-                            .align_y(iced::alignment::Vertical::Center),
-                    )
-                    .on_press(BBImagerMessage::SelectOs(img.id))
-                    .style(move |theme, status| card_btn_style(theme, status, is_selected))
-                })
-                .map(Into::into);
-
-            let col = if state.pos.is_empty() {
-                widget::column(items)
-            } else {
-                let icon = widget::svg(state.arrow_back_svg().clone())
-                    .height(ICON_WIDTH)
-                    .width(ICON_WIDTH)
-                    .style(svg_icon_style);
-                let row = widget::row![icon, text("Back").size(18).width(iced::Length::Fill)]
-                    .spacing(12)
-                    .padding(8)
-                    .align_y(iced::alignment::Vertical::Center);
-                widget::column(
-                    [button(row)
-                        .on_press(BBImagerMessage::GotoOsListParent)
-                        .style(move |theme, status| card_btn_style(theme, status, false))
-                        .into()]
-                    .into_iter()
-                    .chain(items),
-                )
-            };
-
-            widget::scrollable(col.padding(LIST_COL_PADDING))
-                .id(state.common.scroll_id.clone())
-                .into()
-        }
-        None => widget::center(
+    if state.images.is_empty() {
+        widget::center(
             iced_aw::Spinner::new()
                 .width(50)
                 .height(50)
                 .circle_radius(3.0),
         )
-        .into(),
+        .into()
+    } else {
+        let items = state
+            .images
+            .iter()
+            .map(|img| {
+                let is_selected = state
+                    .selected_image
+                    .as_ref()
+                    .map(|(x, _)| *x == img.id)
+                    .unwrap_or(false);
+
+                let icon: Element<BBImagerMessage> = match img.id {
+                    crate::helpers::OsImageId::Format => widget::svg(state.format_svg().clone())
+                        .height(ICON_WIDTH)
+                        .width(ICON_WIDTH)
+                        .style(svg_icon_style)
+                        .into(),
+                    crate::helpers::OsImageId::Local(_) => {
+                        widget::svg(state.file_add_svg().clone())
+                            .height(ICON_WIDTH)
+                            .width(ICON_WIDTH)
+                            .style(svg_icon_style)
+                            .into()
+                    }
+                    crate::helpers::OsImageId::OsImage(_)
+                    | crate::helpers::OsImageId::OsSublist(_) => {
+                        match state
+                            .image_handle_cache()
+                            .get(img.icon.as_ref().expect("Missing Os Image icon"))
+                        {
+                            Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
+                            _ => widget::svg(state.downloading_svg().clone())
+                                .height(ICON_WIDTH)
+                                .width(ICON_WIDTH)
+                                .style(svg_icon_style)
+                                .into(),
+                        }
+                    }
+                };
+
+                let row = widget::row![icon, text(img.label()).size(18).width(iced::Length::Fill)];
+                let row = if img.is_sublist() {
+                    row.push(
+                        widget::svg(state.arrow_forward_svg().clone())
+                            .height(20)
+                            .width(iced::Shrink)
+                            .style(svg_icon_style),
+                    )
+                } else {
+                    row
+                };
+
+                button(
+                    row.spacing(12)
+                        .padding(8)
+                        .align_y(iced::alignment::Vertical::Center),
+                )
+                .on_press(BBImagerMessage::SelectOs(img.id))
+                .style(move |theme, status| card_btn_style(theme, status, is_selected))
+            })
+            .map(Into::into);
+
+        let col = if state.pos.is_none() {
+            widget::column(items)
+        } else {
+            let icon = widget::svg(state.arrow_back_svg().clone())
+                .height(ICON_WIDTH)
+                .width(ICON_WIDTH)
+                .style(svg_icon_style);
+            let row = widget::row![icon, text("Back").size(18).width(iced::Length::Fill)]
+                .spacing(12)
+                .padding(8)
+                .align_y(iced::alignment::Vertical::Center);
+            widget::column(
+                [button(row)
+                    .on_press(BBImagerMessage::GotoOsListParent)
+                    .style(move |theme, status| card_btn_style(theme, status, false))
+                    .into()]
+                .into_iter()
+                .chain(items),
+            )
+        };
+
+        widget::scrollable(col.padding(LIST_COL_PADDING))
+            .id(state.common.scroll_id.clone())
+            .into()
     }
 }
 

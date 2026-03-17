@@ -48,7 +48,7 @@ pub use flasher::*;
 pub use img::OsImage;
 
 /// An Os Image present in the local filesystem
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct LocalImage(Box<Path>);
 
 impl LocalImage {

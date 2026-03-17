@@ -27,6 +27,8 @@ VERBOSE ?= 0
 TARGET ?= ${_HOST_TARGET}
 ## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
 NO_BUILD ?= 0
+## variable: SYSTEM_SQLITE: Do not bundle sqlite.
+SYSTEM_SQLITE ?= 1
 
 ifeq (${VERBOSE}, 1)
 	_RUST_ARGS+=--verbose
@@ -50,6 +52,11 @@ _RUST_ARGS_CLI = ${_RUST_ARGS_CLI_GUI}
 
 ifeq (${DFU}, 1)
 	_RUST_ARGS_CLI+=-F dfu
+endif
+
+_RUST_ARGS_GUI = ${_RUST_ARGS_CLI_GUI} -F updater
+ifeq (${SYSTEM_SQLITE}, 1)
+	_RUST_ARGS_GUI+=--no-default-features -F system-sqlite
 endif
 
 ## housekeeping: help: Display this help message
@@ -94,7 +101,7 @@ ifeq (${NO_BUILD}, 1)
 	$(info "Skip Building GUI")
 else
 	$(info "Building GUI")
-	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_CLI_GUI} -F updater
+	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_GUI}
 endif
 
 ## run: run-gui: Run GUI for quick testing on host.

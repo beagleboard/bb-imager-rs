@@ -12,6 +12,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::state::BBImagerCommon;
 
 mod constants;
+mod db;
 mod helpers;
 mod message;
 mod persistance;
@@ -107,6 +108,7 @@ impl BBImager {
     const fn choose_board(common: BBImagerCommon) -> Self {
         Self::ChooseBoard(state::ChooseBoardState {
             common,
+            boards: Vec::new(),
             selected_board: None,
         })
     }
@@ -128,20 +130,7 @@ impl BBImager {
         )
         .unwrap();
 
-        // Fetch old config
-        let client = downloader.clone();
-        let config_task = helpers::refresh_config_task(client, &helpers::Boards::new());
-        let boards = helpers::Boards::new();
-
-        let img_handle_cache = helpers::ImageHandleCache::from_iter(
-            boards
-                .devices()
-                .filter_map(|(_, dev)| dev.icon.clone())
-                .filter_map(|icon| {
-                    let path = downloader.check_cache_from_url(icon.clone())?;
-                    Some((icon, path))
-                }),
-        );
+        let db = crate::db::Db::new().unwrap();
 
         let common = BBImagerCommon {
             app_config,
@@ -155,7 +144,6 @@ impl BBImager {
                     .map(|x| x.to_string())
                     .collect(),
             ),
-            boards,
             board_svg_handle: widget::svg::Handle::from_memory(constants::BOARD_ICON),
             downloading_svg_handle: widget::svg::Handle::from_memory(constants::DOWNLOADING_ICON),
             arrow_forward_svg_handle: widget::svg::Handle::from_memory(
@@ -170,18 +158,21 @@ impl BBImager {
             window_icon_handle: widget::image::Handle::from_bytes(crate::constants::WINDOW_ICON),
             copy_svg_handle: widget::svg::Handle::from_memory(constants::COPY_ICON),
 
-            img_handle_cache,
+            img_handle_cache: helpers::ImageHandleCache::default(),
 
             scroll_id: widget::Id::unique(),
+            db: db.clone(),
         };
 
-        // Fetch all board images
-        let board_image_task = common.fetch_board_images();
-
+        let db_task = Task::future(async move {
+            db.init().await.expect("Failed to initialize db");
+            BBImagerMessage::DbInitSuccess
+        });
         let updater_task = common.updater_task();
+
         (
             Self::choose_board(common),
-            Task::batch([config_task, board_image_task, updater_task]),
+            Task::batch([db_task, updater_task]),
         )
     }
 
@@ -201,10 +192,6 @@ impl BBImager {
 
     fn fetch_board_images(&self) -> Task<BBImagerMessage> {
         self.common().fetch_board_images()
-    }
-
-    fn boards_merge(&mut self, c: bb_config::Config) {
-        self.common_mut().boards.merge(c)
     }
 
     fn common_mut(&mut self) -> &mut BBImagerCommon {
@@ -243,29 +230,11 @@ impl BBImager {
         self.common_mut().img_handle_cache.insert(k, v)
     }
 
-    fn resolve_remote_subitem(
-        &mut self,
-        item: Vec<bb_config::config::OsListItem>,
-        target: &[usize],
-    ) {
-        self.common_mut()
-            .boards
-            .resolve_remote_subitem(item, target);
+    fn image_cache_extend(&mut self, iter: Vec<(url::Url, std::path::PathBuf)>) {
+        self.common_mut().img_handle_cache.extend(iter)
     }
 
-    // Resolve remote items and image icons only when in os selection page. nop in other cases.
-    pub(crate) fn resolve_images(&self, target: &[usize]) -> Task<BBImagerMessage> {
-        match self {
-            BBImager::ChooseOs(x) => self.common().resolve_images(x.selected_board, target),
-            BBImager::AppInfo(overlay_state) => match &overlay_state.page {
-                state::OverlayData::ChooseOs(x) => self.common().resolve_images(x.selected_board, target),
-                _ => Task::none(),
-            },
-            _ => Task::none(),
-        }
-    }
-
-    fn restart(&mut self) {
+    fn restart(&mut self) -> Task<BBImagerMessage> {
         *self = match std::mem::take(self) {
             BBImager::ChooseOs(x) => BBImager::choose_board(x.common),
             BBImager::ChooseDest(x) => BBImager::choose_board(x.common),
@@ -279,6 +248,8 @@ impl BBImager {
                 panic!("Unexpected screen")
             }
         };
+
+        self.refresh_board_list()
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
@@ -310,15 +281,13 @@ impl BBImager {
             _ => panic!("Unexpected page"),
         };
 
-        let board = state.common.boards.device(state.selected_board);
-
         let is_download = state.is_download();
         let customization = state.customization;
         let img = state.selected_image.1.clone();
         let dst = state.selected_dest;
 
         tracing::info!("Starting Flashing Process");
-        tracing::info!("Selected Board: {:#?}", board);
+        tracing::info!("Selected Board: {:#?}", state.selected_board);
         tracing::info!("Selected Image: {:#?}", img);
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
@@ -373,6 +342,74 @@ impl BBImager {
         t
     }
 
+    fn refresh_board_list(&self) -> Task<BBImagerMessage> {
+        let db = self.common().db.clone();
+
+        Task::perform(async move { db.board_list().await }, |x| match x {
+            Ok(res) => BBImagerMessage::UpdateBoardList(res),
+            Err(e) => {
+                tracing::error!("Failed to get board list {e}");
+                BBImagerMessage::Null
+            }
+        })
+    }
+
+    fn resolve_remote_sublists(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
+        let db = self.common().db.clone();
+        let downloader = self.common().downloader.clone();
+
+        Task::future(async move { db.os_remote_sublists(board_id, pos).await.unwrap() }).then(
+            move |items| {
+                let dl = downloader.clone();
+                let temp = items.into_iter().map(move |(id, url)| {
+                    let url_clone = url::Url::from(url.clone());
+                    let dl = dl.clone();
+                    Task::perform(
+                        async move { dl.download_json_no_cache(url_clone).await },
+                        move |x| match x {
+                            Ok(json) => BBImagerMessage::ResolveRemoteSubitemItem {
+                                item: json,
+                                target: id,
+                            },
+                            Err(e) => {
+                                tracing::error!("Failed to get remote item {}: {e}", url.as_str());
+                                BBImagerMessage::Null
+                            }
+                        },
+                    )
+                });
+
+                Task::batch(temp)
+            },
+        )
+    }
+
+    fn refresh_image_list(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
+        let db = self.common().db.clone();
+        Task::perform(
+            async move {
+                let imgs = db.os_image_items(board_id, pos).await.unwrap();
+                (imgs, pos)
+            },
+            BBImagerMessage::UpdateOsList,
+        )
+    }
+
+    fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
+        let db = self.common().db.clone();
+        Task::perform(
+            async move {
+                db.os_image_icons_by_board_id(board_id)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(Into::into)
+                    .collect()
+            },
+            BBImagerMessage::FilterResolveImages,
+        )
+    }
+
     fn scroll_reset(&self) -> Task<BBImagerMessage> {
         widget::operation::snap_to(
             self.common().scroll_id.clone(),
@@ -415,7 +452,20 @@ impl BBImager {
             | Self::ChooseBoard(_) => panic!("Unexpected message"),
         };
 
-        self.scroll_reset()
+        match self {
+            BBImager::ChooseBoard(_) => {
+                Task::batch([self.refresh_board_list(), self.scroll_reset()])
+            }
+            BBImager::ChooseOs(inner) => {
+                let board_id = inner.selected_board.id;
+                Task::batch([
+                    self.refresh_image_list(board_id, None),
+                    self.refresh_image_icons(board_id),
+                    self.scroll_reset(),
+                ])
+            }
+            _ => self.scroll_reset(),
+        }
     }
 
     fn next(&mut self) -> Task<BBImagerMessage> {
@@ -426,9 +476,11 @@ impl BBImager {
                     .expect("Board should alread have been selected");
                 Self::ChooseOs(state::ChooseOsState {
                     common: inner.common,
+                    flasher: selected_board.flasher,
                     selected_board,
-                    pos: Vec::with_capacity(5),
+                    pos: None,
                     selected_image: None,
+                    images: Vec::new(),
                 })
             }
             Self::ChooseOs(inner) => {
@@ -521,10 +573,15 @@ impl BBImager {
         };
 
         match self {
-            Self::ChooseOs(inner) => Task::batch([
-                inner.common.resolve_images(inner.selected_board, &[]),
-                self.scroll_reset(),
-            ]),
+            Self::ChooseOs(inner) => {
+                let board_id = inner.selected_board.id;
+                Task::batch([
+                    self.refresh_image_list(board_id, None),
+                    self.resolve_remote_sublists(board_id, None),
+                    self.refresh_image_icons(board_id),
+                    self.scroll_reset(),
+                ])
+            }
             Self::Review(inner) => match &inner.customization {
                 helpers::FlashingCustomization::LinuxSdSysconfig(c) => {
                     let mut temp = inner
