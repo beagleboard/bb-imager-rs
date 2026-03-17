@@ -263,9 +263,9 @@ dependencies = [
 
 [[package]]
 name = "ashpd"
-version = "0.13.5"
+version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b09507a218cf6eb4ab0659883e54880cea3984e3dbaa4989b6cda3f8f8a97a5"
+checksum = "313dc617cf7b7e5d58021f999756898e60bdddd64eab2bc2f67909659e3ce5f9"
 dependencies = [
  "enumflags2",
  "futures-util",
@@ -653,7 +653,7 @@ name = "bb-imager-gui"
 version = "0.0.20"
 dependencies = [
  "anyhow",
- "ashpd 0.13.5",
+ "ashpd 0.13.7",
  "bb-config",
  "bb-downloader",
  "bb-flasher",
@@ -5738,7 +5738,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
