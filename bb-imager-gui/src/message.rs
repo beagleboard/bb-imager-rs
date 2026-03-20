@@ -1,6 +1,6 @@
 //! Global GUI Messages
 
-use iced::{Task, widget::operation};
+use iced::Task;
 
 use crate::{
     BBImager, helpers,
@@ -213,7 +213,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::FilterResolveImages(x) => {
             let iter = x
                 .into_iter()
-                .filter(|x| state.common().img_handle_cache.get(x).is_none());
+                .filter(|x| state.common().img_handle_cache.contains(x));
             return helpers::fetch_images(&state.common().downloader, iter);
         }
         BBImagerMessage::ExtendConfig((u, c)) => {
@@ -455,10 +455,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 std::mem::take(state).try_into().expect("Unexpected page"),
             ));
 
-            return operation::snap_to(
-                state.common().scroll_id.clone(),
-                operation::RelativeOffset::START,
-            );
+            return state.scroll_reset();
         }
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
@@ -510,9 +507,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             );
 
-            let update_board_list = state.refresh_board_list();
-
-            return Task::batch([board_icon_cache_task, config_fetch_task, update_board_list]);
+            return Task::batch([
+                board_icon_cache_task,
+                config_fetch_task,
+                state.refresh_board_list(),
+            ]);
         }
         BBImagerMessage::Null => {}
     }

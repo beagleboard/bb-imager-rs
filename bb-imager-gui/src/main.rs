@@ -112,9 +112,7 @@ impl BBImager {
             selected_board: None,
         })
     }
-}
 
-impl BBImager {
     fn new() -> (Self, Task<BBImagerMessage>) {
         let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
 
