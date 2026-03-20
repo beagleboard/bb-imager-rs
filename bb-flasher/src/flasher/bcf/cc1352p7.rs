@@ -93,16 +93,14 @@ where
                 .await
                 .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-            let resp = tokio::task::spawn_blocking(move || {
+            tokio::task::spawn_blocking(move || {
                 let mut data = Vec::new();
                 img.read_to_end(&mut data)?;
                 Ok::<Vec<u8>, std::io::Error>(data)
             })
             .await
             .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            resp
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
         };
 
         let flasher_task = if let Some(mut chan) = chan {

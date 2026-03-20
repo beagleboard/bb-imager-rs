@@ -21,15 +21,21 @@ pub(crate) fn view<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
         board_list_pane(state),
         board_view_pane(state),
         [widget::button("NEXT")
-            .on_press_maybe(state.selected_board.map(|_| BBImagerMessage::Next))],
+            .on_press_maybe(state.selected_board.as_ref().map(|_| BBImagerMessage::Next))],
     )
 }
 
 fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessage> {
     let items = state
-        .devices()
-        .map(|(id, dev)| {
-            let is_selected = state.selected_board.map(|x| x == id).unwrap_or(false);
+        .boards
+        .iter()
+        .map(|dev| {
+            // TODO: Make selected_board proper id
+            let is_selected = state
+                .selected_board
+                .as_ref()
+                .map(|x| x.id == dev.id)
+                .unwrap_or(false);
             let img: Element<BBImagerMessage> = match &dev.icon {
                 Some(u) => match state.image_handle_cache().get(u) {
                     Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
@@ -49,7 +55,8 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
                     .padding(8)
                     .align_y(iced::alignment::Vertical::Center),
             )
-            .on_press(BBImagerMessage::SelectBoard(id))
+            // TODO: Make selected_board proper id
+            .on_press(BBImagerMessage::SelectBoardById(dev.id))
             .style(move |theme, status| card_btn_style(theme, status, is_selected))
         })
         .map(Into::into);

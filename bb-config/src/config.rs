@@ -8,19 +8,6 @@ use url::Url;
 
 /// [BeagleBoard.org] distros.json abstraction.
 ///
-/// # Merging Behaviour
-///
-/// Configs can be merged together using [Extend::extend]. This allows for having some portion of
-/// config locally while downloading parts from network.
-///
-/// If [Imager::latest_version] is present, it will overwrite the current field.
-///
-/// For [Imager::devices], any new board will be appended to the end of the board list. Existing
-/// boards are not added again. Duplicate boards are checked by [Device::name] field. The [Device]
-/// fields are overwritten.
-///
-/// For [Config::os_list], all non-duplicate [OsListItem] are appended to the end of the list.
-///
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 #[serde_as]
 #[derive(Deserialize, Serialize, Debug, Clone, Default, PartialEq, Eq)]
@@ -73,11 +60,11 @@ pub struct Device {
     /// Board Specification. With order preserved
     pub specification: Vec<(String, String)>,
     /// OSHW details for the device.
-    pub oshw: Option<String>
+    pub oshw: Option<String>,
 }
 
 /// Types of customization Initialization formats
-#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Default, sqlx::Type)]
 #[non_exhaustive]
 #[serde(rename_all = "lowercase")]
 pub enum InitFormat {
@@ -181,7 +168,7 @@ pub struct OsImage {
 }
 
 /// Types of flashers Os Image(s) support
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize, sqlx::Type)]
 #[non_exhaustive]
 pub enum Flasher {
     #[default]
@@ -193,86 +180,4 @@ pub enum Flasher {
     Msp430Usb,
     /// PocketBeagle2 Mspm0 firmware
     Pb2Mspm0,
-}
-
-impl Extend<Self> for Config {
-    fn extend<T: IntoIterator<Item = Self>>(&mut self, iter: T) {
-        for config in iter.into_iter() {
-            self.imager
-                .remote_configs
-                .extend(config.imager.remote_configs);
-
-            for c_dev in config.imager.devices {
-                // If the board already exists, overwrite fields.
-                // Else, add new board
-                if let Some(my_dev) = self
-                    .imager
-                    .devices
-                    .iter_mut()
-                    .find(|x| x.name == c_dev.name)
-                {
-                    my_dev.tags.extend(c_dev.tags.clone());
-                    my_dev.flasher = c_dev.flasher;
-
-                    if let Some(doc) = &c_dev.documentation {
-                        my_dev.documentation = Some(doc.clone());
-                    }
-
-                    if let Some(icon) = &c_dev.icon {
-                        my_dev.icon = Some(icon.clone());
-                    }
-                } else {
-                    self.imager.devices.push(c_dev);
-                }
-            }
-
-            // Only add non_duplicate os_list items
-            self.os_list.reserve(config.os_list.len());
-            for item in config.os_list {
-                if !self.os_list.contains(&item) {
-                    self.os_list.push(item);
-                }
-            }
-        }
-    }
-}
-
-impl OsListItem {
-    pub fn icon(&self) -> &url::Url {
-        match self {
-            OsListItem::Image(img) => &img.icon,
-            OsListItem::SubList(img) => &img.icon,
-            OsListItem::RemoteSubList(img) => &img.icon,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        match self {
-            OsListItem::Image(img) => &img.name,
-            OsListItem::SubList(img) => &img.name,
-            OsListItem::RemoteSubList(img) => &img.name,
-        }
-    }
-
-    /// Check if the [OsListItem] (or any of it's children) has an image for a board
-    pub fn has_board_image(&self, tags: &HashSet<String>) -> bool {
-        match self {
-            OsListItem::Image(item) => !tags.is_disjoint(&item.devices),
-            OsListItem::SubList(item) => item.subitems.iter().any(|x| x.has_board_image(tags)),
-            OsListItem::RemoteSubList(item) => !tags.is_disjoint(&item.devices),
-        }
-    }
-}
-
-impl OsRemoteSubList {
-    /// Construct [OsSubList] once subitems have been downloaded.
-    pub fn resolve(self, subitems: Vec<OsListItem>) -> OsSubList {
-        OsSubList {
-            name: self.name,
-            description: self.description,
-            icon: self.icon,
-            flasher: self.flasher,
-            subitems,
-        }
-    }
 }

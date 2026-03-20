@@ -12,7 +12,7 @@ categories = ["development-tools", "embedded", "hardware-support"]
 
 [dependencies]
 liblzma = { version = "0.4", features = ["static", "parallel"] }
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 thiserror = { version = "2.0" }
 tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
@@ -41,7 +41,7 @@ sd_macos_authopen = ["bb-flasher-sd/macos_authopen"]
 bcf = ["bb-flasher-bcf/cc1352p7"]
 bcf_msp430 = ["bb-flasher-bcf/msp430"]
 pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
-pb2_mspm0_dbus = ["dep:zbus", "dep:serde", "dep:bin_file", "dep:serde_json"]
+pb2_mspm0_dbus = ["dep:zbus", "dep:bin_file", "dep:serde_json"]
 dfu = ["bb-flasher-dfu"]
 
 [package.metadata.docs.rs]

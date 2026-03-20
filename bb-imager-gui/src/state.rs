@@ -1,13 +1,11 @@
-use std::{
-    collections::HashSet,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use bb_config::config;
 use iced::{Task, widget};
 
 use crate::{
     BBImager, constants,
+    db::{self, Board},
     helpers::{self, DestinationItem, OsImageId, OsImageItem},
     message::BBImagerMessage,
     persistance, updater,
@@ -16,7 +14,6 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct BBImagerCommon {
     pub(crate) app_config: persistance::GuiConfiguration,
-    pub(crate) boards: helpers::Boards,
     pub(crate) downloader: bb_downloader::Downloader,
     pub(crate) timezones: widget::combo_box::State<String>,
     pub(crate) keymaps: widget::combo_box::State<String>,
@@ -37,6 +34,7 @@ pub(crate) struct BBImagerCommon {
     pub(crate) img_handle_cache: helpers::ImageHandleCache,
 
     pub(crate) scroll_id: widget::Id,
+    pub(crate) db: db::Db,
 }
 
 impl BBImagerCommon {
@@ -62,117 +60,22 @@ impl BBImagerCommon {
         }
     }
 
-    pub(crate) fn fetch_images(
-        &self,
-        iter: impl IntoIterator<Item = url::Url>,
-    ) -> Task<BBImagerMessage> {
-        let tasks = iter.into_iter().map(|icon| {
-            let downloader = self.downloader.clone();
-            let icon_clone = icon.clone();
-            let icon_clone2 = icon.clone();
-            Task::perform(
-                async move { downloader.download_no_cache(icon_clone).await },
-                move |p| match p {
-                    Ok(p) => BBImagerMessage::ResolveImage(icon_clone2, p),
-                    Err(_) => {
-                        tracing::warn!("Failed to fetch image {}", icon);
-                        BBImagerMessage::Null
-                    }
-                },
-            )
-        });
-        Task::batch(tasks)
-    }
-
     pub(crate) fn fetch_board_images(&self) -> Task<BBImagerMessage> {
-        // Do not try downloading same image multiple times
-        let icons: HashSet<url::Url> = self
-            .boards
-            .devices()
-            .filter_map(|(_, dev)| dev.icon.clone())
-            .collect();
-
-        self.fetch_images(icons)
-    }
-
-    /// Expects image at target is not remote sub item
-    fn crawl_image_level(
-        &self,
-        board: usize,
-        target: &[usize],
-    ) -> (HashSet<url::Url>, Vec<(Vec<usize>, url::Url)>) {
-        let mut icons = HashSet::new();
-        let mut remote_imgs = Vec::new();
-
-        let os_images = self
-            .boards
-            .images(board, target)
-            .expect("Cannot be Remote sublist");
-        for (id, img) in os_images {
-            match img {
-                config::OsListItem::Image(os_image) => {
-                    icons.insert(os_image.icon.clone());
-                }
-                config::OsListItem::SubList(os_sub_list) => {
-                    let mut temp_target = target.to_vec();
-
-                    temp_target.push(id);
-                    icons.insert(os_sub_list.icon.clone());
-
-                    let (temp_icons, mut temp_remote_imgs) =
-                        self.crawl_image_level(board, &temp_target);
-
-                    icons.extend(temp_icons);
-                    remote_imgs.append(&mut temp_remote_imgs);
-                }
-                config::OsListItem::RemoteSubList(os_remote_sub_list) => {
-                    let mut temp_target = target.to_vec();
-
-                    temp_target.push(id);
-                    icons.insert(os_remote_sub_list.icon.clone());
-
-                    remote_imgs.push((temp_target, os_remote_sub_list.subitems_url.clone()));
-                }
-            }
-        }
-
-        (icons, remote_imgs)
-    }
-
-    // Try to resolve all images (including remote images in sublists)
-    pub(crate) fn resolve_images(&self, board: usize, target: &[usize]) -> Task<BBImagerMessage> {
-        let (icons, remote_imgs) = self.crawl_image_level(board, target);
-
-        let icon_task = self.fetch_images(icons);
-        let remote_img_task = remote_imgs.into_iter().map(|(id, u)| {
-            let downloader = self.downloader.clone();
-            Task::perform(
-                async move { downloader.download_json_no_cache(u).await },
-                move |x| match x {
-                    Ok(item) => BBImagerMessage::ResolveRemoteSubitemItem { item, target: id },
-                    Err(e) => {
-                        tracing::warn!("Failed to download subitems with error {e}");
-                        BBImagerMessage::Null
-                    }
-                },
-            )
-        });
-
-        Task::batch(remote_img_task.chain([icon_task]))
+        let db = self.db.clone();
+        let downloader = self.downloader.clone();
+        Task::future(async move { db.board_icons().await.unwrap() })
+            .then(move |iter| helpers::fetch_images(&downloader, iter))
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Option<usize>,
+    pub(crate) boards: Vec<db::BoardListItem>,
+    pub(crate) selected_board: Option<Board>,
 }
 
 impl ChooseBoardState {
-    pub(crate) fn devices(&self) -> impl Iterator<Item = (usize, &config::Device)> {
-        self.common.boards.devices()
-    }
-
     pub(crate) fn board_svg(&self) -> &widget::svg::Handle {
         &self.common.board_svg_handle
     }
@@ -181,8 +84,8 @@ impl ChooseBoardState {
         &self.common.downloading_svg_handle
     }
 
-    pub(crate) fn selected_board(&self) -> Option<&config::Device> {
-        Some(self.common.boards.device(self.selected_board?))
+    pub(crate) fn selected_board(&self) -> Option<&Board> {
+        self.selected_board.as_ref()
     }
 
     pub(crate) fn image_handle_cache(&self) -> &helpers::ImageHandleCache {
@@ -194,6 +97,7 @@ impl From<ChooseOsState> for ChooseBoardState {
     fn from(value: ChooseOsState) -> Self {
         Self {
             common: value.common,
+            boards: Vec::new(),
             selected_board: Some(value.selected_board),
         }
     }
@@ -202,8 +106,10 @@ impl From<ChooseOsState> for ChooseBoardState {
 #[derive(Debug)]
 pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: usize,
-    pub(crate) pos: Vec<usize>,
+    pub(crate) selected_board: Board,
+    pub(crate) images: Vec<OsImageItem>,
+    pub(crate) pos: Option<i64>,
+    pub(crate) flasher: config::Flasher,
     pub(crate) selected_image: Option<(OsImageId, helpers::BoardImage)>,
 }
 
@@ -215,59 +121,21 @@ impl ChooseOsState {
         }
     }
 
-    pub(crate) fn selected_board(&self) -> &config::Device {
-        self.common.boards.device(self.selected_board)
-    }
+    pub(crate) fn update_images(&mut self, mut imgs: Vec<OsImageItem>, pos: Option<i64>) {
+        match self.flasher {
+            config::Flasher::SdCard => imgs.extend([
+                OsImageItem::format("Format SD Card".into()),
+                OsImageItem::local(config::Flasher::SdCard),
+            ]),
+            _ => imgs.push(OsImageItem::local(self.flasher)),
+        }
 
-    pub(crate) fn images(&self) -> Option<impl Iterator<Item = OsImageItem<'_>>> {
-        let iter = self
-            .common
-            .boards
-            .images(self.selected_board, self.pos.as_slice())?
-            .map(|(id, x)| {
-                let mut idx = self.pos.clone();
-                idx.push(id);
-
-                OsImageItem::remote(
-                    idx,
-                    x.icon(),
-                    x.name(),
-                    matches!(
-                        x,
-                        config::OsListItem::SubList(_) | config::OsListItem::RemoteSubList(_)
-                    ),
-                )
-            });
-
-        let extra = match self.flasher() {
-            config::Flasher::SdCard => vec![
-                OsImageItem::format(self.pos.clone(), "Format SD Card"),
-                OsImageItem::local(self.pos.clone()),
-            ],
-            _ => vec![OsImageItem::local(self.pos.clone())],
-        };
-
-        Some(iter.chain(extra))
-    }
-
-    pub(crate) fn image(&self, idx: &[usize]) -> &config::OsListItem {
-        self.common.boards.image(idx)
+        self.images = imgs;
+        self.pos = pos;
     }
 
     pub(crate) fn image_handle_cache(&self) -> &helpers::ImageHandleCache {
         &self.common.img_handle_cache
-    }
-
-    pub(crate) fn flasher(&self) -> config::Flasher {
-        if self.pos.is_empty() {
-            self.selected_board().flasher
-        } else {
-            match self.image(&self.pos) {
-                config::OsListItem::Image(_) => panic!("Expected list"),
-                config::OsListItem::SubList(x) => x.flasher,
-                config::OsListItem::RemoteSubList(x) => x.flasher,
-            }
-        }
     }
 
     pub(crate) fn downloading_svg(&self) -> &widget::svg::Handle {
@@ -299,14 +167,9 @@ impl ChooseOsState {
     }
 
     pub(crate) fn img_json(&self) -> Option<String> {
-        let id = &self.selected_image.as_ref()?.0;
-
-        if let OsImageId::Remote(x) = id {
-            let img = self.image(x);
-            return Some(serde_json::to_string_pretty(&img).expect("Invalid image"));
-        }
-
-        None
+        self.selected_image
+            .as_ref()
+            .map(|(_, b)| serde_json::to_string_pretty(&b).unwrap())
     }
 }
 
@@ -314,8 +177,10 @@ impl From<CustomizeState> for ChooseOsState {
     fn from(value: CustomizeState) -> Self {
         Self {
             common: value.common,
+            images: Vec::new(),
+            flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
-            pos: Vec::new(),
+            pos: None,
             selected_image: Some(value.selected_image),
         }
     }
@@ -325,8 +190,10 @@ impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
         Self {
             common: value.common,
+            images: Vec::new(),
+            flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
-            pos: Vec::new(),
+            pos: None,
             selected_image: Some(value.selected_image),
         }
     }
@@ -335,7 +202,7 @@ impl From<ChooseDestState> for ChooseOsState {
 #[derive(Debug)]
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: usize,
+    pub(crate) selected_board: Board,
     pub(crate) selected_image: (OsImageId, helpers::BoardImage),
     pub(crate) selected_dest: Option<helpers::Destination>,
     pub(crate) destinations: Vec<helpers::Destination>,
@@ -362,8 +229,8 @@ impl ChooseDestState {
         &self.common.file_save_icon
     }
 
-    pub(crate) fn selected_board(&self) -> &config::Device {
-        self.common.boards.device(self.selected_board)
+    pub(crate) fn selected_board(&self) -> &Board {
+        &self.selected_board
     }
 
     pub(crate) fn instruction(&self) -> Option<&str> {
@@ -390,7 +257,7 @@ impl From<CustomizeState> for ChooseDestState {
 #[derive(Debug)]
 pub(crate) struct CustomizeState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: usize,
+    pub(crate) selected_board: Board,
     pub(crate) selected_image: (OsImageId, helpers::BoardImage),
     pub(crate) selected_dest: helpers::Destination,
     pub(crate) customization: helpers::FlashingCustomization,
@@ -420,7 +287,7 @@ impl CustomizeState {
     }
 
     pub(crate) fn selected_board(&self) -> &str {
-        self.common.boards.device(self.selected_board).name.as_str()
+        self.selected_board.name.as_str()
     }
 
     pub(crate) fn selected_image(&self) -> String {
@@ -488,7 +355,7 @@ impl CustomizeState {
 #[derive(Debug)]
 pub(crate) struct FlashingState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: usize,
+    pub(crate) selected_board: Board,
     pub(crate) cancel_flashing: iced::task::Handle,
     pub(crate) progress: bb_flasher::DownloadFlashingStatus,
     pub(crate) start_timestamp: Option<Instant>,
@@ -496,8 +363,8 @@ pub(crate) struct FlashingState {
 }
 
 impl FlashingState {
-    pub(crate) fn selected_board(&self) -> &config::Device {
-        self.common.boards.device(self.selected_board)
+    pub(crate) fn selected_board(&self) -> &Board {
+        &self.selected_board
     }
 
     pub(crate) fn time_remaining(&self) -> Option<Duration> {
@@ -539,13 +406,13 @@ impl FlashingState {
 #[derive(Debug)]
 pub(crate) struct FlashingFinishState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: usize,
+    pub(crate) selected_board: Board,
     pub(crate) is_download: bool,
 }
 
 impl FlashingFinishState {
-    pub(crate) fn selected_board(&self) -> &config::Device {
-        self.common.boards.device(self.selected_board)
+    pub(crate) fn selected_board(&self) -> &Board {
+        &self.selected_board
     }
 }
 

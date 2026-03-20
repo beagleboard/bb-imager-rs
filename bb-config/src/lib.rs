@@ -8,7 +8,10 @@
 //! # Usage
 //!
 //! ```no_run
-//! let config: bb_config::Config = reqwest::blocking::get(bb_config::DISTROS_URL)
+//! pub const DISTROS_URL: &str =
+//!     "https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json";
+//! 
+//! let config: bb_config::Config = reqwest::blocking::get(DISTROS_URL)
 //!     .unwrap()
 //!     .json()
 //!     .unwrap();
@@ -18,10 +21,6 @@
 //! ```
 
 pub mod config;
-
-/// URL for the BeagleBoard.org `distros.json` file
-pub const DISTROS_URL: &str =
-    "https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json";
 
 pub use config::Config;
 

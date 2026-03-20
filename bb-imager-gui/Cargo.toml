@@ -31,6 +31,9 @@ bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-util = { version = "0.7" }
 semver = "1.0.27"
 anyhow = "1.0"
+sqlx = { version = "0.8", features = ["runtime-tokio", "chrono"] }
+tempfile = "3.26"
+const-hex = { version = "1.17", features = ["serde"] }
 
 [build-dependencies]
 embed-resource = "3.0"
@@ -42,14 +45,23 @@ ashpd = { version = "0.13", features = ["notification"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
+# bundle sqlite
+sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# bundle sqlite
+sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
 
 [features]
+default = ["bundled-sqlite"]
 pb2_mspm0 = ["bb-flasher/pb2_mspm0_dbus"]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 # GUI requires the base board support for any sub soc firmware
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 # Handle application updates
 updater = []
+bundled-sqlite  = ["sqlx/sqlite"]
+system-sqlite  = ["sqlx/sqlite-unbundled"]
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]
