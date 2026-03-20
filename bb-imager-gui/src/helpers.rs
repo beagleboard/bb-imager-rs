@@ -724,6 +724,10 @@ impl ImageHandleCache {
     pub(crate) fn insert(&mut self, u: url::Url, path: PathBuf) {
         self.0.insert(u, path.into());
     }
+
+    pub(crate) fn contains(&self, u: &url::Url) -> bool {
+        self.0.contains_key(u)
+    }
 }
 
 impl Extend<(url::Url, PathBuf)> for ImageHandleCache {
