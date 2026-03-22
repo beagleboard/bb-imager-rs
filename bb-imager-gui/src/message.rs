@@ -213,7 +213,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::FilterResolveImages(x) => {
             let iter = x
                 .into_iter()
-                .filter(|x| state.common().img_handle_cache.contains(x));
+                .filter(|x| !state.common().img_handle_cache.contains(x));
             return helpers::fetch_images(&state.common().downloader, iter);
         }
         BBImagerMessage::ExtendConfig((u, c)) => {
