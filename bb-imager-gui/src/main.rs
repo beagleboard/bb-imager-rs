@@ -603,3 +603,10 @@ impl BBImager {
         }
     }
 }
+
+
+
+//Tests
+//Tests
+#[cfg(test)]
+mod tests;
