@@ -615,6 +615,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-flasher-mspm0"
+version = "0.0.20"
+dependencies = [
+ "bin_file",
+ "crc32fast",
+ "serialport",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "zerocopy",
+]
+
+[[package]]
 name = "bb-flasher-pb2-mspm0"
 version = "0.1.0"
 dependencies = [

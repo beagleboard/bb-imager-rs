@@ -7,7 +7,7 @@ members = [
 	"bb-imager-gui", "bb-imager-service",
 	"xtask", "bb-flasher-bcf", "bb-flasher-sd", "bb-downloader", "bb-config", "bb-helper", "bb-flasher-dfu",
 	"bb-drivelist"
-]
+, "bb-flasher-mspm0"]
 
 [profile.release]
 strip = true
