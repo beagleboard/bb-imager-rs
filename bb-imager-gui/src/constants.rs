@@ -42,35 +42,8 @@ pub(crate) const FONT_BOLD: iced::Font = {
 };
 
 // Base Fonts
-pub(crate) const FONT_EXTRA_LIGHT_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-ExtraLight.ttf");
-pub(crate) const FONT_LIGHT_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Light.ttf");
-pub(crate) const FONT_NORMAL_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Regular.ttf");
-pub(crate) const FONT_MEDIUM_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Medium.ttf");
-pub(crate) const FONT_SEMI_BOLD_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-SemiBold.ttf");
-pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold.ttf");
-pub(crate) const FONT_EXTRA_BOLD_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-ExtraBold.ttf");
-pub(crate) const FONT_BLACK_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Black.ttf");
-
-// Italic Fonts
-pub(crate) const FONT_EXTRA_LIGHT_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-ExtraLightItalic.ttf");
-pub(crate) const FONT_LIGHT_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-LightItalic.ttf");
-pub(crate) const FONT_NORMAL_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-Italic.ttf");
-pub(crate) const FONT_MEDIUM_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-MediumItalic.ttf");
-pub(crate) const FONT_SEMI_BOLD_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-SemiBoldItalic.ttf");
-pub(crate) const FONT_BOLD_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-BoldItalic.ttf");
-pub(crate) const FONT_EXTRA_BOLD_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-ExtraBoldItalic.ttf");
-pub(crate) const FONT_BLACK_ITALIC_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/Nunito-BlackItalic.ttf");
+pub(crate) const FONT_NORMAL_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Regular-subset.ttf");
+pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold-subset.ttf");
 
 // Theme
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
