@@ -47,9 +47,11 @@ fn main() -> iced::Result {
     // Force using the low power gpu since this is not a GPU intensive application
     unsafe { std::env::set_var("WGPU_POWER_PREF", "low") };
 
-    let icon =
-        iced::window::icon::from_file_data(constants::WINDOW_ICON, Some(image::ImageFormat::Png))
-            .ok();
+    let icon = iced::window::icon::from_file_data(
+        constants::WINDOW_ICON_BYTES,
+        Some(image::ImageFormat::Png),
+    )
+    .ok();
     assert!(icon.is_some());
 
     #[cfg(target_os = "macos")]
@@ -128,19 +130,6 @@ impl BBImager {
                     .map(|x| x.to_string())
                     .collect(),
             ),
-            board_svg_handle: widget::svg::Handle::from_memory(constants::BOARD_ICON),
-            downloading_svg_handle: widget::svg::Handle::from_memory(constants::DOWNLOADING_ICON),
-            arrow_forward_svg_handle: widget::svg::Handle::from_memory(
-                constants::ARROW_FORWARD_IOS_ICON,
-            ),
-            format_svg_handle: widget::svg::Handle::from_memory(constants::FORMAT_ICON),
-            file_add_svg_handle: widget::svg::Handle::from_memory(constants::FILE_ADD_ICON),
-            arrow_back_svg_handle: widget::svg::Handle::from_memory(constants::ARROW_BACK_ICON),
-            usb_svg_handle: widget::svg::Handle::from_memory(constants::USB_ICON),
-            file_save_icon: widget::svg::Handle::from_memory(constants::FILE_SAVE_ICON),
-            info_svg_handle: widget::svg::Handle::from_memory(constants::INFO_ICON),
-            window_icon_handle: widget::image::Handle::from_bytes(crate::constants::WINDOW_ICON),
-            copy_svg_handle: widget::svg::Handle::from_memory(constants::COPY_ICON),
 
             img_handle_cache: helpers::ImageHandleCache::default(),
 

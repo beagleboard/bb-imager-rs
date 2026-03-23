@@ -8,7 +8,7 @@ use crate::{
     helpers::DestinationItem,
     state::ChooseDestState,
     ui::helpers::{
-        LIST_COL_PADDING, VIEW_COL_PADDING, card_btn_style, detail_entry, page_type1,
+        self, LIST_COL_PADDING, VIEW_COL_PADDING, card_btn_style, detail_entry, page_type1,
         svg_icon_style,
     },
 };
@@ -17,7 +17,6 @@ const ICON_WIDTH: u32 = 60;
 
 pub(crate) fn view<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage> {
     page_type1(
-        &state.common,
         dest_list_pane(state),
         dest_view_pane(state),
         [
@@ -41,8 +40,8 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
                 .unwrap_or(false);
 
             let icon: Element<BBImagerMessage> = match dest {
-                DestinationItem::SaveToFile(_) => widget::svg(state.file_save_icon().clone()),
-                DestinationItem::Destination(_) => widget::svg(state.usb_svg().clone()),
+                DestinationItem::SaveToFile(_) => widget::svg(helpers::FILE_SAVE_ICON.clone()),
+                DestinationItem::Destination(_) => widget::svg(helpers::USB_ICON.clone()),
             }
             .height(ICON_WIDTH)
             .width(ICON_WIDTH)
@@ -87,7 +86,7 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
 fn dest_view_pane<'a>(state: &'a crate::state::ChooseDestState) -> Element<'a, BBImagerMessage> {
     match state.selected_dest.as_ref() {
         Some(dest) => {
-            let icon: Element<BBImagerMessage> = widget::svg(state.usb_svg().clone())
+            let icon: Element<BBImagerMessage> = widget::svg(helpers::USB_ICON.clone())
                 .height(100)
                 .width(iced::Fill)
                 .style(svg_icon_style)

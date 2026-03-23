@@ -19,18 +19,18 @@ pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 // Icons
-pub(crate) const WINDOW_ICON: &[u8] = include_bytes!("../assets/icons/icon.png");
-pub(crate) const ARROW_BACK_ICON: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
-pub(crate) const DOWNLOADING_ICON: &[u8] = include_bytes!("../assets/icons/downloading.svg");
-pub(crate) const FILE_ADD_ICON: &[u8] = include_bytes!("../assets/icons/file-add.svg");
-pub(crate) const USB_ICON: &[u8] = include_bytes!("../assets/icons/usb.svg");
-pub(crate) const FORMAT_ICON: &[u8] = include_bytes!("../assets/icons/format.svg");
-pub(crate) const BOARD_ICON: &[u8] = include_bytes!("../assets/icons/board.svg");
-pub(crate) const ARROW_FORWARD_IOS_ICON: &[u8] =
+pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
+pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
+pub(crate) const DOWNLOADING_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/downloading.svg");
+pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
+pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
+pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
+pub(crate) const BOARD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/board.svg");
+pub(crate) const ARROW_FORWARD_IOS_ICON_BYTES: &[u8] =
     include_bytes!("../assets/icons/arrow-forward-ios.svg");
-pub(crate) const FILE_SAVE_ICON: &[u8] = include_bytes!("../assets/icons/file-save.svg");
-pub(crate) const INFO_ICON: &[u8] = include_bytes!("../assets/icons/info.svg");
-pub(crate) const COPY_ICON: &[u8] = include_bytes!("../assets/icons/content-copy.svg");
+pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
+pub(crate) const INFO_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/info.svg");
+pub(crate) const COPY_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/content-copy.svg");
 
 // Font
 pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");

@@ -11,7 +11,6 @@ use crate::{
 
 pub(crate) fn view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
     page_type1(
-        &state.common,
         info_view(state),
         progress_view(state),
         [button("Restart")

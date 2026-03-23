@@ -20,7 +20,6 @@ pub(crate) fn view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage
     };
 
     page_type2(
-        &state.common,
         review_view(state),
         [
             widget::button("BACK")
