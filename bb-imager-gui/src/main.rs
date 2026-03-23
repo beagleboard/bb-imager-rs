@@ -318,13 +318,10 @@ impl BBImager {
     fn refresh_board_list(&self) -> Task<BBImagerMessage> {
         let db = self.common().db.clone();
 
-        Task::perform(async move { db.board_list().await }, |x| match x {
-            Ok(res) => BBImagerMessage::UpdateBoardList(res),
-            Err(e) => {
-                tracing::error!("Failed to get board list {e}");
-                BBImagerMessage::Null
-            }
-        })
+        Task::perform(
+            async move { db.board_list().await.unwrap() },
+            BBImagerMessage::UpdateBoardList,
+        )
     }
 
     fn resolve_remote_sublists(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
