@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io;
 
-use futures::channel::mpsc;
+use tokio::sync::mpsc;
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct Target(bb_flasher_dfu::Device);
@@ -120,7 +120,7 @@ where
     R: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let c = if let Some(mut c) = chan {
+        let c = if let Some(c) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(2);
 
             tokio::spawn(async move {

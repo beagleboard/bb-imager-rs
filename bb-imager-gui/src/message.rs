@@ -489,22 +489,17 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             let downloader = state.common().downloader.clone();
             let board_icon_cache_task = Task::perform(
                 async move {
-                    let res = db
-                        .board_icons()
-                        .await?
+                    db.board_icons()
+                        .await
+                        .unwrap()
                         .into_iter()
                         .filter_map(|x| {
                             let p = downloader.check_cache_from_url(x.clone())?;
                             Some((x, p))
                         })
-                        .collect();
-
-                    Ok(res)
+                        .collect()
                 },
-                |x: sqlx::Result<_>| match x {
-                    Ok(res) => BBImagerMessage::ResolveImages(res),
-                    Err(e) => panic!("Unexpected error when trying to resolve board icons: {e}"),
-                },
+                BBImagerMessage::ResolveImages,
             );
 
             return Task::batch([

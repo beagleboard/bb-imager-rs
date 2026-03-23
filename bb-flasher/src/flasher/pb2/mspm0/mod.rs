@@ -17,6 +17,7 @@ cfg_if::cfg_if! {
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Read;
+use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
 
@@ -79,7 +80,7 @@ where
 {
     async fn flash(
         self,
-        chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let bin = {
             let (mut img, _) = self

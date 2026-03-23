@@ -5,7 +5,8 @@ use std::{
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
-use iced::{futures, widget};
+use iced::widget;
+use tokio::sync::mpsc;
 use url::Url;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -223,12 +224,12 @@ impl RemoteImage {
     async fn save(
         &self,
         path: &std::path::Path,
-        mut chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+        chan: mpsc::Sender<DownloadFlashingStatus>,
     ) -> std::io::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::channel(5);
+        let (tx, mut rx) = mpsc::channel(5);
 
         let handle = tokio::spawn(async move {
-            while let Some(x) = futures::StreamExt::next(&mut rx).await {
+            while let Some(x) = rx.recv().await {
                 let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(x));
             }
         });
@@ -330,7 +331,7 @@ impl SelectedImage {
     async fn save(
         &self,
         path: &std::path::Path,
-        chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+        chan: mpsc::Sender<DownloadFlashingStatus>,
     ) -> std::io::Result<()> {
         match self {
             Self::LocalImage(x) => tokio::fs::copy(x.path(), path).await.map(|_| ()),
@@ -376,7 +377,7 @@ pub(crate) async fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
-    chan: futures::channel::mpsc::Sender<DownloadFlashingStatus>,
+    chan: mpsc::Sender<DownloadFlashingStatus>,
     cancel: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
