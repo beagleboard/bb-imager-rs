@@ -1,11 +1,37 @@
+use std::sync::LazyLock;
+
 use iced::{
     Element, Radians, Rectangle, Renderer, Theme,
     advanced::text::highlighter::PlainText,
     mouse,
-    widget::{self, canvas},
+    widget::{self, canvas, svg},
 };
 
 use crate::{constants, message::BBImagerMessage};
+
+pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
+    LazyLock::new(|| widget::image::Handle::from_bytes(constants::WINDOW_ICON_BYTES));
+
+pub(crate) static ARROW_BACK_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_BACK_ICON_BYTES));
+pub(crate) static DOWNLOADING_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::DOWNLOADING_ICON_BYTES));
+pub(crate) static FILE_ADD_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::FILE_ADD_ICON_BYTES));
+pub(crate) static USB_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::USB_ICON_BYTES));
+pub(crate) static FORMAT_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::FORMAT_ICON_BYTES));
+pub(crate) static BOARD_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::BOARD_ICON_BYTES));
+pub(crate) static ARROW_FORWARD_IOS_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_FORWARD_IOS_ICON_BYTES));
+pub(crate) static FILE_SAVE_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::FILE_SAVE_ICON_BYTES));
+pub(crate) static INFO_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::INFO_ICON_BYTES));
+pub(crate) static COPY_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::COPY_ICON_BYTES));
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
 pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
@@ -33,8 +59,8 @@ pub(crate) fn card_btn_style(
     style
 }
 
-pub(crate) fn svg_icon_style(theme: &iced::Theme, _: widget::svg::Status) -> widget::svg::Style {
-    widget::svg::Style {
+pub(crate) fn svg_icon_style(theme: &iced::Theme, _: svg::Status) -> svg::Style {
+    svg::Style {
         color: Some(theme.palette().text),
     }
 }
@@ -47,14 +73,13 @@ pub(crate) fn svg_icon_style(theme: &iced::Theme, _: widget::svg::Status) -> wid
 /// |      | btns |
 /// |------|------|
 pub(crate) fn page_type1<'a>(
-    common: &crate::BBImagerCommon,
     col1: Element<'a, BBImagerMessage>,
     col2: Element<'a, BBImagerMessage>,
     btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
 ) -> Element<'a, BBImagerMessage> {
     let row2 = widget::row(
         [
-            info_btn(common.info_svg_handle.clone()).into(),
+            info_btn(INFO_ICON.clone()).into(),
             widget::space::horizontal().into(),
         ]
         .into_iter()
@@ -92,13 +117,12 @@ pub(crate) fn page_type1<'a>(
 /// |  btns  |
 /// |--------|
 pub(crate) fn page_type2<'a>(
-    common: &crate::BBImagerCommon,
     row1: Element<'a, BBImagerMessage>,
     btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
 ) -> Element<'a, BBImagerMessage> {
     let row2 = widget::row(
         [
-            info_btn(common.info_svg_handle.clone()).into(),
+            info_btn(INFO_ICON.clone()).into(),
             widget::space::horizontal().into(),
         ]
         .into_iter()
@@ -236,18 +260,18 @@ pub(crate) fn board_view_pane<'a>(
     let img: Element<BBImagerMessage> = match &dev.icon {
         Some(u) => match state.img_handle_cache.get(u) {
             Some(x) => x.view(iced::Length::Fill, iced::Shrink),
-            None => widget::svg(state.downloading_svg_handle.clone())
+            None => svg(DOWNLOADING_ICON.clone())
                 .width(iced::Length::Fill)
                 .style(svg_icon_style)
                 .into(),
         },
-        None => widget::svg(state.board_svg_handle.clone())
+        None => svg(BOARD_ICON.clone())
             .width(iced::Length::Fill)
             .style(svg_icon_style)
             .into(),
     };
 
-    let copy_btn = copy_btn(state.copy_svg_handle.clone()).on_press_with(|| {
+    let copy_btn = copy_btn(COPY_ICON.clone()).on_press_with(|| {
         let json = serde_json::to_string_pretty(dev).expect("Invalid image");
         BBImagerMessage::CopyToClipboard(json)
     });
@@ -407,15 +431,15 @@ fn card_box<'a>(
     })
 }
 
-fn info_btn(handle: widget::svg::Handle) -> widget::Button<'static, BBImagerMessage> {
-    widget::button(widget::svg(handle))
+fn info_btn(handle: svg::Handle) -> widget::Button<'static, BBImagerMessage> {
+    widget::button(svg(handle))
         .on_press(BBImagerMessage::AppInfo)
         .width(iced::Shrink)
         .height(iced::Shrink)
 }
 
-pub(crate) fn copy_btn<'a>(handle: widget::svg::Handle) -> widget::Button<'a, BBImagerMessage> {
-    widget::button(widget::svg(handle))
+pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> widget::Button<'a, BBImagerMessage> {
+    widget::button(svg(handle))
         .width(iced::Shrink)
         .style(widget::button::secondary)
 }

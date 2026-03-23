@@ -18,19 +18,6 @@ pub(crate) struct BBImagerCommon {
     pub(crate) timezones: widget::combo_box::State<String>,
     pub(crate) keymaps: widget::combo_box::State<String>,
 
-    // Constant image handles
-    pub(crate) board_svg_handle: widget::svg::Handle,
-    pub(crate) downloading_svg_handle: widget::svg::Handle,
-    pub(crate) arrow_forward_svg_handle: widget::svg::Handle,
-    pub(crate) format_svg_handle: widget::svg::Handle,
-    pub(crate) file_add_svg_handle: widget::svg::Handle,
-    pub(crate) arrow_back_svg_handle: widget::svg::Handle,
-    pub(crate) usb_svg_handle: widget::svg::Handle,
-    pub(crate) file_save_icon: widget::svg::Handle,
-    pub(crate) info_svg_handle: widget::svg::Handle,
-    pub(crate) copy_svg_handle: widget::svg::Handle,
-    pub(crate) window_icon_handle: widget::image::Handle,
-
     pub(crate) img_handle_cache: helpers::ImageHandleCache,
 
     pub(crate) scroll_id: widget::Id,
@@ -76,14 +63,6 @@ pub(crate) struct ChooseBoardState {
 }
 
 impl ChooseBoardState {
-    pub(crate) fn board_svg(&self) -> &widget::svg::Handle {
-        &self.common.board_svg_handle
-    }
-
-    pub(crate) fn downloading_svg(&self) -> &widget::svg::Handle {
-        &self.common.downloading_svg_handle
-    }
-
     pub(crate) fn selected_board(&self) -> Option<&Board> {
         self.selected_board.as_ref()
     }
@@ -138,33 +117,10 @@ impl ChooseOsState {
         &self.common.img_handle_cache
     }
 
-    pub(crate) fn downloading_svg(&self) -> &widget::svg::Handle {
-        &self.common.downloading_svg_handle
-    }
-
-    pub(crate) fn arrow_forward_svg(&self) -> &widget::svg::Handle {
-        &self.common.arrow_forward_svg_handle
-    }
-
-    pub(crate) fn format_svg(&self) -> &widget::svg::Handle {
-        &self.common.format_svg_handle
-    }
-
-    pub(crate) fn file_add_svg(&self) -> &widget::svg::Handle {
-        &self.common.file_add_svg_handle
-    }
-
-    pub(crate) fn arrow_back_svg(&self) -> &widget::svg::Handle {
-        &self.common.arrow_back_svg_handle
-    }
-
     pub(crate) fn downloader(&self) -> &bb_downloader::Downloader {
         &self.common.downloader
     }
 
-    pub(crate) fn copy_svg(&self) -> &widget::svg::Handle {
-        &self.common.copy_svg_handle
-    }
 
     pub(crate) fn img_json(&self) -> Option<String> {
         self.selected_image
@@ -219,14 +175,6 @@ impl ChooseDestState {
         };
 
         iter.chain(temp)
-    }
-
-    pub(crate) fn usb_svg(&self) -> &widget::svg::Handle {
-        &self.common.usb_svg_handle
-    }
-
-    pub(crate) fn file_save_icon(&self) -> &widget::svg::Handle {
-        &self.common.file_save_icon
     }
 
     pub(crate) fn selected_board(&self) -> &Board {

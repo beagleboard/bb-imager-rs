@@ -17,7 +17,6 @@ const ICON_WIDTH: u32 = 100;
 
 pub(crate) fn view<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessage> {
     page_type1(
-        &state.common,
         board_list_pane(state),
         board_view_pane(state),
         [widget::button("NEXT")
@@ -39,12 +38,12 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
             let img: Element<BBImagerMessage> = match &dev.icon {
                 Some(u) => match state.image_handle_cache().get(u) {
                     Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
-                    _ => widget::svg(state.downloading_svg().clone())
+                    _ => widget::svg(helpers::DOWNLOADING_ICON.clone())
                         .width(ICON_WIDTH)
                         .style(svg_icon_style)
                         .into(),
                 },
-                None => widget::svg(state.board_svg().clone())
+                None => widget::svg(helpers::BOARD_ICON.clone())
                     .width(ICON_WIDTH)
                     .style(svg_icon_style)
                     .into(),

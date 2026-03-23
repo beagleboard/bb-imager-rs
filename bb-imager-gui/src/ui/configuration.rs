@@ -14,7 +14,6 @@ const INPUT_WIDTH: u32 = 200;
 
 pub(crate) fn view<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, BBImagerMessage> {
     page_type2(
-        &state.common,
         customization_pane(state),
         [
             widget::button("RESET")

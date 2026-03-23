@@ -16,7 +16,6 @@ const ICON_WIDTH: u32 = 60;
 
 pub(crate) fn view<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBImagerMessage> {
     page_type1(
-        &state.common,
         os_list_pane(state),
         os_view_pane(state),
         [
@@ -50,13 +49,13 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                     .unwrap_or(false);
 
                 let icon: Element<BBImagerMessage> = match img.id {
-                    crate::helpers::OsImageId::Format => widget::svg(state.format_svg().clone())
+                    crate::helpers::OsImageId::Format => widget::svg(helpers::FORMAT_ICON.clone())
                         .height(ICON_WIDTH)
                         .width(ICON_WIDTH)
                         .style(svg_icon_style)
                         .into(),
                     crate::helpers::OsImageId::Local(_) => {
-                        widget::svg(state.file_add_svg().clone())
+                        widget::svg(helpers::FILE_ADD_ICON.clone())
                             .height(ICON_WIDTH)
                             .width(ICON_WIDTH)
                             .style(svg_icon_style)
@@ -69,7 +68,7 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                             .get(img.icon.as_ref().expect("Missing Os Image icon"))
                         {
                             Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
-                            _ => widget::svg(state.downloading_svg().clone())
+                            _ => widget::svg(helpers::DOWNLOADING_ICON.clone())
                                 .height(ICON_WIDTH)
                                 .width(ICON_WIDTH)
                                 .style(svg_icon_style)
@@ -81,7 +80,7 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 let row = widget::row![icon, text(img.label()).size(18).width(iced::Length::Fill)];
                 let row = if img.is_sublist() {
                     row.push(
-                        widget::svg(state.arrow_forward_svg().clone())
+                        widget::svg(helpers::ARROW_FORWARD_IOS_ICON.clone())
                             .height(20)
                             .width(iced::Shrink)
                             .style(svg_icon_style),
@@ -103,7 +102,7 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
         let col = if state.pos.is_none() {
             widget::column(items)
         } else {
-            let icon = widget::svg(state.arrow_back_svg().clone())
+            let icon = widget::svg(helpers::ARROW_BACK_ICON.clone())
                 .height(ICON_WIDTH)
                 .width(ICON_WIDTH)
                 .style(svg_icon_style);
@@ -134,16 +133,18 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 crate::helpers::BoardImageIcon::Remote(url) => {
                     match state.image_handle_cache().get(url) {
                         Some(x) => x.view(iced::Length::Fill, 100),
-                        None => widget::svg(state.downloading_svg().clone())
+                        None => widget::svg(helpers::DOWNLOADING_ICON.clone())
                             .width(iced::Length::Fill)
                             .into(),
                     }
                 }
-                crate::helpers::BoardImageIcon::Local => widget::svg(state.file_add_svg().clone())
-                    .height(100)
-                    .width(iced::Length::Fill)
-                    .into(),
-                crate::helpers::BoardImageIcon::Format => widget::svg(state.format_svg().clone())
+                crate::helpers::BoardImageIcon::Local => {
+                    widget::svg(helpers::FILE_ADD_ICON.clone())
+                        .height(100)
+                        .width(iced::Length::Fill)
+                        .into()
+                }
+                crate::helpers::BoardImageIcon::Format => widget::svg(helpers::FORMAT_ICON.clone())
                     .height(100)
                     .width(iced::Length::Fill)
                     .into(),
@@ -154,7 +155,7 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
             // Add button to copy image info when it makes sense.
             if let Some(json) = state.img_json() {
                 col = col.push(widget::center(
-                    helpers::copy_btn(state.copy_svg().clone())
+                    helpers::copy_btn(helpers::COPY_ICON.clone())
                         .on_press(BBImagerMessage::CopyToClipboard(json)),
                 ));
             }

@@ -3,7 +3,7 @@ use iced::{Element, widget};
 use crate::{
     message::BBImagerMessage,
     state::OverlayState,
-    ui::helpers::{VIEW_COL_PADDING, element_with_label, page_type3, selectable_text},
+    ui::helpers::{VIEW_COL_PADDING, WINDOW_ICON, element_with_label, page_type3, selectable_text},
 };
 
 const INP_BOX_WIDTH: u32 = 420;
@@ -19,7 +19,7 @@ pub(crate) fn view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> 
 
 fn review_view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> {
     let col = widget::column![
-        widget::image(state.common().window_icon_handle.clone()),
+        widget::image(WINDOW_ICON.clone()),
         crate::constants::APP_NAME,
         crate::constants::APP_RELEASE,
         crate::constants::APP_DESC,
