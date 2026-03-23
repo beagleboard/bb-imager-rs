@@ -5,6 +5,7 @@
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
+use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
@@ -122,10 +123,7 @@ impl FormatFlasher {
 }
 
 impl BBFlasher for FormatFlasher {
-    async fn flash(
-        self,
-        _: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    async fn flash(self, _: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let p = self.0;
         bb_flasher_sd::format(p.as_path()).await.map_err(Into::into)
     }
@@ -180,14 +178,11 @@ where
     I: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
     B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
-    async fn flash(
-        self,
-        chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let customization = self.customization.customization;
         let dst = self.dst;
 
-        if let Some(mut chan) = chan {
+        if let Some(chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(2);
 
             let t = tokio::spawn(async move {

@@ -268,7 +268,7 @@ impl BBImager {
         let cancel = tokio_util::sync::CancellationToken::new();
 
         let s = iced::stream::channel(20, async move |mut chan| {
-            let (tx, mut rx) = iced::futures::channel::mpsc::channel(19);
+            let (tx, mut rx) = tokio::sync::mpsc::channel(19);
 
             let cancel_child = cancel.child_token();
             let flash_task = tokio::spawn(async move {
@@ -276,7 +276,7 @@ impl BBImager {
             });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::spawn(async move {
-                while let Some(progress) = rx.next().await {
+                while let Some(progress) = rx.recv().await {
                     let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(progress));
                 }
             });

@@ -38,7 +38,6 @@
 //! }
 //! ```
 
-use futures::{Stream, StreamExt, channel::mpsc};
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
@@ -48,6 +47,8 @@ use std::{
     time::Duration,
 };
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::sync::mpsc;
+use tokio_stream::{Stream, StreamExt};
 
 pub use reqwest::IntoUrl;
 
@@ -276,7 +277,7 @@ impl Downloader {
     ///
     /// # Progress
     ///
-    /// Download progress can be optionally tracked using a [`futures::channel::mpsc`].
+    /// Download progress can be optionally tracked using a [`tokio::sync::mpsc`].
     pub async fn download_with_sha<U: reqwest::IntoUrl>(
         &self,
         url: U,

@@ -1,5 +1,6 @@
-use futures::{StreamExt, channel::mpsc};
+use tokio_stream::StreamExt;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use zbus::proxy;
 
 #[derive(Error, Debug)]
@@ -99,7 +100,7 @@ pub(crate) async fn flash(
 
     let proxy_clone = proxy.clone();
     let progress_task = tokio::spawn(async move {
-        if let Some(mut chan) = chan {
+        if let Some(chan) = chan {
             let mut stream = proxy_clone.receive_status().await.unwrap();
             while let Some(v) = stream.next().await {
                 if let Ok(json) = v.message().body().deserialize::<String>() {

@@ -5,6 +5,7 @@
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
 use std::{borrow::Cow, ffi::CString, fmt::Display, io::Read};
+use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
 
@@ -86,7 +87,7 @@ where
 {
     async fn flash(
         self,
-        chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let dst = self.port;
         let img = {
@@ -105,7 +106,7 @@ where
             .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
         }?;
 
-        let flasher_task = if let Some(mut chan) = chan {
+        let flasher_task = if let Some(chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);
             let flasher_task = tokio::task::spawn_blocking(move || {
                 bb_flasher_bcf::msp430::flash(&img, &dst, Some(tx))

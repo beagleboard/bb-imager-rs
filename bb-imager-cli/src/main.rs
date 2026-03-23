@@ -4,9 +4,9 @@ mod helpers;
 use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
-use futures::StreamExt;
 use helpers::LocalStringFile;
 use std::path::PathBuf;
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +30,7 @@ async fn flash(target: TargetCommands, quite: bool) {
     if quite {
         flash_internal(target, None).await
     } else {
-        let (tx, mut rx) = futures::channel::mpsc::channel(20);
+        let (tx, mut rx) = mpsc::channel(20);
         tokio::task::spawn(async move {
             let term = console::Term::stdout();
             let bar_style =
@@ -46,7 +46,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
                 .unwrap();
 
-            while let Some(progress) = rx.next().await {
+            while let Some(progress) = rx.recv().await {
                 // Skip if no change in stage
                 if progress == last_state {
                     continue;
@@ -107,7 +107,7 @@ async fn flash(target: TargetCommands, quite: bool) {
 
 async fn flash_internal(
     target: TargetCommands,
-    chan: Option<futures::channel::mpsc::Sender<DownloadFlashingStatus>>,
+    chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
 ) -> anyhow::Result<()> {
     match target {
         TargetCommands::Sd {
@@ -245,11 +245,10 @@ fn check_macos_device_path(dst: PathBuf) -> PathBuf {
 }
 
 async fn format(dst: PathBuf, quite: bool) {
-    let (tx, _) = futures::channel::mpsc::channel(20);
     let term = console::Term::stdout();
 
     let config = bb_flasher::sd::FormatFlasher::new(dst.try_into().unwrap());
-    config.flash(Some(tx)).await.unwrap();
+    config.flash(None).await.unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();

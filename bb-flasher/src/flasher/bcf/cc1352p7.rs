@@ -4,6 +4,7 @@
 //! [CC1352P7]: https://www.ti.com/product/CC1352P7
 
 use std::{borrow::Cow, fmt::Display, io::Read};
+use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
 
@@ -83,7 +84,7 @@ where
 {
     async fn flash(
         self,
-        chan: Option<futures::channel::mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
@@ -103,7 +104,7 @@ where
             .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
         };
 
-        let flasher_task = if let Some(mut chan) = chan {
+        let flasher_task = if let Some(chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);
             let flasher_task = tokio::task::spawn_blocking(move || {
                 bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, Some(tx), self.cancel)

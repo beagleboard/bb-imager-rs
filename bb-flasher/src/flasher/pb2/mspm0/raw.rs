@@ -1,4 +1,4 @@
-use futures::channel::mpsc;
+use tokio::sync::mpsc;
 
 use bb_flasher_pb2_mspm0::Error;
 
@@ -21,7 +21,7 @@ pub(crate) async fn flash(
             async move { bb_flasher_pb2_mspm0::flash(&firmware, &tx, persist_eeprom).await },
         );
 
-    if let Some(mut chan) = chan {
+    if let Some(chan) = chan {
         while let Some(s) = rx.recv().await {
             let _ = chan.try_send(s.into());
         }
