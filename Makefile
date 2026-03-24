@@ -197,3 +197,10 @@ package-armv7-unknown-linux-gnueabihf: package-checks build-cli-manpage build-cl
 	$(RUST_BUILD) -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_RUST_ARGS} -F dfu
 	$(CARGO_PATH) packager -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_PACKAGER_ARGS} -f deb,pacman
 	rm bb-imager-cli/dist/PKGBUILD
+
+## housekeeping: vendor-deps: Create tarball of dependencies
+.PHONY: vendor-deps
+vendor-deps:
+	$(info Create tarball of all deps)
+	$(CARGO_PATH) vendor
+	tar -czvf cargo-vendor.tar.gz vendor/

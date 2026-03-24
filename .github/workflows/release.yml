@@ -179,9 +179,7 @@ jobs:
         lfs: true
 
     - name: Create dependency tar
-      run: |
-        cargo vendor
-        tar -czvf cargo-vendor.tar.gz vendor/
+      run: make vendor-deps
 
     - name: Release
       uses: softprops/action-gh-release@v2
