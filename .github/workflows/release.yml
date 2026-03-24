@@ -9,40 +9,38 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  VERBOSE: 1
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  native:
+  linux:
     strategy:
       matrix:
         platform:
           - runs-on: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-deb
-            pb2: 0
 
           - runs-on: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            make-targets: setup-debian-deps package-cli-linux-deb package-cli-linux-targz package-gui-linux-targz package-gui-linux-deb package-service-linux-targz package-service-linux-deb
-            pb2: 1
 
     name: Build Artifacts - ${{ matrix.platform.target }}
     runs-on: ${{ matrix.platform.runs-on }}
-    env:
-      PB2_MSPM0: ${{ matrix.platform.pb2 }}
-      BCF_CC1352P7: 1
-      BCF_MSP430: 1
-      DFU: 1
-      TARGET: ${{ matrix.platform.target }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6
       with:
         lfs: true
+
+    - name: Setup deps
+      run: make setup-debian-deps
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Add ${{ matrix.platform.target }} target
+      run:  rustup target add ${{ matrix.platform.target }}
 
     - name: Set version
       if: startsWith(github.ref, 'refs/tags/')
@@ -51,12 +49,6 @@ jobs:
     - name: Set PRE_RELEASE Environment Variable
       if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
       run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
-
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-
-    - name: Add ${{ matrix.platform.target }} target
-      run:  rustup target add ${{ matrix.platform.target }}
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
@@ -67,13 +59,7 @@ jobs:
       run: make setup-packaging-deps
 
     - name: Build packages
-      env:
-        SYSTEM_SQLITE: 1
-      run: make ${{ matrix.platform.make-targets }}
-
-      # Bundle sqlite in appimage.
-    - name: Build appimage
-      run: make package-gui-linux-appimage 
+      run: make package-${{ matrix.platform.target }}
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -117,7 +103,6 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       NO_BUILD: 1
-      TARGET: armv7-unknown-linux-gnueabihf
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -144,7 +129,7 @@ jobs:
       run: make setup-packaging-deps
 
     - name: Build packages
-      run: make package-cli-linux-targz package-cli-linux-deb
+      run: make package-armv7-unknown-linux-gnueabihf
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -194,9 +179,7 @@ jobs:
         lfs: true
 
     - name: Create dependency tar
-      run: |
-        cargo vendor
-        tar -czvf cargo-vendor.tar.gz vendor/
+      run: make vendor-deps
 
     - name: Release
       uses: softprops/action-gh-release@v2
@@ -207,9 +190,6 @@ jobs:
   macos-job:
     name: Build MacOS Artifacts
     runs-on: macos-latest
-    env:
-      BCF_CC1352P7: 1
-      BCF_MSP430: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -254,9 +234,7 @@ jobs:
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
         APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
-      run: |
-        TARGET=aarch64-apple-darwin make package-gui-macos-dmg
-        TARGET=x86_64-apple-darwin make package-gui-macos-dmg
+      run: make package-x86_64-apple-darwin package-aarch64-apple-darwin
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -292,9 +270,6 @@ jobs:
   windows-job:
     name: Build Windows Artifacts
     runs-on: windows-latest
-    env:
-      BCF_CC1352P7: 1
-      BCF_MSP430: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -312,8 +287,8 @@ jobs:
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
 
-    - name: Add ${{ matrix.platform.target }} target
-      run:  rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
+    - name: Add rust target
+      run:  rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
@@ -324,9 +299,7 @@ jobs:
       run: make setup-packaging-deps
 
     - name: Build packages
-      run: |
-        TARGET=x86_64-pc-windows-msvc make package-gui-windows-wix package-gui-windows-portable
-        TARGET=aarch64-pc-windows-msvc make package-gui-windows-portable
+      run: make package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages

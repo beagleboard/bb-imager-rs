@@ -1,11 +1,13 @@
 # Run 'make help' to see guidance on usage of this Makefile
 
-_HOST_TARGET = $(shell rustc -vV | awk '/^host/ { print $$2 }')
-_RUST_ARGS = --locked
-_CARGO_PACKAGER_ARGS = -r -vvv
 _TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
+# Rust args common for GUI and CLI across all targets and packages
+_RUST_ARGS_BASE = --locked --verbose
+_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430
+_RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
+_PACKAGER_ARGS = -r -vvv --verbose
 
 ## variable: CARGO_PATH: Path to cargo binary
 CARGO_PATH ?= $(shell which cargo)
@@ -13,50 +15,14 @@ CARGO_PATH ?= $(shell which cargo)
 RUST_BUILDER ?= $(CARGO_PATH)
 ## variable: VERSION: Release versions for bb-imager-cli and bb-imager-gui
 VERSION ?= $(_CARGO_TOML_VERSION)
-## variable: PB2_MSPM0: Enable support for PocketBeagle 2 MSPM0
-PB2_MSPM0 ?= 0
-## variable: BCF_CC1352P7: Enable support for BeagleConnect Freedom CC1352P7
-BCF_CC1352P7 ?= 0
-## variable: BCF_MSP430: Enable support for BeagleConnect Freedom MSP430
-BCF_MSP430 ?= 0
-## variable: DFU: Enable support for DFU
-DFU ?= 0
-## variable: VERBOSE: Enable verbose logging. Useful in CI
-VERBOSE ?= 0
-## variable: TARGET: Package Target platform. Defaults to Host target.
-TARGET ?= ${_HOST_TARGET}
 ## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
 NO_BUILD ?= 0
-## variable: SYSTEM_SQLITE: Do not bundle sqlite.
-SYSTEM_SQLITE ?= 1
 
-ifeq (${VERBOSE}, 1)
-	_RUST_ARGS+=--verbose
-	_CARGO_PACKAGER_ARGS+=--verbose
-endif
-
-_RUST_ARGS_CLI_GUI = ${_RUST_ARGS}
-_RUST_ARGS_SERVICE = ${_RUST_ARGS}
-
-ifeq (${PB2_MSPM0}, 1)
-	_RUST_ARGS_CLI_GUI+=-F pb2_mspm0
-endif
-ifeq (${BCF_CC1352P7}, 1)
-	_RUST_ARGS_CLI_GUI+=-F bcf_cc1352p7
-endif
-ifeq (${BCF_MSP430}, 1)
-	_RUST_ARGS_CLI_GUI+=-F bcf_msp430
-endif
-
-_RUST_ARGS_CLI = ${_RUST_ARGS_CLI_GUI}
-
-ifeq (${DFU}, 1)
-	_RUST_ARGS_CLI+=-F dfu
-endif
-
-_RUST_ARGS_GUI = ${_RUST_ARGS_CLI_GUI} -F updater
-ifeq (${SYSTEM_SQLITE}, 1)
-	_RUST_ARGS_GUI+=--no-default-features -F system-sqlite
+# Allow skipping build step
+ifeq ($(NO_BUILD),1)
+RUST_BUILD = @true
+else
+RUST_BUILD = $(RUST_BUILDER) build
 endif
 
 ## housekeeping: help: Display this help message
@@ -86,56 +52,13 @@ endif
 .PHONY: check
 check:
 	$(info "Running clippy checks")
-	$(CARGO_PATH) clippy --all-targets --all-features --no-deps --workspace ${_RUST_ARGS}
+	$(CARGO_PATH) clippy --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE}
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
 test:
 	$(info "Run workspace tests")
-	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS}
-
-## build: build-gui: Build GUI. Target platform can be changed using TARGET env variable.
-.PHONY: build-gui
-build-gui:
-ifeq (${NO_BUILD}, 1)
-	$(info "Skip Building GUI")
-else
-	$(info "Building GUI")
-	$(RUST_BUILDER) build -r -p bb-imager-gui --target ${TARGET} ${_RUST_ARGS_GUI}
-endif
-
-## run: run-gui: Run GUI for quick testing on host.
-.PHONY: run-gui
-run-gui:
-	$(info "Running GUI")
-	$(CARGO_PATH) run -p bb-imager-gui
-
-## build: build-cli: Build CLI. Target platform can be changed using TARGET env variable.
-.PHONY: build-cli
-build-cli:
-ifeq (${NO_BUILD}, 1)
-	$(info "Skip Building CLI")
-else
-	$(info "Building CLI")
-	$(RUST_BUILDER) build -r -p bb-imager-cli --target ${TARGET} ${_RUST_ARGS_CLI}
-endif
-
-## run: run-cli: Run CLI for quick testing on host.
-.PHONY: run-cli
-run-cli:
-	$(info "Running CLI")
-	$(CARGO_PATH) run -p bb-imager-cli
-
-## build: build-service: Build BeagleBoard Service. Target platform can be changed using TARGET env variable.
-.PHONY: build-service
-build-service:
-ifeq (${NO_BUILD}, 1)
-	$(info "Skip Building SERVICE")
-else
-	$(info "Building Service")
-	$(RUST_BUILDER) build -r -p bb-imager-service --target ${TARGET} ${_RUST_ARGS_SERVICE}
-endif
-
+	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS_BASE}
 
 ## build: build-cli-manpage: Build manpage for CLI.
 .PHONY: build-cli-manpage
@@ -155,70 +78,6 @@ build-cli-shell-comp:
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
 	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
 	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-
-## package: package-gui-linux-appimage: Build AppImage package for GUI.
-.PHONY: package-gui-linux-appimage
-package-gui-linux-appimage: package-checks build-gui
-	$(info "Packaging GUI as appimage")
-	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f appimage ${_CARGO_PACKAGER_ARGS}
-
-## package: package-gui-linux-deb: Build Debian package for GUI
-.PHONY: package-gui-linux-deb
-package-gui-linux-deb: package-checks build-gui
-	$(info "Packaging GUI as deb")
-	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
-
-## package: package-cli-linux-deb: Build Debian package for CLI
-.PHONY: package-cli-linux-deb
-package-cli-linux-deb: package-checks build-cli build-cli-manpage build-cli-shell-comp
-	$(info "Packaging CLI as deb")
-	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
-
-## package: package-service-linux-deb: Build Debian package for Service
-.PHONY: package-service-linux-deb
-package-service-linux-deb: package-checks build-service
-	$(info "Packaging Service as deb")
-	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f deb ${_CARGO_PACKAGER_ARGS}
-
-## package: package-gui-linux-targz: Build generic linux package for GUI
-.PHONY: package-gui-linux-targz
-package-gui-linux-targz: package-checks build-gui
-	$(info "Packaging GUI as generic linux tar.gz")
-	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
-	rm bb-imager-gui/dist/PKGBUILD
-
-## package: package-cli-linux-targz: Build generic linux package for CLI
-.PHONY: package-cli-linux-targz
-package-cli-linux-targz: package-checks build-cli build-cli-manpage build-cli-shell-comp
-	$(info "Packaging CLI as generic linux tar.gz")
-	$(CARGO_PATH) packager -p bb-imager-cli --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
-	rm bb-imager-cli/dist/PKGBUILD
-
-## package: package-service-linux-targz: Build generic Linux package for Service
-.PHONY: package-service-linux-targz
-package-service-linux-targz: package-checks build-service
-	$(info "Packaging Service as generic linux tar.gz")
-	$(CARGO_PATH) packager -p bb-imager-service --target ${TARGET} -f pacman ${_CARGO_PACKAGER_ARGS}
-	rm bb-imager-service/dist/PKGBUILD
-
-## package: package-gui-windows-portable: Build portable Windows exe package for GUI
-.PHONY: package-gui-windows-portable
-package-gui-windows-portable: package-checks build-gui
-	$(info "Packaging GUI as portable Windows exe")
-	mkdir -p bb-imager-gui/dist
-	cp target/${TARGET}/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_${_TARGET_ARCH}.exe
-
-## package: package-gui-windows-wix: Build Windows installer for GUI
-.PHONY: package-gui-windows-wix
-package-gui-windows-wix: package-checks build-gui
-	$(info "Packaging GUI as windows installer")
-	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f wix ${_CARGO_PACKAGER_ARGS}
-
-## package: package-gui-macos-dmg: Build MacOS DMG package for GUI
-.PHONY: package-gui-macos-dmg
-package-gui-macos-dmg: package-checks build-gui
-	$(info "Packaging GUI as DMG")
-	$(CARGO_PATH) packager -p bb-imager-gui --target ${TARGET} -f dmg ${_CARGO_PACKAGER_ARGS}
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
@@ -274,3 +133,87 @@ endif
 	git add Cargo.toml Cargo.lock bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml website/.env
 	git commit -s -m "Bump version to ${VERSION}"
 	git tag ${VERSION}
+
+define package-linux-x86_64_aarch64
+	$(info Building packages for $(1))
+	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI}
+	$(CARGO_PATH) packager -p bb-imager-cli --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} --no-default-features -F system-sqlite
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
+	rm bb-imager-gui/dist/PKGBUILD
+	rm bb-imager-cli/dist/PKGBUILD
+endef
+
+define package-apple-x86_64_aarch64
+	$(info Building packages for $(1))
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
+endef
+
+define package-windows-x86_64_aarch64
+	$(info Building packages for $(1))
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
+	mkdir -p bb-imager-gui/dist
+	cp target/$(1)/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_$(word 1,$(subst -, ,$(1))).exe
+endef
+
+## package: package-x86_64-unknown-linux-gnu: Create all packages for x86_64-unknown-linux-gnu
+.PHONY: package-x86_64-unknown-linux-gnu
+package-x86_64-unknown-linux-gnu: package-checks build-cli-manpage build-cli-shell-comp
+	$(call package-linux-x86_64_aarch64,x86_64-unknown-linux-gnu)
+
+## package: package-aarch64-unknown-linux-gnu: Create all packages for aarch64-unknown-linux-gnu
+.PHONY: package-aarch64-unknown-linux-gnu
+package-aarch64-unknown-linux-gnu: package-checks build-cli-manpage build-cli-shell-comp
+	$(call package-linux-x86_64_aarch64,aarch64-unknown-linux-gnu)
+
+## package: package-x86_64-apple-darwin: Create all packages for x86_64-apple-darwin
+.PHONY: package-x86_64-apple-darwin
+package-x86_64-apple-darwin: package-checks
+	$(call package-apple-x86_64_aarch64,x86_64-apple-darwin)
+
+## package: package-aarch64-apple-darwin: Create all packages for aarch64-apple-darwin
+.PHONY: package-aarch64-apple-darwin
+package-aarch64-apple-darwin: package-checks
+	$(call package-apple-x86_64_aarch64,aarch64-apple-darwin)
+
+## package: package-x86_64-pc-windows-msvc: Create all packages for x86_64-pc-windows-msvc
+.PHONY: package-x86_64-pc-windows-msvc
+package-x86_64-pc-windows-msvc: package-checks
+	$(call package-windows-x86_64_aarch64,x86_64-pc-windows-msvc)
+	$(CARGO_PATH) packager -p bb-imager-gui --target x86_64-pc-windows-msvc ${_PACKAGER_ARGS} -f wix
+
+## package: package-aarch64-pc-windows-msvc: Create all packages for aarch64-pc-windows-msvc
+.PHONY: package-aarch64-pc-windows-msvc
+package-aarch64-pc-windows-msvc: package-checks
+	$(call package-windows-x86_64_aarch64,aarch64-pc-windows-msvc)
+
+## package: package-armv7-unknown-linux-gnueabihf: Create all packages for armv7-unknown-linux-gnueabihf
+.PHONY: package-armv7-unknown-linux-gnueabihf
+package-armv7-unknown-linux-gnueabihf: package-checks build-cli-manpage build-cli-shell-comp
+	$(info Building packages for armv7-unknown-linux-gnueabihf)
+	$(RUST_BUILD) -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_RUST_ARGS} -F dfu
+	$(CARGO_PATH) packager -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_PACKAGER_ARGS} -f deb,pacman
+	rm bb-imager-cli/dist/PKGBUILD
+
+## housekeeping: vendor-deps: Create tarball of dependencies
+.PHONY: vendor-deps
+vendor-deps:
+	$(info Create tarball of all deps)
+	$(CARGO_PATH) vendor
+	tar -czvf cargo-vendor.tar.gz vendor/
+
+## housekeeping: coverage: Check test coverage
+.PHONY: coverage
+coverage:
+	$(info Check test coverage)
+	cargo tarpaulin
+
+## housekeeping: bloat: Check dependency contribution to bin size.
+.PHONY: bloat
+bloat:
+	$(info Check dependency bloat)
+	cargo bloat -p bb-imager-cli --crates --all-features --release --locked > bloat-cli.txt
+	cargo bloat -p bb-imager-gui --crates --all-features --release --locked > bloat-gui.txt
