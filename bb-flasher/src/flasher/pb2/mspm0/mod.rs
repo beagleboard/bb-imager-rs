@@ -4,15 +4,8 @@
 //! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 //! [MSPM0L1105]: https://www.ti.com/product/MSPM0L1105
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "pb2_mspm0")] {
-        mod raw;
-        use raw::*;
-    } else if #[cfg(feature = "pb2_mspm0_dbus")] {
-        mod dbus;
-        use dbus::*;
-    }
-}
+mod raw;
+use raw::*;
 
 use std::borrow::Cow;
 use std::collections::HashSet;

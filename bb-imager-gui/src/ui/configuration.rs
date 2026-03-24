@@ -35,8 +35,6 @@ fn customization_pane<'a>(state: &'a crate::state::CustomizeState) -> Element<'a
     match &state.customization {
         FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card(state, inner),
         FlashingCustomization::Bcf(inner) => bcf(inner),
-        #[cfg(feature = "pb2_mspm0")]
-        FlashingCustomization::Pb2Mspm0(inner) => pb2_mspm0(inner),
         _ => panic!("No customization"),
     }
 }
@@ -48,21 +46,6 @@ fn bcf<'a>(state: &'a persistance::BcfCustomization) -> Element<'a, BBImagerMess
             .on_toggle(|x| {
                 BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Bcf(
                     state.clone().update_verify(!x),
-                ))
-            }),
-    )
-    .padding(VIEW_COL_PADDING)
-    .into()
-}
-
-#[cfg(feature = "pb2_mspm0")]
-fn pb2_mspm0<'a>(state: &'a persistance::Pb2Mspm0Customization) -> Element<'a, BBImagerMessage> {
-    widget::container(
-        widget::toggler(!state.persist_eeprom)
-            .label("Persist EEPROM")
-            .on_toggle(|x| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Pb2Mspm0(
-                    state.clone().update_persist_eeprom(x),
                 ))
             }),
     )

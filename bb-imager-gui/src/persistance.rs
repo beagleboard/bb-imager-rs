@@ -12,9 +12,6 @@ pub(crate) struct GuiConfiguration {
     sd_customization: Option<SdCustomization>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bcf_customization: Option<BcfCustomization>,
-    #[cfg(feature = "pb2_mspm0")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pb2_mspm0_customization: Option<Pb2Mspm0Customization>,
 }
 
 impl GuiConfiguration {
@@ -58,11 +55,6 @@ impl GuiConfiguration {
 
     pub(crate) const fn bcf_customization(&self) -> Option<&BcfCustomization> {
         self.bcf_customization.as_ref()
-    }
-
-    #[cfg(feature = "pb2_mspm0")]
-    pub(crate) const fn pb2_mspm0_customization(&self) -> Option<&Pb2Mspm0Customization> {
-        self.pb2_mspm0_customization.as_ref()
     }
 
     pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
@@ -249,28 +241,5 @@ impl BcfCustomization {
 impl Default for BcfCustomization {
     fn default() -> Self {
         Self { verify: true }
-    }
-}
-
-#[cfg(feature = "pb2_mspm0")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Pb2Mspm0Customization {
-    pub(crate) persist_eeprom: bool,
-}
-
-#[cfg(feature = "pb2_mspm0")]
-impl Pb2Mspm0Customization {
-    pub(crate) fn update_persist_eeprom(mut self, t: bool) -> Self {
-        self.persist_eeprom = t;
-        self
-    }
-}
-
-#[cfg(feature = "pb2_mspm0")]
-impl Default for Pb2Mspm0Customization {
-    fn default() -> Self {
-        Self {
-            persist_eeprom: true,
-        }
     }
 }

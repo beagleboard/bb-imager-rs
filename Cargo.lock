@@ -580,13 +580,10 @@ dependencies = [
  "liblzma",
  "rc-zip-sync",
  "serde",
- "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "tokio-stream",
  "tokio-util",
  "tracing",
- "zbus",
 ]
 
 [[package]]
@@ -701,19 +698,6 @@ dependencies = [
  "url",
  "webbrowser",
  "whoami 2.1.1",
-]
-
-[[package]]
-name = "bb-imager-service"
-version = "0.0.20"
-dependencies = [
- "bb-flasher-pb2-mspm0",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "zbus",
- "zbus_polkit",
 ]
 
 [[package]]
@@ -8709,19 +8693,6 @@ dependencies = [
  "serde",
  "winnow 0.7.15",
  "zvariant",
-]
-
-[[package]]
-name = "zbus_polkit"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad23d5c4d198c7e2641b33e6e0d1f866f117408ba66fe80bbe52e289eeb77c52"
-dependencies = [
- "enumflags2",
- "serde",
- "serde_repr",
- "static_assertions",
- "zbus",
 ]
 
 [[package]]

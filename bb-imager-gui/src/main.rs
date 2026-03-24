@@ -391,13 +391,7 @@ impl BBImager {
         *self = match std::mem::take(self) {
             Self::ChooseOs(inner) => Self::ChooseBoard(inner.into()),
             Self::ChooseDest(inner) => Self::ChooseOs(inner.into()),
-            Self::Customize(inner) => {
-                if helpers::static_destination(inner.selected_image.1.flasher()).is_none() {
-                    Self::ChooseDest(inner.into())
-                } else {
-                    Self::ChooseOs(inner.into())
-                }
-            }
+            Self::Customize(inner) => Self::ChooseDest(inner.into()),
             Self::Review(inner) => {
                 if helpers::no_customization(
                     inner.selected_image.1.flasher(),
@@ -407,10 +401,8 @@ impl BBImager {
                 .is_none()
                 {
                     Self::Customize(inner)
-                } else if helpers::static_destination(inner.selected_image.1.flasher()).is_none() {
-                    Self::ChooseDest(inner.into())
                 } else {
-                    Self::ChooseOs(inner.into())
+                    Self::ChooseDest(inner.into())
                 }
             }
             Self::AppInfo(inner) => inner.page.into(),
@@ -458,44 +450,14 @@ impl BBImager {
                     .selected_image
                     .expect("Image should already be selected");
 
-                if let Some(dest) = helpers::static_destination(selected_image.1.flasher()) {
-                    if let Some(customization) = helpers::no_customization(
-                        selected_image.1.flasher(),
-                        &selected_image.1,
-                        &dest,
-                    ) {
-                        Self::Customize(state::CustomizeState {
-                            common: inner.common,
-                            selected_board: inner.selected_board,
-                            selected_image,
-                            selected_dest: dest,
-                            customization,
-                        })
-                    } else {
-                        let temp = helpers::FlashingCustomization::new(
-                            selected_image.1.flasher(),
-                            &selected_image.1,
-                            &inner.common.app_config,
-                        );
-
-                        Self::Customize(state::CustomizeState {
-                            common: inner.common,
-                            selected_board: inner.selected_board,
-                            selected_image,
-                            selected_dest: dest,
-                            customization: temp,
-                        })
-                    }
-                } else {
-                    Self::ChooseDest(state::ChooseDestState {
-                        common: inner.common,
-                        selected_board: inner.selected_board,
-                        selected_image,
-                        selected_dest: None,
-                        destinations: Vec::new(),
-                        filter_destination: true,
-                    })
-                }
+                Self::ChooseDest(state::ChooseDestState {
+                    common: inner.common,
+                    selected_board: inner.selected_board,
+                    selected_image,
+                    selected_dest: None,
+                    destinations: Vec::new(),
+                    filter_destination: true,
+                })
             }
             Self::ChooseDest(inner) => {
                 let selected_dest = inner

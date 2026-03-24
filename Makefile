@@ -7,6 +7,7 @@ _DATE = $(shell date +%F)
 _RUST_ARGS_BASE = --locked --verbose
 _RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
+_RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0
 _PACKAGER_ARGS = -r -vvv --verbose
 
 ## variable: CARGO_PATH: Path to cargo binary
@@ -136,7 +137,7 @@ endif
 
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI}
+	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI} $(_RUST_ARGS_CLI-$(1))
 	$(CARGO_PATH) packager -p bb-imager-cli --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} --no-default-features -F system-sqlite
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
