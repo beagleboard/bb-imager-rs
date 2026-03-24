@@ -440,16 +440,6 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
-        #[cfg(feature = "pb2_mspm0")]
-        (
-            BoardImage::Image { img, .. },
-            FlashingCustomization::Pb2Mspm0(x),
-            Destination::Pb2Mspm0,
-        ) => {
-            bb_flasher::pb2::mspm0::Flasher::new(img.into_future(), x.persist_eeprom)
-                .flash(Some(chan))
-                .await
-        }
         _ => unimplemented!(),
     }
 }
@@ -462,8 +452,6 @@ pub(crate) enum Destination {
     BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
     #[cfg(feature = "bcf_msp430")]
     Msp430(bb_flasher::bcf::msp430::Target),
-    #[cfg(feature = "pb2_mspm0")]
-    Pb2Mspm0,
 }
 
 impl Display for Destination {
@@ -475,8 +463,6 @@ impl Display for Destination {
             Destination::BeagleConnectFreedom(target) => target.fmt(f),
             #[cfg(feature = "bcf_msp430")]
             Destination::Msp430(target) => target.fmt(f),
-            #[cfg(feature = "pb2_mspm0")]
-            Destination::Pb2Mspm0 => write!(f, "PocketBeagle 2 MSPM0"),
         }
     }
 }
@@ -507,8 +493,6 @@ impl Destination {
             Self::BeagleConnectFreedom(t) => vec![("Path", t.path().to_string())],
             #[cfg(feature = "bcf_msp430")]
             Self::Msp430(t) => vec![("Path", t.path().to_string())],
-            #[cfg(feature = "pb2_mspm0")]
-            Self::Pb2Mspm0 => Vec::new(),
         }
     }
 }
@@ -534,8 +518,6 @@ pub(crate) async fn destinations(flasher: config::Flasher, filter: bool) -> Vec<
             .into_iter()
             .map(Destination::Msp430)
             .collect(),
-        #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => vec![Destination::Pb2Mspm0],
         _ => unimplemented!(),
     }
 }
@@ -547,8 +529,6 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
         config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::FILE_TYPES,
-        #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => bb_flasher::pb2::mspm0::Target::FILE_TYPES,
         _ => unimplemented!(),
     }
 }
@@ -560,8 +540,6 @@ pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
         config::Flasher::Msp430Usb => true,
-        #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => true,
         _ => false,
     }
 }
@@ -572,8 +550,6 @@ pub(crate) enum FlashingCustomization {
     LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
-    #[cfg(feature = "pb2_mspm0")]
-    Pb2Mspm0(crate::persistance::Pb2Mspm0Customization),
 }
 
 impl FlashingCustomization {
@@ -596,13 +572,6 @@ impl FlashingCustomization {
                 Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
             }
             config::Flasher::Msp430Usb => Self::Msp430,
-            #[cfg(feature = "pb2_mspm0")]
-            config::Flasher::Pb2Mspm0 => Self::Pb2Mspm0(
-                app_config
-                    .pb2_mspm0_customization()
-                    .cloned()
-                    .unwrap_or_default(),
-            ),
             _ => unimplemented!(),
         }
     }
@@ -614,10 +583,6 @@ impl FlashingCustomization {
             }
             Self::Bcf(_) => {
                 *self = Self::Bcf(Default::default());
-            }
-            #[cfg(feature = "pb2_mspm0")]
-            Self::Pb2Mspm0(_) => {
-                *self = Self::Pb2Mspm0(Default::default());
             }
             _ => {}
         };
@@ -764,14 +729,6 @@ pub(crate) fn pretty_bytes(bytes: u64) -> String {
         format!("{} {}", bytes, UNITS[unit])
     } else {
         format!("{:.2} {}", size, UNITS[unit])
-    }
-}
-
-pub(crate) const fn static_destination(flasher: config::Flasher) -> Option<Destination> {
-    match flasher {
-        #[cfg(feature = "pb2_mspm0")]
-        config::Flasher::Pb2Mspm0 => Some(Destination::Pb2Mspm0),
-        _ => None,
     }
 }
 
