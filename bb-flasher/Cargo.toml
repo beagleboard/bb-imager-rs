@@ -11,7 +11,7 @@ keywords = ["beagle", "flasher"]
 categories = ["development-tools", "embedded", "hardware-support"]
 
 [dependencies]
-liblzma = { version = "0.4", features = ["static", "parallel"] }
+liblzma = { version = "0.4", features = ["parallel"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "2.0" }
 tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
@@ -39,6 +39,7 @@ bcf = ["bb-flasher-bcf/cc1352p7"]
 bcf_msp430 = ["bb-flasher-bcf/msp430"]
 pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
 dfu = ["bb-flasher-dfu"]
+static = ["liblzma/static"]
 
 [package.metadata.docs.rs]
 all-features = true
