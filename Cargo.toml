@@ -14,7 +14,7 @@ members = [
 	"bb-helper",
 	"bb-flasher-dfu",
 	"bb-drivelist"
-]
+, "bb-flasher-mspm0"]
 
 [profile.release]
 strip = true
