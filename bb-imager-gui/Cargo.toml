@@ -17,7 +17,7 @@ iced_aw = { version = "0.13.1", default-features = false, features = ["spinner"]
 image = "0.25"
 tokio = { version = "1.50", default-features = false, features = ["macros"] }
 webbrowser = "1.1.0"
-notify-rust = "4.12.0"
+notify-rust = { version = "4.12.0", default-features = false, features = ["z-with-tokio"] }
 url = "2.5.4"
 whoami = "2.1"
 localzone = "0.3.1"
@@ -53,13 +53,13 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
 
 [features]
-default = ["bundled-sqlite"]
+default = ["static"]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 # GUI requires the base board support for any sub soc firmware
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 # Handle application updates
 updater = []
-bundled-sqlite  = ["sqlx/sqlite"]
+static = ["sqlx/sqlite", "bb-flasher/static"]
 system-sqlite  = ["sqlx/sqlite-unbundled"]
 
 [package.metadata.packager]
