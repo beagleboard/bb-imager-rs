@@ -206,15 +206,9 @@ pub async fn flash<R: Read + Send + 'static>(
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: Box<Path>,
     chan: Option<mpsc::Sender<f32>>,
-    customization: Option<Customization>,
+    customizations: Vec<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
-    if let Some(x) = &customization
-        && !x.validate()
-    {
-        return Err(crate::Error::InvalidCustomizaton);
-    }
-
     tracing::info!("Opening Destination");
     let dst_clone = dst.to_path_buf();
     let sd = crate::pal::open(&dst_clone).await?;
@@ -230,7 +224,7 @@ pub async fn flash<R: Read + Send + 'static>(
 
     let cancel_child = cancel.as_ref().map(|x| x.child_token());
     let res = tokio::task::spawn_blocking(move || {
-        flash_internal(img, img_size, bmap, sd, chan, customization, cancel_child)
+        flash_internal(img, img_size, bmap, sd, chan, customizations, cancel_child)
     })
     .await
     .unwrap();
@@ -247,7 +241,7 @@ fn flash_internal(
     bmap: Option<bb_bmap_parser::Bmap>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
     mut chan: Option<mpsc::Sender<f32>>,
-    customization: Option<Customization>,
+    customizations: Vec<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     chan_send(chan.as_mut(), 0.0);
@@ -260,7 +254,7 @@ fn flash_internal(
     check_token(cancel.as_ref())?;
 
     tracing::info!("Applying customization");
-    if let Some(c) = customization {
+    for c in customizations {
         let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
         c.customize(temp)?;
     }
