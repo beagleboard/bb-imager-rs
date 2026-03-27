@@ -63,14 +63,19 @@ impl BBFlasherTarget for Target {
     }
 }
 
-/// Linux Image post-install customization options. Only work on BeagleBoard.org images.
+/// Linux Image post-install customization options.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FlashingSdLinuxConfig {
-    customization: Option<bb_flasher_sd::Customization>,
+pub struct FlashingSdLinuxConfig(Vec<bb_flasher_sd::Customization>);
+
+fn sysconf_w(sysconf: &mut Vec<u8>, key: &str, value: &str) {
+    sysconf.extend(key.as_bytes());
+    sysconf.extend(b"=");
+    sysconf.extend(value.as_bytes());
+    sysconf.extend(b"\n");
 }
 
 impl FlashingSdLinuxConfig {
-    pub const fn sysconfig(
+    pub fn sysconfig(
         hostname: Option<Box<str>>,
         timezone: Option<Box<str>>,
         keymap: Option<Box<str>>,
@@ -79,36 +84,68 @@ impl FlashingSdLinuxConfig {
         ssh: Option<Box<str>>,
         usb_enable_dhcp: Option<bool>,
     ) -> Self {
-        Self {
-            customization: Some(bb_flasher_sd::Customization::Sysconf(
-                bb_flasher_sd::SysconfCustomization {
-                    hostname,
-                    timezone,
-                    keymap,
-                    user,
-                    wifi,
-                    ssh,
-                    usb_enable_dhcp,
-                },
-            )),
+        let mut content = Vec::<u8>::new();
+
+        if let Some(h) = hostname {
+            sysconf_w(&mut content, "hostname", &h);
+        }
+        if let Some(tz) = timezone {
+            sysconf_w(&mut content, "timezone", &tz);
+        }
+        if let Some(k) = keymap {
+            sysconf_w(&mut content, "keymap", &k);
+        }
+        if let Some((u, p)) = user {
+            sysconf_w(&mut content, "user_name", &u);
+            sysconf_w(&mut content, "user_password", &p);
+        }
+        if let Some(x) = ssh {
+            sysconf_w(&mut content, "user_authorized_key", &x);
+        }
+        if Some(true) == usb_enable_dhcp {
+            sysconf_w(&mut content, "usb_enable_dhcp", "yes");
+        }
+
+        match wifi {
+            Some((ssid, psk)) => {
+                sysconf_w(&mut content, "iwd_psk_file", &format!("{ssid}.psk"));
+
+                Self(vec![bb_flasher_sd::Customization {
+                    partition: bb_flasher_sd::ParitionType::Boot,
+                    content: vec![
+                        (
+                            "sysconf.txt".to_string().into(),
+                            content.into_boxed_slice().into(),
+                        ),
+                        (
+                            format!("services/{ssid}.psk").into(),
+                            format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
+                                .into_boxed_str()
+                                .into_boxed_bytes()
+                                .into(),
+                        ),
+                    ],
+                }])
+            }
+            None => Self(vec![bb_flasher_sd::Customization {
+                partition: bb_flasher_sd::ParitionType::Boot,
+                content: vec![(
+                    "sysconf.txt".to_string().into(),
+                    content.into_boxed_slice().into(),
+                )],
+            }]),
         }
     }
 
-    pub const fn generic_file(file_name: Box<str>, file_content: Option<Box<str>>) -> Self {
-        Self {
-            customization: Some(bb_flasher_sd::Customization::GenericFile(
-                bb_flasher_sd::GenericFileCustomization {
-                    file_name,
-                    file_content,
-                },
-            )),
-        }
+    pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
+        Self(vec![bb_flasher_sd::Customization {
+            partition: bb_flasher_sd::ParitionType::Boot,
+            content: vec![(file_name, file_content.into_boxed_bytes().into())],
+        }])
     }
 
     pub const fn none() -> Self {
-        Self {
-            customization: None,
-        }
+        Self(Vec::new())
     }
 }
 
@@ -179,7 +216,7 @@ where
     B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let customization = self.customization.customization;
+        let customization = self.customization.0;
         let dst = self.dst;
 
         if let Some(chan) = chan {

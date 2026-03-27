@@ -29,7 +29,7 @@
 //!     };
 //!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 //!
-//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), None, None).await });
+//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), Vec::new(), None).await });
 //!
 //!     while let Some(m) = rx.recv().await {
 //!         println!("{:?}", m);
@@ -50,7 +50,7 @@ mod flashing;
 mod helpers;
 pub(crate) mod pal;
 
-pub use customization::{Customization, GenericFileCustomization, SysconfCustomization};
+pub use customization::{Customization, ParitionType};
 pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
@@ -58,41 +58,16 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for this crate
 pub enum Error {
-    /// Provided customization options are not valid for the current image.
-    #[error("Invalid customization options.")]
-    InvalidCustomizaton,
     /// The partition table of image invalid.
     #[error("Partition table of image not valid.")]
     InvalidPartitionTable,
     #[error("Only FAT BOOT partitions are supported.")]
     InvalidBootPartition,
-    #[error("Failed to create sysconf.txt")]
-    SysconfCreateFail {
-        #[source]
-        source: io::Error,
-    },
-    #[error("Failed to write {field} to sysconf.txt.")]
-    SysconfWriteFail {
-        #[source]
-        source: io::Error,
-        field: &'static str,
-    },
-    #[error("Failed to create {file}")]
-    GenericFileCreateFail {
+    #[error("Failed to create customization {file}")]
+    CustomizationFileCreateFail {
         #[source]
         source: io::Error,
         file: Box<str>,
-    },
-    #[error("Failed to write to {file}")]
-    GenericFileWriteFail {
-        #[source]
-        source: io::Error,
-        file: Box<str>,
-    },
-    #[error("Failed to setup WiFi.")]
-    WifiSetupFail {
-        #[source]
-        source: io::Error,
     },
     /// Unknown error occured during IO.
     #[error("Unknown Error during IO. Please check logs for more information.")]
