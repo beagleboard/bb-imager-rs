@@ -676,6 +676,7 @@ dependencies = [
  "bb-downloader",
  "bb-flasher",
  "bb-helper",
+ "chrono",
  "const-hex",
  "directories",
  "embed-resource",
