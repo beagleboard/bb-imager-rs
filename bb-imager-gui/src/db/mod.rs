@@ -5,6 +5,9 @@ use std::{collections::VecDeque, sync::Arc};
 use bb_config::config;
 use sqlx::{FromRow, Row, sqlite::SqliteRow};
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone)]
 pub(crate) struct Db {
     _f: Arc<tempfile::NamedTempFile>,
@@ -178,7 +181,6 @@ impl Db {
             .iter()
             .filter(|x| crate::helpers::flasher_supported(x.flasher))
         {
-            // TODO: Test if the board already exists first.
             Self::insert_board(&mut tx, dev).await?;
         }
 
@@ -187,15 +189,20 @@ impl Db {
         tx.commit().await
     }
 
-    pub(crate) async fn insert_remote_config(
+    async fn insert_remote_config(
         exec: &mut sqlx::SqliteConnection,
         remote_configs: impl Iterator<Item = &url::Url>,
     ) -> sqlx::Result<()> {
         for u in remote_configs {
-            sqlx::query("INSERT INTO remote_configs(url) VALUES ($1)")
-                .bind(u.as_str())
-                .execute(&mut *exec)
-                .await?;
+            sqlx::query(
+                r#"
+                INSERT INTO remote_configs(url) VALUES ($1) 
+                ON CONFLICT DO NOTHING
+                "#,
+            )
+            .bind(u.as_str())
+            .execute(&mut *exec)
+            .await?;
         }
 
         Ok(())
@@ -355,13 +362,30 @@ impl Db {
     ) -> sqlx::Result<()> {
         let spec = serde_json::to_vec(&board.specification).unwrap();
 
-        let id = sqlx::query(
+        // Insert or update board
+        let id: i64 = sqlx::query_scalar(
             r#"
-            INSERT INTO boards(name, description, icon, flasher, instructions, 
-                oshw, specification, documentation) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT(name) DO NOTHING
-            "#,
+        INSERT INTO boards(
+            name,
+            description,
+            icon,
+            flasher,
+            instructions,
+            oshw,
+            specification,
+            documentation
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT(name) DO UPDATE SET
+            description = excluded.description,
+            icon = excluded.icon,
+            flasher = excluded.flasher,
+            instructions = excluded.instructions,
+            oshw = excluded.oshw,
+            specification = excluded.specification,
+            documentation = excluded.documentation
+        RETURNING id
+        "#,
         )
         .bind(&board.name)
         .bind(&board.description)
@@ -371,16 +395,27 @@ impl Db {
         .bind(&board.oshw)
         .bind(&spec)
         .bind(board.documentation.as_ref().map(|x| x.as_str()))
-        .execute(&mut *exec)
-        .await?
-        .last_insert_rowid();
+        .fetch_one(&mut *exec)
+        .await?;
 
+        // Remove old tags
+        sqlx::query(
+            r#"
+        DELETE FROM board_tags
+        WHERE board_id = $1
+        "#,
+        )
+        .bind(id)
+        .execute(&mut *exec)
+        .await?;
+
+        // Insert new tags
         for tag in &board.tags {
             sqlx::query(
                 r#"
-            INSERT INTO board_tags(board_id, tag) VALUES ($1, $2)
-            ON CONFLICT DO NOTHING
-                "#,
+            INSERT INTO board_tags(board_id, tag)
+            VALUES ($1, $2)
+            "#,
             )
             .bind(id)
             .bind(tag)
