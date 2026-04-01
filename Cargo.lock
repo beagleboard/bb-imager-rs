@@ -572,6 +572,7 @@ dependencies = [
  "anyhow",
  "bb-flasher-bcf",
  "bb-flasher-dfu",
+ "bb-flasher-mspm0",
  "bb-flasher-pb2-mspm0",
  "bb-flasher-sd",
  "bb-helper",

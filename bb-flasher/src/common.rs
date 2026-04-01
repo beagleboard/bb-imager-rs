@@ -2,12 +2,22 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-#[cfg(any(feature = "bcf", feature = "bcf_msp430", feature = "pb2_mspm0",))]
+#[cfg(any(
+    feature = "bcf",
+    feature = "bcf_msp430",
+    feature = "pb2_mspm0",
+    feature = "mspm0_uart"
+))]
 use thiserror::Error;
 use tokio::sync::mpsc;
 
 #[derive(Error, Debug)]
-#[cfg(any(feature = "bcf", feature = "bcf_msp430", feature = "pb2_mspm0",))]
+#[cfg(any(
+    feature = "bcf",
+    feature = "bcf_msp430",
+    feature = "pb2_mspm0",
+    feature = "mspm0_uart"
+))]
 pub(crate) enum FlasherError {
     #[error("Failed to fetch image.")]
     ImageResolvingError {
