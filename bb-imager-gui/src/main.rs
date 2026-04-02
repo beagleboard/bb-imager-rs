@@ -518,8 +518,8 @@ impl BBImager {
                 helpers::FlashingCustomization::LinuxSdSysconfig(c) => {
                     let mut temp = inner
                         .app_config()
-                        .sd_customization()
-                        .cloned()
+                        .sd_customization
+                        .clone()
                         .unwrap_or_default();
                     temp.update_sysconfig(c.clone());
                     inner.common.app_config.update_sd_customization(temp);
@@ -528,7 +528,13 @@ impl BBImager {
                 }
                 helpers::FlashingCustomization::Bcf(c) => {
                     inner.common.app_config.update_bcf_customization(c.clone());
-
+                    Task::batch([inner.save_app_config(), self.scroll_reset()])
+                }
+                helpers::FlashingCustomization::Zepto(c) => {
+                    inner
+                        .common
+                        .app_config
+                        .update_zepto_customization(c.clone());
                     Task::batch([inner.save_app_config(), self.scroll_reset()])
                 }
                 _ => self.scroll_reset(),

@@ -197,6 +197,21 @@ async fn flash_internal(
                 .flash(chan)
                 .await
         }
+        #[cfg(feature = "zepto")]
+        TargetCommands::Zepto {
+            img,
+            dst,
+            no_verify,
+        } => {
+            bb_flasher::mspm0::Flasher::new(
+                LocalImage::new(img).into_future(),
+                dst.into(),
+                !no_verify,
+                None,
+            )
+            .flash(chan)
+            .await
+        }
     }
 }
 
@@ -285,6 +300,10 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             #[cfg(feature = "pb2_mspm0")]
             DestinationsTarget::Pb2Mspm0 => {
                 no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter).await
+            }
+            #[cfg(feature = "zepto")]
+            DestinationsTarget::Zepto => {
+                no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
             }
         }
         return;
@@ -453,6 +472,10 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
         #[cfg(feature = "pb2_mspm0")]
         DestinationsTarget::Pb2Mspm0 => {
             no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(!no_filter).await
+        }
+        #[cfg(feature = "zepto")]
+        DestinationsTarget::Zepto => {
+            no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
         }
     }
 }

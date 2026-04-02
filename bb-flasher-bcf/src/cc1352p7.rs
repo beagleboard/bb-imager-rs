@@ -19,6 +19,8 @@ use crate::{
     helpers::{chan_send, parse_bin},
 };
 
+const CRC_ALGO: crc_fast::CrcAlgorithm = crc_fast::CrcAlgorithm::Crc32IsoHdlc;
+
 const ACK: u8 = 0xcc;
 const NACK: u8 = 0x33;
 
@@ -79,28 +81,10 @@ where
     fn new(port: S) -> Result<Self> {
         let mut bcf = BeagleConnectFreedom { port };
 
-        const MAX_RETRIES: usize = 3;
-        let mut last_error = None;
+        bcf.invoke_bootloader()?;
+        bcf.send_sync()?;
 
-        for attempt in 1..=MAX_RETRIES {
-            info!("Bootloader invocation attempt {}/{}", attempt, MAX_RETRIES);
-
-            match bcf.invoke_bootloader().and_then(|_| bcf.send_sync()) {
-                Ok(_) => {
-                    info!("Successfully started bootloader on attempt {}", attempt);
-                    return Ok(bcf);
-                }
-                Err(e) => {
-                    warn!("Bootloader invocation attempt {} failed: {:?}", attempt, e);
-                    last_error = Some(e);
-                    if attempt < MAX_RETRIES {
-                        std::thread::sleep(Duration::from_millis(500));
-                    }
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or(Error::FailedToStartBootloader))
+        Ok(bcf)
     }
 
     fn wait_for_ack(&mut self) -> Result<()> {
@@ -123,7 +107,7 @@ where
         self.port
             .set_break()
             .map_err(|_| Error::FailedToStartBootloader)?;
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(Duration::from_millis(500));
         self.port
             .clear_break()
             .map_err(|_| Error::FailedToStartBootloader)?;
@@ -290,6 +274,25 @@ fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<(
     }
 }
 
+fn open_bcf(port: &str) -> Result<BeagleConnectFreedom<impl SerialPort>> {
+    const MAX_RETRIES: usize = 5;
+    let mut last_err = None;
+
+    for _ in 0..MAX_RETRIES {
+        let port = serialport::new(port, 115200)
+            .timeout(Duration::from_millis(2000))
+            .open_native()
+            .map_err(|_| Error::FailedToOpenPort)?;
+
+        match BeagleConnectFreedom::new(port) {
+            Ok(x) => return Ok(x),
+            Err(e) => last_err = Some(e),
+        }
+    }
+
+    Err(last_err.unwrap_or(Error::FailedToOpenPort))
+}
+
 /// Flash BeagleConnect Freedom. Also provides optional progress and abort mechanism.
 ///
 /// # Firmware
@@ -299,14 +302,6 @@ fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<(
 /// - Raw binary
 /// - Ti-TXT
 /// - Intel Hex
-///
-/// # Aborting
-///
-/// The process can be aborted by dropping all strong references to the [`Arc`] that owns the
-/// [`Weak`] passed as `cancel`.
-///
-/// [`Arc`]: std::sync::Arc
-/// [`Weak`]: std::sync::Weak
 pub fn flash(
     firmware: &[u8],
     port: &str,
@@ -318,21 +313,20 @@ pub fn flash(
 
     chan_send(chan.as_mut(), Status::Preparing);
 
-    let port = serialport::new(port, 115200)
-        .timeout(Duration::from_millis(2000))
-        .open_native()
-        .map_err(|_| Error::FailedToOpenPort)?;
-    let mut bcf = BeagleConnectFreedom::new(port)?;
+    let mut bcf = open_bcf(port)?;
     info!("BeagleConnectFreedom Connected");
 
     check_token(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
 
-    let img_crc32 = crc32fast::hash(
+    let img_crc32: u32 = crc_fast::checksum(
+        CRC_ALGO,
         &firmware_bin
             .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xff))
             .expect("Unexpected error"),
-    );
+    )
+    .try_into()
+    .unwrap();
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
         return Ok(());

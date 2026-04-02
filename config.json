@@ -141,6 +141,20 @@
 					"GPU": "PowerVR® Rogue™ AXE-1-16M",
 					"RAM": "512MB DDR4"
 				}
+			},
+			{
+				"name": "BeagleConnect Zepto",
+				"tags": [
+					"beagleconnect-zepto"
+				],
+				"description": "TODO",
+				"flasher": "Mspm0Uart",
+				"instructions": "1. Connect the BeagleConnect Zepto board to your computer via USB to UART Bridge.\n2. Keep BSL button presed.\n3. Press and release RESET button.\n4. Release BSL button.",
+				"specification": {
+					"Processor": "Texas Instruments MSPM0L1117",
+					"Cores": "1 x 32MHz ARM® Cortex-M0+",
+					"Onboard Flash": "128KB"
+				}
 			}
 		]
 	},
