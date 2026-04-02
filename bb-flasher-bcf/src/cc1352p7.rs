@@ -19,6 +19,8 @@ use crate::{
     helpers::{chan_send, parse_bin},
 };
 
+const CRC_ALGO: crc_fast::CrcAlgorithm = crc_fast::CrcAlgorithm::Crc32IsoHdlc;
+
 const ACK: u8 = 0xcc;
 const NACK: u8 = 0x33;
 
@@ -320,11 +322,14 @@ pub fn flash(
     check_token(cancel.as_ref())?;
     chan_send(chan.as_mut(), Status::Flashing(0.0));
 
-    let img_crc32 = crc32fast::hash(
+    let img_crc32: u32 = crc_fast::checksum(
+        CRC_ALGO,
         &firmware_bin
             .to_bytes(0..(FIRMWARE_SIZE as usize), Some(0xff))
             .expect("Unexpected error"),
-    );
+    )
+    .try_into()
+    .unwrap();
     if bcf.verify(img_crc32)? {
         warn!("Skipping flashing same image");
         return Ok(());

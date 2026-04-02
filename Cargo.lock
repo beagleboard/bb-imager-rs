@@ -592,7 +592,7 @@ name = "bb-flasher-bcf"
 version = "1.0.2"
 dependencies = [
  "bin_file",
- "crc32fast",
+ "crc-fast",
  "hidapi",
  "serialport",
  "thiserror 2.0.18",
