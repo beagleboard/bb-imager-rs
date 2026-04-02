@@ -64,6 +64,7 @@ bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 updater = []
 static = ["sqlx/sqlite", "bb-flasher/static"]
 system-sqlite  = ["sqlx/sqlite-unbundled"]
+zepto = ["bb-flasher/mspm0_uart"]
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]

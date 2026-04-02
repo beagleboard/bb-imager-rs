@@ -9,9 +9,11 @@ use tokio::io::AsyncWriteExt;
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
-    sd_customization: Option<SdCustomization>,
+    pub(crate) sd_customization: Option<SdCustomization>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    bcf_customization: Option<BcfCustomization>,
+    pub(crate) bcf_customization: Option<BcfCustomization>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) zepto_customization: Option<BcfCustomization>,
 }
 
 impl GuiConfiguration {
@@ -49,20 +51,16 @@ impl GuiConfiguration {
         Some(dirs.config_local_dir().join("config.json").to_owned())
     }
 
-    pub(crate) const fn sd_customization(&self) -> Option<&SdCustomization> {
-        self.sd_customization.as_ref()
-    }
-
-    pub(crate) const fn bcf_customization(&self) -> Option<&BcfCustomization> {
-        self.bcf_customization.as_ref()
-    }
-
     pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
         self.sd_customization = Some(t);
     }
 
     pub(crate) fn update_bcf_customization(&mut self, t: BcfCustomization) {
         self.bcf_customization = Some(t)
+    }
+
+    pub(crate) fn update_zepto_customization(&mut self, t: BcfCustomization) {
+        self.zepto_customization = Some(t)
     }
 }
 

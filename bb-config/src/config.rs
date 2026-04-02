@@ -180,4 +180,6 @@ pub enum Flasher {
     Msp430Usb,
     /// PocketBeagle2 Mspm0 firmware
     Pb2Mspm0,
+    /// MSPM0 flasher over UART
+    Mspm0Uart,
 }

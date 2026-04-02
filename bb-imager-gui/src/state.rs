@@ -121,7 +121,6 @@ impl ChooseOsState {
         &self.common.downloader
     }
 
-
     pub(crate) fn img_json(&self) -> Option<String> {
         self.selected_image
             .as_ref()
@@ -288,7 +287,7 @@ impl CustomizeState {
 
                 ans
             }
-            helpers::FlashingCustomization::Bcf(x) => {
+            helpers::FlashingCustomization::Bcf(x) | helpers::FlashingCustomization::Zepto(x) => {
                 if !x.verify {
                     vec!["• Skip Verification"]
                 } else {

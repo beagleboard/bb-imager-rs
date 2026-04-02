@@ -440,6 +440,21 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
+        #[cfg(feature = "zepto")]
+        (
+            BoardImage::Image { img, .. },
+            FlashingCustomization::Zepto(customization),
+            Destination::Mspm0Uart(t),
+        ) => {
+            bb_flasher::mspm0::Flasher::new(
+                img.into_future(),
+                t,
+                customization.verify,
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
+        }
         _ => unimplemented!(),
     }
 }
@@ -452,6 +467,8 @@ pub(crate) enum Destination {
     BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
     #[cfg(feature = "bcf_msp430")]
     Msp430(bb_flasher::bcf::msp430::Target),
+    #[cfg(feature = "zepto")]
+    Mspm0Uart(bb_flasher::mspm0::Target),
 }
 
 impl Display for Destination {
@@ -463,6 +480,8 @@ impl Display for Destination {
             Destination::BeagleConnectFreedom(target) => target.fmt(f),
             #[cfg(feature = "bcf_msp430")]
             Destination::Msp430(target) => target.fmt(f),
+            #[cfg(feature = "zepto")]
+            Destination::Mspm0Uart(target) => target.fmt(f),
         }
     }
 }
@@ -493,6 +512,8 @@ impl Destination {
             Self::BeagleConnectFreedom(t) => vec![("Path", t.path().to_string())],
             #[cfg(feature = "bcf_msp430")]
             Self::Msp430(t) => vec![("Path", t.path().to_string())],
+            #[cfg(feature = "zepto")]
+            Self::Mspm0Uart(t) => vec![("Path", t.path().to_string())],
         }
     }
 }
@@ -518,6 +539,12 @@ pub(crate) async fn destinations(flasher: config::Flasher, filter: bool) -> Vec<
             .into_iter()
             .map(Destination::Msp430)
             .collect(),
+        #[cfg(feature = "zepto")]
+        config::Flasher::Mspm0Uart => bb_flasher::mspm0::Target::destinations(filter)
+            .await
+            .into_iter()
+            .map(Destination::Mspm0Uart)
+            .collect(),
         _ => unimplemented!(),
     }
 }
@@ -529,6 +556,8 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
         config::Flasher::Msp430Usb => bb_flasher::bcf::msp430::Target::FILE_TYPES,
+        #[cfg(feature = "zepto")]
+        config::Flasher::Mspm0Uart => bb_flasher::mspm0::Target::FILE_TYPES,
         _ => unimplemented!(),
     }
 }
@@ -540,6 +569,8 @@ pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
         config::Flasher::Msp430Usb => true,
+        #[cfg(feature = "zepto")]
+        config::Flasher::Mspm0Uart => true,
         _ => false,
     }
 }
@@ -550,6 +581,7 @@ pub(crate) enum FlashingCustomization {
     LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
+    Zepto(crate::persistance::BcfCustomization),
 }
 
 impl FlashingCustomization {
@@ -562,16 +594,20 @@ impl FlashingCustomization {
             config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => {
                 Self::LinuxSdSysconfig(
                     app_config
-                        .sd_customization()
+                        .sd_customization
+                        .as_ref()
                         .map(|x| x.sysconf_customization().cloned().unwrap_or_default())
                         .unwrap_or_default(),
                 )
             }
             config::Flasher::SdCard => Self::NoneSd,
             config::Flasher::BeagleConnectFreedom => {
-                Self::Bcf(app_config.bcf_customization().cloned().unwrap_or_default())
+                Self::Bcf(app_config.bcf_customization.clone().unwrap_or_default())
             }
             config::Flasher::Msp430Usb => Self::Msp430,
+            config::Flasher::Mspm0Uart => {
+                Self::Zepto(app_config.zepto_customization.clone().unwrap_or_default())
+            }
             _ => unimplemented!(),
         }
     }
@@ -583,6 +619,9 @@ impl FlashingCustomization {
             }
             Self::Bcf(_) => {
                 *self = Self::Bcf(Default::default());
+            }
+            Self::Zepto(_) => {
+                *self = Self::Zepto(Default::default());
             }
             _ => {}
         };

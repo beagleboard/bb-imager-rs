@@ -35,8 +35,23 @@ fn customization_pane<'a>(state: &'a crate::state::CustomizeState) -> Element<'a
     match &state.customization {
         FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card(state, inner),
         FlashingCustomization::Bcf(inner) => bcf(inner),
+        FlashingCustomization::Zepto(inner) => zepto(inner),
         _ => panic!("No customization"),
     }
+}
+
+fn zepto<'a>(state: &'a persistance::BcfCustomization) -> Element<'a, BBImagerMessage> {
+    widget::container(
+        widget::toggler(!state.verify)
+            .label("Skip Verification")
+            .on_toggle(|x| {
+                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::Zepto(
+                    state.clone().update_verify(!x),
+                ))
+            }),
+    )
+    .padding(VIEW_COL_PADDING)
+    .into()
 }
 
 fn bcf<'a>(state: &'a persistance::BcfCustomization) -> Element<'a, BBImagerMessage> {
