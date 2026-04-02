@@ -276,7 +276,7 @@ async fn add_config_does_not_duplicate_remote_configs() {
 
     assert!(!initial_urls.is_empty());
 
-    let existing_url = initial_urls.iter().next().unwrap().clone();
+    let existing_url = initial_urls.first().unwrap().clone();
 
     let initial_count = initial_urls.len();
 

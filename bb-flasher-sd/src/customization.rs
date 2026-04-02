@@ -96,7 +96,7 @@ impl Customization {
                 }
                 ContentType::Data(items) => {
                     f.seek(SeekFrom::End(0))?;
-                    f.write_all(&items)?;
+                    f.write_all(items)?;
                 }
             }
         }
