@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+      - name: Select rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Run checks
+        run: cargo clippy --all-targets --all-features --no-deps
+      - name: Run tests
+        run: cargo test --all-features

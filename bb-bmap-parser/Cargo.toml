@@ -1,0 +1,22 @@
+[package]
+name = "bb-bmap-parser"
+version = "0.1.0"
+authors = ["Sjoerd Simons <sjoerd@collabora.com>", "Ayush Singh <ayush@beagleboard.org>"]
+edition = "2024"
+license = "MIT AND Apache-2.0"
+description = "bmap-parser is a library for Rust to parse bmap files"
+repository = "https://github.com/Ayush1325/bb-bmap-parser"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "2.0"
+quick-xml = { version = "0.37", features = [ "serialize" ] }
+serde = { version = "1.0", features = [ "derive" ] }
+
+[dev-dependencies]
+sha2 = { version = "0.10", features = ["asm"] }
+
+[profile.dev]
+opt-level = 3
