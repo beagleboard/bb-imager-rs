@@ -35,7 +35,7 @@ use windows::core::{PCSTR, PCWSTR};
 
 use crate::{DeviceDescriptor, MountPoint};
 
-pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
     let mut drives: Vec<DeviceDescriptor> = Vec::new();
 
     let h_device_info = unsafe {
@@ -189,7 +189,7 @@ fn get_detail_data(
     device: &mut DeviceDescriptor,
     h_dev_info: HDEVINFO,
     device_info_data: &SP_DEVINFO_DATA,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for i in 0.. {
         let mut device_interface_data = SP_DEVICE_INTERFACE_DATA {
             cbSize: size_of::<SP_DEVICE_INTERFACE_DATA>() as _,
@@ -283,7 +283,7 @@ fn is_readonly(h_physical: HANDLE) -> bool {
     .is_err()
 }
 
-fn get_device_block_size(device: &mut DeviceDescriptor, h_physical: HANDLE) -> anyhow::Result<()> {
+fn get_device_block_size(device: &mut DeviceDescriptor, h_physical: HANDLE) -> crate::Result<()> {
     let mut query = STORAGE_PROPERTY_QUERY::default();
     let mut descriptor = STORAGE_ACCESS_ALIGNMENT_DESCRIPTOR::default();
 
@@ -309,7 +309,7 @@ fn get_device_block_size(device: &mut DeviceDescriptor, h_physical: HANDLE) -> a
     Ok(())
 }
 
-fn get_adapter_info(device: &mut DeviceDescriptor, h_physical: HANDLE) -> anyhow::Result<()> {
+fn get_adapter_info(device: &mut DeviceDescriptor, h_physical: HANDLE) -> crate::Result<()> {
     let mut query = STORAGE_PROPERTY_QUERY::default();
     let mut adapter_descriptor = STORAGE_ADAPTER_DESCRIPTOR::default();
 
@@ -367,7 +367,7 @@ const fn get_bus_type(bus_type: i32) -> &'static str {
 fn get_partition_table_type(
     device: &mut DeviceDescriptor,
     h_physical: HANDLE,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     const LSIZE: usize =
         size_of::<DRIVE_LAYOUT_INFORMATION_EX>() + 256 * size_of::<PARTITION_INFORMATION_EX>();
 
@@ -401,7 +401,7 @@ fn get_partition_table_type(
 fn get_device_size(
     device_descriptor: &mut DeviceDescriptor,
     h_physical: HANDLE,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let mut disk_geometry = DISK_GEOMETRY_EX::default();
 
     unsafe {
@@ -442,7 +442,7 @@ fn get_available_volumes() -> Vec<char> {
     }
 }
 
-fn get_mount_points(device_number: u32, mount_points: &mut Vec<MountPoint>) -> anyhow::Result<()> {
+fn get_mount_points(device_number: u32, mount_points: &mut Vec<MountPoint>) -> crate::Result<()> {
     for volume_name in get_available_volumes() {
         let mut drive = MountPoint::new(format!(r"{}:\", volume_name));
         let drive_type = unsafe {
@@ -549,7 +549,7 @@ fn get_device_number(h_device: HANDLE) -> Option<u32> {
 fn get_device_path(
     h_dev_info: HDEVINFO,
     device_interface_data: &SP_DEVICE_INTERFACE_DATA,
-) -> anyhow::Result<String> {
+) -> crate::Result<String> {
     let mut len = 0;
 
     let _ = unsafe {

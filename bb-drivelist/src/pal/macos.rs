@@ -345,9 +345,9 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
     }
 }
 
-pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
     let Some(session) = (unsafe { DASession::new(kCFAllocatorDefault) }) else {
-        anyhow::bail!("Failed to create DiskArbitration session");
+        return Err(crate::Error::MacosDiskArbitration);
     };
 
     let disk_list = DiskList::new();

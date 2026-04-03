@@ -8,16 +8,16 @@ mod windows;
 use crate::DeviceDescriptor;
 
 #[cfg(target_os = "windows")]
-pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
     windows::drive_list()
 }
 
 #[cfg(target_os = "linux")]
-pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
     linux::lsblk()
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn drive_list() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
     macos::drive_list()
 }
