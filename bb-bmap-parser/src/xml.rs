@@ -3,6 +3,18 @@ use quick_xml::de::{DeError, from_str};
 use serde::Deserialize;
 use thiserror::Error;
 
+/// Custom deserializer to first trim whitespace around text elements before converting.
+/// Should be unnecessary once https://github.com/tafia/quick-xml/issues/900 gets fixed
+fn deserialize_trimmed<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    <T as std::str::FromStr>::Err: std::fmt::Display,
+{
+    let s = <&str>::deserialize(deserializer)?;
+    s.trim().parse().map_err(serde::de::Error::custom)
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
@@ -10,11 +22,22 @@ pub enum HashType {
     Sha256,
 }
 
+impl std::str::FromStr for HashType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "sha256" => Ok(Self::Sha256),
+            _ => Err("Unsupported"),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct Range {
-    #[serde(rename = "@chksum")]
+    #[serde(rename = "@chksum", deserialize_with = "deserialize_trimmed")]
     chksum: String,
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", deserialize_with = "deserialize_trimmed")]
     range: String,
 }
 
@@ -27,19 +50,19 @@ struct BlockMap {
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct Bmap {
-    #[serde(rename = "@version")]
+    #[serde(rename = "@version", deserialize_with = "deserialize_trimmed")]
     version: String,
-    #[serde(rename = "ImageSize")]
+    #[serde(rename = "ImageSize", deserialize_with = "deserialize_trimmed")]
     image_size: u64,
-    #[serde(rename = "BlockSize")]
+    #[serde(rename = "BlockSize", deserialize_with = "deserialize_trimmed")]
     block_size: u64,
-    #[serde(rename = "BlocksCount")]
+    #[serde(rename = "BlocksCount", deserialize_with = "deserialize_trimmed")]
     blocks_count: u64,
-    #[serde(rename = "MappedBlocksCount")]
+    #[serde(rename = "MappedBlocksCount", deserialize_with = "deserialize_trimmed")]
     mapped_blocks_count: u64,
-    #[serde(rename = "ChecksumType")]
+    #[serde(rename = "ChecksumType", deserialize_with = "deserialize_trimmed")]
     checksum_type: HashType,
-    #[serde(rename = "BmapFileChecksum")]
+    #[serde(rename = "BmapFileChecksum", deserialize_with = "deserialize_trimmed")]
     bmap_file_checksum: String,
     #[serde(rename = "BlockMap")]
     block_map: BlockMap,
