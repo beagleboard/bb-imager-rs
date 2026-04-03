@@ -27,5 +27,5 @@ panic = "abort"
 version = "0.0.20"
 edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
-repository = "https://openbeagle.org/ayush1325/bb-imager-rs"
+repository = "https://github.com/beagleboard/bb-imager-rs"
 license = "MIT"
