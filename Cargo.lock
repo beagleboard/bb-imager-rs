@@ -511,11 +511,10 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bb-bmap-parser"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26cdf8db3a883ec3c1c50e7fb7dc5a55265399fb680a9835b8f291089e6da679"
 dependencies = [
- "quick-xml 0.37.5",
+ "quick-xml 0.39.2",
  "serde",
+ "sha2",
  "thiserror 2.0.18",
 ]
 
@@ -4896,7 +4895,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
 dependencies = [
  "memchr",
- "serde",
 ]
 
 [[package]]
@@ -4906,6 +4904,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958f21e8e7ceb5a1aa7fa87fab28e7c75976e0bfe7e23ff069e0a260f894067d"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]
