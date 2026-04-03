@@ -16,4 +16,4 @@ quick-xml = { version = "0.39", features = [ "serialize" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 
 [dev-dependencies]
-sha2 = { version = "0.10", features = ["asm"] }
+sha2 = "0.10"
