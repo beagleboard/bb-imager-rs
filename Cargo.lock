@@ -553,13 +553,13 @@ dependencies = [
 name = "bb-drivelist"
 version = "0.3.1"
 dependencies = [
- "anyhow",
  "objc2 0.6.4",
  "objc2-core-foundation",
  "objc2-disk-arbitration",
  "objc2-foundation 0.3.2",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "windows 0.62.2",
 ]
 

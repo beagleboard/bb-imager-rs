@@ -143,13 +143,14 @@ impl From<Child> for MountPoint {
     }
 }
 
-pub(crate) fn lsblk() -> anyhow::Result<Vec<DeviceDescriptor>> {
+pub(crate) fn lsblk() -> crate::Result<Vec<DeviceDescriptor>> {
     let output = Command::new("lsblk")
         .args(["--bytes", "--all", "--json", "--paths", "--output-all"])
-        .output()?;
+        .output()
+        .map_err(|e| crate::Error::LsblkExecuteError { source: Some(e) })?;
 
     if !output.status.success() {
-        return Err(anyhow::Error::msg("lsblk fail"));
+        return Err(crate::Error::LsblkExecuteError { source: None });
     }
 
     let res: Devices = serde_json::from_slice(&output.stdout).unwrap();
