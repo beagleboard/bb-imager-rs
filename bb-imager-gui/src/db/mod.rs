@@ -626,6 +626,26 @@ impl Db {
         .await
     }
 
+    pub(crate) async fn os_images_by_name(
+        &self,
+        board_id: i64,
+        search: &str,
+    ) -> sqlx::Result<Vec<crate::helpers::OsImageItem>> {
+        let res: Vec<OsImageListItem> = sqlx::query_as(
+            r#"
+            SELECT oi.id, oi.name, oi.icon
+            FROM os_images oi
+            JOIN os_image_boards oib ON oi.id = oib.image_id
+            WHERE oib.board_id = $1 AND oi.name LIKE $2"#,
+        )
+        .bind(board_id)
+        .bind(format!("%{search}%"))
+        .fetch_all(&self.db)
+        .await?;
+
+        Ok(res.into_iter().map(Into::into).collect())
+    }
+
     pub(crate) async fn os_remote_sublists(
         &self,
         board_id: i64,

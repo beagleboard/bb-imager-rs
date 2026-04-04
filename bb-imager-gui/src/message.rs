@@ -171,7 +171,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 helpers::OsImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
                     return Task::batch([
-                        state.refresh_image_list(board_id, Some(id)),
+                        inner.update_pos(Some(id)),
                         state.resolve_remote_sublists(board_id, Some(id)),
                     ]);
                 }
@@ -253,7 +253,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             let db = state.common().db.clone();
             let tail = match &state {
                 BBImager::ChooseOs(inner) => Task::batch([
-                    state.refresh_image_list(inner.selected_board.id, inner.pos),
+                    inner.refresh_image_list(),
                     state.refresh_image_icons(inner.selected_board.id),
                 ]),
                 _ => Task::none(),
@@ -520,6 +520,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseBoard(inner) => {
                 return inner.search(x);
             }
+            BBImager::ChooseOs(inner) => return inner.update_search(x),
             _ => {}
         },
         BBImagerMessage::Null => {}
