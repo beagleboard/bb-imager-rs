@@ -98,6 +98,7 @@ impl BBImager {
             common,
             boards: Vec::new(),
             selected_board: None,
+            search_text: String::new(),
         })
     }
 
@@ -163,10 +164,6 @@ impl BBImager {
         )
     }
 
-    fn fetch_board_images(&self) -> Task<BBImagerMessage> {
-        self.common().fetch_board_images()
-    }
-
     fn common_mut(&mut self) -> &mut BBImagerCommon {
         match self {
             BBImager::ChooseBoard(x) => &mut x.common,
@@ -222,7 +219,11 @@ impl BBImager {
             }
         };
 
-        self.refresh_board_list()
+        if let BBImager::ChooseBoard(x) = self {
+            return x.refresh_board_list();
+        }
+
+        unreachable!()
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
@@ -313,15 +314,6 @@ impl BBImager {
         });
 
         t
-    }
-
-    fn refresh_board_list(&self) -> Task<BBImagerMessage> {
-        let db = self.common().db.clone();
-
-        Task::perform(
-            async move { db.board_list().await.unwrap() },
-            BBImagerMessage::UpdateBoardList,
-        )
     }
 
     fn resolve_remote_sublists(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
@@ -415,8 +407,8 @@ impl BBImager {
         };
 
         match self {
-            BBImager::ChooseBoard(_) => {
-                Task::batch([self.refresh_board_list(), self.scroll_reset()])
+            BBImager::ChooseBoard(inner) => {
+                Task::batch([inner.refresh_board_list(), self.scroll_reset()])
             }
             BBImager::ChooseOs(inner) => {
                 let board_id = inner.selected_board.id;

@@ -325,7 +325,7 @@ async fn add_config_inserts_device_into_board_list() {
     db.init().await.expect("DB initialization should succeed");
 
     let initial_boards = db
-        .board_list()
+        .board_list(None)
         .await
         .expect("Fetching board list should succeed");
 
@@ -357,7 +357,7 @@ async fn add_config_inserts_device_into_board_list() {
         .expect("add_config should succeed");
 
     let updated_boards = db
-        .board_list()
+        .board_list(None)
         .await
         .expect("Fetching board list should succeed");
 
@@ -419,7 +419,7 @@ async fn add_config_updates_existing_device_with_same_name() {
 
     // Get inserted board id
     let boards = db
-        .board_list()
+        .board_list(None)
         .await
         .expect("Fetching board list should succeed");
 
@@ -456,7 +456,7 @@ async fn add_config_updates_existing_device_with_same_name() {
 
     // Ensure board count unchanged
     let updated_boards = db
-        .board_list()
+        .board_list(None)
         .await
         .expect("Fetching board list should succeed");
 
@@ -544,7 +544,7 @@ async fn add_config_inserts_os_image_for_board() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list(None).await.unwrap();
     let board_id = boards.iter().find(|b| b.name == board.name).unwrap().id;
 
     let items = db
@@ -623,7 +623,7 @@ async fn os_image_by_id_returns_correct_data() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list(None).await.unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
@@ -730,7 +730,7 @@ async fn add_config_inserts_os_sublist_for_board() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list(None).await.unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
@@ -827,7 +827,7 @@ async fn nested_os_sublists_propagate_board_support() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list(None)
         .await
         .unwrap()
         .into_iter()
@@ -906,7 +906,7 @@ async fn remote_os_sublist_is_returned_for_board() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list(None)
         .await
         .unwrap()
         .into_iter()
@@ -994,7 +994,7 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list(None)
         .await
         .unwrap()
         .into_iter()
@@ -1102,7 +1102,7 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list(None)
         .await
         .unwrap()
         .into_iter()

@@ -83,6 +83,9 @@ pub(crate) enum BBImagerMessage {
 
     /// DB Ops
     DbInitSuccess,
+
+    /// Search
+    UpdateSearchText(String),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
@@ -233,11 +236,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             );
 
-            let tail_tasks = if let BBImager::ChooseBoard(_) = state {
+            let tail_tasks = if let BBImager::ChooseBoard(inner) = state {
                 // If we are in ChooseBoard page, update the board list
-                Task::batch([state.fetch_board_images(), state.refresh_board_list()])
+                Task::batch([
+                    inner.common.fetch_board_images(),
+                    inner.refresh_board_list(),
+                ])
             } else {
-                state.fetch_board_images()
+                state.common().fetch_board_images()
             };
 
             // We want fetch board images to run after the config has been added
@@ -502,12 +508,20 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImagerMessage::ResolveImages,
             );
 
-            return Task::batch([
-                board_icon_cache_task,
-                config_fetch_task,
-                state.refresh_board_list(),
-            ]);
+            let board_refresh_task = if let BBImager::ChooseBoard(x) = state {
+                x.refresh_board_list()
+            } else {
+                Task::none()
+            };
+
+            return Task::batch([board_icon_cache_task, config_fetch_task, board_refresh_task]);
         }
+        BBImagerMessage::UpdateSearchText(x) => match state {
+            BBImager::ChooseBoard(inner) => {
+                return inner.search(x);
+            }
+            _ => {}
+        },
         BBImagerMessage::Null => {}
     }
 

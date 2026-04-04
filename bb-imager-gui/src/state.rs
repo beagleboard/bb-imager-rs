@@ -60,6 +60,7 @@ pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
     pub(crate) boards: Vec<db::BoardListItem>,
     pub(crate) selected_board: Option<Board>,
+    pub(crate) search_text: String,
 }
 
 impl ChooseBoardState {
@@ -70,6 +71,26 @@ impl ChooseBoardState {
     pub(crate) fn image_handle_cache(&self) -> &helpers::ImageHandleCache {
         &self.common.img_handle_cache
     }
+
+    pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
+        let db = self.common.db.clone();
+        let search = if self.search_text.is_empty() {
+            None
+        } else {
+            Some(self.search_text.clone())
+        };
+
+        Task::perform(
+            async move { db.board_list(search.as_deref()).await.unwrap() },
+            BBImagerMessage::UpdateBoardList,
+        )
+    }
+
+    pub(crate) fn search(&mut self, search: String) -> Task<BBImagerMessage> {
+        self.search_text = search;
+
+        self.refresh_board_list()
+    }
 }
 
 impl From<ChooseOsState> for ChooseBoardState {
@@ -78,6 +99,7 @@ impl From<ChooseOsState> for ChooseBoardState {
             common: value.common,
             boards: Vec::new(),
             selected_board: Some(value.selected_board),
+            search_text: String::new(),
         }
     }
 }
