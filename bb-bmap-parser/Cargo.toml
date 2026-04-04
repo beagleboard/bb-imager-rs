@@ -1,6 +1,6 @@
 [package]
 name = "bb-bmap-parser"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Sjoerd Simons <sjoerd@collabora.com>", "Ayush Singh <ayush@beagleboard.org>"]
 edition.workspace = true
 license = "MIT AND Apache-2.0"
