@@ -65,6 +65,8 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
     widget::scrollable(
         widget::column(
             [
+                helpers::search_box(&state.search_text).into(),
+                widget::rule::horizontal(2).into(),
                 widget::container(
                     widget::toggler(!state.filter_destination)
                         .label("Show all destinations")

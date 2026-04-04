@@ -221,6 +221,7 @@ pub(crate) struct ChooseDestState {
     pub(crate) selected_dest: Option<helpers::Destination>,
     pub(crate) destinations: Vec<helpers::Destination>,
     pub(crate) filter_destination: bool,
+    pub(crate) search_text: String,
 }
 
 impl ChooseDestState {
@@ -245,6 +246,10 @@ impl ChooseDestState {
             None => self.selected_board().instructions.as_deref(),
         }
     }
+
+    pub(crate) fn update_search(&mut self, search: String) {
+        self.search_text = search;
+    }
 }
 
 impl From<CustomizeState> for ChooseDestState {
@@ -256,6 +261,7 @@ impl From<CustomizeState> for ChooseDestState {
             selected_dest: Some(value.selected_dest),
             destinations: Vec::new(),
             filter_destination: true,
+            search_text: String::new(),
         }
     }
 }

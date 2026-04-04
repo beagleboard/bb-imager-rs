@@ -229,17 +229,29 @@ impl BBImager {
     fn subscription(&self) -> Subscription<BBImagerMessage> {
         match self {
             Self::ChooseDest(x) => Subscription::run_with(
-                (x.selected_image.1.flasher(), x.filter_destination),
-                |(flasher, filter)| {
+                (
+                    x.selected_image.1.flasher(),
+                    x.filter_destination,
+                    x.search_text.to_lowercase(),
+                ),
+                |(flasher, filter, search_text)| {
                     iced::futures::stream::unfold(
-                        (*flasher, *filter),
-                        async move |(flasher, filter)| {
-                            let mut dest = helpers::destinations(flasher, filter).await;
+                        (*flasher, *filter, search_text.clone()),
+                        async move |(flasher, filter, search_text)| {
+                            let mut dest: Vec<helpers::Destination> =
+                                helpers::destinations(flasher, filter)
+                                    .await
+                                    .into_iter()
+                                    .filter(|t| {
+                                        search_text.is_empty()
+                                            || t.to_string().to_lowercase().contains(&search_text)
+                                    })
+                                    .collect();
 
                             dest.sort_by_key(|x| x.to_string());
 
                             let msg = BBImagerMessage::Destinations(dest);
-                            Some((msg, (flasher, filter)))
+                            Some((msg, (flasher, filter, search_text)))
                         },
                     )
                     .throttle(Duration::from_secs(1))
@@ -439,6 +451,7 @@ impl BBImager {
                     selected_dest: None,
                     destinations: Vec::new(),
                     filter_destination: true,
+                    search_text: String::new(),
                 })
             }
             Self::ChooseDest(inner) => {
