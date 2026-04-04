@@ -32,6 +32,8 @@ pub(crate) static INFO_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::INFO_ICON_BYTES));
 pub(crate) static COPY_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::COPY_ICON_BYTES));
+pub(crate) static SEARCH_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(constants::SEARCH_ICON_BYTES));
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
 pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
@@ -442,4 +444,30 @@ pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> widget::Button<'a, BBImagerMe
     widget::button(svg(handle))
         .width(iced::Shrink)
         .style(widget::button::secondary)
+}
+
+pub(crate) fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
+    widget::container(
+        widget::row![
+            widget::svg(SEARCH_ICON.clone())
+                .style(svg_icon_style)
+                .width(iced::Length::Shrink)
+                .height(18),
+            widget::text_input("SEARCH", inp)
+                .style(|theme, status| {
+                    let mut temp = widget::text_input::default(theme, status);
+                    temp.border.width = 0.0;
+                    temp.background = iced::Background::Color(iced::Color::TRANSPARENT);
+                    temp
+                })
+                .on_input(BBImagerMessage::UpdateSearchText),
+        ]
+        .align_y(iced::Alignment::Center),
+    )
+    .padding(iced::Padding {
+        left: 16.0,
+        top: 16.0,
+        bottom: 8.0,
+        ..Default::default()
+    })
 }

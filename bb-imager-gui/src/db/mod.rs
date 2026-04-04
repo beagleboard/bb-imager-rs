@@ -527,8 +527,9 @@ impl Db {
     }
 
     /// Get board list data. (ID, Icon, Name)
-    pub(crate) async fn board_list(&self) -> sqlx::Result<Vec<BoardListItem>> {
-        sqlx::query_as("SELECT id, icon, name FROM boards")
+    pub(crate) async fn board_list(&self, search: &str) -> sqlx::Result<Vec<BoardListItem>> {
+        sqlx::query_as("SELECT id, icon, name FROM boards WHERE name LIKE $1 COLLATE NOCASE")
+            .bind(format!("%{}%", search))
             .fetch_all(&self.db)
             .await
     }

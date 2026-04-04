@@ -60,9 +60,24 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
         })
         .map(Into::into);
 
-    widget::scrollable(column(items).padding(LIST_COL_PADDING))
-        .id(state.common.scroll_id.clone())
-        .into()
+    widget::scrollable(
+        column(
+            [
+                helpers::search_box(&state.search_text).into(),
+                widget::center(widget::rule::horizontal(2))
+                    .padding(iced::Padding {
+                        left: 16.0,
+                        ..Default::default()
+                    })
+                    .into(),
+            ]
+            .into_iter()
+            .chain(items),
+        )
+        .padding(LIST_COL_PADDING),
+    )
+    .id(state.common.scroll_id.clone())
+    .into()
 }
 
 fn board_view_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessage> {
