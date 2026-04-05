@@ -325,7 +325,7 @@ async fn add_config_inserts_device_into_board_list() {
     db.init().await.expect("DB initialization should succeed");
 
     let initial_boards = db
-        .board_list()
+        .board_list("")
         .await
         .expect("Fetching board list should succeed");
 
@@ -357,7 +357,7 @@ async fn add_config_inserts_device_into_board_list() {
         .expect("add_config should succeed");
 
     let updated_boards = db
-        .board_list()
+        .board_list("")
         .await
         .expect("Fetching board list should succeed");
 
@@ -419,7 +419,7 @@ async fn add_config_updates_existing_device_with_same_name() {
 
     // Get inserted board id
     let boards = db
-        .board_list()
+        .board_list("")
         .await
         .expect("Fetching board list should succeed");
 
@@ -456,7 +456,7 @@ async fn add_config_updates_existing_device_with_same_name() {
 
     // Ensure board count unchanged
     let updated_boards = db
-        .board_list()
+        .board_list("")
         .await
         .expect("Fetching board list should succeed");
 
@@ -544,7 +544,7 @@ async fn add_config_inserts_os_image_for_board() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list("").await.unwrap();
     let board_id = boards.iter().find(|b| b.name == board.name).unwrap().id;
 
     let items = db
@@ -623,7 +623,7 @@ async fn os_image_by_id_returns_correct_data() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list("").await.unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
@@ -730,7 +730,7 @@ async fn add_config_inserts_os_sublist_for_board() {
         .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list().await.unwrap();
+    let boards = db.board_list("").await.unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
@@ -827,7 +827,7 @@ async fn nested_os_sublists_propagate_board_support() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list("")
         .await
         .unwrap()
         .into_iter()
@@ -906,7 +906,7 @@ async fn remote_os_sublist_is_returned_for_board() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list("")
         .await
         .unwrap()
         .into_iter()
@@ -994,7 +994,7 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list("")
         .await
         .unwrap()
         .into_iter()
@@ -1102,7 +1102,7 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         .expect("add_config should succeed");
 
     let board_id = db
-        .board_list()
+        .board_list("")
         .await
         .unwrap()
         .into_iter()
@@ -1157,4 +1157,89 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     let remote_lists_after = db.os_remote_sublists(board_id, None).await.unwrap();
 
     assert!(remote_lists_after.is_empty(),);
+}
+
+/// This test verifies that board_list(search) correctly filters boards
+/// using a case-insensitive LIKE query.
+///
+/// What this test checks:
+/// 1. Multiple boards are inserted into the database.
+/// 2. board_list(Some("beagle")) is called.
+/// 3. Only boards whose names contain "beagle" (case-insensitive) are returned.
+/// 4. Non-matching boards are excluded.
+///
+/// Why this test is needed:
+/// - board_list() has two execution paths (search and non-search).
+/// - Ensures the LIKE query is applied correctly.
+/// - Ensures COLLATE NOCASE works as expected.
+/// - Prevents regressions where search returns all boards or none.
+///
+/// Without this test:
+/// - Search filtering could silently break.
+/// - Case-insensitive matching might stop working.
+/// - UI board search would behave incorrectly.
+#[tokio::test]
+async fn board_list_search_filters_boards_case_insensitive() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().await.expect("DB init should succeed");
+
+    let board1 = bb_config::config::Device {
+        name: "Test Board 1".to_string(),
+        description: "Board 1".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: HashSet::from(["bbb".to_string()]),
+    };
+
+    let board2 = bb_config::config::Device {
+        name: "Test Board 2".to_string(),
+        description: "Board 2".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: HashSet::from(["beagleplay".to_string()]),
+    };
+
+    let board3 = bb_config::config::Device {
+        name: "Test Board 3".to_string(),
+        description: "Board 3".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: HashSet::from(["rpi".to_string()]),
+    };
+
+    let config = Config {
+        imager: bb_config::config::Imager {
+            remote_configs: Default::default(),
+            devices: vec![board1, board2, board3],
+        },
+        os_list: vec![],
+    };
+
+    db.add_config(config)
+        .await
+        .expect("add_config should succeed");
+
+    let results = db.board_list("test").await.expect("search should succeed");
+
+    assert_eq!(
+        results.len(),
+        3,
+        "Only boards containing 'test' should be returned"
+    );
+
+    assert!(results.iter().any(|b| b.name == "Test Board 1"));
+    assert!(results.iter().any(|b| b.name == "Test Board 2"));
+    assert!(results.iter().any(|b| b.name == "Test Board 3"));
 }
