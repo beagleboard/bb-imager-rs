@@ -520,6 +520,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseBoard(inner) => {
                 return inner.update_search(x);
             }
+            BBImager::ChooseDest(inner) => inner.update_search(x),
             _ => {}
         },
         BBImagerMessage::Null => {}
