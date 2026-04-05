@@ -172,7 +172,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     let board_id = inner.selected_board.id;
                     return Task::batch([
                         inner.resolve_remote_sublists(board_id, Some(id)),
-                        state.refresh_image_list(board_id, Some(id)),
+                        inner.update_pos(Some(id)),
                     ]);
                 }
             },
@@ -265,7 +265,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImager::ChooseOs(inner) => Task::batch([
                     // Fetch all children remote subitems.
                     inner.resolve_remote_sublists(inner.selected_board.id, Some(target)),
-                    state.refresh_image_list(inner.selected_board.id, inner.pos),
+                    inner.refresh_image_list(),
                     state.refresh_image_icons(inner.selected_board.id),
                 ]),
                 _ => Task::none(),
@@ -530,9 +530,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return Task::batch([board_icon_cache_task, config_fetch_task, board_refresh_task]);
         }
         BBImagerMessage::UpdateSearchText(x) => match state {
-            BBImager::ChooseBoard(inner) => {
-                return inner.update_search(x);
-            }
+            BBImager::ChooseBoard(inner) => return inner.update_search(x),
+            BBImager::ChooseOs(inner) => return inner.update_search(x),
             BBImager::ChooseDest(inner) => inner.update_search(x),
             _ => {}
         },

@@ -107,6 +107,7 @@ pub(crate) struct ChooseOsState {
     pub(crate) pos: Option<i64>,
     pub(crate) flasher: config::Flasher,
     pub(crate) selected_image: Option<(OsImageId, helpers::BoardImage)>,
+    pub(crate) search_text: String,
 }
 
 impl ChooseOsState {
@@ -163,6 +164,41 @@ impl ChooseOsState {
         Task::future(async move { db.os_remote_sublists_by_board(board_id).await.unwrap() })
             .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
     }
+
+    pub(crate) fn refresh_image_list(&self) -> Task<BBImagerMessage> {
+        let db = self.common.db.clone();
+        let pos = self.pos;
+        let board_id = self.selected_board.id;
+
+        if self.search_text.is_empty() {
+            Task::perform(
+                async move {
+                    let imgs = db.os_image_items(board_id, pos).await.unwrap();
+                    (imgs, pos)
+                },
+                BBImagerMessage::UpdateOsList,
+            )
+        } else {
+            let search = self.search_text.clone();
+            Task::perform(
+                async move {
+                    let imgs = db.os_images_by_name(board_id, &search).await.unwrap();
+                    (imgs, pos)
+                },
+                BBImagerMessage::UpdateOsList,
+            )
+        }
+    }
+
+    pub(crate) fn update_search(&mut self, search: String) -> Task<BBImagerMessage> {
+        self.search_text = search;
+        self.refresh_image_list()
+    }
+
+    pub fn update_pos(&mut self, pos: Option<i64>) -> Task<BBImagerMessage> {
+        self.pos = pos;
+        self.refresh_image_list()
+    }
 }
 
 impl From<CustomizeState> for ChooseOsState {
@@ -174,6 +210,7 @@ impl From<CustomizeState> for ChooseOsState {
             selected_board: value.selected_board,
             pos: None,
             selected_image: Some(value.selected_image),
+            search_text: String::new(),
         }
     }
 }
@@ -187,6 +224,7 @@ impl From<ChooseDestState> for ChooseOsState {
             selected_board: value.selected_board,
             pos: None,
             selected_image: Some(value.selected_image),
+            search_text: String::new(),
         }
     }
 }

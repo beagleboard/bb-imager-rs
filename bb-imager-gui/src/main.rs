@@ -328,17 +328,6 @@ impl BBImager {
         t
     }
 
-    fn refresh_image_list(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
-        let db = self.common().db.clone();
-        Task::perform(
-            async move {
-                let imgs = db.os_image_items(board_id, pos).await.unwrap();
-                (imgs, pos)
-            },
-            BBImagerMessage::UpdateOsList,
-        )
-    }
-
     fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
         let db = self.common().db.clone();
         Task::perform(
@@ -395,7 +384,7 @@ impl BBImager {
             BBImager::ChooseOs(inner) => {
                 let board_id = inner.selected_board.id;
                 Task::batch([
-                    self.refresh_image_list(board_id, None),
+                    inner.refresh_image_list(),
                     self.refresh_image_icons(board_id),
                     self.scroll_reset(),
                 ])
@@ -417,6 +406,7 @@ impl BBImager {
                     pos: None,
                     selected_image: None,
                     images: Vec::new(),
+                    search_text: String::new(),
                 })
             }
             Self::ChooseOs(inner) => {
@@ -484,7 +474,7 @@ impl BBImager {
                 let board_id = inner.selected_board.id;
                 Task::batch([
                     inner.resolve_all_remote_sublists(board_id),
-                    self.refresh_image_list(board_id, None),
+                    inner.refresh_image_list(),
                     self.refresh_image_icons(board_id),
                     self.scroll_reset(),
                 ])

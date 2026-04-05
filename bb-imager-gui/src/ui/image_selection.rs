@@ -99,8 +99,16 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
             })
             .map(Into::into);
 
+        let col = widget::column![
+            helpers::search_box(&state.search_text),
+            widget::center(widget::rule::horizontal(2)).padding(iced::Padding {
+                left: 16.0,
+                ..Default::default()
+            }),
+        ];
+
         let col = if state.pos.is_none() {
-            widget::column(items)
+            col.extend(items)
         } else {
             let icon = widget::svg(helpers::ARROW_BACK_ICON.clone())
                 .height(ICON_WIDTH)
@@ -110,7 +118,7 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 .spacing(12)
                 .padding(8)
                 .align_y(iced::alignment::Vertical::Center);
-            widget::column(
+            col.extend(
                 [button(row)
                     .on_press(BBImagerMessage::GotoOsListParent)
                     .style(move |theme, status| card_btn_style(theme, status, false))
