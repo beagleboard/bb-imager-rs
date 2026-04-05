@@ -328,36 +328,6 @@ impl BBImager {
         t
     }
 
-    fn resolve_remote_sublists(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
-        let db = self.common().db.clone();
-        let downloader = self.common().downloader.clone();
-
-        Task::future(async move { db.os_remote_sublists(board_id, pos).await.unwrap() }).then(
-            move |items| {
-                let dl = downloader.clone();
-                let temp = items.into_iter().map(move |(id, url)| {
-                    let url_clone = url::Url::from(url.clone());
-                    let dl = dl.clone();
-                    Task::perform(
-                        async move { dl.download_json_no_cache(url_clone).await },
-                        move |x| match x {
-                            Ok(json) => BBImagerMessage::ResolveRemoteSubitemItem {
-                                item: json,
-                                target: id,
-                            },
-                            Err(e) => {
-                                tracing::error!("Failed to get remote item {}: {e}", url.as_str());
-                                BBImagerMessage::Null
-                            }
-                        },
-                    )
-                });
-
-                Task::batch(temp)
-            },
-        )
-    }
-
     fn refresh_image_list(&self, board_id: i64, pos: Option<i64>) -> Task<BBImagerMessage> {
         let db = self.common().db.clone();
         Task::perform(
@@ -513,8 +483,8 @@ impl BBImager {
             Self::ChooseOs(inner) => {
                 let board_id = inner.selected_board.id;
                 Task::batch([
+                    inner.resolve_all_remote_sublists(board_id),
                     self.refresh_image_list(board_id, None),
-                    self.resolve_remote_sublists(board_id, None),
                     self.refresh_image_icons(board_id),
                     self.scroll_reset(),
                 ])

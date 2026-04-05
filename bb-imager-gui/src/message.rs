@@ -13,7 +13,7 @@ pub(crate) enum BBImagerMessage {
     Null,
 
     /// Config related options
-    ExtendConfig((url::Url, bb_config::Config)),
+    ExtendConfig((i64, bb_config::Config)),
     ResolveRemoteSubitemItem {
         item: Vec<bb_config::config::OsListItem>,
         target: i64,
@@ -171,8 +171,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 helpers::OsImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
                     return Task::batch([
+                        inner.resolve_remote_sublists(board_id, Some(id)),
                         state.refresh_image_list(board_id, Some(id)),
-                        state.resolve_remote_sublists(board_id, Some(id)),
                     ]);
                 }
             },
@@ -223,27 +223,37 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             tracing::debug!("Update Config: {:#?}", c);
 
             let db = state.common().db.clone();
-            let db_task = Task::perform(
-                async move {
-                    db.add_config(c).await?;
-                    db.remote_config_fetched(u).await
-                },
-                |x| {
-                    if let Err(e) = x {
-                        tracing::error!("Failed to merge config {e}");
-                    }
-                    BBImagerMessage::Null
-                },
-            );
+            let db_task = Task::perform(async move { db.add_config(c, Some(u)).await }, |x| {
+                if let Err(e) = x {
+                    tracing::error!("Failed to merge config {e}");
+                }
+                BBImagerMessage::Null
+            });
 
-            let tail_tasks = if let BBImager::ChooseBoard(inner) = state {
+            let tail_tasks = match state {
                 // If we are in ChooseBoard page, update the board list
-                Task::batch([
+                BBImager::ChooseBoard(inner) => Task::batch([
                     inner.common.fetch_board_images(),
                     inner.refresh_board_list(),
-                ])
-            } else {
-                state.common().fetch_board_images()
+                ]),
+                BBImager::ChooseOs(inner) => {
+                    let board_id = inner.selected_board.id;
+                    let db = inner.common.db.clone();
+                    let downloader = inner.common.downloader.clone();
+
+                    let remote_items_fetch = Task::future(async move {
+                        db.os_remote_sublists_by_remote_config(board_id, u)
+                            .await
+                            .unwrap()
+                    })
+                    .then(move |items| {
+                        let dl = downloader.clone();
+                        helpers::fetch_remote_subitems(items, dl)
+                    });
+
+                    Task::batch([inner.common.fetch_board_images(), remote_items_fetch])
+                }
+                _ => state.common().fetch_board_images(),
             };
 
             // We want fetch board images to run after the config has been added
@@ -253,6 +263,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             let db = state.common().db.clone();
             let tail = match &state {
                 BBImager::ChooseOs(inner) => Task::batch([
+                    // Fetch all children remote subitems.
+                    inner.resolve_remote_sublists(inner.selected_board.id, Some(target)),
                     state.refresh_image_list(inner.selected_board.id, inner.pos),
                     state.refresh_image_icons(inner.selected_board.id),
                 ]),
@@ -472,14 +484,15 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             let config_fetch_task = Task::future(async move { db.remote_configs().await.unwrap() })
                 .then(move |configs| {
                     let dc = downloader.clone();
-                    let tasks = configs.into_iter().map(move |x| {
+                    let tasks = configs.into_iter().map(move |(i, u)| {
                         let dc = dc.clone();
                         Task::perform(
                             async move {
-                                let res = dc.clone().download_json_no_cache(x.clone()).await?;
-                                Ok((x, res))
+                                let res =
+                                    dc.clone().download_json_no_cache(url::Url::from(u)).await?;
+                                Ok((i, res))
                             },
-                            |x: std::io::Result<(url::Url, bb_config::config::Config)>| match x {
+                            |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
                                 Ok(y) => BBImagerMessage::ExtendConfig(y),
                                 Err(e) => {
                                     tracing::error!("Failed to fetch config: {e}");

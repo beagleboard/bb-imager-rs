@@ -923,3 +923,28 @@ pub(crate) fn fetch_images(
 
     iced::Task::batch(tasks)
 }
+
+pub(crate) fn fetch_remote_subitems(
+    items: impl IntoIterator<Item = (i64, crate::db::Url)>,
+    downloader: bb_downloader::Downloader,
+) -> iced::Task<BBImagerMessage> {
+    let temp = items.into_iter().map(move |(id, url)| {
+        let url_clone = url::Url::from(url.clone());
+        let dl = downloader.clone();
+        iced::Task::perform(
+            async move { dl.download_json_no_cache(url_clone).await },
+            move |x| match x {
+                Ok(json) => BBImagerMessage::ResolveRemoteSubitemItem {
+                    item: json,
+                    target: id,
+                },
+                Err(e) => {
+                    tracing::error!("Failed to get remote item {}: {e}", url.as_str());
+                    BBImagerMessage::Null
+                }
+            },
+        )
+    });
+
+    iced::Task::batch(temp)
+}

@@ -43,141 +43,9 @@ async fn init_loads_all_default_remote_configs() {
     );
 
     assert_eq!(expected_urls.len(), urls.len());
-    for u in urls {
+    for (_, u) in urls {
         assert!(expected_urls.contains(&u));
     }
-}
-
-/// This test verifies that marking a remote config as fetched
-/// removes it from the list of pending remote configs.
-///
-/// What this test checks:
-/// 1. DB initializes with DEFAULT_CONFIG remote URLs.
-/// 2. remote_configs() returns all URLs initially.
-/// 3. Calling remote_config_fetched(url) marks it as fetched.
-/// 4. remote_configs() no longer returns that URL.
-/// 5. Remaining URLs are unaffected.
-///
-/// Why this matters:
-/// - Ensures remote_config_fetched() updates DB correctly
-/// - Ensures remote_configs() filters fetched entries
-/// - Ensures pending remote config tracking works correctly
-#[tokio::test]
-async fn remote_config_fetched_removes_url_from_pending_list() {
-    let db = Db::new().expect("Failed to create DB");
-
-    db.init().await.expect("DB initialization should succeed");
-
-    // Parse DEFAULT_CONFIG to get expected URLs
-    let config: Config =
-        serde_json::from_slice(DEFAULT_CONFIG).expect("DEFAULT_CONFIG should be valid");
-
-    let expected_urls = config.imager.remote_configs;
-
-    // Get current URLs
-    let urls = db
-        .remote_configs()
-        .await
-        .expect("Fetching remote configs should succeed");
-
-    assert!(!urls.is_empty(), "There should be remote configs present");
-
-    let first_url = urls[0].clone();
-
-    // Mark one URL as fetched
-    db.remote_config_fetched(first_url.clone())
-        .await
-        .expect("Marking remote config as fetched should succeed");
-
-    // Fetch again
-    let updated_urls = db
-        .remote_configs()
-        .await
-        .expect("Fetching remote configs should succeed");
-
-    // One less URL should remain
-    assert_eq!(
-        updated_urls.len(),
-        expected_urls.len() - 1,
-        "One remote config should be removed after marking as fetched"
-    );
-
-    // Ensure fetched URL is not present
-    assert!(
-        !updated_urls.contains(&first_url),
-        "Fetched remote config should not appear in pending list"
-    );
-
-    // Ensure other URLs still exist
-    for url in updated_urls {
-        assert!(
-            expected_urls.contains(&url),
-            "Remaining URL should still be part of DEFAULT_CONFIG"
-        );
-    }
-}
-
-/// This test verifies that calling remote_config_fetched() multiple times
-/// on the same URL does not cause errors and remains idempotent.
-///
-/// What this test checks:
-/// 1. DB initializes with DEFAULT_CONFIG remote URLs.
-/// 2. A remote config is marked as fetched.
-/// 3. Calling remote_config_fetched() again on the same URL succeeds.
-/// 4. The URL remains removed from remote_configs().
-///
-/// Why this matters:
-/// - Remote config fetching may be retried in real scenarios
-/// - Ensures DB update operation is safe to call multiple times
-/// - Prevents failures during repeated fetch attempts
-#[tokio::test]
-async fn remote_config_fetched_is_idempotent() {
-    let db = Db::new().expect("Failed to create DB");
-
-    db.init().await.expect("DB initialization should succeed");
-
-    // Parse DEFAULT_CONFIG
-    let config: Config =
-        serde_json::from_slice(DEFAULT_CONFIG).expect("DEFAULT_CONFIG should be valid");
-
-    let expected_urls = config.imager.remote_configs;
-
-    // Get one URL
-    let urls = db
-        .remote_configs()
-        .await
-        .expect("Fetching remote configs should succeed");
-
-    assert!(!urls.is_empty());
-
-    let url = urls[0].clone();
-
-    // First fetch
-    db.remote_config_fetched(url.clone())
-        .await
-        .expect("First fetch should succeed");
-
-    // Second fetch (should not fail)
-    db.remote_config_fetched(url.clone())
-        .await
-        .expect("Second fetch should also succeed");
-
-    // Verify URL is still removed
-    let remaining_urls = db
-        .remote_configs()
-        .await
-        .expect("Fetching remote configs should succeed");
-
-    assert_eq!(
-        remaining_urls.len(),
-        expected_urls.len() - 1,
-        "URL should only be removed once"
-    );
-
-    assert!(
-        !remaining_urls.contains(&url),
-        "Fetched URL should not reappear in pending list"
-    );
 }
 
 /// This test verifies that add_config() correctly inserts new remote
@@ -222,7 +90,7 @@ async fn add_config_inserts_new_remote_configs() {
     };
 
     // Add new config
-    db.add_config(new_config)
+    db.add_config(new_config, None)
         .await
         .expect("add_config should succeed");
 
@@ -240,13 +108,13 @@ async fn add_config_inserts_new_remote_configs() {
     assert!(
         updated_urls
             .iter()
-            .any(|u| u.as_str() == "https://example.com/test-os-list.json")
+            .any(|(_, u)| u.as_str() == "https://example.com/test-os-list.json")
     );
 
     assert!(
         updated_urls
             .iter()
-            .any(|u| u.as_str() == "https://example.com/another-os-list.json")
+            .any(|(_, u)| u.as_str() == "https://example.com/another-os-list.json")
     );
 }
 
@@ -276,20 +144,20 @@ async fn add_config_does_not_duplicate_remote_configs() {
 
     assert!(!initial_urls.is_empty());
 
-    let existing_url = initial_urls.first().unwrap().clone();
+    let (_, existing_url) = initial_urls.first().unwrap().clone();
 
     let initial_count = initial_urls.len();
 
     // Create config with already existing remote config
     let mut imager = bb_config::config::Imager::default();
-    imager.remote_configs.insert(existing_url);
+    imager.remote_configs.insert(existing_url.into());
 
     let new_config = Config {
         imager,
         os_list: vec![],
     };
 
-    db.add_config(new_config)
+    db.add_config(new_config, None)
         .await
         .expect("add_config should succeed");
 
@@ -352,7 +220,7 @@ async fn add_config_inserts_device_into_board_list() {
         os_list: vec![],
     };
 
-    db.add_config(new_config)
+    db.add_config(new_config, None)
         .await
         .expect("add_config should succeed");
 
@@ -410,10 +278,13 @@ async fn add_config_updates_existing_device_with_same_name() {
     let mut imager = bb_config::config::Imager::default();
     imager.devices.push(device_v1);
 
-    db.add_config(Config {
-        imager,
-        os_list: vec![],
-    })
+    db.add_config(
+        Config {
+            imager,
+            os_list: vec![],
+        },
+        None,
+    )
     .await
     .expect("First add_config should succeed");
 
@@ -447,10 +318,13 @@ async fn add_config_updates_existing_device_with_same_name() {
     let mut imager = bb_config::config::Imager::default();
     imager.devices.push(device_v2.clone());
 
-    db.add_config(Config {
-        imager,
-        os_list: vec![],
-    })
+    db.add_config(
+        Config {
+            imager,
+            os_list: vec![],
+        },
+        None,
+    )
     .await
     .expect("Second add_config should succeed");
 
@@ -540,7 +414,7 @@ async fn add_config_inserts_os_image_for_board() {
         os_list: vec![bb_config::config::OsListItem::Image(image.clone())],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -619,7 +493,7 @@ async fn os_image_by_id_returns_correct_data() {
         os_list: vec![bb_config::config::OsListItem::Image(image.clone())],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -726,7 +600,7 @@ async fn add_config_inserts_os_sublist_for_board() {
         os_list: vec![bb_config::config::OsListItem::SubList(sublist)],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -822,7 +696,7 @@ async fn nested_os_sublists_propagate_board_support() {
         os_list: vec![bb_config::config::OsListItem::SubList(parent_sublist)],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -901,7 +775,7 @@ async fn remote_os_sublist_is_returned_for_board() {
         os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -989,7 +863,7 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -1097,7 +971,7 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
@@ -1227,7 +1101,7 @@ async fn board_list_search_filters_boards_case_insensitive() {
         os_list: vec![],
     };
 
-    db.add_config(config)
+    db.add_config(config, None)
         .await
         .expect("add_config should succeed");
 
