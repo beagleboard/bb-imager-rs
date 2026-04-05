@@ -1,7 +1,8 @@
 -- Add migration script here
 CREATE TABLE remote_configs
 (
-	url TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY ASC,
+	url TEXT NOT NULL UNIQUE,
 	-- Flag to indicate if the config has been resolved
 	fetched INTEGER NOT NULL DEFAULT 0
 ) STRICT;
@@ -39,8 +40,11 @@ CREATE TABLE os_sublists (
 	
 	-- NULL = remote sublist
 	subitems_url TEXT DEFAULT NULL,
+        -- NULL = Not from remote config. Can be from a remote subitem.
+        remote_config_id INTEGER DEFAULT NULL,
 	
-	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE
+	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE,
+        FOREIGN KEY (remote_config_id) REFERENCES remote_configs(id) ON DELETE CASCADE
 ) STRICT;
 
 CREATE TABLE os_sublist_boards (

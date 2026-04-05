@@ -143,6 +143,26 @@ impl ChooseOsState {
             .as_ref()
             .map(|(_, b)| serde_json::to_string_pretty(&b).unwrap())
     }
+
+    pub(crate) fn resolve_remote_sublists(
+        &self,
+        board_id: i64,
+        pos: Option<i64>,
+    ) -> Task<BBImagerMessage> {
+        let db = self.common.db.clone();
+        let downloader = self.common.downloader.clone();
+
+        Task::future(async move { db.os_remote_sublists(board_id, pos).await.unwrap() })
+            .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
+    }
+
+    pub(crate) fn resolve_all_remote_sublists(&self, board_id: i64) -> Task<BBImagerMessage> {
+        let db = self.common.db.clone();
+        let downloader = self.common.downloader.clone();
+
+        Task::future(async move { db.os_remote_sublists_by_board(board_id).await.unwrap() })
+            .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
+    }
 }
 
 impl From<CustomizeState> for ChooseOsState {
