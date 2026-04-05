@@ -1,6 +1,6 @@
 //! This module handles interaction with sqlite db used for config.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::sync::Arc;
 
 use bb_config::config;
 use sqlx::{FromRow, Row, sqlite::SqliteRow};
@@ -251,9 +251,9 @@ impl Db {
         items: &[config::OsListItem],
         start_pid: Option<i64>,
     ) -> sqlx::Result<()> {
-        let mut imgs = VecDeque::from_iter(items.iter().map(|x| (start_pid, x)));
+        let mut imgs = Vec::from_iter(items.iter().map(|x| (start_pid, x)));
 
-        while let Some((pid, img)) = imgs.pop_front() {
+        while let Some((pid, img)) = imgs.pop() {
             match img {
                 config::OsListItem::Image(os_image) => {
                     let id = Self::insert_image(exec, os_image, pid).await?;
