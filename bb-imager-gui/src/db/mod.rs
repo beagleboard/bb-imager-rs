@@ -167,11 +167,20 @@ impl Db {
             serde_json::from_slice::<bb_config::config::Config>(crate::constants::DEFAULT_CONFIG)
                 .expect("Failed to parse config");
 
-        self.add_config(cfg).await
+        self.add_config(cfg, None).await
     }
 
-    pub(crate) async fn add_config(&self, cfg: config::Config) -> sqlx::Result<()> {
+    pub(crate) async fn add_config(
+        &self,
+        cfg: config::Config,
+        remote_config_id: Option<i64>,
+    ) -> sqlx::Result<()> {
         let mut tx = self.db.begin().await?;
+
+        match remote_config_id {
+            Some(x) => Some(Self::remote_config_fetched(&mut tx, x).await?),
+            None => None,
+        };
 
         Self::insert_remote_config(&mut tx, cfg.imager.remote_configs.iter()).await?;
 
@@ -184,7 +193,7 @@ impl Db {
             Self::insert_board(&mut tx, dev).await?;
         }
 
-        Self::insert_os_list_items(&mut tx, &cfg.os_list, None).await?;
+        Self::insert_os_list_items(&mut tx, &cfg.os_list, None, remote_config_id).await?;
 
         tx.commit().await
     }
@@ -208,25 +217,22 @@ impl Db {
         Ok(())
     }
 
-    pub(crate) async fn remote_config_fetched(&self, url: url::Url) -> sqlx::Result<()> {
-        sqlx::query("UPDATE remote_configs SET fetched = TRUE WHERE url = $1")
-            .bind(url.as_str())
-            .execute(&self.db)
+    async fn remote_config_fetched(exec: &mut sqlx::SqliteConnection, id: i64) -> sqlx::Result<()> {
+        sqlx::query("UPDATE remote_configs SET fetched = TRUE WHERE id = $1")
+            .bind(id)
+            .execute(exec)
             .await?;
 
         Ok(())
     }
 
-    pub(crate) async fn remote_configs(&self) -> sqlx::Result<Vec<url::Url>> {
-        let temp: Vec<String> =
-            sqlx::query_scalar("SELECT url FROM remote_configs WHERE fetched = FALSE")
+    pub(crate) async fn remote_configs(&self) -> sqlx::Result<Vec<(i64, url::Url)>> {
+        let temp: Vec<(i64, Url)> =
+            sqlx::query_as("SELECT id, url FROM remote_configs WHERE fetched = FALSE")
                 .fetch_all(&self.db)
                 .await?;
 
-        Ok(temp
-            .into_iter()
-            .map(|x| x.as_str().try_into().unwrap())
-            .collect())
+        Ok(temp.into_iter().map(|(i, u)| (i, u.into())).collect())
     }
 
     pub(crate) async fn os_remote_sublist_resolve(
@@ -241,7 +247,7 @@ impl Db {
             .execute(&mut *tx)
             .await?;
 
-        Self::insert_os_list_items(&mut tx, subitems, Some(id)).await?;
+        Self::insert_os_list_items(&mut tx, subitems, Some(id), None).await?;
 
         tx.commit().await
     }
@@ -250,6 +256,7 @@ impl Db {
         exec: &mut sqlx::SqliteConnection,
         items: &[config::OsListItem],
         start_pid: Option<i64>,
+        remote_config_id: Option<i64>,
     ) -> sqlx::Result<()> {
         let mut imgs = Vec::from_iter(items.iter().map(|x| (start_pid, x)));
 
@@ -262,11 +269,14 @@ impl Db {
                     }
                 }
                 config::OsListItem::SubList(os_sub_list) => {
-                    let id = Self::insert_sub_list(exec, os_sub_list, pid).await?;
+                    let id =
+                        Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id).await?;
                     imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
                 }
                 config::OsListItem::RemoteSubList(os_remote_sub_list) => {
-                    let id = Self::insert_remote_image(exec, os_remote_sub_list, pid).await?;
+                    let id =
+                        Self::insert_remote_image(exec, os_remote_sub_list, pid, remote_config_id)
+                            .await?;
                     Self::insert_remote_sublist_boards(exec, id).await?;
                 }
             }
@@ -337,11 +347,12 @@ impl Db {
         exec: &mut sqlx::SqliteConnection,
         item: &config::OsSubList,
         parent_id: Option<i64>,
+        remote_config_id: Option<i64>,
     ) -> sqlx::Result<i64> {
         let id = sqlx::query(
             r#"
-             INSERT INTO os_sublists(parent_id, name, description, icon, flasher)
-             VALUES ($1, $2, $3, $4, $5)
+             INSERT INTO os_sublists(parent_id, name, description, icon, flasher, remote_config_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
             "#,
         )
         .bind(parent_id)
@@ -349,9 +360,52 @@ impl Db {
         .bind(&item.description)
         .bind(item.icon.as_str())
         .bind(item.flasher)
+        .bind(remote_config_id)
         .execute(&mut *exec)
         .await?
         .last_insert_rowid();
+
+        Ok(id)
+    }
+
+    async fn insert_remote_image(
+        exec: &mut sqlx::SqliteConnection,
+        img: &config::OsRemoteSubList,
+        parent_id: Option<i64>,
+        remote_config_id: Option<i64>,
+    ) -> sqlx::Result<i64> {
+        let id = sqlx::query(
+            r#"
+            INSERT INTO os_sublists(parent_id, name, description, icon, 
+                flasher, subitems_url, remote_config_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(parent_id)
+        .bind(&img.name)
+        .bind(&img.description)
+        .bind(img.icon.as_str())
+        .bind(img.flasher)
+        .bind(img.subitems_url.as_str())
+        .bind(remote_config_id)
+        .execute(&mut *exec)
+        .await?
+        .last_insert_rowid();
+
+        for dev in &img.devices {
+            sqlx::query(
+                r#"
+            INSERT INTO os_sublist_boards(sublist_id, board_id)
+            SELECT $1, b.board_id
+            FROM board_tags b
+            WHERE b.tag = $2
+                "#,
+            )
+            .bind(id)
+            .bind(dev)
+            .execute(&mut *exec)
+            .await?;
+        }
 
         Ok(id)
     }
@@ -459,46 +513,6 @@ impl Db {
             sqlx::query(
                 r#"
             INSERT INTO os_image_boards(image_id, board_id)
-            SELECT $1, b.board_id
-            FROM board_tags b
-            WHERE b.tag = $2
-                "#,
-            )
-            .bind(id)
-            .bind(dev)
-            .execute(&mut *exec)
-            .await?;
-        }
-
-        Ok(id)
-    }
-
-    async fn insert_remote_image(
-        exec: &mut sqlx::SqliteConnection,
-        img: &config::OsRemoteSubList,
-        parent_id: Option<i64>,
-    ) -> sqlx::Result<i64> {
-        let id = sqlx::query(
-            r#"
-            INSERT INTO os_sublists(parent_id, name, description, icon, 
-                flasher, subitems_url)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-        )
-        .bind(parent_id)
-        .bind(&img.name)
-        .bind(&img.description)
-        .bind(img.icon.as_str())
-        .bind(img.flasher)
-        .bind(img.subitems_url.as_str())
-        .execute(&mut *exec)
-        .await?
-        .last_insert_rowid();
-
-        for dev in &img.devices {
-            sqlx::query(
-                r#"
-            INSERT INTO os_sublist_boards(sublist_id, board_id)
             SELECT $1, b.board_id
             FROM board_tags b
             WHERE b.tag = $2
@@ -649,7 +663,7 @@ impl Db {
     pub(crate) async fn os_remote_sublists(
         &self,
         board_id: i64,
-        parent_id: Option<i64>,
+        parent_id: i64,
     ) -> sqlx::Result<Vec<(i64, Url)>> {
         sqlx::query_as(
             r#"
@@ -658,13 +672,46 @@ impl Db {
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
             WHERE sb.board_id = $1
                 AND s.subitems_url IS NOT NULL
-                AND (
-                    ($2 IS NULL AND s.parent_id IS NULL)
-                    OR s.parent_id = $2
-                )"#,
+                AND s.parent_id = $2"#,
         )
         .bind(board_id)
         .bind(parent_id)
+        .fetch_all(&self.db)
+        .await
+    }
+
+    pub(crate) async fn os_remote_sublists_by_board(
+        &self,
+        board_id: i64,
+    ) -> sqlx::Result<Vec<(i64, Url)>> {
+        sqlx::query_as(
+            r#"
+            SELECT s.id, s.subitems_url
+            FROM os_sublists s
+            JOIN os_sublist_boards sb ON sb.sublist_id = s.id
+            WHERE sb.board_id = $1 AND s.subitems_url IS NOT NULL"#,
+        )
+        .bind(board_id)
+        .fetch_all(&self.db)
+        .await
+    }
+
+    pub(crate) async fn os_remote_sublists_by_remote_config(
+        &self,
+        board_id: i64,
+        remote_config_id: i64,
+    ) -> sqlx::Result<Vec<(i64, Url)>> {
+        sqlx::query_as(
+            r#"
+            SELECT s.id, s.subitems_url
+            FROM os_sublists s
+            JOIN os_sublist_boards sb ON sb.sublist_id = s.id
+            WHERE sb.board_id = $1 
+                AND s.subitems_url IS NOT NULL 
+                AND s.remote_config_id = $2"#,
+        )
+        .bind(board_id)
+        .bind(remote_config_id)
         .fetch_all(&self.db)
         .await
     }

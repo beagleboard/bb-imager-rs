@@ -332,30 +332,16 @@ impl BBImager {
         let db = self.common().db.clone();
         let downloader = self.common().downloader.clone();
 
-        Task::future(async move { db.os_remote_sublists(board_id, pos).await.unwrap() }).then(
-            move |items| {
-                let dl = downloader.clone();
-                let temp = items.into_iter().map(move |(id, url)| {
-                    let url_clone = url::Url::from(url.clone());
-                    let dl = dl.clone();
-                    Task::perform(
-                        async move { dl.download_json_no_cache(url_clone).await },
-                        move |x| match x {
-                            Ok(json) => BBImagerMessage::ResolveRemoteSubitemItem {
-                                item: json,
-                                target: id,
-                            },
-                            Err(e) => {
-                                tracing::error!("Failed to get remote item {}: {e}", url.as_str());
-                                BBImagerMessage::Null
-                            }
-                        },
-                    )
-                });
-
-                Task::batch(temp)
-            },
-        )
+        Task::future(async move {
+            match pos {
+                Some(x) => db.os_remote_sublists(board_id, x).await.unwrap(),
+                None => db.os_remote_sublists_by_board(board_id).await.unwrap(),
+            }
+        })
+        .then(move |items| {
+            let dl = downloader.clone();
+            helpers::fetch_remote_subitems(items, dl)
+        })
     }
 
     fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
