@@ -19,7 +19,7 @@ fscommon = "0.1"
 mbrman = "0.6"
 gpt = "4.1"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
-tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "fs"] }
+tokio = { version = "1.51", default-features = false, features = ["rt-multi-thread", "fs"] }
 tokio-util = { version = "0.7" }
 anyhow = "1.0"
 

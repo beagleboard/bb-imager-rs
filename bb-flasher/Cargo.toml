@@ -14,7 +14,7 @@ categories = ["development-tools", "embedded", "hardware-support"]
 liblzma = { version = "0.4", features = ["parallel"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "2.0" }
-tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
+tokio = { version = "1.51", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
 tracing = "0.1"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
@@ -29,7 +29,7 @@ anyhow = "1.0"
 bb-flasher-mspm0 = { path = "../bb-flasher-mspm0", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
+tokio = { version = "1.51", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
 
 [features]
 default = ["sd"]
