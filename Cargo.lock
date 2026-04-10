@@ -615,6 +615,7 @@ version = "0.0.20"
 dependencies = [
  "bin_file",
  "crc-fast",
+ "i2cdev",
  "serialport",
  "thiserror 2.0.18",
  "tokio",
@@ -2641,6 +2642,18 @@ dependencies = [
  "tower-service",
  "tracing",
  "windows-registry",
+]
+
+[[package]]
+name = "i2cdev"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b940f7497c4f95b863b21cd34c3737b53a67d80d94cf29055d7f7eeca6ffdb4"
+dependencies = [
+ "bitflags 2.11.0",
+ "byteorder",
+ "libc",
+ "nix 0.26.4",
 ]
 
 [[package]]

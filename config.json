@@ -148,7 +148,7 @@
 					"beagleconnect-zepto"
 				],
 				"description": "TODO",
-				"flasher": "Mspm0Uart",
+				"flasher": "Mspm0",
 				"instructions": "1. Connect the BeagleConnect Zepto board to your computer via USB to UART Bridge.\n2. Keep BSL button presed.\n3. Press and release RESET button.\n4. Release BSL button.",
 				"specification": {
 					"Processor": "Texas Instruments MSPM0L1117",

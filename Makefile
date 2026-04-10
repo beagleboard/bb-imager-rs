@@ -5,10 +5,9 @@ _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(
 _DATE = $(shell date +%F)
 # Rust args common for GUI and CLI across all targets and packages
 _RUST_ARGS_BASE = --locked --verbose
-_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
+_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart,zepto_i2c
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
-_RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0,zepto_i2c
-_RUST_ARGS_CLI-x86_64-unknown-linux-gnu = -F zepto_i2c
+_RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0
 _PACKAGER_ARGS = -r -vvv --verbose
 
 ## variable: CARGO_PATH: Path to cargo binary
