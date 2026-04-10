@@ -41,7 +41,8 @@ bcf_msp430 = ["bb-flasher-bcf/msp430"]
 pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
 dfu = ["bb-flasher-dfu"]
 static = ["liblzma/static"]
-mspm0_uart = ["bb-flasher-mspm0"]
+mspm0_uart = ["bb-flasher-mspm0/uart"]
+mspm0_i2c = ["bb-flasher-mspm0/i2c"]
 
 [package.metadata.docs.rs]
 all-features = true

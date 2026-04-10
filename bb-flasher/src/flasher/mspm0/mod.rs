@@ -1,3 +1,5 @@
+#[cfg(feature = "mspm0_i2c")]
+use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Display, io::Read};
 use tokio::sync::mpsc;
 
@@ -5,17 +7,42 @@ use crate::{BBFlasher, BBFlasherTarget};
 
 /// MSPM0 UART target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
-pub struct Target(String);
+pub enum Target {
+    #[cfg(feature = "mspm0_uart")]
+    Uart(String),
+    #[cfg(feature = "mspm0_i2c")]
+    I2c(PathBuf),
+}
 
 impl Target {
-    pub fn path(&self) -> &str {
-        self.0.as_str()
+    pub fn path(&self) -> String {
+        match self {
+            #[cfg(feature = "mspm0_uart")]
+            Target::Uart(x) => x.clone(),
+            #[cfg(feature = "mspm0_i2c")]
+            Target::I2c(x) => x.to_string_lossy().to_string(),
+        }
     }
 }
 
 impl From<String> for Target {
+    #[cfg(all(feature = "mspm0_uart", feature = "mspm0_i2c"))]
     fn from(value: String) -> Self {
-        Self(value)
+        if value.contains("i2c-") {
+            Self::I2c(value.into())
+        } else {
+            Self::Uart(value)
+        }
+    }
+
+    #[cfg(all(feature = "mspm0_uart", not(feature = "mspm0_i2c")))]
+    fn from(value: String) -> Self {
+        Self::Uart(value)
+    }
+
+    #[cfg(all(feature = "mspm0_i2c", not(feature = "mspm0_uart")))]
+    fn from(value: String) -> Self {
+        Self::I2c(value.into())
     }
 }
 
@@ -23,19 +50,35 @@ impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
     fn destinations(_: bool) -> impl Future<Output = std::collections::HashSet<Self>> {
-        let temp = bb_flasher_mspm0::ports().into_iter().map(Self).collect();
+        let mut dsts = std::collections::HashSet::new();
 
-        std::future::ready(temp)
+        #[cfg(feature = "mspm0_uart")]
+        dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
+
+        #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
+        dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
+
+        std::future::ready(dsts)
     }
 
     fn identifier(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.0)
+        match self {
+            #[cfg(feature = "mspm0_uart")]
+            Target::Uart(x) => Cow::Borrowed(&x),
+            #[cfg(feature = "mspm0_i2c")]
+            Target::I2c(x) => x.to_string_lossy(),
+        }
     }
 }
 
 impl Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        match self {
+            #[cfg(feature = "mspm0_uart")]
+            Target::Uart(x) => x.fmt(f),
+            #[cfg(feature = "mspm0_i2c")]
+            Target::I2c(x) => x.display().fmt(f),
+        }
     }
 }
 
@@ -49,7 +92,7 @@ impl Display for Target {
 #[derive(Debug, Clone)]
 pub struct Flasher<I> {
     img: I,
-    port: String,
+    port: Target,
     verify: bool,
     cancel: Option<tokio_util::sync::CancellationToken>,
 }
@@ -63,7 +106,7 @@ impl<I> Flasher<I> {
     ) -> Self {
         Self {
             img,
-            port: port.0,
+            port: port,
             verify,
             cancel,
         }
@@ -96,11 +139,21 @@ where
             .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
         };
 
+        let curry = move |chan| match port {
+            #[cfg(feature = "mspm0_uart")]
+            Target::Uart(x) => bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel)
+                .map_err(Into::into),
+            #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
+            Target::I2c(x) => bb_flasher_mspm0::i2c::flash(&img, &x, verify, chan, self.cancel)
+                .map_err(Into::into),
+            #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
+            Target::I2c(_) => Err(anyhow::anyhow!("Unsupported Os")),
+        };
+
         let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-            let flasher_task = tokio::task::spawn_blocking(move || {
-                bb_flasher_mspm0::flash(&img, &port, verify, Some(tx), self.cancel)
-            });
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_mspm0::Status>(20);
+
+            let flasher_task = tokio::task::spawn_blocking(move || curry(Some(tx)));
 
             // Should run until tx is dropped, i.e. flasher task is done.
             // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
@@ -110,12 +163,10 @@ where
 
             flasher_task
         } else {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher_mspm0::flash(&img, &port, verify, None, self.cancel)
-            })
+            tokio::task::spawn_blocking(move || curry(None))
         };
 
-        flasher_task.await.unwrap().map_err(Into::into)
+        flasher_task.await.unwrap()
     }
 }
 

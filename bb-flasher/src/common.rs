@@ -6,7 +6,8 @@ use std::{borrow::Cow, collections::HashSet};
     feature = "bcf",
     feature = "bcf_msp430",
     feature = "pb2_mspm0",
-    feature = "mspm0_uart"
+    feature = "mspm0_uart",
+    feature = "mspm0_i2c"
 ))]
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -16,7 +17,8 @@ use tokio::sync::mpsc;
     feature = "bcf",
     feature = "bcf_msp430",
     feature = "pb2_mspm0",
-    feature = "mspm0_uart"
+    feature = "mspm0_uart",
+    feature = "mspm0_i2c"
 ))]
 pub(crate) enum FlasherError {
     #[error("Failed to fetch image.")]

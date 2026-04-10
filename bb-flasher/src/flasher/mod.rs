@@ -6,5 +6,5 @@ pub mod dfu;
 pub mod pb2;
 #[cfg(feature = "sd")]
 pub mod sd;
-#[cfg(feature = "mspm0_uart")]
+#[cfg(any(feature = "mspm0_uart", feature = "mspm0_i2c"))]
 pub mod mspm0;
