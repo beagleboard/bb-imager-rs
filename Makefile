@@ -62,25 +62,6 @@ test:
 	$(info "Run workspace tests")
 	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS_BASE}
 
-## build: build-cli-manpage: Build manpage for CLI.
-.PHONY: build-cli-manpage
-build-cli-manpage:
-	$(info "Generate CLI Manpages")
-	rm -rf bb-imager-cli/dist/.target/man
-	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-man bb-imager-cli/dist/.target/man/
-	gzip bb-imager-cli/dist/.target/man/*
-
-
-## build: build-cli-shell-comp: Build shell completion for CLI.
-.PHONY: build-cli-shell-comp
-build-cli-shell-comp:
-	$(info "Generate CLI completion")
-	rm -rf bb-imager-cli/dist/.target/shell-comp
-	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
 setup-debian-deps:
@@ -99,7 +80,6 @@ setup-fedora-deps:
 setup-packaging-deps:
 	$(info "Installing dependencies required for packaging")
 	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/crabnebula-dev/cargo-packager.git
-
 
 ## housekeeping: package-rename: Replace package version with `_alpha_`. Intended for use in CI.
 .PHONY: package-rename-alpha
@@ -136,16 +116,34 @@ endif
 	git commit -s -m "Bump version to ${VERSION}"
 	git tag ${VERSION}
 
-define package-linux-x86_64_aarch64
-	$(info Building packages for $(1))
+# Will need updates if CLI starts being built outside linux
+define build-cli
+	$(info Generate CLI Manpages)
+	rm -rf bb-imager-cli/dist/.target/man
+	mkdir -p bb-imager-cli/dist/.target/man
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-man bb-imager-cli/dist/.target/man/
+	gzip bb-imager-cli/dist/.target/man/*
+
+	$(info Generate CLI completion)
+	rm -rf bb-imager-cli/dist/.target/shell-comp
+	mkdir -p bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+
+	$(info Build CLI for $(1))
 	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1))
 	$(CARGO_PATH) packager -p bb-imager-cli --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
+	rm bb-imager-cli/dist/PKGBUILD
+endef
+
+define package-linux-x86_64_aarch64
+	$(info Building packages for $(1))
+	$(call build-cli,$(1))
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-sqlite
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} -F updater
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
 	rm bb-imager-gui/dist/PKGBUILD
-	rm bb-imager-cli/dist/PKGBUILD
 endef
 
 define package-apple-x86_64_aarch64
@@ -163,12 +161,12 @@ endef
 
 ## package: package-x86_64-unknown-linux-gnu: Create all packages for x86_64-unknown-linux-gnu
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: package-checks build-cli-manpage build-cli-shell-comp
+package-x86_64-unknown-linux-gnu: package-checks
 	$(call package-linux-x86_64_aarch64,x86_64-unknown-linux-gnu)
 
 ## package: package-aarch64-unknown-linux-gnu: Create all packages for aarch64-unknown-linux-gnu
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: package-checks build-cli-manpage build-cli-shell-comp
+package-aarch64-unknown-linux-gnu: package-checks
 	$(call package-linux-x86_64_aarch64,aarch64-unknown-linux-gnu)
 
 ## package: package-x86_64-apple-darwin: Create all packages for x86_64-apple-darwin
@@ -194,11 +192,9 @@ package-aarch64-pc-windows-msvc: package-checks
 
 ## package: package-armv7-unknown-linux-gnueabihf: Create all packages for armv7-unknown-linux-gnueabihf
 .PHONY: package-armv7-unknown-linux-gnueabihf
-package-armv7-unknown-linux-gnueabihf: package-checks build-cli-manpage build-cli-shell-comp
+package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
-	$(RUST_BUILD) -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux}
-	$(CARGO_PATH) packager -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_PACKAGER_ARGS} -f deb,pacman
-	rm bb-imager-cli/dist/PKGBUILD
+	$(call build-cli,armv7-unknown-linux-gnueabihf)
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
 .PHONY: vendor-deps
