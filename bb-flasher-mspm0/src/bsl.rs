@@ -1,4 +1,3 @@
-use serialport::SerialPort;
 use zerocopy::{FromBytes, Immutable, IntoBytes, little_endian};
 
 use crate::{Error, Result};
@@ -287,14 +286,14 @@ impl BSLProgramDataReqHeadPkt {
     }
 }
 
-pub(crate) struct Mspm0<S: SerialPort> {
+pub(crate) struct Mspm0<S> {
     port: S,
     max_buffer_size: usize,
 }
 
 impl<S> Mspm0<S>
 where
-    S: SerialPort,
+    S: std::io::Read + std::io::Write,
 {
     pub(crate) fn new(mut port: S) -> Result<Self> {
         Self::connect(&mut port)?;

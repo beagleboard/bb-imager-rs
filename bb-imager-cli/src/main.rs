@@ -197,7 +197,7 @@ async fn flash_internal(
                 .flash(chan)
                 .await
         }
-        #[cfg(feature = "zepto")]
+        #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         TargetCommands::Zepto {
             img,
             dst,
@@ -301,7 +301,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             DestinationsTarget::Pb2Mspm0 => {
                 no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter).await
             }
-            #[cfg(feature = "zepto")]
+            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
             DestinationsTarget::Zepto => {
                 no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
             }
@@ -473,7 +473,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
         DestinationsTarget::Pb2Mspm0 => {
             no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(!no_filter).await
         }
-        #[cfg(feature = "zepto")]
+        #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         DestinationsTarget::Zepto => {
             no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
         }

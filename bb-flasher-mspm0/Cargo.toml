@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-serialport = { version = "4.7", default-features = false }
+serialport = { version = "4.7", default-features = false, optional = true }
 thiserror = "2.0"
 tracing = "0.1"
 zerocopy = { version = "0.8", features = ["std", "derive"] }
@@ -15,3 +15,12 @@ tokio = { version = "1.51", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.7" }
 bin_file = "0.1"
 crc-fast = "1.10"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+i2cdev = { version = "0.6.2", optional = true }
+
+[features]
+# Since uart is cross-platform, can be enabled by default.
+default = ["uart"]
+uart = ["serialport"]
+i2c = ["i2cdev"]
