@@ -147,12 +147,12 @@ pub enum TargetCommands {
         /// be flashed in a sequential order.
         imgs: Vec<String>,
     },
-    /// Flash Zepto over UART
-    #[cfg(feature = "zepto")]
+    /// Flash Zepto
+    #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
     Zepto {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
-        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        /// The destination device (e.g., `/dev/tty*` or `/dev/i2c-*` or specific device identifiers).
         dst: String,
         #[arg(long)]
         /// Disable checksum verification after flashing to speed up the process.
@@ -176,7 +176,7 @@ pub enum DestinationsTarget {
     /// USB DFU Target
     #[cfg(feature = "dfu")]
     Dfu,
-    /// Zepto UART Target
-    #[cfg(feature = "zepto")]
+    /// Zepto Target
+    #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
     Zepto,
 }
