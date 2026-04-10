@@ -5,7 +5,8 @@ _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(
 _DATE = $(shell date +%F)
 # Rust args common for GUI and CLI across all targets and packages
 _RUST_ARGS_BASE = --locked --verbose
-_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart,zepto_i2c
+_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
+_RUST_ARGS-linux = -F zepto_i2c
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
 _RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0
 _PACKAGER_ARGS = -r -vvv --verbose
@@ -137,11 +138,11 @@ endif
 
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI} $(_RUST_ARGS_CLI-$(1))
+	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1))
 	$(CARGO_PATH) packager -p bb-imager-cli --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} --no-default-features -F system-sqlite
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-sqlite
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} -F updater
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
 	rm bb-imager-gui/dist/PKGBUILD
 	rm bb-imager-cli/dist/PKGBUILD
@@ -195,7 +196,7 @@ package-aarch64-pc-windows-msvc: package-checks
 .PHONY: package-armv7-unknown-linux-gnueabihf
 package-armv7-unknown-linux-gnueabihf: package-checks build-cli-manpage build-cli-shell-comp
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
-	$(RUST_BUILD) -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_RUST_ARGS} -F dfu
+	$(RUST_BUILD) -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux}
 	$(CARGO_PATH) packager -p bb-imager-cli --target armv7-unknown-linux-gnueabihf ${_PACKAGER_ARGS} -f deb,pacman
 	rm bb-imager-cli/dist/PKGBUILD
 
