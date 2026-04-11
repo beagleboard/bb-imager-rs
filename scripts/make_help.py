@@ -39,7 +39,7 @@ def print_help(res: dict[str, list[tuple[str, str]]]):
     for grp, targets in res.items():
         print(f"    {YELLOW}[{grp}]{RESET}")
         for cmd, val in targets:
-            print(f"    {cmd: <32}{BLUE}# {val}{RESET}")
+            print(f"    {cmd: <40}{BLUE}# {val}{RESET}")
         print()
 
 
