@@ -149,7 +149,7 @@ endef
 define package-apple-x86_64_aarch64
 	$(info Building packages for $(1))
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f dmg
 endef
 
 define package-windows-x86_64_aarch64
