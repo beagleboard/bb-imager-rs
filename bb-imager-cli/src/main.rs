@@ -102,7 +102,7 @@ async fn flash(target: TargetCommands, quite: bool) {
 
         flash_internal(target, Some(tx)).await
     }
-    .expect("Filed to flash")
+    .expect("Failed to flash")
 }
 
 async fn flash_internal(
