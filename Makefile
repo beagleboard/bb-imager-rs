@@ -139,7 +139,7 @@ endef
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
 	$(call build-cli,$(1))
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-sqlite
+	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-deps
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} -F updater
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
