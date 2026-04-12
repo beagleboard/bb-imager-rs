@@ -25,7 +25,7 @@ tokio-stream = "0.1.18"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149" }
 directories = "6.0.0"
-bb-downloader = { path = "../bb-downloader", features = ["json"] }
+bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-util = { version = "0.7" }
@@ -48,12 +48,6 @@ ashpd = { version = "0.13", features = ["notification"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
-# bundle sqlite
-sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-# bundle sqlite
-sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "sqlite"] }
 
 [features]
 default = ["static"]
@@ -62,8 +56,8 @@ bcf_cc1352p7 = ["bb-flasher/bcf"]
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 # Handle application updates
 updater = []
-static = ["sqlx/sqlite", "bb-flasher/static"]
-system-sqlite  = ["sqlx/sqlite-unbundled"]
+static = ["sqlx/sqlite", "bb-flasher/static", "bb-downloader/rustls"]
+system-deps = ["sqlx/sqlite-unbundled", "bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]
 
