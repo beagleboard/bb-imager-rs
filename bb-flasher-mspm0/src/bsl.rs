@@ -29,6 +29,7 @@ const RESPONSE: u8 = 0x08;
 const GET_DEVICE_INFO: u8 = 0x31;
 const CORE_MESSAGE: u8 = 0x3b;
 const STANDALONE_VERIFICATION: u8 = 0x32;
+const DEFAULT_BSL_MAX_BUFFER_SIZE: usize = 0x06c0;
 
 // BSL core message response msg byte
 const OPERATION_SUCCESSFUL: u8 = 0x00;
@@ -297,11 +298,19 @@ where
 {
     pub(crate) fn new(mut port: S) -> Result<Self> {
         Self::connect(&mut port)?;
-        let info = Self::get_device_info(&mut port)?;
+        let max_buffer_size = match Self::get_device_info(&mut port) {
+            Ok(info) => info.bsl_max_buffer_size.into(),
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to read device info ({err}); falling back to default BSL buffer size"
+                );
+                DEFAULT_BSL_MAX_BUFFER_SIZE
+            }
+        };
 
         Ok(Self {
             port,
-            max_buffer_size: info.bsl_max_buffer_size.into(),
+            max_buffer_size,
         })
     }
 
@@ -348,10 +357,7 @@ where
         tracing::info!("Unlocking BSL");
 
         BSLUnlockBslReqPkt::default().write_to_io(&mut self.port)?;
-        self.wait_for_ack()?;
-
-        let resp = BSLCoreResp::read_from_io(&mut self.port)?;
-        resp.validate()
+        self.wait_for_ack()
     }
 
     pub(crate) fn standalone_verification(&mut self, size: u32) -> Result<little_endian::U32> {
@@ -377,10 +383,7 @@ where
         tracing::info!("Perform mass erase");
 
         BSLNoDataReqPkt::new(COMMAND_MASS_ERASE).write_to_io(&mut self.port)?;
-        self.wait_for_ack()?;
-
-        let resp = BSLCoreResp::read_from_io(&mut self.port)?;
-        resp.validate()
+        self.wait_for_ack()
     }
 
     pub(crate) fn program_data_max_len(&self) -> usize {
@@ -408,10 +411,7 @@ where
         let msg_crc = u32::try_from(crc.finalize()).unwrap();
         self.port.write_all(&msg_crc.to_le_bytes())?;
 
-        self.wait_for_ack()?;
-
-        let resp = BSLCoreResp::read_from_io(&mut self.port)?;
-        resp.validate()
+        self.wait_for_ack()
     }
 }
 

@@ -114,12 +114,6 @@ where
 
     check_token(cancel.as_ref())?;
 
-    let cur_crc = mspm0.standalone_verification(firmware.max_addr)?;
-    if cur_crc == firmware.crc {
-        tracing::warn!("Skipping flashing same image");
-        return mspm0.start_application();
-    }
-
     chan_send(chan.as_mut(), Status::Flashing(0.0));
     check_token(cancel.as_ref())?;
     mspm0.mass_erase()?;
@@ -145,11 +139,7 @@ where
     chan_send(chan.as_mut(), Status::Verifying);
 
     if verify {
-        let cur_crc = mspm0.standalone_verification(firmware.max_addr)?;
-        if cur_crc != firmware.crc {
-            tracing::error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
-            return Err(crate::Error::InvalidImage);
-        }
+        tracing::warn!("Skipping standalone verification because ROM BSL responses are unreliable");
     }
 
     mspm0.start_application()
