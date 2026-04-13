@@ -139,7 +139,17 @@ where
     chan_send(chan.as_mut(), Status::Verifying);
 
     if verify {
-        tracing::warn!("Skipping standalone verification because ROM BSL responses are unreliable");
+        let actual_crc = mspm0.standalone_verification(firmware.max_addr)?;
+        let actual = u32::from(actual_crc);
+        let expected = u32::from(firmware.crc);
+
+        tracing::info!(
+            "Standalone verification CRC expected={expected:#010x} actual={actual:#010x}"
+        );
+
+        if actual != expected {
+            return Err(crate::Error::VerificationMismatch { expected, actual });
+        }
     }
 
     mspm0.start_application()
