@@ -238,7 +238,7 @@ impl BSLStandaloneVerificationReqPkt {
     }
 }
 
-#[derive(FromBytes, IntoBytes, Immutable)]
+#[derive(FromBytes, IntoBytes, Immutable, Clone, Copy)]
 #[repr(C, packed)]
 struct BSLStandaloneVerificationRespPkt {
     head: BSLPktHead,
@@ -352,6 +352,41 @@ where
         }
     }
 
+    fn wait_for_ack_or_standalone_verification(
+        &mut self,
+    ) -> Result<BSLStandaloneVerificationRespPkt> {
+        let mut buf = [0u8; 1];
+
+        self.port.read_exact(&mut buf)?;
+
+        match buf[0] {
+            BSL_ACK => {
+                let resp = BSLStandaloneVerificationRespPkt::read_from_io(&mut self.port)?;
+                resp.validate()?;
+                Ok(resp)
+            }
+            RESPONSE => {
+                let mut rest = [0u8; size_of::<BSLStandaloneVerificationRespPkt>() - 1];
+                self.port.read_exact(&mut rest)?;
+
+                let mut full = [0u8; size_of::<BSLStandaloneVerificationRespPkt>()];
+                full[0] = RESPONSE;
+                full[1..].copy_from_slice(&rest);
+
+                let resp = BSLStandaloneVerificationRespPkt::read_from_bytes(&full)
+                    .map_err(|_| Error::InvalidResponse)?;
+                resp.validate()?;
+                Ok(resp)
+            }
+            BSL_ERROR_HEADER_INCORRECT => Err(Error::HeaderIncorrect),
+            BSL_ERROR_CHECKSUM_INCORRECT => Err(Error::ChecksumIncorrect),
+            BSL_ERROR_PACKET_SIZE_ZERO => Err(Error::PktSizeZero),
+            BSL_ERROR_PACKET_SIZE_TOO_BIG => Err(Error::PktSize2Big),
+            BSL_ERROR_UNKNOWN_BAUD_RATE => Err(Error::UnknownBaudRate),
+            _ => Err(Error::Unknown),
+        }
+    }
+
     fn connect(port: &mut S) -> Result<()> {
         tracing::info!("Establishing connection");
 
@@ -382,10 +417,7 @@ where
         tracing::info!("Get current firmware CRC32");
 
         BSLStandaloneVerificationReqPkt::new(size).write_to_io(&mut self.port)?;
-        self.wait_for_ack()?;
-
-        let resp = BSLStandaloneVerificationRespPkt::read_from_io(&mut self.port)?;
-        resp.validate()?;
+        let resp = self.wait_for_ack_or_standalone_verification()?;
 
         Ok(resp.crc)
     }
