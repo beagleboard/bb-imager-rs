@@ -334,6 +334,34 @@ where
         Self::wait_for_ack_inner(&mut self.port)
     }
 
+    fn wait_for_ack_or_core_success(&mut self) -> Result<()> {
+        let mut buf = [0u8; 1];
+
+        self.port.read_exact(&mut buf)?;
+
+        match buf[0] {
+            BSL_ACK => Ok(()),
+            RESPONSE => {
+                let mut rest = [0u8; size_of::<BSLCoreResp>() - 1];
+                self.port.read_exact(&mut rest)?;
+
+                let mut full = [0u8; size_of::<BSLCoreResp>()];
+                full[0] = RESPONSE;
+                full[1..].copy_from_slice(&rest);
+
+                let resp =
+                    BSLCoreResp::read_from_bytes(&full).map_err(|_| Error::InvalidResponse)?;
+                resp.validate()
+            }
+            BSL_ERROR_HEADER_INCORRECT => Err(Error::HeaderIncorrect),
+            BSL_ERROR_CHECKSUM_INCORRECT => Err(Error::ChecksumIncorrect),
+            BSL_ERROR_PACKET_SIZE_ZERO => Err(Error::PktSizeZero),
+            BSL_ERROR_PACKET_SIZE_TOO_BIG => Err(Error::PktSize2Big),
+            BSL_ERROR_UNKNOWN_BAUD_RATE => Err(Error::UnknownBaudRate),
+            _ => Err(Error::Unknown),
+        }
+    }
+
     fn connect(port: &mut S) -> Result<()> {
         tracing::info!("Establishing connection");
 
@@ -383,7 +411,7 @@ where
         tracing::info!("Perform mass erase");
 
         BSLNoDataReqPkt::new(COMMAND_MASS_ERASE).write_to_io(&mut self.port)?;
-        self.wait_for_ack()
+        self.wait_for_ack_or_core_success()
     }
 
     pub(crate) fn program_data_max_len(&self) -> usize {
@@ -411,7 +439,7 @@ where
         let msg_crc = u32::try_from(crc.finalize()).unwrap();
         self.port.write_all(&msg_crc.to_le_bytes())?;
 
-        self.wait_for_ack()
+        self.wait_for_ack_or_core_success()
     }
 }
 
