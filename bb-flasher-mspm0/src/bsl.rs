@@ -29,8 +29,6 @@ const RESPONSE: u8 = 0x08;
 const GET_DEVICE_INFO: u8 = 0x31;
 const CORE_MESSAGE: u8 = 0x3b;
 const STANDALONE_VERIFICATION: u8 = 0x32;
-const DEFAULT_BSL_MAX_BUFFER_SIZE: usize = 0x06c0;
-
 // BSL core message response msg byte
 const OPERATION_SUCCESSFUL: u8 = 0x00;
 
@@ -298,19 +296,11 @@ where
 {
     pub(crate) fn new(mut port: S) -> Result<Self> {
         Self::connect(&mut port)?;
-        let max_buffer_size = match Self::get_device_info(&mut port) {
-            Ok(info) => info.bsl_max_buffer_size.into(),
-            Err(err) => {
-                tracing::warn!(
-                    "Failed to read device info ({err}); falling back to default BSL buffer size"
-                );
-                DEFAULT_BSL_MAX_BUFFER_SIZE
-            }
-        };
+        let info = Self::get_device_info(&mut port)?;
 
         Ok(Self {
             port,
-            max_buffer_size,
+            max_buffer_size: info.bsl_max_buffer_size.into(),
         })
     }
 
