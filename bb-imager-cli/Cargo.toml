@@ -15,7 +15,7 @@ indicatif = "0.18"
 console = "0.16"
 url = "2.5.4"
 const-hex = "1.17"
-clap_complete = "4.5"
+clap_complete = "4.6"
 anyhow = "1.0"
 
 [features]
