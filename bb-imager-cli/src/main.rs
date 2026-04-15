@@ -303,7 +303,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             }
             #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
             DestinationsTarget::Zepto => {
-                no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
+                no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
             }
         }
         return;
@@ -475,7 +475,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         DestinationsTarget::Zepto => {
-            no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
         }
     }
 }

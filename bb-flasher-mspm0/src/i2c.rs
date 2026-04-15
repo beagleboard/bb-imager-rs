@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::io::{Read, Write};
 
 use i2cdev::core::I2CDevice;
 use tokio::sync::mpsc;
@@ -54,12 +53,12 @@ fn probe_port(port: &Path) -> bool {
         Err(_) => return false,
     };
 
-    if dev.write_all(&BSL_CONNECTION_REQ).is_err() {
+    if dev.write(&BSL_CONNECTION_REQ).is_err() {
         return false;
     }
 
     let mut ack = [0u8; 1];
-    if dev.read_exact(&mut ack).is_err() {
+    if dev.read(&mut ack).is_err() {
         return false;
     }
 
