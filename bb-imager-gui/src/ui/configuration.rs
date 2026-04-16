@@ -203,7 +203,7 @@ fn linux_sd_card<'a>(
     let toggle = widget::toggler(config.hostname.is_some())
         .label("Set Hostname")
         .on_toggle(|t| {
-            let hostname = if t { whoami::hostname().ok() } else { None };
+            let hostname = if t { Some(String::new()) } else { None };
             BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
                 config.clone().update_hostname(hostname),
             ))
