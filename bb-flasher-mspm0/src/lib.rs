@@ -23,8 +23,8 @@ pub enum Error {
     PktSizeZero,
     #[error("Packet size is too big")]
     PktSize2Big,
-    #[error("Unknown error occured")]
-    Unknown,
+    #[error("Unexpected BSL status byte 0x{0:02x}")]
+    UnexpectedAck(u8),
     #[error("Unknown baud rate")]
     UnknownBaudRate,
     /// Unknown error occured during IO.
