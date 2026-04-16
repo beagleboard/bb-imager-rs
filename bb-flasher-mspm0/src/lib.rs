@@ -36,6 +36,8 @@ pub enum Error {
     },
     #[error("MSPM0 BSL sent an unknown message. Please check logs for more information.")]
     InvalidResponse,
+    #[error("Standalone verification CRC mismatch. Expected {expected:#010x}, got {actual:#010x}.")]
+    VerificationMismatch { expected: u32, actual: u32 },
     /// Flashed image is not valid
     #[error("Flashed image is not valid.")]
     InvalidImage,
