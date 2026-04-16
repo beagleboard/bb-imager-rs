@@ -8,6 +8,9 @@ pub struct Opt {
     #[command(subcommand)]
     /// Specifies the subcommand to execute.
     pub command: Commands,
+    #[arg(long)]
+    /// Enable more logging.
+    pub verbose: bool
 }
 
 #[derive(Subcommand, Debug)]
