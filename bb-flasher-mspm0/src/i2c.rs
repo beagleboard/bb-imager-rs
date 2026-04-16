@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use i2cdev::core::{I2CDevice, I2CMessage, I2CTransfer};
-use i2cdev::linux::LinuxI2CMessage;
+use i2cdev::core::I2CDevice;
 use tokio::sync::mpsc;
 
 use crate::{Error, Result, Status};
@@ -10,44 +9,26 @@ const BSL_TARGET_ADDRESS: u16 = 0x48;
 const BSL_ACK: u8 = 0x00;
 const BSL_CONNECTION_REQ: [u8; 8] = [0x80, 0x01, 0x00, 0x12, 0x3A, 0x61, 0x44, 0xDE];
 
-struct I2CDev {
-    dev: i2cdev::linux::LinuxI2CDevice,
-    pending_write: Vec<u8>,
-}
+struct I2CDev(i2cdev::linux::LinuxI2CDevice);
 
 impl I2CDev {
     fn new(port: &Path) -> Result<Self> {
         i2cdev::linux::LinuxI2CDevice::new(port, BSL_TARGET_ADDRESS)
             .map_err(|_| Error::FailedToOpenPort)
-            .map(|dev| Self {
-                dev,
-                pending_write: Vec::new(),
-            })
+            .map(Self)
     }
 }
 
 impl std::io::Read for I2CDev {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.pending_write.is_empty() {
-            self.dev.read(buf).map_err(std::io::Error::other)?;
-            return Ok(buf.len());
-        }
-
-        let write_buf = self.pending_write.as_slice();
-        let mut msgs = [
-            LinuxI2CMessage::write(write_buf),
-            LinuxI2CMessage::read(buf),
-        ];
-
-        self.dev.transfer(&mut msgs).map_err(std::io::Error::other)?;
-        self.pending_write.clear();
+        self.0.read(buf).map_err(std::io::Error::other)?;
         Ok(buf.len())
     }
 }
 
 impl std::io::Write for I2CDev {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.pending_write.extend_from_slice(buf);
+        self.0.write(buf).map_err(std::io::Error::other)?;
         Ok(buf.len())
     }
 
