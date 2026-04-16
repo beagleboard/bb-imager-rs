@@ -7,10 +7,23 @@ use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use helpers::LocalStringFile;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
     let opt = Opt::parse();
+
+    if opt.verbose {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::builder()
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env_lossy(),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .try_init()
+            .expect("Failed to register tracing_subscriber");
+    }
 
     match opt.command {
         Commands::Flash { target, quiet } => flash(*target, quiet).await,
