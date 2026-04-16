@@ -317,7 +317,7 @@ where
             BSL_ERROR_PACKET_SIZE_ZERO => Err(Error::PktSizeZero),
             BSL_ERROR_PACKET_SIZE_TOO_BIG => Err(Error::PktSize2Big),
             BSL_ERROR_UNKNOWN_BAUD_RATE => Err(Error::UnknownBaudRate),
-            other => Err(Error::UnexpectedAck(other)),
+            _ => Err(Error::Unknown),
         }
     }
 
