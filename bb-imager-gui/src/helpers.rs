@@ -446,7 +446,7 @@ pub(crate) async fn flash(
             FlashingCustomization::Zepto(customization),
             Destination::Mspm0(t),
         ) => {
-            bb_flasher::mspm0::Flasher::new(
+            bb_flasher::mspm0::Flasher::no_prep(
                 img.into_future(),
                 t,
                 customization.verify,

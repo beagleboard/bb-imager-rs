@@ -94,32 +94,67 @@ impl Display for Target {
 /// - iHex
 /// - xz: Xz compressed files for any of the above
 #[derive(Debug, Clone)]
-pub struct Flasher<I> {
+pub struct Flasher<I, P> {
     img: I,
     port: Target,
     verify: bool,
     cancel: Option<tokio_util::sync::CancellationToken>,
+    prep_hook: P,
 }
 
-impl<I> Flasher<I> {
+impl<I, P> Flasher<I, P> {
     pub fn new(
         img: I,
         port: Target,
         verify: bool,
         cancel: Option<tokio_util::sync::CancellationToken>,
+        prep_hook: P,
     ) -> Self {
         Self {
             img,
             port: port,
             verify,
             cancel,
+            prep_hook,
         }
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I, fn() -> Result<(), bb_flasher_mspm0::Error>> {
+    pub fn no_prep(
+        img: I,
+        port: Target,
+        verify: bool,
+        cancel: Option<tokio_util::sync::CancellationToken>,
+    ) -> Self {
+        Self::new(img, port, verify, cancel, || Ok(()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
+    pub fn gpio_by_name(
+        img: I,
+        port: Target,
+        verify: bool,
+        cancel: Option<tokio_util::sync::CancellationToken>,
+        reset: String,
+        bsl: String,
+    ) -> Self {
+        Self::new(
+            img,
+            port,
+            verify,
+            cancel,
+            Box::new(bb_flasher_mspm0::bsl_gpio_cdev_by_name(reset, bsl)),
+        )
+    }
+}
+
+impl<I, P> BBFlasher for Flasher<I, P>
 where
     I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
     async fn flash(
         self,
@@ -145,11 +180,15 @@ where
 
         let curry = move |chan| match port {
             #[cfg(feature = "mspm0_uart")]
-            Target::Uart(x) => bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel)
-                .map_err(Into::into),
+            Target::Uart(x) => {
+                bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel, self.prep_hook)
+                    .map_err(Into::into)
+            }
             #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-            Target::I2c(x) => bb_flasher_mspm0::i2c::flash(&img, &x, verify, chan, self.cancel)
-                .map_err(Into::into),
+            Target::I2c(x) => {
+                bb_flasher_mspm0::i2c::flash(&img, &x, verify, chan, self.cancel, self.prep_hook)
+                    .map_err(Into::into)
+            }
             #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
             Target::I2c(_) => Err(anyhow::anyhow!("Unsupported Os")),
         };

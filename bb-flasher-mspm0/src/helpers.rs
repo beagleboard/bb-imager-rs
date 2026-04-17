@@ -91,20 +91,24 @@ pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<Status>>, msg: Status) {
     }
 }
 
-pub fn flash<P, D>(
+pub fn flash<P, D, B>(
     firmware: &[u8],
     port_open: P,
     verify: bool,
     mut chan: Option<mpsc::Sender<Status>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
+    prep_hook: B,
 ) -> crate::Result<()>
 where
     P: FnOnce() -> crate::Result<D>,
     D: std::io::Read + std::io::Write,
+    B: FnOnce() -> crate::Result<()>,
 {
-    let firmware = Firmware::parse(firmware)?;
-
     chan_send(chan.as_mut(), Status::Preparing);
+
+    prep_hook()?;
+
+    let firmware = Firmware::parse(firmware)?;
 
     let port = port_open()?;
     let mut mspm0 = crate::bsl::Mspm0::new(port)?;
