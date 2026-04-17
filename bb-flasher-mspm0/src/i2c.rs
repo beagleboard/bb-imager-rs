@@ -41,8 +41,16 @@ pub fn flash(
     verify: bool,
     chan: Option<mpsc::Sender<Status>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
+    prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
-    crate::helpers::flash(firmware, || I2CDev::new(port), verify, chan, cancel)
+    crate::helpers::flash(
+        firmware,
+        || I2CDev::new(port),
+        verify,
+        chan,
+        cancel,
+        prep_hook,
+    )
 }
 
 /// Returns all paths to serial ports.

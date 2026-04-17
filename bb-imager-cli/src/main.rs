@@ -210,13 +210,17 @@ async fn flash_internal(
                 .flash(chan)
                 .await
         }
-        #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
+        #[cfg(all(
+            any(feature = "zepto_uart", feature = "zepto_i2c"),
+            not(target_os = "linux")
+        ))]
         TargetCommands::Zepto {
             img,
             dst,
             no_verify,
+            reset_gpio,
         } => {
-            bb_flasher::mspm0::Flasher::new(
+            bb_flasher::mspm0::Flasher::no_prep(
                 LocalImage::new(img).into_future(),
                 dst.into(),
                 !no_verify,
@@ -225,6 +229,41 @@ async fn flash_internal(
             .flash(chan)
             .await
         }
+        #[cfg(all(
+            any(feature = "zepto_uart", feature = "zepto_i2c"),
+            target_os = "linux"
+        ))]
+        TargetCommands::Zepto {
+            img,
+            dst,
+            no_verify,
+            reset_gpio,
+            bsl_gpio,
+        } => match (reset_gpio, bsl_gpio) {
+            (Some(reset), Some(bsl)) => {
+                bb_flasher::mspm0::Flasher::gpio_by_name(
+                    LocalImage::new(img).into_future(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                    reset,
+                    bsl,
+                )
+                .flash(chan)
+                .await
+            }
+            (None, None) => {
+                bb_flasher::mspm0::Flasher::no_prep(
+                    LocalImage::new(img).into_future(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                )
+                .flash(chan)
+                .await
+            }
+            _ => panic!("Invalid arguments"),
+        },
     }
 }
 

@@ -15,6 +15,7 @@ pub fn flash(
     verify: bool,
     chan: Option<mpsc::Sender<Status>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
+    prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     helpers::flash(
         firmware,
@@ -30,6 +31,7 @@ pub fn flash(
         verify,
         chan,
         cancel,
+        prep_hook,
     )
 }
 

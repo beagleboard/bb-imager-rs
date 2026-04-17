@@ -10,7 +10,7 @@ pub struct Opt {
     pub command: Commands,
     #[arg(long)]
     /// Enable more logging.
-    pub verbose: bool
+    pub verbose: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -160,6 +160,13 @@ pub enum TargetCommands {
         #[arg(long)]
         /// Disable checksum verification after flashing to speed up the process.
         no_verify: bool,
+        #[arg(long, requires = "bsl_gpio")]
+        /// RESET GPIO for MSPM0.
+        reset_gpio: Option<String>,
+        #[cfg(target_os = "linux")]
+        #[arg(long, requires = "reset_gpio")]
+        /// BSL GPIO for MSPM0.
+        bsl_gpio: Option<String>,
     },
 }
 

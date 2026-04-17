@@ -17,7 +17,8 @@ bin_file = "0.1"
 crc-fast = "1.10"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-i2cdev = { version = "0.6.2", optional = true }
+i2cdev = { version = "0.6", optional = true }
+gpiocdev = "0.8"
 
 [features]
 # Since uart is cross-platform, can be enabled by default.
