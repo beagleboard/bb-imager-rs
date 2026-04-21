@@ -15,7 +15,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
 iced_aw = { version = "0.13.1", default-features = false, features = ["spinner"] }
 image = "0.25"
-tokio = { version = "1.51", default-features = false, features = ["macros"] }
+tokio = { version = "1.52", default-features = false, features = ["macros"] }
 webbrowser = "1.1.0"
 notify-rust = { version = "4.14.0", default-features = false, features = ["z-with-tokio"] }
 url = "2.5.4"
