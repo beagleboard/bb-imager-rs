@@ -41,6 +41,8 @@ clean:
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
 	rm -rf bb-imager-service/dist
+	rm -rf cargo-vendor.tar.gz
+	rm -rf vendor
 
 ## housekeeping: packaging-checks: Some checks to ensure good packaging
 .PHONY: package-checks
@@ -208,12 +210,14 @@ package-flatpak:
 	install -Dm644 ./bb-imager-gui/assets/icons/icon.png /app/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
 	install -Dm644 ./bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
 
-## housekeeping: vendor-deps: Create tarball of dependencies
-.PHONY: vendor-deps
-vendor-deps:
+cargo-vendor.tar.gz: Cargo.lock
 	$(info Create tarball of all deps)
 	$(CARGO_PATH) vendor
 	tar -czvf cargo-vendor.tar.gz vendor/
+
+## housekeeping: vendor-deps: Create tarball of dependencies
+.PHONY: vendor-deps
+vendor-deps: cargo-vendor.tar.gz
 
 ## housekeeping: coverage: Check test coverage
 .PHONY: coverage
