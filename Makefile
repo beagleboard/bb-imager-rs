@@ -69,13 +69,13 @@ test:
 setup-debian-deps:
 	$(info "Installing Debian dependencies")
 	sudo apt-get update -y
-	sudo apt-get install -y --no-install-recommends libudev-dev
+	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev
 
 ## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
