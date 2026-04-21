@@ -122,7 +122,7 @@ jobs:
       with:
         command: build
         target: armv7-unknown-linux-gnueabihf
-        args: "--locked --release -F bcf_msp430 -F bcf_cc1352p7 -F dfu -p bb-imager-cli"
+        args: "--locked --release -F bcf_msp430,bcf_cc1352p7,dfu,zepto_uart,zepto_i2c -p bb-imager-cli"
         strip: true
 
     - name: Install packaging deps
