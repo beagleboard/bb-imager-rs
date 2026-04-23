@@ -362,3 +362,7 @@ package-gui-portable-exe: build-gui
 	$(info Building portable windows exe for $(TARGET))
 	mkdir -p bb-imager-gui/dist
 	cp $(_GUI_BIN) $(_GUI_PORTABLE_EXE)
+
+## package: package-host: Build all packages for host platform.
+.PHONY: package-host
+package-host: package-$(_HOST_TARGET)
