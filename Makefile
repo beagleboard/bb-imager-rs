@@ -54,7 +54,7 @@ TARGET ?= $(_HOST_TARGET)
 ## variable: PB2_MSPM0: Enable pb2_mspm0 feature. Only used in CLI.
 PB2_MSPM0 ?= 0
 ## variable: ZEPTO_I2C: Enable zepto_i2c feature. Only supported in GUI.
-ZEPTO_I2C ?= 0
+ZEPTO_I2C ?= $(if $(findstring linux,$(TARGET)),1)
 ## variable: SYSTEM_DEPS: Use system dependencies. Mainly for linux.
 SYSTEM_DEPS ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
@@ -96,6 +96,18 @@ endif
 ifeq ($(UPDATER),1)
 	_RUST_ARGS_GUI += -F updater
 endif
+
+## build: build: Build both CLI and GUI
+.PHONY: build
+build: build-cli build-gui
+
+## install: install: Install both CLI and GUI. Expects things to be built first.
+.PHONY: install
+install: install-cli install-gui
+
+## install: uninstall: Uninstall both CLI and GUI.
+.PHONY: uninstall
+uninstall: uninstall-cli uninstall-gui
 
 ## housekeeping: help: Display this help message
 .PHONY: help
@@ -344,7 +356,7 @@ install-gui: _install_gui
 .PHONY: package-flatpak
 install-gui-flatpak:
 	cargo fetch --offline ${_RUST_ARGS_BASE} --manifest-path bb-imager-gui/Cargo.toml
-	$(MAKE) _install_gui SYSTEM_DEPS=1 ZEPTO_I2C=1 BINDIR=${FLATPAK_DEST} PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
+	$(MAKE) _install_gui SYSTEM_DEPS=1 BINDIR=${FLATPAK_DEST} PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui
