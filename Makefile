@@ -1,5 +1,6 @@
 # Run 'make help' to see guidance on usage of this Makefile
 
+_HOST_TARGET = $(shell rustc --print host-tuple)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
 # Rust args common for GUI and CLI across all targets and packages
@@ -9,6 +10,11 @@ _RUST_ARGS-linux = -F zepto_i2c
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
 _RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0
 _PACKAGER_ARGS = -r -vvv --verbose
+
+_CLI_BIN = target/${TARGET}/release/bb-imager-cli
+_CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
+_CLI_COMP_ZSH = bb-imager-cli/dist/.target/shell-comp/_bb-imager-cli
+_CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
 
 ## variable: CARGO_PATH: Path to cargo binary
 CARGO_PATH ?= $(shell which cargo)
@@ -22,6 +28,20 @@ NO_BUILD ?= 0
 VERBOSE ?= 0
 ## variable: OFFLINE: Should be used when building flatpak.
 OFFLINE ?= 0
+## variable: PREFIX: Install Prefix
+PREFIX ?= /usr/local
+## variable: BINDIR: Directory to install binary
+BINDIR ?= $(PREFIX)/bin
+## variable: MANDIR: Directory to install manpages
+MANDIR ?= $(PREFIX)/share/man
+## variable: BASH_COMPLETIONDIR: Directory to install bash completions
+BASH_COMPLETIONDIR ?= $(PREFIX)/share/bash-completion/completions
+## variable: ZSH_COMPLETIONDIR: Directory to install zsh completions
+ZSH_COMPLETIONDIR ?= $(PREFIX)/share/zsh/site-functions
+## variable: TARGET: Compilation Target. Default = host
+TARGET ?= $(_HOST_TARGET)
+## variable: PB2_MSPM0: Enable pb2_mspm0 feature. Only used in CLI.
+PB2_MSPM0 ?= 0
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -38,6 +58,11 @@ endif
 # Add offline flag is needed
 ifeq ($(OFFLINE),1)
 	_RUST_ARGS_BASE += --offline
+endif
+
+# Add pb2_mspm0 feature
+ifeq ($(PB2_MSPM0),1)
+	_RUST_ARGS_CLI += -F pb2_mspm0
 endif
 
 ## housekeeping: help: Display this help message
@@ -131,29 +156,15 @@ endif
 	git commit -s -m "Bump version to ${VERSION}"
 	git tag ${VERSION}
 
-# Will need updates if CLI starts being built outside linux
-define build-cli
-	$(info Generate CLI Manpages)
-	rm -rf bb-imager-cli/dist/.target/man
-	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-man bb-imager-cli/dist/.target/man/
-	gzip bb-imager-cli/dist/.target/man/*
+package-cli-deb: build-cli
+	$(CARGO_PATH) packager -p bb-imager-cli --target $(TARGET) $(_PACKAGER_ARGS) -f deb
 
-	$(info Generate CLI completion)
-	rm -rf bb-imager-cli/dist/.target/shell-comp
-	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1)) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-
-	$(info Build CLI for $(1))
-	$(RUST_BUILD) -p bb-imager-cli --target $(1) ${_RUST_ARGS_CLI} ${_RUST_ARGS-linux} $(_RUST_ARGS_CLI-$(1))
-	$(CARGO_PATH) packager -p bb-imager-cli --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
+package-cli-pacman: build-cli
+	$(CARGO_PATH) packager -p bb-imager-cli --target $(TARGET) $(_PACKAGER_ARGS) -f pacman
 	rm bb-imager-cli/dist/PKGBUILD
-endef
 
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(call build-cli,$(1))
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-deps
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
 	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} -F updater
@@ -178,11 +189,13 @@ endef
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: package-checks
 	$(call package-linux-x86_64_aarch64,x86_64-unknown-linux-gnu)
+	$(MAKE) package-cli-deb package-cli-pacman TARGET=x86_64-unknown-linux-gnu
 
 ## package: package-aarch64-unknown-linux-gnu: Create all packages for aarch64-unknown-linux-gnu
 .PHONY: package-aarch64-unknown-linux-gnu
 package-aarch64-unknown-linux-gnu: package-checks
 	$(call package-linux-x86_64_aarch64,aarch64-unknown-linux-gnu)
+	$(MAKE) package-cli-deb package-cli-pacman TARGET=aarch64-unknown-linux-gnu PB2_MSPM0=1
 
 ## package: package-x86_64-apple-darwin: Create all packages for x86_64-apple-darwin
 .PHONY: package-x86_64-apple-darwin
@@ -209,7 +222,7 @@ package-aarch64-pc-windows-msvc: package-checks
 .PHONY: package-armv7-unknown-linux-gnueabihf
 package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
-	$(call build-cli,armv7-unknown-linux-gnueabihf)
+	$(MAKE) package-cli-deb package-cli-pacman TARGET=armv7-unknown-linux-gnueabihf
 
 ## package: package-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
 .PHONY: build-flatpak
@@ -236,11 +249,53 @@ vendor-deps: cargo-vendor.tar.gz
 .PHONY: coverage
 coverage:
 	$(info Check test coverage)
-	cargo tarpaulin
+	$(CARGO_PATH) tarpaulin
 
 ## housekeeping: bloat: Check dependency contribution to bin size.
 .PHONY: bloat
 bloat:
 	$(info Check dependency bloat)
-	cargo bloat -p bb-imager-cli --crates --all-features --release --locked > bloat-cli.txt
-	cargo bloat -p bb-imager-gui --crates --all-features --release --locked > bloat-gui.txt
+	$(CARGO_PATH) bloat -p bb-imager-cli --crates --all-features --release --locked > bloat-cli.txt
+	$(CARGO_PATH) bloat -p bb-imager-gui --crates --all-features --release --locked > bloat-gui.txt
+
+.PHONY: _build-cli-bin
+_build-cli-bin:
+	$(info Build CLI for $(TARGET))
+	$(RUST_BUILD) -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
+
+.PHONY: _build-cli-comp
+_build-cli-comp:
+	$(info Generate CLI shell completion)
+	mkdir -p bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+
+.PHONY: _build-cli-man
+_build-cli-man:
+	$(info Generate CLI manpages)
+	mkdir -p bb-imager-cli/dist/.target/man
+	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
+	gzip bb-imager-cli/dist/.target/man/*
+
+## build: build-cli: Build CLI and complementary stuff.
+.PHONY: build-cli
+build-cli: _build-cli-bin _build-cli-man _build-cli-comp
+
+## install: install-cli: Install CLI. Intended for use in Linux
+.PHONY: install-cli
+install-cli:
+	$(info Install CLI)
+	install -Dm755 $(_CLI_BIN) $(BINDIR)/bb-imager-cli
+	mkdir -p $(MANDIR)/man1
+	install -m644 bb-imager-cli/dist/.target/man/*.gz $(MANDIR)/man1/
+	install -Dm644 $(_CLI_COMP_BASH) $(BASH_COMPLETIONDIR)/bb-imager-cli
+	install -Dm644 $(_CLI_COMP_ZSH) $(ZSH_COMPLETIONDIR)/_bb-imager-cli
+
+## install: uninstall-cli: Uninstall CLI. Intended for use in Linux
+.PHONY: uninstall-cli
+uninstall-cli:
+	$(info Uninstall CLI)
+	rm -f $(BINDIR)/bb-imager-cli
+	rm -f $(MANDIR)/man1/bb-imager-cli*.gz
+	rm -f $(BASH_COMPLETIONDIR)/bb-imager-cli
+	rm -f $(ZSH_COMPLETIONDIR)/_bb-imager-cli
