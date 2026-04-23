@@ -6,8 +6,6 @@ const ALIGNMENT: usize = 8;
 
 pub(crate) struct Firmware {
     pub(crate) file: bin_file::BinFile,
-    pub(crate) crc: zerocopy::little_endian::U32,
-    pub(crate) max_addr: u32,
 }
 
 impl Firmware {
@@ -21,31 +19,21 @@ impl Firmware {
                 .map_err(|_| crate::Error::InvalidImage)?;
 
             let file = Self::from_binary(&bin_file).map_err(|_| crate::Error::InvalidImage)?;
-            let max_addr = file
-                .maximum_address()
-                .ok_or(crate::Error::InvalidImage)?
-                .try_into()
-                .unwrap();
 
-            return Ok(Self {
-                file,
-                crc: crate::bsl::crc(&bin_file),
-                max_addr,
-            });
+            return Ok(Self { file });
         }
 
         let file = Self::from_binary(data).map_err(|_| crate::Error::InvalidImage)?;
-        let max_addr = file
-            .maximum_address()
-            .ok_or(crate::Error::InvalidImage)?
-            .try_into()
-            .unwrap();
+        Ok(Self { file })
+    }
 
-        Ok(Self {
-            file,
-            crc: crate::bsl::crc(data),
-            max_addr,
-        })
+    pub(crate) fn max_addr(&self) -> usize {
+        self.file.maximum_address().unwrap()
+    }
+
+    pub(crate) fn crc(&self) -> zerocopy::little_endian::U32 {
+        let bin_file = self.file.to_bytes(0..self.max_addr(), Some(0xff)).unwrap();
+        crate::bsl::crc(&bin_file)
     }
 
     /// Need size and length to be 8 byte aligned.
@@ -118,8 +106,8 @@ where
 
     check_token(cancel.as_ref())?;
 
-    let cur_crc = mspm0.standalone_verification(firmware.max_addr)?;
-    if cur_crc == firmware.crc {
+    let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
+    if cur_crc == firmware.crc() {
         tracing::warn!("Skipping flashing same image");
         return mspm0.start_application();
     }
@@ -139,7 +127,7 @@ where
     {
         chan_send(
             chan.as_mut(),
-            Status::Flashing(addr as f32 / firmware.max_addr as f32),
+            Status::Flashing(addr as f32 / firmware.max_addr() as f32),
         );
         mspm0.program_data(addr as u32, &data)?;
         tracing::debug!("Cur address: {}", addr);
@@ -149,8 +137,8 @@ where
     chan_send(chan.as_mut(), Status::Verifying);
 
     if verify {
-        let cur_crc = mspm0.standalone_verification(firmware.max_addr)?;
-        if cur_crc != firmware.crc {
+        let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
+        if cur_crc != firmware.crc() {
             tracing::error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
             return Err(crate::Error::InvalidImage);
         }
@@ -170,11 +158,11 @@ mod tests {
     fn from_binary_single_block() {
         let data = [1, 2, 3, 4, 5, 6, 7, 8];
 
-        let bin = Firmware::from_binary(&data).unwrap();
-
-        let bytes = bin.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
+        let bin = Firmware::parse(&data).unwrap();
+        let bytes = bin.file.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
 
         assert_eq!(bytes, data);
+        assert_eq!(crate::bsl::crc(&bytes), bin.crc());
     }
 
     /// 0xff aligned blocks should be skipped
@@ -182,9 +170,8 @@ mod tests {
     fn from_binary_skip_ff_block() {
         let data = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
-        let bin = Firmware::from_binary(&data).unwrap();
-
-        let bytes = bin.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
+        let bin = Firmware::parse(&data).unwrap();
+        let bytes = bin.file.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
 
         assert_eq!(bytes.len(), 0);
     }
@@ -196,11 +183,11 @@ mod tests {
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 2, 3, 4, 5, 6, 7, 8,
         ];
 
-        let bin = Firmware::from_binary(&data).unwrap();
-
-        let bytes = bin.to_bytes(0..16, Some(0xff)).unwrap();
+        let bin = Firmware::parse(&data).unwrap();
+        let bytes = bin.file.to_bytes(0..16, Some(0xff)).unwrap();
 
         assert_eq!(bytes, data);
+        assert_eq!(crate::bsl::crc(&bytes), bin.crc());
     }
 
     /// Remainder shorter than alignment should still be added
@@ -208,14 +195,14 @@ mod tests {
     fn from_binary_with_remainder() {
         let data = [1, 2, 3, 4, 5];
 
-        let bin = Firmware::from_binary(&data).unwrap();
-
-        let bytes = bin.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
+        let bin = Firmware::parse(&data).unwrap();
+        let bytes = bin.file.to_bytes(0..ALIGNMENT, Some(0xff)).unwrap();
 
         let mut expected = [0xff; ALIGNMENT];
         expected[..5].copy_from_slice(&data);
 
         assert_eq!(bytes, expected);
+        assert_eq!(crate::bsl::crc(&bytes), bin.crc());
     }
 
     /// Multiple aligned blocks should maintain correct addresses
@@ -226,21 +213,10 @@ mod tests {
             13, 14, 15, 16,
         ];
 
-        let bin = Firmware::from_binary(&data).unwrap();
-
-        let bytes = bin.to_bytes(0..24, Some(0xff)).unwrap();
-
-        assert_eq!(bytes, data);
-    }
-
-    #[test]
-    fn parse_binary_input() {
-        let data = [1, 2, 3, 4, 5, 6, 7, 8];
-
-        let fw = Firmware::parse(&data).unwrap();
-
-        let bytes = fw.file.to_bytes(0..8, Some(0xff)).unwrap();
+        let bin = Firmware::parse(&data).unwrap();
+        let bytes = bin.file.to_bytes(0..24, Some(0xff)).unwrap();
 
         assert_eq!(bytes, data);
+        assert_eq!(crate::bsl::crc(&bytes), bin.crc());
     }
 }
