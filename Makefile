@@ -1,6 +1,5 @@
 # Run 'make help' to see guidance on usage of this Makefile
 
-_TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
 # Rust args common for GUI and CLI across all targets and packages
@@ -21,6 +20,8 @@ VERSION ?= $(_CARGO_TOML_VERSION)
 NO_BUILD ?= 0
 ## variable: VERBOSE: Enable verbose logging.
 VERBOSE ?= 0
+## variable: OFFLINE: Should be used when building flatpak.
+OFFLINE ?= 0
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -32,6 +33,11 @@ endif
 # Add verbose flag is needed
 ifeq ($(VERBOSE),1)
 	_RUST_ARGS_BASE += --verbose
+endif
+
+# Add offline flag is needed
+ifeq ($(OFFLINE),1)
+	_RUST_ARGS_BASE += --offline
 endif
 
 ## housekeeping: help: Display this help message
@@ -209,8 +215,8 @@ package-armv7-unknown-linux-gnueabihf: package-checks
 .PHONY: build-flatpak
 package-flatpak:
 	$(info Building for flatpak)
-	cargo --offline fetch --verbose --manifest-path bb-imager-gui/Cargo.toml
-	cargo --offline build -p bb-imager-gui ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-deps
+	$(CARGO_PATH) fetch $(_RUST_ARGS_BASE) --manifest-path bb-imager-gui/Cargo.toml
+	$(RUST_BUILD) -p bb-imager-gui $(_RUST_ARGS) $(_RUST_ARGS-linux) --no-default-features -F system-deps
 	install -Dm755 ./target/release/bb-imager-gui -t /app/bin/
 	install -Dm644 ./bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop /app/share/applications/${FLATPAK_ID}.desktop
 	desktop-file-edit --set-icon=${FLATPAK_ID} /app/share/applications/${FLATPAK_ID}.desktop
