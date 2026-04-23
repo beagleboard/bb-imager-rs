@@ -4,7 +4,7 @@ _TARGET_ARCH = $(shell echo ${TARGET} | cut -d'-' -f1)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
 # Rust args common for GUI and CLI across all targets and packages
-_RUST_ARGS_BASE = --locked --verbose
+_RUST_ARGS_BASE = --locked
 _RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
 _RUST_ARGS-linux = -F zepto_i2c
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
@@ -19,12 +19,19 @@ RUST_BUILDER ?= $(CARGO_PATH)
 VERSION ?= $(_CARGO_TOML_VERSION)
 ## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
 NO_BUILD ?= 0
+## variable: VERBOSE: Enable verbose logging.
+VERBOSE ?= 0
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
 RUST_BUILD = @true
 else
 RUST_BUILD = $(RUST_BUILDER) build
+endif
+
+# Add verbose flag is needed
+ifeq ($(VERBOSE),1)
+	_RUST_ARGS_BASE += --verbose
 endif
 
 ## housekeeping: help: Display this help message
@@ -212,7 +219,7 @@ package-flatpak:
 
 cargo-vendor.tar.gz: Cargo.lock
 	$(info Create tarball of all deps)
-	$(CARGO_PATH) vendor
+	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE}
 	tar -czvf cargo-vendor.tar.gz vendor/
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
