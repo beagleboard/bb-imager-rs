@@ -25,19 +25,13 @@ make setup-packaging-deps
 * CLI
 
 ....
-make package-cli-linux-deb
+make package-cli-deb
 ....
 
 * GUI
 
 ....
-make package-gui-linux-deb
-....
-
-* Service
-
-....
-make package-service-linux-deb
+make package-gui-deb
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -54,7 +48,7 @@ Compilation]
 == AppImage
 
 ....
-make package-gui-linux-appimage
+make package-gui-appimage
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -75,19 +69,13 @@ be maintained out of tree.
 * GUI
 
 ....
-make package-gui-linux-targz
+make package-gui-pacman
 ....
 
 * CLI
 
 ....
-make package-cli-linux-targz
-....
-
-* Service
-
-....
-make package-service-linux-targz
+make package-cli-pacman
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -106,7 +94,7 @@ Compilation]
 * GUI
 
 ....
-make package-gui-windows-portable
+make package-gui-portable-exe
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -125,7 +113,7 @@ Compilation]
 * GUI
 
 ....
-make package-gui-windows-wix
+make package-gui-wix
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -143,7 +131,7 @@ Compilation]
 Build the package.
 
 ....
-make package-gui-macos-dmg
+make package-gui-dmg
 ....
 
 The target platform can be specified with `+TARGET+` environment
