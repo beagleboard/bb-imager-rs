@@ -3,12 +3,10 @@
 _HOST_TARGET = $(shell rustc --print host-tuple)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
-# Rust args common for GUI and CLI across all targets and packages
 _RUST_ARGS_BASE = --locked
 _RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
-_RUST_ARGS-linux = -F zepto_i2c
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
-_RUST_ARGS_CLI-aarch64-unknown-linux-gnu = -F pb2_mspm0
+_RUST_ARGS_GUI = ${_RUST_ARGS}
 _PACKAGER_ARGS = -r -vvv --verbose
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
@@ -16,6 +14,11 @@ _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
 _CLI_COMP_ZSH = bb-imager-cli/dist/.target/shell-comp/_bb-imager-cli
 _CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
 
+_GUI_BIN = target/${TARGET}/release/bb-imager-gui
+_GUI_PORTABLE_EXE = bb-imager-gui/dist/bb-imager-gui_$(VERSION)_$(word 1,$(subst -, ,$(TARGET))).exe
+
+## variable: GUI_NAME: Change name for GUI related files.
+GUI_NAME ?= BeagleBoardImager
 ## variable: CARGO_PATH: Path to cargo binary
 CARGO_PATH ?= $(shell which cargo)
 ## variable: RUST_BUILDER: The Rust builder to use. Possble choices - cargo (default), cross.
@@ -38,10 +41,24 @@ MANDIR ?= $(PREFIX)/share/man
 BASH_COMPLETIONDIR ?= $(PREFIX)/share/bash-completion/completions
 ## variable: ZSH_COMPLETIONDIR: Directory to install zsh completions
 ZSH_COMPLETIONDIR ?= $(PREFIX)/share/zsh/site-functions
+## variable: UDEV_RULESDIR: Directory to install udev rules to
+UDEV_RULESDIR ?= /etc/udev/rules.d/
+## variable: ICONS_DIR: Directory to install icons to.
+ICONS_DIR ?= $(PREFIX)/share/icons
+## variable: DESKTOP_DIR: Directory to install desktop entry to
+DESKTOP_DIR ?= $(PREFIX)/share/applications
+## variable: METAINFO_DIR: Directory to install metainfo file.
+METAINFO_DIR ?= $(PREFIX)/share/metainfo
 ## variable: TARGET: Compilation Target. Default = host
 TARGET ?= $(_HOST_TARGET)
 ## variable: PB2_MSPM0: Enable pb2_mspm0 feature. Only used in CLI.
 PB2_MSPM0 ?= 0
+## variable: ZEPTO_I2C: Enable zepto_i2c feature. Only supported in GUI.
+ZEPTO_I2C ?= 0
+## variable: SYSTEM_DEPS: Use system dependencies. Mainly for linux.
+SYSTEM_DEPS ?= 0
+## variable: UPDATER: Enable updater feature in GUI.
+UPDATER ?= 0
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -55,6 +72,16 @@ ifeq ($(VERBOSE),1)
 	_RUST_ARGS_BASE += --verbose
 endif
 
+# Add zepto_i2c feature
+ifeq ($(ZEPTO_I2C),1)
+	_RUST_ARGS += -F zepto_i2c
+endif
+
+# Add system-deps feature
+ifeq ($(SYSTEM_DEPS),1)
+	_RUST_ARGS_GUI += --no-default-features -F system-deps
+endif
+
 # Add offline flag is needed
 ifeq ($(OFFLINE),1)
 	_RUST_ARGS_BASE += --offline
@@ -63,6 +90,11 @@ endif
 # Add pb2_mspm0 feature
 ifeq ($(PB2_MSPM0),1)
 	_RUST_ARGS_CLI += -F pb2_mspm0
+endif
+
+# Add updater feature
+ifeq ($(UPDATER),1)
+	_RUST_ARGS_GUI += -F updater
 endif
 
 ## housekeeping: help: Display this help message
@@ -163,26 +195,23 @@ package-cli-pacman: build-cli
 	$(CARGO_PATH) packager -p bb-imager-cli --target $(TARGET) $(_PACKAGER_ARGS) -f pacman
 	rm bb-imager-cli/dist/PKGBUILD
 
+package-gui-deb: build-gui
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f deb
+
+package-gui-pacman: build-gui
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f pacman
+	rm bb-imager-gui/dist/PKGBUILD
+
+package-gui-appimage: build-gui
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f appimage
+
+package-gui-dmg: build-gui
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f dmg
+
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-deps
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f deb,pacman
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} ${_RUST_ARGS-linux} -F updater
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f appimage
-	rm bb-imager-gui/dist/PKGBUILD
-endef
-
-define package-apple-x86_64_aarch64
-	$(info Building packages for $(1))
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(1) ${_PACKAGER_ARGS} -f dmg
-endef
-
-define package-windows-x86_64_aarch64
-	$(info Building packages for $(1))
-	$(RUST_BUILD) -p bb-imager-gui --target $(1) ${_RUST_ARGS} -F updater
-	mkdir -p bb-imager-gui/dist
-	cp target/$(1)/release/bb-imager-gui.exe bb-imager-gui/dist/bb-imager-gui_${VERSION}_$(word 1,$(subst -, ,$(1))).exe
+	$(MAKE) package-gui-pacman package-gui-deb TARGET=$(1) SYSTEM_DEPS=1
+	$(MAKE) package-gui-appimage TARGET=$(1) UPDATER=1
 endef
 
 ## package: package-x86_64-unknown-linux-gnu: Create all packages for x86_64-unknown-linux-gnu
@@ -200,41 +229,31 @@ package-aarch64-unknown-linux-gnu: package-checks
 ## package: package-x86_64-apple-darwin: Create all packages for x86_64-apple-darwin
 .PHONY: package-x86_64-apple-darwin
 package-x86_64-apple-darwin: package-checks
-	$(call package-apple-x86_64_aarch64,x86_64-apple-darwin)
+	$(info Building packages for x86_64-apple-darwin)
+	$(MAKE) package-gui-dmg TARGET=x86_64-apple-darwin UPDATER=1
 
 ## package: package-aarch64-apple-darwin: Create all packages for aarch64-apple-darwin
 .PHONY: package-aarch64-apple-darwin
 package-aarch64-apple-darwin: package-checks
-	$(call package-apple-x86_64_aarch64,aarch64-apple-darwin)
+	$(info Building packages for aarch64-apple-darwin)
+	$(MAKE) package-gui-dmg TARGET=aarch64-apple-darwin UPDATER=1
 
 ## package: package-x86_64-pc-windows-msvc: Create all packages for x86_64-pc-windows-msvc
 .PHONY: package-x86_64-pc-windows-msvc
 package-x86_64-pc-windows-msvc: package-checks
-	$(call package-windows-x86_64_aarch64,x86_64-pc-windows-msvc)
+	$(MAKE) package-gui-portable-exe TARGET=x86_64-pc-windows-msvc UPDATER=1
 	$(CARGO_PATH) packager -p bb-imager-gui --target x86_64-pc-windows-msvc ${_PACKAGER_ARGS} -f wix
 
 ## package: package-aarch64-pc-windows-msvc: Create all packages for aarch64-pc-windows-msvc
 .PHONY: package-aarch64-pc-windows-msvc
 package-aarch64-pc-windows-msvc: package-checks
-	$(call package-windows-x86_64_aarch64,aarch64-pc-windows-msvc)
+	$(MAKE) package-gui-portable-exe TARGET=aarch64-pc-windows-msvc UPDATER=1
 
 ## package: package-armv7-unknown-linux-gnueabihf: Create all packages for armv7-unknown-linux-gnueabihf
 .PHONY: package-armv7-unknown-linux-gnueabihf
 package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
 	$(MAKE) package-cli-deb package-cli-pacman TARGET=armv7-unknown-linux-gnueabihf
-
-## package: package-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
-.PHONY: build-flatpak
-package-flatpak:
-	$(info Building for flatpak)
-	$(CARGO_PATH) fetch $(_RUST_ARGS_BASE) --manifest-path bb-imager-gui/Cargo.toml
-	$(RUST_BUILD) -p bb-imager-gui $(_RUST_ARGS) $(_RUST_ARGS-linux) --no-default-features -F system-deps
-	install -Dm755 ./target/release/bb-imager-gui -t /app/bin/
-	install -Dm644 ./bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop /app/share/applications/${FLATPAK_ID}.desktop
-	desktop-file-edit --set-icon=${FLATPAK_ID} /app/share/applications/${FLATPAK_ID}.desktop
-	install -Dm644 ./bb-imager-gui/assets/icons/icon.png /app/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
-	install -Dm644 ./bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
 
 cargo-vendor.tar.gz: Cargo.lock
 	$(info Create tarball of all deps)
@@ -277,6 +296,12 @@ _build-cli-man:
 	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
 	gzip bb-imager-cli/dist/.target/man/*
 
+## build: build-gui: Build GUI.
+.PHONY: build-gui
+build-gui:
+	$(info Build GUI for $(TARGET))
+	$(RUST_BUILD) -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
+
 ## build: build-cli: Build CLI and complementary stuff.
 .PHONY: build-cli
 build-cli: _build-cli-bin _build-cli-man _build-cli-comp
@@ -299,3 +324,39 @@ uninstall-cli:
 	rm -f $(MANDIR)/man1/bb-imager-cli*.gz
 	rm -f $(BASH_COMPLETIONDIR)/bb-imager-cli
 	rm -f $(ZSH_COMPLETIONDIR)/_bb-imager-cli
+
+_install_gui:
+	$(info Install GUI)
+	install -Dm755 $(_GUI_BIN) $(BINDIR)/bb-imager-gui
+	install -Dm644 bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop $(DESKTOP_DIR)/$(GUI_NAME).desktop
+	desktop-file-edit --set-icon=$(GUI_NAME) $(DESKTOP_DIR)/$(GUI_NAME).desktop
+	install -Dm644 bb-imager-gui/assets/icons/icon.png $(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	install -Dm644 bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml $(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
+
+## install: install-gui: Install GUI. Intended for use in Linux.
+.PHONY: install-gui
+install-gui: _install_gui
+	install -Dm644 bb-imager-gui/assets/packages/linux/udev/10-beagle.rules $(UDEV_RULESDIR)/10-beagle.rules
+
+## package: package-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
+.PHONY: package-flatpak
+install-gui-flatpak:
+	cargo fetch --offline ${_RUST_ARGS_BASE} --manifest-path bb-imager-gui/Cargo.toml
+	$(MAKE) _install_gui SYSTEM_DEPS=1 ZEPTO_I2C=1 BINDIR=${FLATPAK_DEST} PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
+
+## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
+.PHONY: uninstall-gui
+uninstall-gui:
+	$(info Uninstall GUI)
+	rm -f $(BINDIR)/bb-imager-gui
+	rm -f $(UDEV_RULESDIR)/10-beagle.rules
+	rm -f $(DESKTOP_DIR)/$(GUI_NAME).desktop
+	rm -f $(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	rm -f $(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
+
+## package: package-gui-portable-exe: Build portable exe for GUI.
+.PHONY: package-gui-portable-exe
+package-gui-portable-exe: build-gui
+	$(info Building portable windows exe for $(TARGET))
+	mkdir -p bb-imager-gui/dist
+	cp $(_GUI_BIN) $(_GUI_PORTABLE_EXE)
