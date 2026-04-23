@@ -3,7 +3,7 @@
 == Task system
 
 This project uses `+make+` as the task runner. For most people,
-running `+make+` should be enough get a grasp regarding how to build and
+running `+make help+` should be enough get a grasp regarding how to build and
 run the project.
 
 The repo contains a `+Makefile+` to help create the different supported
@@ -151,6 +151,24 @@ variable. Defaults to host target. Currently, the following targets have
 been tested: - x86_64-apple-darwin - aarch64-apple-darwin
 
 MacOS Package cannot be built on a non-MacOS host.
+
+== Creating all packages for a target
+
+Helpers are defined to build all pakcages with sane fetures for each target.
+
+....
+make package-$(TARGET)
+....
+
+The target platform can be specified with `+TARGET+` environment
+variable. Supported values:
+
+- x86_64-unknown-linux-gnu 
+- aarch64-unknown-linux-gnu
+- x86_64-apple-darwin
+- aarch64-apple-darwin
+- x86_64-pc-windows-msvc
+- aarch64-pc-windows-msvc
 
 == Cross Compilation
 
