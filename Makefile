@@ -208,6 +208,9 @@ package-gui-appimage: build-gui
 package-gui-dmg: build-gui
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f dmg
 
+package-gui-wix: build-gui
+	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f wix
+
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
 	$(MAKE) package-gui-pacman package-gui-deb TARGET=$(1) SYSTEM_DEPS=1
@@ -241,8 +244,7 @@ package-aarch64-apple-darwin: package-checks
 ## package: package-x86_64-pc-windows-msvc: Create all packages for x86_64-pc-windows-msvc
 .PHONY: package-x86_64-pc-windows-msvc
 package-x86_64-pc-windows-msvc: package-checks
-	$(MAKE) package-gui-portable-exe TARGET=x86_64-pc-windows-msvc UPDATER=1
-	$(CARGO_PATH) packager -p bb-imager-gui --target x86_64-pc-windows-msvc ${_PACKAGER_ARGS} -f wix
+	$(MAKE) package-gui-portable-exe package-gui-wix TARGET=x86_64-pc-windows-msvc UPDATER=1
 
 ## package: package-aarch64-pc-windows-msvc: Create all packages for aarch64-pc-windows-msvc
 .PHONY: package-aarch64-pc-windows-msvc
