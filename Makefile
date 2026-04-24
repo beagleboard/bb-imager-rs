@@ -352,11 +352,13 @@ _install_gui:
 install-gui: _install_gui
 	install -Dm644 bb-imager-gui/assets/packages/linux/udev/10-beagle.rules $(UDEV_RULESDIR)/10-beagle.rules
 
-## package: package-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
-.PHONY: package-flatpak
-install-gui-flatpak:
-	cargo fetch --offline ${_RUST_ARGS_BASE} --manifest-path bb-imager-gui/Cargo.toml
-	$(MAKE) _install_gui SYSTEM_DEPS=1 BINDIR=${FLATPAK_DEST} PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
+_fetch-gui-deps:
+	$(CARGO_PATH) fetch ${_RUST_ARGS_BASE} --manifest-path bb-imager-gui/Cargo.toml
+
+## package: package-gui-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
+.PHONY: package-gui-flatpak
+package-gui-flatpak:
+	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui
