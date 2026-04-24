@@ -68,10 +68,9 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                             .get(img.icon.as_ref().expect("Missing Os Image icon"))
                         {
                             Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
-                            _ => widget::svg(helpers::DOWNLOADING_ICON.clone())
+                            _ => iced_aw::Spinner::new()
                                 .height(ICON_WIDTH)
                                 .width(ICON_WIDTH)
-                                .style(svg_icon_style)
                                 .into(),
                         }
                     }
@@ -141,9 +140,7 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 crate::helpers::BoardImageIcon::Remote(url) => {
                     match state.image_handle_cache().get(url) {
                         Some(x) => x.view(iced::Length::Fill, 100),
-                        None => widget::svg(helpers::DOWNLOADING_ICON.clone())
-                            .width(iced::Length::Fill)
-                            .into(),
+                        None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
                     }
                 }
                 crate::helpers::BoardImageIcon::Local => {
