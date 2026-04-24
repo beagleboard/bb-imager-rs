@@ -68,7 +68,7 @@ impl BBFlasherTarget for Target {
     fn identifier(&self) -> Cow<'_, str> {
         match self {
             #[cfg(feature = "mspm0_uart")]
-            Target::Uart(x) => Cow::Borrowed(&x),
+            Target::Uart(x) => Cow::Borrowed(x),
             #[cfg(feature = "mspm0_i2c")]
             Target::I2c(x) => x.to_string_lossy(),
         }
@@ -112,7 +112,7 @@ impl<I, P> Flasher<I, P> {
     ) -> Self {
         Self {
             img,
-            port: port,
+            port,
             verify,
             cancel,
             prep_hook,

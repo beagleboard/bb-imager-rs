@@ -38,10 +38,7 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
             let img: Element<BBImagerMessage> = match &dev.icon {
                 Some(u) => match state.image_handle_cache().get(u) {
                     Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
-                    _ => widget::svg(helpers::DOWNLOADING_ICON.clone())
-                        .width(ICON_WIDTH)
-                        .style(svg_icon_style)
-                        .into(),
+                    _ => iced_aw::Spinner::new().width(ICON_WIDTH).into(),
                 },
                 None => widget::svg(helpers::BOARD_ICON.clone())
                     .width(ICON_WIDTH)

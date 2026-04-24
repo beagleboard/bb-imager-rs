@@ -21,7 +21,6 @@ pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 // Icons
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
 pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
-pub(crate) const DOWNLOADING_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/downloading.svg");
 pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
