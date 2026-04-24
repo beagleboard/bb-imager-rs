@@ -9,6 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  VERBOSE: 1
 
 defaults:
   run:
@@ -22,8 +23,6 @@ jobs:
 
     name: Build Artifacts - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
-    env:
-      VERBOSE: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -70,7 +69,6 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
     - name: Release
       uses: softprops/action-gh-release@v3
@@ -80,7 +78,6 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
@@ -90,13 +87,11 @@ jobs:
         path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
   linux-cross:
     name: Build Artifacts - armv7-unknown-linux-gnueabihf
     runs-on: ubuntu-24.04
     env:
-      VERBOSE: 1
       NO_BUILD: 1
     steps:
     - name: Checkout
@@ -141,7 +136,6 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
     - name: Release
       uses: softprops/action-gh-release@v3
@@ -151,7 +145,6 @@ jobs:
         files: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
@@ -161,13 +154,10 @@ jobs:
         path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
-          bb-imager-service/dist/*
 
   vendor-deps:
     name: Vendor dependencies
     runs-on: ubuntu-24.04
-    env:
-      VERBOSE: 1
     if: github.ref_type == 'tag'
     steps:
     - name: Checkout
@@ -187,8 +177,6 @@ jobs:
   macos-job:
     name: Build MacOS Artifacts
     runs-on: macos-latest
-    env:
-      VERBOSE: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -269,8 +257,6 @@ jobs:
   windows-job:
     name: Build Windows Artifacts
     runs-on: windows-latest
-    env:
-      VERBOSE: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v6
