@@ -324,33 +324,33 @@ build-cli: _build-cli-bin _build-cli-man _build-cli-comp
 .PHONY: install-cli
 install-cli:
 	$(info Install CLI)
-	install -Dm755 $(_CLI_BIN) $(BINDIR)/bb-imager-cli
-	mkdir -p $(MANDIR)/man1
-	install -m644 bb-imager-cli/dist/.target/man/*.gz $(MANDIR)/man1/
-	install -Dm644 $(_CLI_COMP_BASH) $(BASH_COMPLETIONDIR)/bb-imager-cli
-	install -Dm644 $(_CLI_COMP_ZSH) $(ZSH_COMPLETIONDIR)/_bb-imager-cli
+	install -Dm755 $(_CLI_BIN) $(DESTDIR)$(BINDIR)/bb-imager-cli
+	mkdir -p $(DESTDIR)$(MANDIR)/man1
+	install -m644 bb-imager-cli/dist/.target/man/*.gz $(DESTDIR)$(MANDIR)/man1/
+	install -Dm644 $(_CLI_COMP_BASH) $(DESTDIR)$(BASH_COMPLETIONDIR)/bb-imager-cli
+	install -Dm644 $(_CLI_COMP_ZSH) $(DESTDIR)$(ZSH_COMPLETIONDIR)/_bb-imager-cli
 
 ## install: uninstall-cli: Uninstall CLI. Intended for use in Linux
 .PHONY: uninstall-cli
 uninstall-cli:
 	$(info Uninstall CLI)
-	rm -f $(BINDIR)/bb-imager-cli
-	rm -f $(MANDIR)/man1/bb-imager-cli*.gz
-	rm -f $(BASH_COMPLETIONDIR)/bb-imager-cli
-	rm -f $(ZSH_COMPLETIONDIR)/_bb-imager-cli
+	rm -f $(DESTDIR)$(BINDIR)/bb-imager-cli
+	rm -f $(DESTDIR)$(MANDIR)/man1/bb-imager-cli*.gz
+	rm -f $(DESTDIR)$(BASH_COMPLETIONDIR)/bb-imager-cli
+	rm -f $(DESTDIR)$(ZSH_COMPLETIONDIR)/_bb-imager-cli
 
 _install_gui:
 	$(info Install GUI)
-	install -Dm755 $(_GUI_BIN) $(BINDIR)/bb-imager-gui
-	install -Dm644 bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop $(DESKTOP_DIR)/$(GUI_NAME).desktop
-	desktop-file-edit --set-icon=$(GUI_NAME) $(DESKTOP_DIR)/$(GUI_NAME).desktop
-	install -Dm644 bb-imager-gui/assets/icons/icon.png $(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
-	install -Dm644 bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml $(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
+	install -Dm755 $(_GUI_BIN) $(DESTDIR)$(BINDIR)/bb-imager-gui
+	install -Dm644 bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
+	desktop-file-edit --set-icon=$(GUI_NAME) $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
+	install -Dm644 bb-imager-gui/assets/icons/icon.png $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	install -Dm644 bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml $(DESTDIR)$(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
 
 ## install: install-gui: Install GUI. Intended for use in Linux.
 .PHONY: install-gui
 install-gui: _install_gui
-	install -Dm644 bb-imager-gui/assets/packages/linux/udev/10-beagle.rules $(UDEV_RULESDIR)/10-beagle.rules
+	install -Dm644 bb-imager-gui/assets/packages/linux/udev/10-beagle.rules $(DESTDIR)$(UDEV_RULESDIR)/10-beagle.rules
 
 _fetch-gui-deps:
 	$(CARGO_PATH) fetch ${_RUST_ARGS_BASE} --manifest-path bb-imager-gui/Cargo.toml
@@ -364,11 +364,11 @@ package-gui-flatpak:
 .PHONY: uninstall-gui
 uninstall-gui:
 	$(info Uninstall GUI)
-	rm -f $(BINDIR)/bb-imager-gui
-	rm -f $(UDEV_RULESDIR)/10-beagle.rules
-	rm -f $(DESKTOP_DIR)/$(GUI_NAME).desktop
-	rm -f $(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
-	rm -f $(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
+	rm -f $(DESTDIR)$(BINDIR)/bb-imager-gui
+	rm -f $(DESTDIR)$(UDEV_RULESDIR)/10-beagle.rules
+	rm -f $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
+	rm -f $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	rm -f $(DESTDIR)$(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
 
 ## package: package-gui-portable-exe: Build portable exe for GUI.
 .PHONY: package-gui-portable-exe
