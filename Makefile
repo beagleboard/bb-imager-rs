@@ -296,12 +296,17 @@ _build-cli-bin:
 	$(info Build CLI for $(TARGET))
 	$(RUST_BUILD) -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
 
-.PHONY: _build-cli-comp
-_build-cli-comp:
-	$(info Generate CLI shell completion)
+.PHONY: _build-cli-comp-zsh
+_build-cli-comp-zsh:
+	$(info Generate ZSH CLI shell completion)
+	mkdir -p bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+
+.PHONY: _build-cli-comp-bash
+_build-cli-comp-bash:
+	$(info Generate BASH CLI shell completion)
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
 	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
 
 .PHONY: _build-cli-man
 _build-cli-man:
@@ -318,7 +323,7 @@ build-gui:
 
 ## build: build-cli: Build CLI and complementary stuff.
 .PHONY: build-cli
-build-cli: _build-cli-bin _build-cli-man _build-cli-comp
+build-cli: _build-cli-bin _build-cli-man _build-cli-comp-zsh _build-cli-comp-bash
 
 ## install: install-cli: Install CLI. Intended for use in Linux
 .PHONY: install-cli
