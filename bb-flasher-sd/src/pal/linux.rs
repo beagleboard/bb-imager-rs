@@ -116,21 +116,18 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
 
 #[cfg(not(feature = "udev"))]
 pub(crate) async fn format(dst: &Path) -> Result<()> {
-    async fn format_inner(dst: &Path) -> io::Result<()> {
-        let output = tokio::process::Command::new("mkfs.vfat")
-            .arg(dst)
-            .output()
-            .await?;
+    let sd = tokio::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(false)
+        .open(dst)
+        .await?
+        .into_std()
+        .await;
 
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(io::Error::other(format!("Status: {}", output.status)))
-        }
-    }
-
-    format_inner(dst)
+    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
         .await
+        .unwrap()
         .map_err(|source| Error::FailedToFormat { source })
 }
 
