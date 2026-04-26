@@ -308,7 +308,7 @@ _build-cli-man:
 	$(info Generate CLI manpages)
 	mkdir -p bb-imager-cli/dist/.target/man
 	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
-	gzip bb-imager-cli/dist/.target/man/*
+	gzip -f bb-imager-cli/dist/.target/man/*
 
 ## build: build-gui: Build GUI.
 .PHONY: build-gui
