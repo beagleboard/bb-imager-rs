@@ -13,7 +13,7 @@ rfd = { version = "0.16.0", default-features = false, features = ["tokio", "file
 bb-flasher = { path = "../bb-flasher" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
-iced_aw = { version = "0.13.1", default-features = false, features = ["spinner"] }
+iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
 image = "0.25"
 tokio = { version = "1.52", default-features = false, features = ["macros"] }
 webbrowser = "1.2.1"
