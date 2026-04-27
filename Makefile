@@ -125,6 +125,7 @@ clean:
 	rm -rf bb-imager-service/dist
 	rm -rf cargo-vendor.tar.gz
 	rm -rf vendor
+	rm -f *.snap
 
 ## housekeeping: packaging-checks: Some checks to ensure good packaging
 .PHONY: package-checks
@@ -380,3 +381,11 @@ package-gui-portable-exe: build-gui
 ## package: package-host: Build all packages for host platform.
 .PHONY: package-host
 package-host: package-$(_HOST_TARGET)
+
+## package: package-cli-snap: Build snap package for CLI.
+.PHONY: package-cli-snap
+package-cli-snap:
+	$(info Build snap package for CLI)
+	ln -sf snapcraft.cli.yaml snapcraft.yaml
+	snapcraft pack
+	unlink snapcraft.yaml
