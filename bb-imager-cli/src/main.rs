@@ -355,7 +355,7 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             }
             #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
             DestinationsTarget::Zepto => {
-                no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
+                no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
             }
         }
         return;
@@ -515,19 +515,19 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
         }
         #[cfg(feature = "bcf_msp430")]
         DestinationsTarget::Msp430 => {
-            no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(no_filter).await
         }
         #[cfg(feature = "bcf_cc1352p7")]
         DestinationsTarget::Bcf => {
-            no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(no_filter).await
         }
         #[cfg(feature = "pb2_mspm0")]
         DestinationsTarget::Pb2Mspm0 => {
-            no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter).await
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         DestinationsTarget::Zepto => {
-            no_frills_list_destinations::<bb_flasher::mspm0::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
         }
     }
 }
