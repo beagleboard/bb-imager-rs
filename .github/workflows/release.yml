@@ -54,12 +54,17 @@ jobs:
     - name: Build packages
       run: make package-host
 
+    # Build CLI Snap
     - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
-    - name: Build snap
-      uses: snapcore/action-build@v1
+    - uses: snapcore/action-build@v1
+
+    # Build GUI Snap
+    - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
+    - uses: snapcore/action-build@v1
 
     - run: |
         mv bb-imager-cli_*.snap bb-imager-cli/dist/
+        mv bb-imager_*.snap bb-imager-gui/dist/
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages

@@ -388,5 +388,13 @@ package-host: package-$(_HOST_TARGET)
 package-cli-snap:
 	$(info Build snap package for CLI)
 	ln -sf snapcraft.cli.yaml snapcraft.yaml
-	snapcraft pack
+	snapcraft pack -v
+	unlink snapcraft.yaml
+
+## package: package-gui-snap: Build snap package for GUI.
+.PHONY: package-gui-snap
+package-gui-snap:
+	$(info Build snap package for GUI)
+	ln -sf snapcraft.gui.yaml snapcraft.yaml
+	snapcraft pack -v
 	unlink snapcraft.yaml
