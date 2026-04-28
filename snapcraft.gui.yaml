@@ -1,0 +1,48 @@
+name: bb-imager
+base: core24 # the base snap is the execution environment for this snap
+version: 1.0.0
+adopt-info: bb-imager
+contact:
+  - https://www.beagleboard.org/collaborate
+
+grade: stable # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+parts:
+  bb-imager:
+    # See 'snapcraft plugins'
+    plugin: rust
+    source: .
+    build-packages:
+      - libudev-dev
+      - libssl-dev
+      - libsqlite3-dev
+      - libclang-dev
+      - desktop-file-utils
+    parse-info:
+      - usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml
+    override-build: |
+      make build-gui _install_gui DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr SYSTEM_DEPS=1 GUI_NAME=org.beagleboard.imagingutility
+
+apps:
+  bb-imager:
+    command: /usr/bin/bb-imager-gui
+    common-id: org.beagleboard.imagingutility
+    plugs:
+      # Access to local firmware/iso files for flashing.
+      - home
+      # Downloading firmware/iso from network.
+      - network
+      # Used for lsblk.
+      - hardware-observe
+      # Used for getting mount info when doing lsblk.
+      - mount-observe
+      # Used for opening SD card device.
+      - udisks2
+      # BCF and Zepto UART
+      - serial-port
+      # Zepto I2C
+      - i2c
+      # BCF MSP430
+      - hidraw
+    extensions: [gnome]
