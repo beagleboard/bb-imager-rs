@@ -1,6 +1,6 @@
 name: bb-imager
 base: core24 # the base snap is the execution environment for this snap
-version: 1.0.0
+version: 1.0.1
 adopt-info: bb-imager
 contact:
   - https://www.beagleboard.org/collaborate

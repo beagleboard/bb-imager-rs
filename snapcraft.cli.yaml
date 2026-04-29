@@ -1,7 +1,7 @@
 name: bb-imager-cli
 title: BeagleBoard Imager CLI
 base: core24 # the base snap is the execution environment for this snap
-version: 1.0.0
+version: 1.0.1
 license: MIT
 contact:
   - https://www.beagleboard.org/about
