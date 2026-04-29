@@ -16,7 +16,7 @@ defaults:
     shell: bash
 
 jobs:
-  linux:
+  linux-native-job:
     strategy:
       matrix:
         platform: [ ubuntu-22.04, ubuntu-22.04-arm ]
@@ -54,53 +54,57 @@ jobs:
     - name: Build packages
       run: make package-host
 
-    # Build CLI Snap
-    - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
-    - uses: snapcore/action-build@v1
-
-    # Build GUI Snap
-    - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
-    - uses: snapcore/action-build@v1
-
-    - run: |
-        mv bb-imager-cli_*.snap bb-imager-cli/dist/
-        mv bb-imager_*.snap bb-imager-gui/dist/
-
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
       if: github.ref_type != 'tag'
       run: make package-rename
 
-    - name: Pre-Release
-      uses: softprops/action-gh-release@v3
-      if: github.event_name != 'pull_request' && github.ref_type != 'tag'
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: |
-          bb-imager-gui/dist/*
-          bb-imager-cli/dist/*
-
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      if: github.ref_type == 'tag'
-      with:
-        generate_release_notes: false
-        files: |
-          bb-imager-gui/dist/*
-          bb-imager-cli/dist/*
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
-      if: github.event_name == 'pull_request'
       with:
         name: artifacts-${{ matrix.platform }}
         path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
 
-  linux-cross:
+  linux-snap-job:
+    strategy:
+      matrix:
+        platform: [ubuntu-22.04, ubuntu-22.04-arm]
+        package: [gui, cli]
+    name: Build Snaps - ${{ matrix.package }} ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - run: ln -sf snapcraft.${{ matrix.package }}.yaml snapcraft.yaml
+    - uses: snapcore/action-build@v1
+
+    - name: Move to dist folders
+      run: |
+        mkdir -p bb-imager-cli/dist/
+        mkdir -p bb-imager-gui/dist/
+        mv bb-imager-cli_*.snap bb-imager-cli/dist/ 2>/dev/null || true
+        mv bb-imager_*.snap bb-imager-gui/dist/ 2>/dev/null || true
+
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: github.ref_type != 'tag'
+      run: make package-rename
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: artifacts-snap-${{ matrix.package }}-${{ matrix.platform }}
+        path: |
+          bb-imager-gui/dist/*
+          bb-imager-cli/dist/*
+
+
+  linux-cross-job:
     name: Build Artifacts - armv7-unknown-linux-gnueabihf
     runs-on: ubuntu-24.04
     env:
@@ -138,29 +142,8 @@ jobs:
       if: github.ref_type != 'tag'
       run: make package-rename
 
-    - name: Pre-Release
-      uses: softprops/action-gh-release@v3
-      if: github.event_name != 'pull_request' && github.ref_type != 'tag'
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: |
-          bb-imager-gui/dist/*
-          bb-imager-cli/dist/*
-
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      if: github.ref_type == 'tag'
-      with:
-        generate_release_notes: false
-        files: |
-          bb-imager-gui/dist/*
-          bb-imager-cli/dist/*
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
-      if: github.event_name == 'pull_request'
       with:
         name: artifacts-armv7-unknown-linux-gnueabihf
         path: |
@@ -240,27 +223,8 @@ jobs:
       if: github.ref_type != 'tag'
       run: make package-rename
 
-    - name: Pre-Release
-      uses: softprops/action-gh-release@v3
-      if: github.event_name != 'pull_request' && github.ref_type != 'tag'
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: |
-          bb-imager-gui/dist/*
-
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      if: github.ref_type == 'tag'
-      with:
-        generate_release_notes: false
-        files: |
-          bb-imager-gui/dist/*
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
-      if: github.event_name == 'pull_request'
       with:
         name: artifacts-macos
         path: |
@@ -305,28 +269,43 @@ jobs:
       if: github.ref_type != 'tag'
       run: make package-rename
 
-    - name: Pre-Release
-      uses: softprops/action-gh-release@v3
-      if: github.event_name != 'pull_request' && github.ref_type != 'tag'
-      with:
-        prerelease: true
-        name: Continuous Release
-        tag_name: continuous-release
-        files: |
-          bb-imager-gui/dist/*
-
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      if: github.ref_type == 'tag'
-      with:
-        generate_release_notes: false
-        files: |
-          bb-imager-gui/dist/*
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
-      if: github.event_name == 'pull_request'
       with:
         name: artifacts-windows
         path: |
           bb-imager-gui/dist/*
+
+  release:
+    name: Upload Release artifacts
+    needs:
+      - linux-native-job
+      - linux-cross-job
+      - linux-snap-job
+      - macos-job
+      - windows-job
+    runs-on: ubuntu-slim
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - run: ls -laR artifacts
+
+      - name: Create Pre-Release
+        if: github.ref_type != 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          prerelease: true
+          name: Continuous Release
+          tag_name: continuous-release
+          files: artifacts/**
+
+      - name: Create Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: false
+          files: artifacts/**
