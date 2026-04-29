@@ -185,7 +185,8 @@ ifeq (${VERSION}, ${_CARGO_TOML_VERSION})
 	$(error ${VERSION} == ${_CARGO_TOML_VERSION})
 endif
 	sed -i '/\[workspace.package\]/,/^\[/{s/^\s*version\s*=.*/version = "${VERSION}"/}' Cargo.toml
-	sed -i "s/^version: .*/version: ${VERSION}/" snapcraft.cli.yml
+	sed -i "s/^version: .*/version: ${VERSION}/" snapcraft.cli.yaml
+	sed -i "s/^version: .*/version: ${VERSION}/" snapcraft.gui.yaml
 	sed -i "s/^version: .*/version: ${VERSION}/" docs/antora.yml
 	sed -i '/<releases>/a \
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
@@ -198,7 +199,7 @@ endif
         	read -r -p "Create git commit and tag [y/N]: " CONTINUE; \
 	done ; \
 	[ $$CONTINUE = "y" ] || [ $$CONTINUE = "Y" ] || (echo "Aborting."; exit 1;)
-	git add Cargo.toml Cargo.lock bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml website/.env
+	git add Cargo.toml Cargo.lock bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml docs/antora.yml snapcraft.*.yaml
 	git commit -s -m "Bump version to ${VERSION}"
 	git tag ${VERSION}
 
