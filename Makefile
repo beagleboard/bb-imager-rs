@@ -185,7 +185,6 @@ ifeq (${VERSION}, ${_CARGO_TOML_VERSION})
 	$(error ${VERSION} == ${_CARGO_TOML_VERSION})
 endif
 	sed -i '/\[workspace.package\]/,/^\[/{s/^\s*version\s*=.*/version = "${VERSION}"/}' Cargo.toml
-	sed -i "s/^VITE_BB_IMAGER_VERSION=.*/VITE_BB_IMAGER_VERSION=${VERSION}/" website/.env
 	sed -i "s/^version: .*/version: ${VERSION}/" snapcraft.cli.yml
 	sed -i '/<releases>/a \
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
