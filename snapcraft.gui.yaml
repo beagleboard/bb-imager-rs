@@ -26,7 +26,7 @@ parts:
 
 apps:
   bb-imager:
-    command: /usr/bin/bb-imager-gui
+    command: usr/bin/bb-imager-gui
     common-id: org.beagleboard.imagingutility
     plugs:
       # Access to local firmware/iso files for flashing.
