@@ -58,7 +58,7 @@ jobs:
   linux-snap-job:
     strategy:
       matrix:
-        platform: [ubuntu-22.04, ubuntu-22.04-arm]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm]
         package: [gui, cli]
     name: Build Snaps - ${{ matrix.package }} ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
