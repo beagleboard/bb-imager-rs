@@ -237,7 +237,7 @@ jobs:
       - linux-snap-job
       - macos-job
       - windows-job
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
       - name: Download all artifacts
@@ -262,3 +262,14 @@ jobs:
         with:
           generate_release_notes: false
           files: artifacts/**
+
+      # TODO: Publish GUI for all architectures
+      # TODO: Publish GUI to stable
+      # TODO: Publish CLI
+      - uses: snapcore/action-publish@v1
+        if: github.ref_type != 'tag'
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+        with:
+          snap: artifacts/bb-imager-gui/dist/bb-imager_alpha_amd64.snap
+          release: edge
