@@ -24,7 +24,7 @@ CARGO_PATH ?= $(shell which cargo)
 ## variable: RUST_BUILDER: The Rust builder to use. Possble choices - cargo (default), cross.
 RUST_BUILDER ?= $(CARGO_PATH)
 ## variable: VERSION: Release versions for bb-imager-cli and bb-imager-gui
-VERSION ?= $(_CARGO_TOML_VERSION)
+VERSION := $(if $(strip $(VERSION)),$(VERSION),$(_CARGO_TOML_VERSION))
 ## variable: PRE_RELEASE: Flag to denote if this is not a stable version.
 PRE_RELEASE ?= 1
 ## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
