@@ -35,5 +35,5 @@ parts:
 
 apps:
   bb-imager-cli:
-    command: /usr/bin/bb-imager-cli
-    completer: /usr/share/bash-completion/completions/bb-imager-cli
+    command: usr/bin/bb-imager-cli
+    completer: usr/share/bash-completion/completions/bb-imager-cli
