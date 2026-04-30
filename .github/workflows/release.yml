@@ -238,6 +238,9 @@ jobs:
       - macos-job
       - windows-job
     runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+      SNAP_CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'edge' }}
     if: github.event_name != 'pull_request'
     steps:
       - name: Download all artifacts
@@ -263,13 +266,17 @@ jobs:
           generate_release_notes: false
           files: artifacts/**
 
-      # TODO: Publish GUI for all architectures
-      # TODO: Publish GUI to stable
+      - name: Install Snapcraft
+        uses: samuelmeuli/action-snapcraft@v3
+
       # TODO: Publish CLI
-      - uses: snapcore/action-publish@v1
-        if: github.ref_type != 'tag'
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
-        with:
-          snap: artifacts/bb-imager-gui/dist/bb-imager_alpha_amd64.snap
-          release: edge
+      - name: Publish Snaps
+        run: |
+          for pkg in gui; do
+            for file in artifacts/bb-imager-$pkg/dist/*.snap; do
+              snapcraft upload "$file" --release=$SNAP_CHANNEL;
+            done
+          done
+
+      - name: Logout from snapcraft
+        run: snapcraft logout
