@@ -24,7 +24,9 @@ CARGO_PATH ?= $(shell which cargo)
 ## variable: RUST_BUILDER: The Rust builder to use. Possble choices - cargo (default), cross.
 RUST_BUILDER ?= $(CARGO_PATH)
 ## variable: VERSION: Release versions for bb-imager-cli and bb-imager-gui
-VERSION ?= $(_CARGO_TOML_VERSION)
+VERSION := $(if $(strip $(VERSION)),$(VERSION),$(_CARGO_TOML_VERSION))
+## variable: PRE_RELEASE: Flag to denote if this is not a stable version.
+PRE_RELEASE ?= 1
 ## variable: NO_BUILD: Do not build any packages. Useful for cross builds in CI.
 NO_BUILD ?= 0
 ## variable: VERBOSE: Enable verbose logging.
@@ -97,6 +99,11 @@ ifeq ($(UPDATER),1)
 	_RUST_ARGS_GUI += -F updater
 endif
 
+# Add pre-relase feature
+ifeq ($(PRE_RELEASE),1)
+	_RUST_ARGS_GUI += -F pre-release
+endif
+
 ## build: build: Build both CLI and GUI
 .PHONY: build
 build: build-cli build-gui
@@ -158,7 +165,7 @@ setup-debian-deps:
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps

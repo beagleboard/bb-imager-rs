@@ -10,7 +10,7 @@ pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", 
 pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
-pub(crate) const APP_RELEASE: &str = if option_env!("PRE_RELEASE").is_some() {
+pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
     "pre-release"
 } else {
     env!("CARGO_PKG_VERSION")
