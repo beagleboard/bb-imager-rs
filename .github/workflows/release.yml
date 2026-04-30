@@ -31,9 +31,6 @@ jobs:
       with:
         lfs: true
 
-    - name: Setup deps
-      run: make setup-debian-deps
-
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
 
@@ -42,11 +39,8 @@ jobs:
       with:
         prefix-key: "v1"
         
-    - name: Install packaging deps
-      run: make setup-packaging-deps
-
     - name: Build packages
-      run: make package-host
+      run: make setup-debian-deps setup-packaging-deps package-host
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -117,11 +111,8 @@ jobs:
         args: "--locked --release -F bcf_msp430,bcf_cc1352p7,dfu,zepto_uart,zepto_i2c -p bb-imager-cli"
         strip: true
 
-    - name: Install packaging deps
-      run: make setup-packaging-deps
-
     - name: Build packages
-      run: make package-armv7-unknown-linux-gnueabihf
+      run: make setup-packaging-deps package-armv7-unknown-linux-gnueabihf
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -164,20 +155,16 @@ jobs:
       with:
         lfs: true
 
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-
-    - name: Add Rust targets
-      run:  rustup target add aarch64-apple-darwin x86_64-apple-darwin
+    - name: Setup rust toolchain
+      run: |
+        rustup toolchain install stable --profile minimal
+        rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
       with:
         prefix-key: "v2"
         
-    - name: Install packaging deps
-      run: make setup-packaging-deps
-
     # The ENV variable names are what cargo-packager requires
     - name: Setup macos signing
       working-directory: bb-imager-gui
@@ -194,7 +181,7 @@ jobs:
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_PASSWORD: ${{ secrets.APP_PASSWORD }}
         APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
-      run: make package-x86_64-apple-darwin package-aarch64-apple-darwin
+      run: make setup-packaging-deps package-x86_64-apple-darwin package-aarch64-apple-darwin
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -217,22 +204,18 @@ jobs:
       with:
         lfs: true
 
-    - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
-
-    - name: Add rust target
-      run:  rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+    - name: Setup rust toolchain
+      run: |
+        rustup toolchain install stable --profile minimal
+        rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
       with:
         prefix-key: "v1"
         
-    - name: Install packaging deps
-      run: make setup-packaging-deps
-
     - name: Build packages
-      run: make package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc
+      run: make setup-packaging-deps package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
