@@ -60,6 +60,7 @@ static = ["sqlx/sqlite", "bb-flasher/static", "bb-downloader/rustls"]
 system-deps = ["sqlx/sqlite-unbundled", "bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]
+pre-release = []
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]

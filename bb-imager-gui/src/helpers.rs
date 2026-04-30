@@ -800,7 +800,7 @@ pub(crate) fn pretty_duration(d: Duration) -> String {
 }
 
 pub(crate) fn app_title(_: &crate::BBImager) -> String {
-    if option_env!("PRE_RELEASE").is_some() {
+    if cfg!(feature = "pre-release") {
         format!("{} (pre-release)", constants::APP_NAME)
     } else {
         format!("{} v{}", constants::APP_NAME, env!("CARGO_PKG_VERSION"))

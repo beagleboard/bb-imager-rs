@@ -10,6 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   VERBOSE: 1
+  PRE_RELEASE: ${{ github.ref_type != 'tag' && '1' || '0' }}
 
 defaults:
   run:
@@ -38,10 +39,6 @@ jobs:
     - name: Set version
       if: github.ref_type == 'tag'
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-    - name: Set PRE_RELEASE Environment Variable
-      if: github.ref_type != 'tag'
-      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
@@ -119,10 +116,6 @@ jobs:
       if: github.ref_type == 'tag'
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-    - name: Set PRE_RELEASE Environment Variable
-      if: github.ref_type != 'tag'
-      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
-
     - name: Build binary
       uses: houseabsolute/actions-rust-cross@v1
       with:
@@ -182,10 +175,6 @@ jobs:
       if: github.ref_type == 'tag'
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-    - name: Set PRE_RELEASE Environment Variable
-      if: github.ref_type != 'tag'
-      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
-
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
 
@@ -242,10 +231,6 @@ jobs:
     - name: Set version
       if: github.ref_type == 'tag'
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-    - name: Set PRE_RELEASE Environment Variable
-      if: github.ref_type != 'tag'
-      run: echo "PRE_RELEASE=1" >> $GITHUB_ENV
 
     - name: Select rust toolchain
       run: rustup toolchain install stable --profile minimal
