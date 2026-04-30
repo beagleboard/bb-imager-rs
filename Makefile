@@ -165,7 +165,7 @@ setup-debian-deps:
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
