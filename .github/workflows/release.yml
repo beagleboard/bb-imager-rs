@@ -94,7 +94,7 @@ jobs:
   linux-snap-cross-job:
     strategy:
       matrix:
-        platform: [armhf]
+        platform: [armhf, riscv64]
     name: Build CLI Snap - ${{matrix.platform}}
     runs-on: ubuntu-24.04
     steps:
