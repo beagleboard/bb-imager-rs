@@ -91,6 +91,41 @@ jobs:
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
 
+  linux-snap-cross-job:
+    strategy:
+      matrix:
+        platform: [armhf]
+    name: Build CLI Snap - ${{matrix.platform}}
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - uses: docker/setup-qemu-action@v4
+
+    - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
+    - uses: canonical/snapcraft-multiarch-action@v1
+      with:
+        architecture: ${{ matrix.platform }}
+
+    - name: Move to dist folders
+      run: |
+        mkdir -p bb-imager-cli/dist/
+        mv bb-imager-cli_*.snap bb-imager-cli/dist/
+
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: github.ref_type != 'tag'
+      run: make package-rename
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: artifacts-snap-cli-${{ matrix.platform }}
+        path: |
+          bb-imager-cli/dist/*
 
   linux-cross-job:
     strategy:
@@ -236,6 +271,7 @@ jobs:
       - linux-native-job
       - linux-cross-job
       - linux-snap-job
+      - linux-snap-cross-job
       - macos-job
       - windows-job
     runs-on: ubuntu-latest
