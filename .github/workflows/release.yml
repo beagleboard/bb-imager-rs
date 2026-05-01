@@ -93,7 +93,10 @@ jobs:
 
 
   linux-cross-job:
-    name: Build Artifacts - armv7-unknown-linux-gnueabihf
+    strategy:
+      matrix:
+        platform: [armv7-unknown-linux-gnueabihf]
+    name: Build Artifacts - ${{matrix.platform}}
     runs-on: ubuntu-24.04
     env:
       NO_BUILD: 1
@@ -107,12 +110,11 @@ jobs:
       uses: houseabsolute/actions-rust-cross@v1
       with:
         command: build
-        target: armv7-unknown-linux-gnueabihf
+        target: ${{matrix.platform}}
         args: "--locked --release -F bcf_msp430,bcf_cc1352p7,dfu,zepto_uart,zepto_i2c -p bb-imager-cli"
-        strip: true
 
     - name: Build packages
-      run: make setup-packaging-deps package-armv7-unknown-linux-gnueabihf
+      run: make setup-packaging-deps package-${{matrix.platform}}
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
@@ -122,9 +124,8 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: artifacts-armv7-unknown-linux-gnueabihf
+        name: artifacts-${{matrix.platform}}
         path: |
-          bb-imager-gui/dist/*
           bb-imager-cli/dist/*
 
   vendor-deps:
