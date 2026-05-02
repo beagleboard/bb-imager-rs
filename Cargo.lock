@@ -678,7 +678,6 @@ dependencies = [
  "indicatif",
  "tokio",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -8825,7 +8824,6 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "url",
 ]
 
 [[package]]
