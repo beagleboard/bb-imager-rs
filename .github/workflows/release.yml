@@ -309,7 +309,7 @@ jobs:
       # TODO: Publish CLI
       - name: Publish Snaps
         run: |
-          for pkg in gui; do
+          for pkg in gui cli; do
             for file in artifacts/bb-imager-$pkg/dist/*.snap; do
               snapcraft upload "$file" --release=$SNAP_CHANNEL;
             done
