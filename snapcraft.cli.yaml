@@ -18,8 +18,8 @@ description: |
   A streamlined command line tool to flash SD cards and boards such as
   BeagleConnect Freedom, BeagleConnect Zepto, etc.
 
-grade: stable # must be 'stable' to release into candidate/stable channels
-confinement: classic # use 'strict' once you have the right plugs and slots
+grade: stable
+confinement: strict
 
 parts:
   bb-imager-cli:
@@ -33,7 +33,29 @@ parts:
     override-build: |
       make build-cli install-cli DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr
 
+plugs:
+  # Required to read normal user files when running as root (when flashing SD Cards).
+  home:
+    read: all
+
 apps:
   bb-imager-cli:
     command: usr/bin/bb-imager-cli
     completer: usr/share/bash-completion/completions/bb-imager-cli
+    plugs:
+      # Used for lsblk.
+      - hardware-observe
+      # Used for getting mount info when doing lsblk.
+      - mount-observe
+      # BCF and Zepto UART
+      - serial-port
+      # Zepto I2C
+      - i2c
+      # BCF MSP430
+      - hidraw
+      # Used to write SD Cards.
+      - block-devices
+      # Used to read the firmware/image to flash.
+      - home
+      # Used to toggle BSL in MSPM0.
+      - gpio-control
