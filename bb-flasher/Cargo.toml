@@ -42,7 +42,10 @@ pb2_mspm0 = ["bb-flasher-pb2-mspm0", "dep:bin_file"]
 dfu = ["bb-flasher-dfu"]
 static = ["liblzma/static"]
 mspm0_uart = ["bb-flasher-mspm0/uart"]
-mspm0_i2c = ["bb-flasher-mspm0/i2c"]
+mspm0_i2c = ["bb-flasher-mspm0/i2c", "dep:nix"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.31", features = ["fs"], optional = true }

@@ -19,9 +19,10 @@ crc-fast = "1.10"
 [target.'cfg(target_os = "linux")'.dependencies]
 i2cdev = { version = "0.6", optional = true }
 gpiocdev = "0.8"
+nix = { version = "0.31", features = ["fs"], optional = true }
 
 [features]
 # Since uart is cross-platform, can be enabled by default.
 default = ["uart"]
 uart = ["serialport"]
-i2c = ["i2cdev"]
+i2c = ["i2cdev", "nix"]

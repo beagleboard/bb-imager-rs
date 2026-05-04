@@ -218,7 +218,6 @@ async fn flash_internal(
             img,
             dst,
             no_verify,
-            reset_gpio,
         } => {
             bb_flasher::mspm0::Flasher::no_prep(
                 LocalImage::new(img).into_future(),
