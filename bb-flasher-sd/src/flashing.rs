@@ -216,6 +216,7 @@ pub async fn flash<R: Read + Send + 'static>(
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(path)
                 .await?
                 .into_std()
