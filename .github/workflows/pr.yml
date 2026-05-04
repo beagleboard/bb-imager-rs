@@ -60,7 +60,7 @@ jobs:
         run: docker run -v $PWD:/antora:Z --rm -t ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml --fetch --stacktrace
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           # Upload public folder
           path: './build/site'
