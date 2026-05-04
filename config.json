@@ -120,7 +120,7 @@
 				"specification": {
 					"Processor": "Texas Instruments AM3358",
 					"Cores": "1GHz ARM® Cortex-A8",
-					"GPU": "PowerVR Rogue 8XE GE8430",
+					"GPU": "PowerVR SGX530",
 					"RAM": "512MB DDR3L",
 					"Onboard Flash": "4GB, 8bit eMMC"
 				}
