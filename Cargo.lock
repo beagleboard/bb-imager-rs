@@ -558,6 +558,7 @@ dependencies = [
  "bin_file",
  "cfg-if",
  "liblzma",
+ "nix 0.31.2",
  "rc-zip-sync",
  "serde",
  "thiserror 2.0.18",

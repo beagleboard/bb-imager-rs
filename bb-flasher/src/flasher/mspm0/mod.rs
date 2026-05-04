@@ -28,7 +28,7 @@ impl Target {
 impl From<String> for Target {
     #[cfg(all(feature = "mspm0_uart", feature = "mspm0_i2c"))]
     fn from(value: String) -> Self {
-        if value.contains("i2c-") {
+        if matches!(is_i2c_dev(&value), Ok(true)) {
             Self::I2c(value.into())
         } else {
             Self::Uart(value)
@@ -220,5 +220,18 @@ impl From<bb_flasher_mspm0::Status> for crate::DownloadFlashingStatus {
             bb_flasher_mspm0::Status::Flashing(x) => Self::FlashingProgress(x),
             bb_flasher_mspm0::Status::Verifying => Self::Verifying,
         }
+    }
+}
+
+#[cfg(all(feature = "mspm0_i2c"))]
+fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+    cfg_select! {
+        target_os = "linux" => {
+            use std::os::unix::fs::MetadataExt;
+
+            let meta = std::fs::metadata(p)?;
+            Ok(nix::sys::stat::major(meta.rdev()) == 89)
+        }
+        _ => Ok(false)
     }
 }

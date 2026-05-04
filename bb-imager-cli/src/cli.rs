@@ -160,6 +160,7 @@ pub enum TargetCommands {
         #[arg(long)]
         /// Disable checksum verification after flashing to speed up the process.
         no_verify: bool,
+        #[cfg(target_os = "linux")]
         #[arg(long, requires = "bsl_gpio")]
         /// RESET GPIO for MSPM0.
         reset_gpio: Option<String>,
