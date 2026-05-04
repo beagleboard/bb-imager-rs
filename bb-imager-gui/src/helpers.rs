@@ -381,6 +381,21 @@ pub(crate) async fn flash(
     cancel: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
+        (
+            BoardImage::Image { img, bmap, .. },
+            FlashingCustomization::LinuxSdSysconfig(customization),
+            Destination::LocalFile(f),
+        ) => {
+            bb_flasher::sd::Flasher::with_file_dest(
+                img.into_future(),
+                bmap.map(IntoFuture::into_future),
+                f,
+                customization.into(),
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
+        }
         (BoardImage::Image { img, .. }, _, Destination::LocalFile(f)) => {
             img.save(&f, chan).await.map_err(Into::into)
         }
@@ -775,12 +790,7 @@ pub(crate) fn pretty_bytes(bytes: u64) -> String {
 pub(crate) fn no_customization(
     flasher: config::Flasher,
     img: &BoardImage,
-    dst: &Destination,
 ) -> Option<FlashingCustomization> {
-    if dst.is_download_action() {
-        return Some(FlashingCustomization::NoneSd);
-    }
-
     match flasher {
         config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => None,
         config::Flasher::SdCard => Some(FlashingCustomization::NoneSd),

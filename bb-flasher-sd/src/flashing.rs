@@ -1,5 +1,4 @@
 use std::io::{Read, Seek, Write};
-use std::path::Path;
 use std::time::Instant;
 
 use tokio::sync::mpsc;
@@ -204,15 +203,40 @@ fn write_sd(
 pub async fn flash<R: Read + Send + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
-    dst: Box<Path>,
+    dst: crate::Destination,
     chan: Option<mpsc::Sender<f32>>,
     customizations: Vec<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
     tracing::info!("Opening Destination");
-    let dst_clone = dst.to_path_buf();
-    let sd = crate::pal::open(&dst_clone).await?;
 
+    match dst {
+        crate::Destination::File(path) => {
+            let sd = tokio::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(path)
+                .await?
+                .into_std()
+                .await;
+            flash_common(img, bmap, sd, chan, customizations, cancel).await
+        }
+        crate::Destination::SdCard(path) => {
+            let sd = crate::pal::open(&path).await?;
+            flash_common(img, bmap, sd, chan, customizations, cancel).await
+        }
+    }
+}
+
+async fn flash_common<R: Read + Send + 'static>(
+    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
+    sd: impl Read + Write + Seek + Eject + std::fmt::Debug + Send + 'static,
+    chan: Option<mpsc::Sender<f32>>,
+    customizations: Vec<Customization>,
+    cancel: Option<tokio_util::sync::CancellationToken>,
+) -> Result<()> {
     tracing::info!("Resolving Image");
     let bmap = match bmap {
         Some(x) => {

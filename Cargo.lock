@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-sd"
-version = "2.0.1"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "bb-bmap-parser",

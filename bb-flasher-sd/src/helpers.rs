@@ -25,6 +25,12 @@ pub(crate) trait Eject {
     fn eject(self) -> io::Result<()>;
 }
 
+impl Eject for std::fs::File {
+    fn eject(self) -> io::Result<()> {
+        self.sync_all()
+    }
+}
+
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]
