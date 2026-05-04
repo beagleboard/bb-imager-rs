@@ -556,7 +556,6 @@ dependencies = [
  "bb-flasher-sd",
  "bb-helper",
  "bin_file",
- "cfg-if",
  "liblzma",
  "nix 0.31.2",
  "rc-zip-sync",
