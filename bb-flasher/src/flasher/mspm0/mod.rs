@@ -223,7 +223,7 @@ impl From<bb_flasher_mspm0::Status> for crate::DownloadFlashingStatus {
     }
 }
 
-#[cfg(all(feature = "mspm0_i2c"))]
+#[cfg(feature = "mspm0_i2c")]
 fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
     cfg_select! {
         target_os = "linux" => {

@@ -419,10 +419,10 @@ impl FlashingState {
         // Required for better time estimate.
         match u {
             bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
-            | bb_flasher::DownloadFlashingStatus::FlashingProgress(_) => {
-                if self.start_timestamp.is_none() {
-                    self.start_timestamp = Some(Instant::now())
-                }
+            | bb_flasher::DownloadFlashingStatus::FlashingProgress(_)
+                if self.start_timestamp.is_none() =>
+            {
+                self.start_timestamp = Some(Instant::now())
             }
             _ => {}
         }
