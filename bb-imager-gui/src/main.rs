@@ -359,7 +359,6 @@ impl BBImager {
                 if helpers::no_customization(
                     inner.selected_image.1.flasher(),
                     &inner.selected_image.1,
-                    &inner.selected_dest,
                 )
                 .is_none()
                 {
@@ -432,7 +431,6 @@ impl BBImager {
                 if let Some(customization) = helpers::no_customization(
                     inner.selected_image.1.flasher(),
                     &inner.selected_image.1,
-                    &selected_dest,
                 ) {
                     Self::Review(state::CustomizeState {
                         common: inner.common,

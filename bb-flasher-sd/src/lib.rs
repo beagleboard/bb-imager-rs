@@ -21,7 +21,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let dst = PathBuf::from("/tmp/dummy").into();
+//!     let dst = bb_flasher_sd::Destination::SdCard(PathBuf::from("/tmp/dummy").into());
 //!     let img = async move {
 //!         let f = tokio::fs::File::open("/tmp/image").await?.into_std().await;
 //!         let size = f.metadata().unwrap().len();
@@ -41,7 +41,10 @@
 //!
 //! [BeagleBoard Imager]: https://openbeagle.org/ayush1325/bb-imager-rs
 
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -132,4 +135,10 @@ impl Device {
 /// Format SD card to fat32
 pub async fn format(dst: &std::path::Path) -> Result<()> {
     crate::pal::format(dst).await
+}
+
+#[derive(Debug, Clone)]
+pub enum Destination {
+    File(Box<Path>),
+    SdCard(Box<Path>),
 }

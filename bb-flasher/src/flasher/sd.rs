@@ -176,7 +176,7 @@ impl BBFlasher for FormatFlasher {
 pub struct Flasher<I, B> {
     img: I,
     bmap: Option<B>,
-    dst: PathBuf,
+    dst: bb_flasher_sd::Destination,
     customization: FlashingSdLinuxConfig,
     cancel: Option<tokio_util::sync::CancellationToken>,
 }
@@ -192,7 +192,23 @@ impl<I, B> Flasher<I, B> {
         Self {
             img,
             bmap,
-            dst: dst.0.path,
+            dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
+            customization,
+            cancel,
+        }
+    }
+
+    pub fn with_file_dest(
+        img: I,
+        bmap: Option<B>,
+        dst: PathBuf,
+        customization: FlashingSdLinuxConfig,
+        cancel: Option<tokio_util::sync::CancellationToken>,
+    ) -> Self {
+        Self {
+            img,
+            bmap,
+            dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
             customization,
             cancel,
         }
@@ -237,7 +253,7 @@ where
             let resp = bb_flasher_sd::flash(
                 self.img,
                 self.bmap,
-                dst.into(),
+                dst,
                 Some(tx),
                 customization,
                 self.cancel,
@@ -248,15 +264,7 @@ where
 
             resp
         } else {
-            bb_flasher_sd::flash(
-                self.img,
-                self.bmap,
-                dst.into(),
-                None,
-                customization,
-                self.cancel,
-            )
-            .await
+            bb_flasher_sd::flash(self.img, self.bmap, dst, None, customization, self.cancel).await
         }
         .map_err(Into::into)
     }
