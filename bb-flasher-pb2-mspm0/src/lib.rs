@@ -309,7 +309,6 @@ pub fn device() -> Device {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Flashing status
 pub enum Status {
     Preparing,
@@ -318,8 +317,6 @@ pub enum Status {
 }
 
 /// PocketBeagle 2 MSPM0 information.
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "zvariant", derive(zvariant::Type))]
 pub struct Device {
     pub name: String,
     pub path: String,
