@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
 
 use i2cdev::core::I2CDevice;
 use tokio::sync::mpsc;
@@ -58,14 +61,11 @@ pub fn ports() -> std::collections::HashSet<PathBuf> {
     std::fs::read_dir("/dev")
         .unwrap()
         .filter_map(|x| x.ok())
-        // chardev is not reported as file.
-        .filter(|x| match x.file_type() {
-            Ok(y) => !y.is_dir(),
-            Err(_) => false,
-        })
-        .filter(|x| match x.file_name().to_str() {
-            Some(y) => y.contains("i2c-"),
-            None => false,
+        .filter(|x| {
+            matches!(
+                x.metadata().map(|m| nix::sys::stat::major(m.rdev()) == 89),
+                Ok(true)
+            )
         })
         .map(|x| x.path())
         .collect()
