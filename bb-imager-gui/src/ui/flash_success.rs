@@ -13,7 +13,7 @@ pub(crate) fn view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> 
     page_type1(
         info_view(state),
         progress_view(state),
-        [button("Restart")
+        [button("Flash Another")
             .style(widget::button::primary)
             .on_press(BBImagerMessage::Restart)],
     )
