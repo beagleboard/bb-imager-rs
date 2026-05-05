@@ -502,7 +502,6 @@ impl Display for Destination {
 }
 
 impl Destination {
-    #[allow(irrefutable_let_patterns)]
     pub(crate) fn size(&self) -> Option<u64> {
         if let Destination::SdCard(item) = self {
             Some(item.size())
@@ -907,6 +906,13 @@ impl<'a> DestinationItem<'a> {
         match self {
             DestinationItem::SaveToFile(_) => false,
             DestinationItem::Destination(d) => dst.eq(d),
+        }
+    }
+
+    pub(crate) fn subtitle(&self) -> Option<String> {
+        match self {
+            DestinationItem::SaveToFile(_) => None,
+            DestinationItem::Destination(d) => d.size().map(crate::helpers::pretty_bytes),
         }
     }
 }
