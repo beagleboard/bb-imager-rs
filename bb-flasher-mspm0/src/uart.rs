@@ -24,7 +24,8 @@ pub fn flash(
                 .parity(BSL_UART_PARITY)
                 .stop_bits(BSL_UART_STOP_BITS)
                 .data_bits(BSL_UART_DATA_BITS)
-                .timeout(Duration::from_secs(5))
+                // MSPM0 can be quite slow to respond when full length packet sent
+                .timeout(Duration::from_secs(10))
                 .open_native()
                 .map_err(|_| Error::FailedToOpenPort)
         },
