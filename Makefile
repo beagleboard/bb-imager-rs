@@ -310,14 +310,14 @@ _build-cli-bin:
 _build-cli-comp:
 	$(info Generate CLI shell completion)
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
+	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
 
 .PHONY: _build-cli-man
 _build-cli-man:
 	$(info Generate CLI manpages)
 	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
+	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
 	gzip -f bb-imager-cli/dist/.target/man/*
 
 ## build: build-gui: Build GUI.
