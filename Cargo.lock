@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-dfu"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "dfu-libusb",
  "rusb",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-mspm0"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "bin_file",
  "crc-fast",
@@ -640,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "bb-helper"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "tempfile",
  "tokio",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "bb-flasher",
@@ -663,7 +663,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -8796,7 +8796,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "cargo_toml",
  "clap",

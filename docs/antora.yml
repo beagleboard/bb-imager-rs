@@ -1,5 +1,5 @@
 name: bb-imager
-version: 1.0.1
+version: 1.0.2
 title: BeagleBoard Imaging Utility
 nav:
 - modules/ROOT/nav.adoc
