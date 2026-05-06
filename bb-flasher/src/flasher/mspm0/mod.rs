@@ -223,15 +223,15 @@ impl From<bb_flasher_mspm0::Status> for crate::DownloadFlashingStatus {
     }
 }
 
-#[cfg(feature = "mspm0_i2c")]
+#[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
 fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
-    cfg_select! {
-        target_os = "linux" => {
-            use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::MetadataExt;
 
-            let meta = std::fs::metadata(p)?;
-            Ok(nix::sys::stat::major(meta.rdev()) == 89)
-        }
-        _ => Ok(false)
-    }
+    let meta = std::fs::metadata(p)?;
+    Ok(nix::sys::stat::major(meta.rdev()) == 89)
+}
+
+#[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
+fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+    Ok(false)
 }
