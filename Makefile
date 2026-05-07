@@ -8,6 +8,7 @@ _RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
 _RUST_ARGS_GUI = ${_RUST_ARGS}
 _PACKAGER_ARGS = -r -vvv --verbose
+_CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -145,8 +146,20 @@ endif
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
 check:
-	$(info "Running clippy checks")
-	$(CARGO_PATH) clippy --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE}
+	$(info "Running checks")
+	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE}
+
+## housekeeping: check-cli: Run code quality checks on CLI.
+.PHONY: check-cli
+check-cli:
+	$(info "Running checks on CLI")
+	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
+
+## housekeeping: check-gui: Run code quality checks on GUI.
+.PHONY: check-gui
+check-gui:
+	$(info "Running checks on GUI")
+	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
