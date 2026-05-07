@@ -326,8 +326,8 @@ mod tests {
 
     #[test]
     fn sd_write_bmap() {
-        const FILE_LEN: usize = 32 * 1024;
         const BLOCK_LEN: u64 = BUFFER_SIZE as u64;
+        const FILE_LEN: usize = 32 * BUFFER_SIZE;
         const BLOCKS: u64 = (FILE_LEN as u64) / BLOCK_LEN;
         const MAPPED_BLOCKS: &[u64] = &[0, 2, BLOCKS - 1];
 
