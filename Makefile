@@ -147,19 +147,19 @@ endif
 .PHONY: check
 check:
 	$(info "Running checks")
-	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE}
+	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE}
 
 ## housekeeping: check-cli: Run code quality checks on CLI.
 .PHONY: check-cli
 check-cli:
 	$(info "Running checks on CLI")
-	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
+	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
 
 ## housekeeping: check-gui: Run code quality checks on GUI.
 .PHONY: check-gui
 check-gui:
 	$(info "Running checks on GUI")
-	$(_CARGO_CHECK) --all-targets --all-features --no-deps --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
+	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
