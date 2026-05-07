@@ -167,6 +167,18 @@ test:
 	$(info "Run workspace tests")
 	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS_BASE}
 
+## housekeeping: test-cli: Run tests on CLI.
+.PHONY: test-cli
+test-cli:
+	$(info "Running tests on CLI")
+	$(CARGO_PATH) test --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
+
+## housekeeping: test-gui: Run tests on GUI.
+.PHONY: test-gui
+test-gui:
+	$(info "Running tests on GUI")
+	$(CARGO_PATH) test --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
+
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
 setup-debian-deps:
