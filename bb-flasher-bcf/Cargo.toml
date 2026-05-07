@@ -16,7 +16,7 @@ thiserror = "2.0"
 tracing = "0.1"
 bin_file = "0.1"
 serialport = { version = "4.7", optional = true, default-features = false }
-hidapi = { version = "2.6", optional = true }
+hidapi = { version = "2.6", optional = true, default-features = false }
 tokio = { version = "1.52", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.7" }
 
@@ -24,6 +24,8 @@ tokio-util = { version = "0.7" }
 default = ["cc1352p7"]
 cc1352p7 = ["dep:serialport"]
 msp430 = ["dep:hidapi"]
+static = ["hidapi?/linux-static-hidraw"]
+shared_hidraw = ["hidapi?/linux-shared-hidraw"]
 
 [package.metadata.docs.rs]
 all-features = true
