@@ -60,6 +60,8 @@ PB2_MSPM0 ?= 0
 ZEPTO_I2C ?= $(if $(findstring linux,$(TARGET)),1)
 ## variable: SYSTEM_DEPS: Use system dependencies. Mainly for linux.
 SYSTEM_DEPS ?= 0
+## variable: SHARED_HIDRAW: Use system hidraw. Requires rather recent version of hidraw.
+SHARED_HIDRAW ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
 UPDATER ?= 0
 
@@ -82,7 +84,15 @@ endif
 
 # Add system-deps feature
 ifeq ($(SYSTEM_DEPS),1)
-	_RUST_ARGS_GUI += --no-default-features -F system-deps
+	_RUST_ARGS += --no-default-features
+	_RUST_ARGS_GUI += -F system-deps
+endif
+
+# Add shared-hidraw feature
+ifeq ($(SHARED_HIDRAW),1)
+	_RUST_ARGS += -F shared-hidraw
+else
+	_RUST_ARGS += -F static-hidraw
 endif
 
 # Add offline flag is needed
@@ -143,54 +153,56 @@ ifneq (${VERSION}, ${_CARGO_TOML_VERSION})
 	$(error ${VERSION} != ${_CARGO_TOML_VERSION})
 endif
 
+_check_common:
+	$(_CARGO_CHECK) --all-targets --all-features --workspace --exclude bb-flasher-bcf \
+		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli --exclude xtask \
+		--exclude bb-downloader --exclude bb-config
+	$(_CARGO_CHECK) --all-targets -p bb-flasher-bcf -F msp430,static
+	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c
+	
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
-check:
-	$(info "Running checks")
-	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE}
+check: check-cli check-gui
 
 ## housekeeping: check-cli: Run code quality checks on CLI.
 .PHONY: check-cli
-check-cli:
-	$(info "Running checks on CLI")
-	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
+check-cli: _check_common
+	$(_CARGO_CHECK) --all-targets -p xtask --all-features
+	$(_CARGO_CHECK) --all-targets -p bb-imager-cli -F pb2_mspm0,bcf_cc1352p7,bcf_msp430,dfu,zepto_uart,zepto_i2c
 
 ## housekeeping: check-gui: Run code quality checks on GUI.
 .PHONY: check-gui
-check-gui:
-	$(info "Running checks on GUI")
-	$(_CARGO_CHECK) --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
+check-gui: _check_common
+	$(_CARGO_CHECK) --all-targets -p bb-downloader -p bb-config --all-features
+	$(_CARGO_CHECK) --all-targets -p bb-imager-gui -F bcf_cc1352p7,bcf_msp430,updater,zepto_uart,zepto_i2c,pre-release
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
 test:
-	$(info "Run workspace tests")
-	$(CARGO_PATH) test --workspace --all-features ${_RUST_ARGS_BASE}
+	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} test"
 
 ## housekeeping: test-cli: Run tests on CLI.
 .PHONY: test-cli
 test-cli:
-	$(info "Running tests on CLI")
-	$(CARGO_PATH) test --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-gui --exclude bb-downloader --exclude bb-config
+	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH}test"
 
 ## housekeeping: test-gui: Run tests on GUI.
 .PHONY: test-gui
 test-gui:
-	$(info "Running tests on GUI")
-	$(CARGO_PATH) test --all-targets --all-features --workspace ${_RUST_ARGS_BASE} --exclude bb-imager-cli --exclude xtask
+	$(MAKE) check-gui _CARGO_CHECK="${CARGO_PATH} test"
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
 setup-debian-deps:
 	$(info "Installing Debian dependencies")
 	sudo apt-get update -y
-	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev
+	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev
 
 ## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon hidapi-devel
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
