@@ -184,7 +184,7 @@ test:
 ## housekeeping: test-cli: Run tests on CLI.
 .PHONY: test-cli
 test-cli:
-	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH}test"
+	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH} test"
 
 ## housekeeping: test-gui: Run tests on GUI.
 .PHONY: test-gui
