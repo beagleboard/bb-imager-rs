@@ -264,13 +264,14 @@ impl BBImager {
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
         let state = match std::mem::take(self) {
             Self::Review(inner) => inner,
+            Self::FlashingFail(inner) => inner.into(),
             _ => panic!("Unexpected page"),
         };
 
         let is_download = state.is_download();
-        let customization = state.customization;
+        let customization = state.customization.clone();
         let img = state.selected_image.1.clone();
-        let dst = state.selected_dest;
+        let dst = state.selected_dest.clone();
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", state.selected_board);
@@ -323,6 +324,9 @@ impl BBImager {
             cancel_flashing: h,
             progress: bb_flasher::DownloadFlashingStatus::Preparing,
             start_timestamp: None,
+            selected_image: state.selected_image,
+            selected_dest: state.selected_dest,
+            customization: state.customization,
         });
 
         t

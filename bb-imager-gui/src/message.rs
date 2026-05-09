@@ -54,6 +54,8 @@ pub(crate) enum BBImagerMessage {
 
     // Reset to start from beginning.
     Restart,
+    // Retry flashing
+    Retry,
 
     /// Open URL in browser
     OpenUrl(url::Url),
@@ -395,6 +397,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         common: inner.common,
                         err,
                         logs,
+                        selected_board: inner.selected_board,
+                        selected_image: inner.selected_image,
+                        selected_dest: inner.selected_dest,
+                        customization: inner.customization,
                     })
                 }
                 BBImager::AppInfo(inner) => match inner.page {
@@ -408,6 +414,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                                 common: flashing_state.common,
                                 err,
                                 logs,
+                                selected_board: flashing_state.selected_board,
+                                selected_image: flashing_state.selected_image,
+                                selected_dest: flashing_state.selected_dest,
+                                customization: flashing_state.customization,
                             }),
                             ..inner
                         })
@@ -429,7 +439,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             },
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::FlashStart => {
+        BBImagerMessage::FlashStart | BBImagerMessage::Retry => {
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess => {
