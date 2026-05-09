@@ -12,6 +12,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 /// Errors for MSPM0
 pub enum Error {
+    #[error("Failed to connect to the bootloader (BSL). Please put the board in BSL mode.")]
+    ConnectionFail,
     /// Aborted before completing
     #[error("Aborted before completing.")]
     Aborted,
