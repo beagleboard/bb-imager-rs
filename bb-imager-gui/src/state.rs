@@ -388,6 +388,9 @@ pub(crate) struct FlashingState {
     pub(crate) progress: bb_flasher::DownloadFlashingStatus,
     pub(crate) start_timestamp: Option<Instant>,
     pub(crate) is_download: bool,
+    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
 }
 
 impl FlashingState {
@@ -458,6 +461,22 @@ pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     pub(crate) err: String,
     pub(crate) logs: widget::text_editor::Content,
+    pub(crate) selected_board: Board,
+    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
+}
+
+impl From<FlashingFailState> for CustomizeState {
+    fn from(value: FlashingFailState) -> Self {
+        Self {
+            common: value.common,
+            selected_board: value.selected_board,
+            selected_image: value.selected_image,
+            selected_dest: value.selected_dest,
+            customization: value.customization,
+        }
+    }
 }
 
 // State for Pages that can be opened from any of the normal pages but are not part of normal flow.
