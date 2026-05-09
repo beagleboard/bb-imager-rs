@@ -196,6 +196,18 @@ package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
 	$(call build-cli,armv7-unknown-linux-gnueabihf)
 
+## package: package-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
+.PHONY: build-flatpak
+package-flatpak:
+	$(info Building for flatpak)
+	cargo --offline fetch --verbose --manifest-path bb-imager-gui/Cargo.toml
+	cargo --offline build -p bb-imager-gui ${_RUST_ARGS} ${_RUST_ARGS-linux} --no-default-features -F system-deps
+	install -Dm755 ./target/release/bb-imager-gui -t /app/bin/
+	install -Dm644 ./bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop /app/share/applications/${FLATPAK_ID}.desktop
+	desktop-file-edit --set-icon=${FLATPAK_ID} /app/share/applications/${FLATPAK_ID}.desktop
+	install -Dm644 ./bb-imager-gui/assets/icons/icon.png /app/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
+	install -Dm644 ./bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
+
 ## housekeeping: vendor-deps: Create tarball of dependencies
 .PHONY: vendor-deps
 vendor-deps:

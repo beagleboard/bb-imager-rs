@@ -62,11 +62,18 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
         })
         .map(Into::into);
 
+    let hrule_pad = iced::Padding {
+        left: 16.0,
+        ..Default::default()
+    };
+
     widget::scrollable(
         widget::column(
             [
                 helpers::search_box(&state.search_text).into(),
-                widget::rule::horizontal(2).into(),
+                widget::center(widget::rule::horizontal(2))
+                    .padding(hrule_pad)
+                    .into(),
                 widget::container(
                     widget::toggler(!state.filter_destination)
                         .label("Show all destinations")
@@ -74,7 +81,9 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
                 )
                 .padding(16)
                 .into(),
-                widget::rule::horizontal(2).into(),
+                widget::center(widget::rule::horizontal(2))
+                    .padding(hrule_pad)
+                    .into(),
             ]
             .into_iter()
             .chain(items),
