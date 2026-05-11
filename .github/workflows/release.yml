@@ -22,7 +22,6 @@ jobs:
     strategy:
       matrix:
         platform: [ ubuntu-22.04, ubuntu-22.04-arm ]
-
     name: Build Artifacts - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
     steps:
@@ -173,10 +172,8 @@ jobs:
       uses: actions/checkout@v6
       with:
         lfs: true
-
     - name: Create dependency tar
       run: make vendor-deps
-
     - name: Release
       uses: softprops/action-gh-release@v3
       with:
@@ -318,3 +315,37 @@ jobs:
 
       - name: Logout from snapcraft
         run: snapcraft logout
+
+  publish-aur:
+    name: Publish Package to AUR
+    # needs:
+    #   - vendor-deps
+    runs-on: ubuntu-latest
+    # if: github.ref_type == 'tag'
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.AUR_SSH_KEY }}
+
+      - name: Clone AUR repo
+        run: git clone ssh://aur@aur.archlinux.org/bb-imager-cli.git
+
+      - name: Update PKGBUILD
+        run: |
+          pkgctl version upgrade
+          makepkg --printsrcinfo > .SRCINFO
+
+      - name: Build Package
+        run: makepkg -s --noconfirm
+
+      - name: Run checks
+        run: |
+          namcap PKGBUILD
+          namcap bb-imager-cli-$VERSION-1-x86_64.pkg.tar.zst
+
+      # - name: Push
+      #   run: |
+      #     git add .
+      #     git commit -m "Update to $VERSION"
+      #     git push
