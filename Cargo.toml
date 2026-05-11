@@ -19,10 +19,8 @@ members = [
 ]
 
 [profile.release]
-strip = true
 lto = true
 codegen-units = 1
-panic = "abort"
 
 [workspace.package]
 version = "1.0.6"
