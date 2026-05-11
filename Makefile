@@ -141,7 +141,7 @@ clean:
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
 	rm -rf bb-imager-service/dist
-	rm -rf cargo-vendor.tar.gz
+	rm -rf cargo-vendor.tar.zst
 	rm -rf vendor
 	rm -f *.snap
 
@@ -316,14 +316,24 @@ package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
 	$(MAKE) package-cli-deb package-cli-pacman TARGET=armv7-unknown-linux-gnueabihf
 
-cargo-vendor.tar.gz: Cargo.lock
+cargo-vendor.tar.zst: Cargo.lock
 	$(info Create tarball of all deps)
-	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE}
-	tar -czvf cargo-vendor.tar.gz vendor/
+	tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	mkdir -p "$$tmpdir/.cargo"; \
+	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE} "$$tmpdir/vendor"; \
+	printf '%s\n' \
+		'[source.crates-io]' \
+		'replace-with = "vendored-sources"' \
+		'' \
+		'[source.vendored-sources]' \
+		'directory = "vendor"' \
+		> "$$tmpdir/.cargo/config.toml"; \
+	tar --zstd -C "$$tmpdir" -cvf cargo-vendor.tar.zst vendor .cargo
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
 .PHONY: vendor-deps
-vendor-deps: cargo-vendor.tar.gz
+vendor-deps: cargo-vendor.tar.zst
 
 ## housekeeping: coverage: Check test coverage
 .PHONY: coverage
