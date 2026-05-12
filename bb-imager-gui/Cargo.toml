@@ -33,7 +33,7 @@ semver = "1.0.28"
 anyhow = "1.0"
 sqlx = { version = "0.8", features = ["runtime-tokio", "chrono"] }
 tempfile = "3.26"
-const-hex = { version = "1.17", features = ["serde"] }
+const-hex = { version = "1.19", features = ["serde"] }
 
 [build-dependencies]
 embed-resource = "3.0"

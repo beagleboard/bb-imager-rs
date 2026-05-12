@@ -13,7 +13,7 @@ bb-flasher = { path = "../bb-flasher" }
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.18"
 console = "0.16"
-const-hex = "1.17"
+const-hex = "1.19"
 clap_complete = "4.6"
 anyhow = "1.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
