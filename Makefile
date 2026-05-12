@@ -318,18 +318,8 @@ package-armv7-unknown-linux-gnueabihf: package-checks
 
 cargo-vendor.tar.zst: Cargo.lock
 	$(info Create tarball of all deps)
-	tmpdir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmpdir"' EXIT; \
-	mkdir -p "$$tmpdir/.cargo"; \
-	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE} "$$tmpdir/vendor"; \
-	printf '%s\n' \
-		'[source.crates-io]' \
-		'replace-with = "vendored-sources"' \
-		'' \
-		'[source.vendored-sources]' \
-		'directory = "vendor"' \
-		> "$$tmpdir/.cargo/config.toml"; \
-	tar --zstd -C "$$tmpdir" -cvf cargo-vendor.tar.zst vendor .cargo
+	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE}
+	tar --zstd -cvf cargo-vendor.tar.zst vendor
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
 .PHONY: vendor-deps

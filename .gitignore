@@ -5,3 +5,5 @@
 .DS_Store
 build/
 node_modules/
+*.tar.*
+vendor/
