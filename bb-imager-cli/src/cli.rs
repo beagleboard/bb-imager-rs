@@ -121,6 +121,15 @@ pub enum TargetCommands {
         /// Provide the bmap file for the image
         #[arg(long)]
         bmap: Option<Box<Path>>,
+
+        #[arg(long)]
+        /// Generate clound-init config.
+        cloud_init: bool,
+
+        #[arg(long)]
+        /// Generate sysconfig. Currently, sysconfig will be generated regardless if this flag is
+        /// provides. However, this will change in future. So best to explicitly set the flag.
+        sysconfig: bool,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]

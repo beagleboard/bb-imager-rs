@@ -659,6 +659,7 @@ dependencies = [
  "const-hex",
  "indicatif",
  "tokio",
+ "tracing",
  "tracing-subscriber",
 ]
 
