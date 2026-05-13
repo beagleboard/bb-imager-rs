@@ -62,7 +62,7 @@ CREATE TABLE os_images(
 	name TEXT NOT NULL,
 	description TEXT NOT NULL,
 	icon TEXT NOT NULL,
-	url TEXT NOT NULL UNIQUE,
+	url TEXT NOT NULL,
 	image_download_size INTEGER,
 	image_download_sha256 BLOB NOT NULL,
 	extract_size INTEGER NOT NULL,
@@ -71,7 +71,8 @@ CREATE TABLE os_images(
 	bmap TEXT,
 	info_text TEXT,
 
-	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE
+	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE,
+        UNIQUE(name, description, icon, url, init_format)
 ) STRICT;
 
 CREATE TABLE os_image_boards (
