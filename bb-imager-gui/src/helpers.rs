@@ -390,7 +390,22 @@ pub(crate) async fn flash(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
                 f,
-                customization.into(),
+                customization.sysconfig(),
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
+        }
+        (
+            BoardImage::Image { img, bmap, .. },
+            FlashingCustomization::LinuxSdCloudInit(customization),
+            Destination::LocalFile(f),
+        ) => {
+            bb_flasher::sd::Flasher::with_file_dest(
+                img.into_future(),
+                bmap.map(IntoFuture::into_future),
+                f,
+                customization.cloudinit(),
                 Some(cancel),
             )
             .flash(Some(chan))
@@ -413,7 +428,22 @@ pub(crate) async fn flash(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
                 t,
-                customization.into(),
+                customization.sysconfig(),
+                Some(cancel),
+            )
+            .flash(Some(chan))
+            .await
+        }
+        (
+            BoardImage::Image { img, bmap, .. },
+            FlashingCustomization::LinuxSdCloudInit(customization),
+            Destination::SdCard(t),
+        ) => {
+            bb_flasher::sd::Flasher::new(
+                img.into_future(),
+                bmap.map(IntoFuture::into_future),
+                t,
+                customization.cloudinit(),
                 Some(cancel),
             )
             .flash(Some(chan))
@@ -593,6 +623,7 @@ pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
 pub(crate) enum FlashingCustomization {
     NoneSd,
     LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
+    LinuxSdCloudInit(crate::persistance::SdSysconfCustomization),
     Bcf(crate::persistance::BcfCustomization),
     Msp430,
     Zepto(crate::persistance::BcfCustomization),
@@ -607,6 +638,15 @@ impl FlashingCustomization {
         match flasher {
             config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => {
                 Self::LinuxSdSysconfig(
+                    app_config
+                        .sd_customization
+                        .as_ref()
+                        .map(|x| x.sysconf_customization().cloned().unwrap_or_default())
+                        .unwrap_or_default(),
+                )
+            }
+            config::Flasher::SdCard if img.init_format() == config::InitFormat::CloudInit => {
+                Self::LinuxSdCloudInit(
                     app_config
                         .sd_customization
                         .as_ref()
@@ -791,7 +831,12 @@ pub(crate) fn no_customization(
     img: &BoardImage,
 ) -> Option<FlashingCustomization> {
     match flasher {
-        config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => None,
+        config::Flasher::SdCard
+            if img.init_format() == config::InitFormat::Sysconf
+                || img.init_format() == config::InitFormat::CloudInit =>
+        {
+            None
+        }
         config::Flasher::SdCard => Some(FlashingCustomization::NoneSd),
         config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
         _ => None,
@@ -963,4 +1008,31 @@ pub(crate) fn fetch_remote_subitems(
     });
 
     iced::Task::batch(temp)
+}
+
+pub(crate) fn sd_modifications_common(
+    x: &crate::persistance::SdSysconfCustomization,
+) -> Vec<&'static str> {
+    let mut ans = Vec::new();
+
+    if x.user.is_some() {
+        ans.push("• User account configured");
+    }
+    if x.wifi.is_some() {
+        ans.push("• Wifi configured");
+    }
+    if x.hostname.is_some() {
+        ans.push("• Hostname configured");
+    }
+    if x.keymap.is_some() {
+        ans.push("• Keymap configured");
+    }
+    if x.timezone.is_some() {
+        ans.push("• Timezone configured");
+    }
+    if x.ssh.is_some() {
+        ans.push("• SSH Key configured");
+    }
+
+    ans
 }

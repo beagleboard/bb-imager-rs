@@ -336,37 +336,15 @@ impl CustomizeState {
     pub(crate) fn modifications(&self) -> Vec<&'static str> {
         match &self.customization {
             helpers::FlashingCustomization::LinuxSdSysconfig(x) => {
-                let mut ans = Vec::new();
-
-                if x.user.is_some() {
-                    ans.push("• User account configured");
-                }
-
-                if x.wifi.is_some() {
-                    ans.push("• Wifi configured");
-                }
-
-                if x.hostname.is_some() {
-                    ans.push("• Hostname configured");
-                }
-
-                if x.keymap.is_some() {
-                    ans.push("• Keymap configured");
-                }
-
-                if x.timezone.is_some() {
-                    ans.push("• Timezone configured");
-                }
-
-                if x.ssh.is_some() {
-                    ans.push("• SSH Key configured");
-                }
-
+                let mut ans = helpers::sd_modifications_common(x);
                 if x.usb_enable_dhcp == Some(true) {
                     ans.push("• USB DHCP enabled");
                 }
 
                 ans
+            }
+            helpers::FlashingCustomization::LinuxSdCloudInit(x) => {
+                helpers::sd_modifications_common(x)
             }
             helpers::FlashingCustomization::Bcf(x) | helpers::FlashingCustomization::Zepto(x) => {
                 if !x.verify {
