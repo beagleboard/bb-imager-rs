@@ -4,6 +4,8 @@
 //!
 //! [BeagleBoard.org]: https://www.beagleboard.org/
 
+mod cloud_init;
+
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 use tokio::sync::mpsc;
 
@@ -137,6 +139,24 @@ impl FlashingSdLinuxConfig {
         }
     }
 
+    pub fn cloud_init(
+        hostname: Option<Box<str>>,
+        timezone: Option<Box<str>>,
+        keymap: Option<Box<str>>,
+        user: Option<(Box<str>, Box<str>)>,
+        wifi: Option<(Box<str>, Box<str>)>,
+        ssh: Option<Box<str>>,
+    ) -> Self {
+        let data = cloud_init::CloudInitConfig::new(hostname, timezone, keymap, user, wifi, ssh);
+        Self(vec![bb_flasher_sd::Customization {
+            partition: bb_flasher_sd::ParitionType::Boot,
+            content: vec![(
+                "cloud-init".to_string().into(),
+                bb_flasher_sd::ContentType::Data(data.to_file_data()),
+            )],
+        }])
+    }
+
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
         Self(vec![bb_flasher_sd::Customization {
             partition: bb_flasher_sd::ParitionType::Boot,
@@ -146,6 +166,12 @@ impl FlashingSdLinuxConfig {
 
     pub const fn none() -> Self {
         Self(Vec::new())
+    }
+}
+
+impl Extend<Self> for FlashingSdLinuxConfig {
+    fn extend<T: IntoIterator<Item = Self>>(&mut self, iter: T) {
+        self.0.extend(iter.into_iter().map(|x| x.0).flatten());
     }
 }
 

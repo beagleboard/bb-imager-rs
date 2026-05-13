@@ -53,7 +53,7 @@ mod flashing;
 mod helpers;
 pub(crate) mod pal;
 
-pub use customization::{Customization, ParitionType};
+pub use customization::{Customization, ParitionType, ContentType};
 pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
