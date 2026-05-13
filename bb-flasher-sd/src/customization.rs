@@ -22,33 +22,67 @@ impl ParitionType {
     where
         T: Write + Seek + Read + std::fmt::Debug,
     {
-        // First try GPT partition table. If that fails, try MBR
-        let (start_offset, end_offset) = if let Ok(disk) = gpt::GptConfig::new()
-            .writable(false)
-            .open_from_device(&mut dst)
-        {
-            // FIXME: Add better partition lookup
-            let partition_2 = disk.partitions().get(&2).unwrap();
+        let part_table = PartitionTable::detect_partition_table(&mut dst)?;
+        dst.seek(SeekFrom::Start(0))?;
+        let (start_offset, end_offset) = match part_table {
+            PartitionTable::GPT => {
+                let disk = gpt::GptConfig::new()
+                    .writable(false)
+                    .open_from_device(&mut dst)
+                    .map_err(|_| crate::Error::InvalidPartitionTable)?;
 
-            let start_offset: u64 = partition_2.first_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
-            let end_offset: u64 = partition_2.last_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
+                let partition_2 = disk.partitions().get(&2).unwrap();
 
-            (start_offset, end_offset)
-        } else {
-            let mbr =
-                mbrman::MBRHeader::read_from(&mut dst).map_err(|_| Error::InvalidPartitionTable)?;
+                let start_offset: u64 =
+                    partition_2.first_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
+                let end_offset: u64 =
+                    partition_2.last_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
 
-            let boot_part = mbr.get(1).ok_or(Error::InvalidPartitionTable)?;
-            let start_offset: u64 = (boot_part.starting_lba * 512).into();
-            let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
+                (start_offset, end_offset)
+            }
+            PartitionTable::MBR => {
+                let mbr = mbrman::MBRHeader::read_from(&mut dst)
+                    .map_err(|_| Error::InvalidPartitionTable)?;
 
-            (start_offset, end_offset)
+                let boot_part = mbr.get(1).ok_or(Error::InvalidPartitionTable)?;
+                let start_offset: u64 = (boot_part.starting_lba * 512).into();
+                let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
+
+                (start_offset, end_offset)
+            }
         };
+
         let slice = StreamSlice::new(dst, start_offset, end_offset)
             .map_err(|_| Error::InvalidPartitionTable)?;
         let boot_stream = BufStream::new(slice);
         FileSystem::new(boot_stream, fatfs::FsOptions::new())
             .map_err(|_| Error::InvalidBootPartition)
+    }
+}
+
+#[derive(Debug)]
+enum PartitionTable {
+    GPT,
+    MBR,
+}
+
+impl PartitionTable {
+    fn detect_partition_table(mut reader: impl Read) -> Result<PartitionTable> {
+        // Read first 1024 bytes (enough for MBR + GPT header)
+        let mut buf = [0u8; 1024];
+        reader.read_exact(&mut buf)?;
+
+        // Check GPT signature at LBA1 (offset 512)
+        if &buf[512..520] == b"EFI PART" {
+            return Ok(PartitionTable::GPT);
+        }
+
+        // Check MBR boot signature
+        if buf[510] == 0x55 && buf[511] == 0xAA {
+            return Ok(PartitionTable::MBR);
+        }
+
+        Err(crate::Error::InvalidPartitionTable)
     }
 }
 
