@@ -184,12 +184,33 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 None => col,
             };
 
-            let col = col.extend(
+            let mut col = col.extend(
                 img.details()
                     .iter()
                     .map(|(k, v)| detail_entry(k, v))
                     .map(Into::into),
             );
+
+            let init_formats = img.supported_init_formats();
+            if init_formats.len() > 1 {
+                let init_format = img.init_format();
+                let el = widget::pick_list(
+                    init_formats,
+                    if init_format == bb_config::config::InitFormat::None {
+                        None
+                    } else {
+                        Some(init_format)
+                    },
+                    BBImagerMessage::UpdateInitFormat,
+                );
+                col = col.push(
+                    widget::row![text("Init Format: ").font(constants::FONT_BOLD), el]
+                        .align_y(iced::Alignment::Center)
+                        .padding(iced::Padding::ZERO.right(16)),
+                )
+            } else if init_formats.len() == 1 {
+                col = col.push(detail_entry("Init Format", init_formats[0].to_string()))
+            }
 
             widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
                 .id(state.common.scroll_id.clone())

@@ -33,6 +33,7 @@ pub(crate) enum BBImagerMessage {
     SelectLocalOs(helpers::BoardImage),
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
     GotoOsListParent,
+    UpdateInitFormat(bb_config::config::InitFormat),
 
     /// Choose Destination page
     SelectDest(helpers::Destination),
@@ -545,6 +546,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseDest(inner) => inner.update_search(x),
             _ => {}
         },
+        BBImagerMessage::UpdateInitFormat(f) => {
+            if let BBImager::ChooseOs(inner) = state
+                && let Some((_, img)) = &mut inner.selected_image
+            {
+                img.update_init_format(f);
+            }
+        }
         BBImagerMessage::Null => {}
     }
 
