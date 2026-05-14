@@ -74,6 +74,8 @@ pub enum InitFormat {
     Sysconf,
     /// Armbian base customization
     Armbian,
+    /// Cloud Init based customization
+    CloudInit,
 }
 
 /// Os List can contain multiple types of items depending on the situation.

@@ -136,21 +136,34 @@ async fn flash_internal(
             ssh_key,
             usb_enable_dhcp,
             bmap,
+            sysconfig,
+            cloud_init,
         } => {
+            // TODO: Remove fallback in the future.
+            if !sysconfig && !cloud_init {
+                tracing::warn!("No config format specified. Using sysconfig by default");
+            }
+
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
             let dst = check_macos_device_path(dst);
 
-            let customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
-                hostname,
-                timezone,
-                keymap,
-                user,
-                wifi,
-                ssh_key,
+            let mut customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
+                hostname.clone(),
+                timezone.clone(),
+                keymap.clone(),
+                user.clone(),
+                wifi.clone(),
+                ssh_key.clone(),
                 Some(usb_enable_dhcp),
             );
+
+            if cloud_init {
+                customization.extend([bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
+                    hostname, timezone, keymap, user, wifi, ssh_key,
+                )]);
+            }
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img).into_future(),

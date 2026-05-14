@@ -33,7 +33,8 @@ pub(crate) fn view<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, B
 
 fn customization_pane<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, BBImagerMessage> {
     match &state.customization {
-        FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card(state, inner),
+        FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card_sysconfig(state, inner),
+        FlashingCustomization::LinuxSdCloudInit(inner) => linux_sd_card_cloudinit(state, inner),
         FlashingCustomization::Bcf(inner) => bcf(inner),
         FlashingCustomization::Zepto(inner) => zepto(inner),
         _ => panic!("No customization"),
@@ -68,21 +69,20 @@ fn bcf<'a>(state: &'a persistance::BcfCustomization) -> Element<'a, BBImagerMess
     .into()
 }
 
-fn linux_sd_card<'a>(
+fn linux_sd_card_common<'a>(
     state: &'a crate::state::CustomizeState,
     config: &'a persistance::SdSysconfCustomization,
-) -> Element<'a, BBImagerMessage> {
+    wrap: impl Fn(persistance::SdSysconfCustomization) -> FlashingCustomization + Copy + 'static,
+) -> widget::Column<'a, BBImagerMessage> {
     let mut col = widget::column([]);
 
     // Username and Password
     col = col.push(
         widget::toggler(config.user.is_some())
             .label("Configure Username and Password")
-            .on_toggle(|t| {
+            .on_toggle(move |t| {
                 let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_user(c),
-                ))
+                BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_user(c)))
             }),
     );
     if let Some(usr) = config.user.as_ref() {
@@ -91,8 +91,8 @@ fn linux_sd_card<'a>(
                 "Username",
                 "username",
                 &usr.username,
-                |inp| {
-                    FlashingCustomization::LinuxSdSysconfig(
+                move |inp| {
+                    wrap(
                         config
                             .clone()
                             .update_user(Some(usr.clone().update_username(inp))),
@@ -105,8 +105,8 @@ fn linux_sd_card<'a>(
                 "Password",
                 "password",
                 &usr.password,
-                |inp| {
-                    FlashingCustomization::LinuxSdSysconfig(
+                move |inp| {
+                    wrap(
                         config
                             .clone()
                             .update_user(Some(usr.clone().update_password(inp))),
@@ -124,11 +124,9 @@ fn linux_sd_card<'a>(
     col = col.push(
         widget::toggler(config.wifi.is_some())
             .label("Configure Wireless LAN")
-            .on_toggle(|t| {
+            .on_toggle(move |t| {
                 let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_wifi(c),
-                ))
+                BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_wifi(c)))
             }),
     );
     if let Some(wifi) = config.wifi.as_ref() {
@@ -137,8 +135,8 @@ fn linux_sd_card<'a>(
                 "SSID",
                 "SSID",
                 &wifi.ssid,
-                |inp| {
-                    FlashingCustomization::LinuxSdSysconfig(
+                move |inp| {
+                    wrap(
                         config
                             .clone()
                             .update_wifi(Some(wifi.clone().update_ssid(inp))),
@@ -151,8 +149,8 @@ fn linux_sd_card<'a>(
                 "Password",
                 "password",
                 &wifi.password,
-                |inp| {
-                    FlashingCustomization::LinuxSdSysconfig(
+                move |inp| {
+                    wrap(
                         config
                             .clone()
                             .update_wifi(Some(wifi.clone().update_password(inp))),
@@ -169,11 +167,9 @@ fn linux_sd_card<'a>(
     // Timezone
     let toggle = widget::toggler(config.timezone.is_some())
         .label("Set Timezone")
-        .on_toggle(|t| {
+        .on_toggle(move |t| {
             let tz = if t { helpers::system_timezone() } else { None };
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                config.clone().update_timezone(tz.cloned()),
-            ))
+            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_timezone(tz.cloned())))
         });
     col = match config.timezone.as_ref() {
         Some(tz) => {
@@ -185,7 +181,7 @@ fn linux_sd_card<'a>(
                     "Timezone",
                     Some(&tz.to_owned()),
                     move |t| {
-                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                        BBImagerMessage::UpdateFlashConfig(wrap(
                             xc.clone().update_timezone(Some(t)),
                         ))
                     },
@@ -202,18 +198,16 @@ fn linux_sd_card<'a>(
     // Hostname
     let toggle = widget::toggler(config.hostname.is_some())
         .label("Set Hostname")
-        .on_toggle(|t| {
+        .on_toggle(move |t| {
             let hostname = if t { Some(String::new()) } else { None };
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                config.clone().update_hostname(hostname),
-            ))
+            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_hostname(hostname)))
         });
     col = match config.hostname.as_ref() {
         Some(hostname) => col.push(element_with_element(
             toggle.into(),
             widget::text_input("beagle", hostname)
-                .on_input(|inp| {
-                    BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                .on_input(move |inp| {
+                    BBImagerMessage::UpdateFlashConfig(wrap(
                         config.clone().update_hostname(Some(inp)),
                     ))
                 })
@@ -228,15 +222,13 @@ fn linux_sd_card<'a>(
     // Keymap
     let toggle = widget::toggler(config.keymap.is_some())
         .label("Set Keymap")
-        .on_toggle(|t| {
+        .on_toggle(move |t| {
             let keymap = if t {
                 Some(helpers::system_keymap())
             } else {
                 None
             };
-            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                config.clone().update_keymap(keymap),
-            ))
+            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_keymap(keymap)))
         });
     col = match config.keymap.as_ref() {
         Some(keymap) => {
@@ -249,9 +241,7 @@ fn linux_sd_card<'a>(
                     "Keymap",
                     Some(&keymap.to_owned()),
                     move |t| {
-                        BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                            xc.clone().update_keymap(Some(t)),
-                        ))
+                        BBImagerMessage::UpdateFlashConfig(wrap(xc.clone().update_keymap(Some(t))))
                     },
                 )
                 .width(INPUT_WIDTH)
@@ -264,12 +254,12 @@ fn linux_sd_card<'a>(
     col = col.push(widget::rule::horizontal(2));
 
     // SSH Key
-    col = col.extend([
+    col.extend([
         text("SSH authorization public key").into(),
         widget::center(
             widget::text_input("authorized key", config.ssh.as_deref().unwrap_or("")).on_input(
-                |x| {
-                    BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                move |x| {
+                    BBImagerMessage::UpdateFlashConfig(wrap(
                         config
                             .clone()
                             .update_ssh(if x.is_empty() { None } else { Some(x) }),
@@ -279,10 +269,26 @@ fn linux_sd_card<'a>(
         )
         .padding(iced::Padding::ZERO.horizontal(16))
         .into(),
-    ]);
+    ])
+}
+
+fn linux_sd_card_cloudinit<'a>(
+    state: &'a crate::state::CustomizeState,
+    config: &'a persistance::SdSysconfCustomization,
+) -> Element<'a, BBImagerMessage> {
+    let col = linux_sd_card_common(state, config, FlashingCustomization::LinuxSdCloudInit);
+    widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
+        .id(state.common.scroll_id.clone())
+        .into()
+}
+
+fn linux_sd_card_sysconfig<'a>(
+    state: &'a crate::state::CustomizeState,
+    config: &'a persistance::SdSysconfCustomization,
+) -> Element<'a, BBImagerMessage> {
+    let mut col = linux_sd_card_common(state, config, FlashingCustomization::LinuxSdSysconfig);
 
     col = col.push(widget::rule::horizontal(2));
-
     // Enable USB DHCP
     col = col.push(
         widget::toggler(config.usb_enable_dhcp == Some(true))

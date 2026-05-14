@@ -158,18 +158,27 @@ impl SdSysconfCustomization {
             None => true,
         }
     }
-}
 
-impl From<SdSysconfCustomization> for bb_flasher::sd::FlashingSdLinuxConfig {
-    fn from(value: SdSysconfCustomization) -> Self {
-        Self::sysconfig(
-            value.hostname.map(Into::into),
-            value.timezone.map(Into::into),
-            value.keymap.map(Into::into),
-            value.user.map(|x| (x.username.into(), x.password.into())),
-            value.wifi.map(|x| (x.ssid.into(), x.password.into())),
-            value.ssh.map(Into::into),
-            value.usb_enable_dhcp,
+    pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
+        bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
+            self.hostname.map(Into::into),
+            self.timezone.map(Into::into),
+            self.keymap.map(Into::into),
+            self.user.map(|x| (x.username.into(), x.password.into())),
+            self.wifi.map(|x| (x.ssid.into(), x.password.into())),
+            self.ssh.map(Into::into),
+            self.usb_enable_dhcp,
+        )
+    }
+
+    pub(crate) fn cloudinit(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
+        bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
+            self.hostname.map(Into::into),
+            self.timezone.map(Into::into),
+            self.keymap.map(Into::into),
+            self.user.map(|x| (x.username.into(), x.password.into())),
+            self.wifi.map(|x| (x.ssid.into(), x.password.into())),
+            self.ssh.map(Into::into),
         )
     }
 }
