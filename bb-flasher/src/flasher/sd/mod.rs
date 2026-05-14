@@ -171,7 +171,7 @@ impl FlashingSdLinuxConfig {
 
 impl Extend<Self> for FlashingSdLinuxConfig {
     fn extend<T: IntoIterator<Item = Self>>(&mut self, iter: T) {
-        self.0.extend(iter.into_iter().map(|x| x.0).flatten());
+        self.0.extend(iter.into_iter().flat_map(|x| x.0));
     }
 }
 
