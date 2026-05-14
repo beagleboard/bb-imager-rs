@@ -25,7 +25,7 @@ impl ParitionType {
         let part_table = PartitionTable::detect_partition_table(&mut dst)?;
         dst.seek(SeekFrom::Start(0))?;
         let (start_offset, end_offset) = match part_table {
-            PartitionTable::GPT => {
+            PartitionTable::Gpt => {
                 let disk = gpt::GptConfig::new()
                     .writable(false)
                     .open_from_device(&mut dst)
@@ -40,7 +40,7 @@ impl ParitionType {
 
                 (start_offset, end_offset)
             }
-            PartitionTable::MBR => {
+            PartitionTable::Mbr => {
                 let mbr = mbrman::MBRHeader::read_from(&mut dst)
                     .map_err(|_| Error::InvalidPartitionTable)?;
 
@@ -62,8 +62,8 @@ impl ParitionType {
 
 #[derive(Debug)]
 enum PartitionTable {
-    GPT,
-    MBR,
+    Gpt,
+    Mbr,
 }
 
 impl PartitionTable {
@@ -74,12 +74,12 @@ impl PartitionTable {
 
         // Check GPT signature at LBA1 (offset 512)
         if &buf[512..520] == b"EFI PART" {
-            return Ok(PartitionTable::GPT);
+            return Ok(PartitionTable::Gpt);
         }
 
         // Check MBR boot signature
         if buf[510] == 0x55 && buf[511] == 0xAA {
-            return Ok(PartitionTable::MBR);
+            return Ok(PartitionTable::Mbr);
         }
 
         Err(crate::Error::InvalidPartitionTable)
