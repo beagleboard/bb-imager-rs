@@ -145,6 +145,41 @@ impl BoardImage {
             BoardImage::Image { details, .. } => details,
         }
     }
+
+    pub(crate) fn supported_init_formats(&self) -> &'static [config::InitFormat] {
+        match self {
+            BoardImage::SdFormat { .. } => &[],
+            BoardImage::Image {
+                img,
+                init_format,
+                flasher,
+                ..
+            } if !matches!(img, SelectedImage::LocalImage(_)) => match init_format {
+                config::InitFormat::Sysconf => &[config::InitFormat::Sysconf],
+                config::InitFormat::CloudInit => &[config::InitFormat::CloudInit],
+                _ => &[],
+            },
+            BoardImage::Image {
+                init_format,
+                flasher,
+                ..
+            } if *flasher == config::Flasher::SdCard => {
+                &[config::InitFormat::Sysconf, config::InitFormat::CloudInit]
+            }
+            BoardImage::Image { .. } => &[],
+        }
+    }
+
+    pub(crate) fn update_init_format(&mut self, f: config::InitFormat) {
+        match self {
+            BoardImage::SdFormat { .. } => {
+                unreachable!();
+            }
+            BoardImage::Image { init_format, .. } => {
+                *init_format = f;
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for BoardImage {

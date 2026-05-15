@@ -78,6 +78,17 @@ pub enum InitFormat {
     CloudInit,
 }
 
+impl std::fmt::Display for InitFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InitFormat::None => f.write_str("none"),
+            InitFormat::Sysconf => f.write_str("sysconfig"),
+            InitFormat::Armbian => f.write_str("armbian"),
+            InitFormat::CloudInit => f.write_str("cloudinit"),
+        }
+    }
+}
+
 /// Os List can contain multiple types of items depending on the situation.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
