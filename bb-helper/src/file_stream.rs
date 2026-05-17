@@ -187,6 +187,7 @@ mod tests {
         let (mut writer, mut reader) = file_stream().unwrap();
 
         writer.write_all(b"abcdef").await.unwrap();
+        writer.flush().await.unwrap();
 
         tokio::task::spawn_blocking(move || {
             reader.seek(SeekFrom::Start(2)).unwrap();
@@ -205,6 +206,7 @@ mod tests {
         let (mut writer, mut reader) = file_stream().unwrap();
 
         writer.write_all(b"abcdef").await.unwrap();
+        writer.flush().await.unwrap();
 
         tokio::task::spawn_blocking(move || {
             reader.seek(SeekFrom::Start(1)).unwrap();
@@ -236,6 +238,7 @@ mod tests {
         let (mut writer, mut reader) = file_stream().unwrap();
 
         writer.write_all(b"abcdef").await.unwrap();
+        writer.flush().await.unwrap();
         drop(writer);
 
         tokio::task::spawn_blocking(move || {
@@ -254,7 +257,9 @@ mod tests {
     #[tokio::test]
     async fn invalid_negative_seek_fails() {
         let (mut writer, mut reader) = file_stream().unwrap();
+
         writer.write_all(b"abc").await.unwrap();
+        writer.flush().await.unwrap();
 
         tokio::task::spawn_blocking(move || {
             let err = reader.seek(SeekFrom::Current(-10)).unwrap_err();
