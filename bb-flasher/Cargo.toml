@@ -30,6 +30,8 @@ bb-flasher-mspm0 = { path = "../bb-flasher-mspm0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }
+tempfile = "3.27"
+zip = "8.6"
 
 [features]
 default = ["sd"]

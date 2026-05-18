@@ -8,6 +8,9 @@ use std::{
 };
 use tokio_util::task::AbortOnDropHandle;
 
+#[cfg(test)]
+mod test;
+
 const XZ_MAGIC: [u8; 6] = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00];
 
 pub struct OsImage {
