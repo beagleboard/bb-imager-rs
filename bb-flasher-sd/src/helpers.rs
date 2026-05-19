@@ -31,6 +31,12 @@ impl Eject for std::fs::File {
     }
 }
 
+impl Eject for &mut std::fs::File {
+    fn eject(self) -> io::Result<()> {
+        self.sync_all()
+    }
+}
+
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]

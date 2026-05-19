@@ -644,6 +644,7 @@ dependencies = [
  "mbrman",
  "nix 0.31.3",
  "security-framework",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
