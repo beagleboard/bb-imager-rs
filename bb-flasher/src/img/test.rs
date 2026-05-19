@@ -204,6 +204,7 @@ async fn file_stream_uncompressed_image_reads_contents() {
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
     writer.write_all(data).await.unwrap();
+    writer.flush().await.unwrap();
     drop(writer);
 
     tokio::task::spawn_blocking(move || {
@@ -245,6 +246,7 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
     writer.write_all(&compressed).await.unwrap();
+    writer.flush().await.unwrap();
     drop(writer);
 
     tokio::task::spawn_blocking(move || {
@@ -290,6 +292,7 @@ async fn file_stream_zip_image_reads_first_entry_contents() {
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
     writer.write_all(zip_data.get_ref()).await.unwrap();
+    writer.flush().await.unwrap();
     drop(writer);
 
     tokio::task::spawn_blocking(move || {
