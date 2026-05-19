@@ -52,6 +52,7 @@ pub(crate) mod customization;
 mod flashing;
 mod helpers;
 pub(crate) mod pal;
+pub mod update_boot;
 
 pub use customization::{Customization, ParitionType, ContentType};
 pub use flashing::flash;

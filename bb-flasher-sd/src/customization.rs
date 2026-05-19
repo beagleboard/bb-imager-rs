@@ -9,7 +9,7 @@ pub enum ParitionType {
 }
 
 impl ParitionType {
-    fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
+    pub(crate) fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
     where
         T: Write + Seek + Read + std::fmt::Debug,
     {
@@ -23,7 +23,7 @@ impl ParitionType {
         T: Write + Seek + Read + std::fmt::Debug,
     {
         let part_table = PartitionTable::detect_partition_table(&mut dst)?;
-        dst.seek(SeekFrom::Start(0))?;
+        dst.rewind()?;
         let (start_offset, end_offset) = match part_table {
             PartitionTable::Gpt => {
                 let disk = gpt::GptConfig::new()
