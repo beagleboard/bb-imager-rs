@@ -13,6 +13,85 @@ mod test;
 
 const XZ_MAGIC: [u8; 6] = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00];
 
+pub struct OsArchive {
+    inner: OsArchiveCompression,
+}
+
+impl OsArchive {
+    pub fn from_path(path: &Path) -> io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let img = OsArchiveCompression::new(OsImageSource::from(file))?;
+
+        Ok(Self { inner: img })
+    }
+}
+
+impl<'a> IntoIterator for &'a mut OsArchive {
+    type Item = (Box<str>, bb_flasher_sd::update_boot::FileType<'a>);
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &mut self.inner {
+            OsArchiveCompression::TarXz(archive) => {
+                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
+            }
+            OsArchiveCompression::Tar(archive) => {
+                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
+            }
+        }
+    }
+}
+
+fn flat_map_with_log<'a, R: Read>(
+    entry: io::Result<tar::Entry<'a, R>>,
+) -> Option<(Box<str>, bb_flasher_sd::update_boot::FileType<'a>)> {
+    match entry {
+        Ok(x) => Some(tar_entry_map(x)),
+        Err(e) => {
+            tracing::warn!("Dropping archive entry: {}", e);
+            None
+        }
+    }
+}
+
+fn tar_entry_map<'a, R: Read>(
+    entry: tar::Entry<'a, R>,
+) -> (Box<str>, bb_flasher_sd::update_boot::FileType<'a>) {
+    let p = entry
+        .path()
+        .unwrap()
+        .to_string_lossy()
+        .to_string()
+        .into_boxed_str();
+    let f = if entry.header().entry_type().is_dir() {
+        bb_flasher_sd::update_boot::FileType::Dir
+    } else {
+        bb_flasher_sd::update_boot::FileType::File(Box::new(entry))
+    };
+
+    (p, f)
+}
+
+enum OsArchiveCompression {
+    TarXz(tar::Archive<liblzma::read::XzDecoder<OsImageSource>>),
+    Tar(tar::Archive<io::BufReader<OsImageSource>>),
+}
+
+impl OsArchiveCompression {
+    fn new(mut img: OsImageSource) -> io::Result<Self> {
+        let mut magic = [0u8; 6];
+        img.read_exact(&mut magic)?;
+        img.rewind()?;
+
+        match magic {
+            XZ_MAGIC => Ok(Self::TarXz(tar::Archive::new(
+                liblzma::read::XzDecoder::new_parallel(img),
+            ))),
+            _ => Ok(Self::Tar(tar::Archive::new(io::BufReader::new(img)))),
+        }
+    }
+}
+
 pub struct OsImage {
     size: u64,
     img: OsImageCompression<OsImageSource>,

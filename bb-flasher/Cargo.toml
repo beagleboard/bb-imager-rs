@@ -27,6 +27,7 @@ rc-zip-sync = "4.4"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 bb-flasher-mspm0 = { path = "../bb-flasher-mspm0", optional = true }
+tar = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }

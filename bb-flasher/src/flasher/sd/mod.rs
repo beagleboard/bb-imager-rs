@@ -295,3 +295,61 @@ where
         .map_err(Into::into)
     }
 }
+
+/// Flasher of updaing BOOT partition on pre-flashed SD Card
+pub struct UpdateBootFlasher<I> {
+    img: I,
+    dst: bb_flasher_sd::Destination,
+    cancel: Option<tokio_util::sync::CancellationToken>,
+}
+
+impl<I, T> UpdateBootFlasher<I>
+where
+    I: Future<Output = std::io::Result<T>>,
+    T: Send + 'static,
+    for<'b> &'b mut T: IntoIterator<Item = (Box<str>, bb_flasher_sd::update_boot::FileType<'b>)>,
+{
+    pub fn new(img: I, dst: Target, cancel: Option<tokio_util::sync::CancellationToken>) -> Self {
+        Self {
+            img,
+            dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
+            cancel,
+        }
+    }
+}
+
+impl<I, T> BBFlasher for UpdateBootFlasher<I>
+where
+    I: Future<Output = std::io::Result<T>>,
+    T: Send + 'static,
+    for<'b> &'b mut T: IntoIterator<Item = (Box<str>, bb_flasher_sd::update_boot::FileType<'b>)>,
+{
+    async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
+        let dst = self.dst;
+
+        if let Some(chan) = chan {
+            let (_tx, mut rx) = tokio::sync::mpsc::channel(2);
+
+            let t = tokio::spawn(async move {
+                // Should run until tx is dropped, i.e. flasher task is done.
+                // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
+                while let Some(x) = rx.recv().await {
+                    let _ = chan.try_send(if x == 0.0 {
+                        DownloadFlashingStatus::Preparing
+                    } else {
+                        DownloadFlashingStatus::FlashingProgress(x)
+                    });
+                }
+            });
+
+            let resp = bb_flasher_sd::update_boot::update_boot(self.img, dst, self.cancel).await;
+
+            t.abort();
+
+            resp
+        } else {
+            bb_flasher_sd::update_boot::update_boot(self.img, dst, self.cancel).await
+        }
+        .map_err(Into::into)
+    }
+}

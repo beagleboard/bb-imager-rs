@@ -47,6 +47,8 @@ pub use common::*;
 pub use flasher::*;
 pub use img::OsImage;
 
+use crate::img::OsArchive;
+
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -74,6 +76,13 @@ impl LocalImage {
         let size = img.size();
 
         Ok((img, size))
+    }
+
+    pub async fn into_archive_future(self) -> std::io::Result<OsArchive> {
+        let p = self.0.clone();
+        tokio::task::spawn_blocking(move || OsArchive::from_path(&p))
+            .await
+            .unwrap()
     }
 }
 
