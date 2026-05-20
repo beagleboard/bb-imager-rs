@@ -123,6 +123,15 @@ async fn flash_internal(
     chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
 ) -> anyhow::Result<()> {
     match target {
+        TargetCommands::SdBootUpdate { img, dst } => {
+            bb_flasher::sd::UpdateBootFlasher::new(
+                LocalImage::new(img).into_archive_future(),
+                dst.try_into().unwrap(),
+                None,
+            )
+            .flash(chan)
+            .await
+        }
         TargetCommands::Sd {
             dst,
             hostname,
