@@ -65,22 +65,15 @@ impl LocalImage {
     pub fn file_name(&self) -> &std::ffi::OsStr {
         self.0.file_name().unwrap()
     }
-}
 
-impl IntoFuture for LocalImage {
-    type Output = std::io::Result<(OsImage, u64)>;
-    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
+    pub async fn into_image_future(self) -> std::io::Result<(OsImage, u64)> {
+        let p = self.0.clone();
+        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
+            .await
+            .unwrap()?;
+        let size = img.size();
 
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let p = self.0.clone();
-            let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
-                .await
-                .unwrap()?;
-            let size = img.size();
-
-            Ok((img, size))
-        })
+        Ok((img, size))
     }
 }
 
