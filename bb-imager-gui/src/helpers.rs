@@ -381,7 +381,7 @@ impl IntoFuture for SelectedImage {
 
     fn into_future(self) -> Self::IntoFuture {
         match self {
-            SelectedImage::LocalImage(x) => x.into_future(),
+            SelectedImage::LocalImage(x) => Box::pin(x.into_image_future()),
             SelectedImage::RemoteImage(x) => x.into_future(),
         }
     }
