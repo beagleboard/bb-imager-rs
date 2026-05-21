@@ -1,6 +1,7 @@
 use std::io::{Read, Seek, Write};
 use std::time::Instant;
 
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
 
 use crate::Result;
@@ -15,6 +16,26 @@ mod tests;
 const BUFFER_SIZE: usize = 1 * 1024 * 1024;
 #[cfg(debug_assertions)]
 const BUFFER_SIZE: usize = 8 * 1024;
+
+async fn reader_task_async(
+    mut img: impl AsyncRead + Unpin,
+    mut buf_rx: mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    buf_tx: mpsc::Sender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+) -> Result<()> {
+    while let Some(mut buf) = buf_rx.recv().await {
+        let count = read_aligned_async(&mut img, buf.as_mut_slice()).await?;
+        if count == 0 {
+            break;
+        }
+
+        buf_tx
+            .send((buf, count))
+            .await
+            .map_err(|_| crate::Error::WriterClosed)?;
+    }
+
+    Ok(())
+}
 
 fn reader_task(
     mut img: impl Read,
@@ -91,6 +112,58 @@ fn writer_task_bmap(
     sd.flush().map_err(Into::into)
 }
 
+async fn writer_task_bmap_async<Sd>(
+    bmap: bb_bmap_parser::Bmap,
+    mut sd: Sd,
+    mut chan: Option<mpsc::Sender<f32>>,
+    mut buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+) -> Result<Sd>
+where
+    Sd: AsyncWrite + AsyncSeek + Unpin,
+{
+    let mut pos = 0;
+    let (mut buf, mut count) = buf_rx.recv().await.unwrap();
+    let img_size = bmap.total_mapped_size();
+    let mut bytes_written = 0u64;
+
+    for b in bmap.block_map() {
+        let end_offset = b.offset() + b.length();
+
+        loop {
+            // Write any buffer that lies even partially in the bmap range.
+            if pos + (count as u64) > b.offset() && pos < end_offset {
+                sd.seek(std::io::SeekFrom::Start(pos)).await?;
+                sd.write_all(&buf.as_slice()[..count]).await?;
+                bytes_written += count as u64;
+            } else if pos >= end_offset {
+                break;
+            }
+
+            pos += count as u64;
+            // Clippy warning is simply wrong here
+            #[allow(clippy::option_map_or_none)]
+            chan_send(
+                chan.as_mut().map_or(None, |p| Some(p)),
+                progress(bytes_written, img_size),
+            );
+
+            match buf_rx.recv().await {
+                Some((x, y)) => {
+                    let _ = buf_tx.send(buf).await;
+                    buf = x;
+                    count = y;
+                }
+                None => break,
+            }
+        }
+    }
+
+    sd.flush().await?;
+
+    Ok(sd)
+}
+
 fn writer_task(
     img_size: u64,
     mut sd: impl Write + Seek,
@@ -119,6 +192,37 @@ fn writer_task(
     sd.flush().map_err(Into::into)
 }
 
+async fn writer_task_async<Sd>(
+    img_size: u64,
+    mut sd: Sd,
+    mut chan: Option<mpsc::Sender<f32>>,
+    mut buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+) -> Result<Sd>
+where
+    Sd: AsyncWrite + Unpin,
+{
+    let mut pos = 0u64;
+
+    while let Some((buf, count)) = buf_rx.recv().await {
+        sd.write_all(&buf.as_slice()[..count]).await?;
+
+        pos += count as u64;
+        // Clippy warning is simply wrong here
+        #[allow(clippy::option_map_or_none)]
+        chan_send(
+            chan.as_mut().map_or(None, |p| Some(p)),
+            progress(pos, img_size),
+        );
+
+        let _ = buf_tx.send(buf).await;
+    }
+
+    sd.flush().await?;
+
+    Ok(sd)
+}
+
 /// A lot of reads from compressed files are not aligned. Since reading even from compressed files
 /// is significantly faster than writing to SD Card, better to do multiple reads.
 fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
@@ -128,6 +232,27 @@ fn read_aligned(mut img: impl Read, buf: &mut [u8]) -> Result<usize> {
 
     while pos != buf.len() {
         let count = img.read(&mut buf[pos..])?;
+        if count == 0 {
+            if pos % ALIGNMENT != 0 {
+                let end = pos - pos % ALIGNMENT + ALIGNMENT;
+                buf[pos..end].fill(0);
+                pos = end;
+            }
+            return Ok(pos);
+        }
+        pos += count;
+    }
+
+    Ok(pos)
+}
+
+async fn read_aligned_async(mut img: impl AsyncRead + Unpin, buf: &mut [u8]) -> Result<usize> {
+    const ALIGNMENT: usize = 512;
+
+    let mut pos = 0;
+
+    while pos != buf.len() {
+        let count = img.read(&mut buf[pos..]).await?;
         if count == 0 {
             if pos % ALIGNMENT != 0 {
                 let end = pos - pos % ALIGNMENT + ALIGNMENT;
@@ -173,6 +298,65 @@ fn write_sd(
 
         handle.join().unwrap()
     })
+}
+
+async fn write_sd_async<Sd>(
+    img: impl AsyncRead + Unpin + Send + 'static,
+    img_size: u64,
+    bmap: Option<bb_bmap_parser::Bmap>,
+    sd: Sd,
+    mut chan: Option<mpsc::Sender<f32>>,
+) -> Result<Sd>
+where
+    Sd: AsyncWrite + AsyncSeek + Unpin + Send + 'static,
+{
+    const NUM_BUFFERS: usize = 4;
+
+    let (tx1, rx1) = mpsc::channel(NUM_BUFFERS);
+    let (tx2, rx2) = mpsc::channel(NUM_BUFFERS);
+    let global_start = Instant::now();
+
+    // Starting buffers
+    for _ in 0..NUM_BUFFERS {
+        tx1.send(Box::new(DirectIoBuffer::new())).await.unwrap();
+    }
+
+    let mut reader = tokio::spawn(reader_task_async(img, rx1, tx2));
+    let mut writer = match bmap {
+        Some(x) => tokio::spawn(writer_task_bmap_async(x, sd, chan, rx2, tx1)),
+        None => tokio::spawn(writer_task_async(img_size, sd, chan, rx2, tx1)),
+    };
+
+    let res = tokio::select! {
+        r = &mut reader => {
+            match r.unwrap() {
+                Ok(()) => {
+                    writer.await.unwrap()
+                }
+                Err(e) => {
+                    writer.abort();
+                    Err(e)
+                }
+            }
+        }
+
+        r = &mut writer => {
+            match r.unwrap() {
+                Ok(sd) => {
+                    reader.await.unwrap()?;
+                    Ok(sd)
+                }
+                Err(e) => {
+                    reader.abort();
+                    Err(e)
+                }
+            }
+        }
+    };
+
+    tracing::info!("Total Time taken: {:?}", global_start.elapsed());
+
+    res
 }
 
 /// Flash OS image to SD card.
