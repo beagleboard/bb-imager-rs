@@ -224,20 +224,20 @@ pub async fn flash<R: Read + Send + 'static>(
                 .await?
                 .into_std()
                 .await;
-            flash_common(img, bmap, sd, chan, customizations, cancel).await
+            flash_internal(img, bmap, sd, chan, customizations, cancel).await
         }
         crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path).await?;
-            flash_common(img, bmap, sd, chan, customizations, cancel).await
+            flash_internal(img, bmap, sd, chan, customizations, cancel).await
         }
     }
 }
 
-async fn flash_common<R: Read + Send + 'static>(
+async fn flash_internal<R: Read + Send + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     sd: impl Read + Write + Seek + Eject + std::fmt::Debug + Send + 'static,
-    chan: Option<mpsc::Sender<f32>>,
+    mut chan: Option<mpsc::Sender<f32>>,
     customizations: Vec<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
@@ -252,7 +252,32 @@ async fn flash_common<R: Read + Send + 'static>(
 
     let cancel_child = cancel.as_ref().map(|x| x.child_token());
     let res = tokio::task::spawn_blocking(move || {
-        flash_internal(img, img_size, bmap, sd, chan, customizations, cancel_child)
+        chan_send(chan.as_mut(), 0.0);
+
+        let mut sd = crate::helpers::SdCardWrapper::new(sd);
+
+        tracing::info!("Writing to SD Card");
+        write_sd(
+            img,
+            img_size,
+            bmap,
+            &mut sd,
+            chan.as_mut(),
+            cancel_child.clone(),
+        )?;
+
+        check_token(cancel_child.as_ref())?;
+
+        tracing::info!("Applying customization");
+        for c in customizations {
+            let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
+            c.customize(temp)?;
+        }
+
+        tracing::info!("Ejecting SD Card");
+        let _ = sd.eject();
+
+        Ok(())
     })
     .await
     .unwrap();
@@ -261,34 +286,4 @@ async fn flash_common<R: Read + Send + 'static>(
     let _drop_guard = cancel.map(|x| x.drop_guard());
 
     res
-}
-
-fn flash_internal(
-    img: impl Read + Send,
-    img_size: u64,
-    bmap: Option<bb_bmap_parser::Bmap>,
-    sd: impl Read + Write + Seek + Eject + std::fmt::Debug,
-    mut chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
-) -> Result<()> {
-    chan_send(chan.as_mut(), 0.0);
-
-    let mut sd = crate::helpers::SdCardWrapper::new(sd);
-
-    tracing::info!("Writing to SD Card");
-    write_sd(img, img_size, bmap, &mut sd, chan.as_mut(), cancel.clone())?;
-
-    check_token(cancel.as_ref())?;
-
-    tracing::info!("Applying customization");
-    for c in customizations {
-        let temp = crate::helpers::DeviceWrapper::new(&mut sd).unwrap();
-        c.customize(temp)?;
-    }
-
-    tracing::info!("Ejecting SD Card");
-    let _ = sd.eject();
-
-    Ok(())
 }
