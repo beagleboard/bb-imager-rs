@@ -34,6 +34,7 @@ impl Eject for std::fs::File {
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]
+/// Wrapper to perform aligned read/write operations.
 pub(crate) struct DeviceWrapper<F> {
     f: F,
     offset: u64,
@@ -63,7 +64,7 @@ where
     F: io::Seek,
 {
     pub(crate) fn new(mut f: F) -> io::Result<Self> {
-        f.seek(io::SeekFrom::Start(0))?;
+        f.rewind()?;
         Ok(Self {
             f,
             offset: 0,
