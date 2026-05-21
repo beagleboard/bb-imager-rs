@@ -7,7 +7,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{DirectIoBuffer, EjectAsync, chan_send, progress};
+use crate::helpers::{DirectIoBuffer, Eject, chan_send, progress};
 
 #[cfg(test)]
 mod tests;
@@ -18,13 +18,13 @@ const BUFFER_SIZE: usize = 1 * 1024 * 1024;
 #[cfg(debug_assertions)]
 const BUFFER_SIZE: usize = 8 * 1024;
 
-async fn reader_task_async(
+async fn reader_task(
     mut img: impl AsyncRead + Unpin,
     mut buf_rx: mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     buf_tx: mpsc::Sender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
 ) -> Result<()> {
     while let Some(mut buf) = buf_rx.recv().await {
-        let count = read_aligned_async(&mut img, buf.as_mut_slice()).await?;
+        let count = read_aligned(&mut img, buf.as_mut_slice()).await?;
         if count == 0 {
             break;
         }
@@ -43,7 +43,7 @@ async fn reader_task_async(
 /// - All writes should be aligned to block size (4K).
 ///
 /// Thus, we will be writing some data that is not strictly present in the bmap.
-async fn writer_task_bmap_async<Sd>(
+async fn writer_task_bmap<Sd>(
     bmap: bb_bmap_parser::Bmap,
     mut sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
@@ -101,7 +101,7 @@ where
     Ok(sd)
 }
 
-async fn writer_task_async<Sd>(
+async fn writer_task<Sd>(
     img_size: u64,
     mut sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
@@ -134,7 +134,7 @@ where
 
 /// A lot of reads from compressed files are not aligned. Since reading even from compressed files
 /// is significantly faster than writing to SD Card, better to do multiple reads.
-async fn read_aligned_async(mut img: impl AsyncRead + Unpin, buf: &mut [u8]) -> Result<usize> {
+async fn read_aligned(mut img: impl AsyncRead + Unpin, buf: &mut [u8]) -> Result<usize> {
     const ALIGNMENT: usize = 512;
 
     let mut pos = 0;
@@ -155,7 +155,7 @@ async fn read_aligned_async(mut img: impl AsyncRead + Unpin, buf: &mut [u8]) -> 
     Ok(pos)
 }
 
-async fn write_sd_async<Sd>(
+async fn write_sd<Sd>(
     img: impl AsyncRead + Unpin + Send + 'static,
     img_size: u64,
     bmap: Option<bb_bmap_parser::Bmap>,
@@ -176,10 +176,10 @@ where
         tx1.send(Box::new(DirectIoBuffer::new())).await.unwrap();
     }
 
-    let mut reader = tokio::spawn(reader_task_async(img, rx1, tx2));
+    let mut reader = tokio::spawn(reader_task(img, rx1, tx2));
     let mut writer = match bmap {
-        Some(x) => tokio::spawn(writer_task_bmap_async(x, sd, chan, rx2, tx1)),
-        None => tokio::spawn(writer_task_async(img_size, sd, chan, rx2, tx1)),
+        Some(x) => tokio::spawn(writer_task_bmap(x, sd, chan, rx2, tx1)),
+        None => tokio::spawn(writer_task(img_size, sd, chan, rx2, tx1)),
     };
 
     let res = tokio::select! {
@@ -283,19 +283,19 @@ pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
                 .truncate(true)
                 .open(path)
                 .await?;
-            flash_internal_async(img, bmap, sd, chan, customizations).await
+            flash_internal(img, bmap, sd, chan, customizations).await
         }
         crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path).await?;
-            flash_internal_async(img, bmap, sd, chan, customizations).await
+            flash_internal(img, bmap, sd, chan, customizations).await
         }
     }
 }
 
-async fn flash_internal_async<R: AsyncRead + Send + Unpin + 'static>(
+async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
-    sd: impl AsyncRead + AsyncWrite + AsyncSeek + EjectAsync + std::fmt::Debug + Send + Unpin + 'static,
+    sd: impl AsyncRead + AsyncWrite + AsyncSeek + Eject + std::fmt::Debug + Send + Unpin + 'static,
     mut chan: Option<mpsc::Sender<f32>>,
     customizations: Vec<Customization>,
 ) -> Result<()> {
@@ -310,13 +310,13 @@ async fn flash_internal_async<R: AsyncRead + Send + Unpin + 'static>(
 
     chan_send(chan.as_mut(), 0.0);
 
-    let sd = crate::helpers::SdCardWrapperAsync::new(sd);
+    let sd = crate::helpers::SdCardWrapper::new(sd);
 
     tracing::info!("Writing to SD Card");
-    let sd = write_sd_async(img, img_size, bmap, sd, chan).await?;
+    let sd = write_sd(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    let mut temp = crate::helpers::DeviceWrapperAsync::new(sd).await.unwrap();
+    let mut temp = crate::helpers::DeviceWrapper::new(sd).await.unwrap();
     let sd = tokio::task::spawn_blocking(move || {
         for c in customizations {
             c.customize_async(&mut temp)?;

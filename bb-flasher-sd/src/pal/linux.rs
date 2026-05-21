@@ -1,4 +1,4 @@
-use crate::helpers::EjectAsync;
+use crate::helpers::Eject;
 use crate::{Error, Result};
 
 use std::{
@@ -139,7 +139,7 @@ pub(crate) struct LinuxDrive {
 }
 
 #[cfg(feature = "udev")]
-impl EjectAsync for LinuxDrive {
+impl Eject for LinuxDrive {
     async fn eject(self) -> io::Result<()> {
         async fn inner(dst: PathBuf) -> io::Result<()> {
             let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
@@ -191,7 +191,7 @@ impl EjectAsync for LinuxDrive {
 }
 
 #[cfg(not(feature = "udev"))]
-impl EjectAsync for LinuxDrive {
+impl Eject for LinuxDrive {
     async fn eject(self) -> std::io::Result<()> {
         let _ = self.file.sync_all().await;
         let drive = self.drive.clone();

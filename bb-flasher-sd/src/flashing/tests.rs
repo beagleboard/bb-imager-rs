@@ -1,6 +1,6 @@
-use crate::flashing::{BUFFER_SIZE, read_aligned_async};
+use crate::flashing::{BUFFER_SIZE, read_aligned};
 
-use super::write_sd_async;
+use super::write_sd;
 
 fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
     let data: Vec<u8> = (0..len)
@@ -17,7 +17,7 @@ async fn sd_write() {
     let dummy_file = test_file(FILE_LEN);
     let sd = std::io::Cursor::new(Vec::<u8>::new());
 
-    let sd = write_sd_async(dummy_file.clone(), FILE_LEN as u64, None, sd, None)
+    let sd = write_sd(dummy_file.clone(), FILE_LEN as u64, None, sd, None)
         .await
         .unwrap();
 
@@ -51,7 +51,7 @@ async fn sd_write_bmap() {
 
     let bmap = bmap.build().unwrap();
 
-    let sd = write_sd_async(
+    let sd = write_sd(
         dummy_file.clone(),
         FILE_LEN as u64,
         Some(bmap.clone()),
@@ -87,7 +87,7 @@ async fn aligned_read() {
     let mut pos = 0;
 
     loop {
-        let count = read_aligned_async(&mut dummy_file, &mut buf).await.unwrap();
+        let count = read_aligned(&mut dummy_file, &mut buf).await.unwrap();
         if count == 0 {
             break;
         }

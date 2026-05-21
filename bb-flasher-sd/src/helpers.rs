@@ -1,7 +1,7 @@
 use std::{io, pin::Pin, task::Poll};
 
 use tokio::{
-    io::{AsyncReadExt, AsyncSeekExt},
+    io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite},
     sync::mpsc,
 };
 
@@ -15,11 +15,11 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
 }
 
-pub(crate) trait EjectAsync {
+pub(crate) trait Eject {
     fn eject(self) -> impl Future<Output = io::Result<()>>;
 }
 
-impl EjectAsync for tokio::fs::File {
+impl Eject for tokio::fs::File {
     async fn eject(self) -> io::Result<()> {
         self.sync_all().await
     }
@@ -29,7 +29,7 @@ const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]
 /// Wrapper to perform aligned read/write operations.
-pub(crate) struct DeviceWrapperAsync<F> {
+pub(crate) struct DeviceWrapper<F> {
     f: F,
     offset: u64,
     buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
@@ -37,7 +37,7 @@ pub(crate) struct DeviceWrapperAsync<F> {
     pending_offset: Option<u64>,
 }
 
-impl<F> DeviceWrapperAsync<F> {
+impl<F> DeviceWrapper<F> {
     /// Start offset of current block
     const fn block_offset(&self) -> u64 {
         self.offset - self.cache_buf_offset() as u64
@@ -54,13 +54,12 @@ impl<F> DeviceWrapperAsync<F> {
     }
 }
 
-impl<F> DeviceWrapperAsync<F>
+impl<F> DeviceWrapper<F>
 where
-    F: tokio::io::AsyncSeek + Unpin,
+    F: AsyncSeek + Unpin,
 {
     pub(crate) async fn new(mut f: F) -> io::Result<Self> {
         f.rewind().await?;
-
         Ok(Self {
             f,
             offset: 0,
@@ -72,16 +71,14 @@ where
     }
 }
 
-impl<F> DeviceWrapperAsync<F>
+impl<F> DeviceWrapper<F>
 where
-    F: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+    F: AsyncRead + AsyncSeek + Unpin,
 {
     async fn fill_cache(&mut self) -> io::Result<()> {
         if self.cache_offset != self.block_offset() {
             self.cache_offset = self.block_offset();
-
             self.f.seek(io::SeekFrom::Start(self.cache_offset)).await?;
-
             self.f.read_exact(self.buf.as_mut_slice()).await?;
         }
 
@@ -89,9 +86,9 @@ where
     }
 }
 
-impl<F> tokio::io::AsyncRead for DeviceWrapperAsync<F>
+impl<F> AsyncRead for DeviceWrapper<F>
 where
-    F: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+    F: AsyncRead + AsyncSeek + Unpin,
 {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -100,7 +97,6 @@ where
     ) -> Poll<io::Result<()>> {
         {
             let fut = self.fill_cache();
-
             tokio::pin!(fut);
 
             match fut.poll(cx) {
@@ -111,7 +107,6 @@ where
         }
 
         let count = std::cmp::min(buf.remaining(), self.cache_buf_hit_len());
-
         let start = self.cache_buf_offset();
 
         buf.put_slice(&self.buf.as_slice()[start..(start + count)]);
@@ -122,9 +117,9 @@ where
     }
 }
 
-impl<F> tokio::io::AsyncWrite for DeviceWrapperAsync<F>
+impl<F> AsyncWrite for DeviceWrapper<F>
 where
-    F: tokio::io::AsyncWrite + tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+    F: AsyncWrite + AsyncRead + AsyncSeek + Unpin,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
@@ -193,9 +188,9 @@ where
     }
 }
 
-impl<F> tokio::io::AsyncSeek for DeviceWrapperAsync<F>
+impl<F> AsyncSeek for DeviceWrapper<F>
 where
-    F: tokio::io::AsyncSeek + Unpin,
+    F: AsyncSeek + Unpin,
 {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let new_offset = match position {
@@ -240,9 +235,9 @@ where
     }
 }
 
-impl<W> EjectAsync for DeviceWrapperAsync<W>
+impl<W> Eject for DeviceWrapper<W>
 where
-    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin + EjectAsync,
+    W: AsyncRead + AsyncWrite + AsyncSeek + Unpin + Eject,
 {
     async fn eject(self) -> io::Result<()> {
         self.f.eject().await
@@ -274,15 +269,15 @@ impl<const N: usize> DirectIoBuffer<N> {
 /// A wrapper to support writing the first block at the end. This is required on Windows to make
 /// things work reliably.
 #[derive(Debug)]
-pub(crate) struct SdCardWrapperAsync<W> {
+pub(crate) struct SdCardWrapper<W> {
     inner: W,
     buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
     pos: u64,
 }
 
-impl<W> SdCardWrapperAsync<W>
+impl<W> SdCardWrapper<W>
 where
-    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin,
+    W: AsyncRead + AsyncWrite + AsyncSeek + Unpin,
 {
     pub(crate) fn new(inner: W) -> Self {
         Self {
@@ -303,9 +298,9 @@ where
     }
 }
 
-impl<W> EjectAsync for SdCardWrapperAsync<W>
+impl<W> Eject for SdCardWrapper<W>
 where
-    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin + EjectAsync,
+    W: AsyncRead + AsyncWrite + AsyncSeek + Unpin + Eject,
 {
     async fn eject(mut self) -> io::Result<()> {
         self.finish().await?;
@@ -313,9 +308,9 @@ where
     }
 }
 
-impl<W> tokio::io::AsyncRead for SdCardWrapperAsync<W>
+impl<W> AsyncRead for SdCardWrapper<W>
 where
-    W: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+    W: AsyncRead + AsyncSeek + Unpin,
 {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -367,9 +362,9 @@ where
     }
 }
 
-impl<W> tokio::io::AsyncWrite for SdCardWrapperAsync<W>
+impl<W> AsyncWrite for SdCardWrapper<W>
 where
-    W: tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin,
+    W: AsyncWrite + AsyncSeek + Unpin,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
@@ -432,9 +427,9 @@ where
     }
 }
 
-impl<W> tokio::io::AsyncSeek for SdCardWrapperAsync<W>
+impl<W> AsyncSeek for SdCardWrapper<W>
 where
-    W: tokio::io::AsyncSeek + Unpin,
+    W: AsyncSeek + Unpin,
 {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         Pin::new(&mut self.inner).start_seek(position)
@@ -472,12 +467,12 @@ mod tests {
         std::io::Cursor::new(data.into())
     }
 
-    async fn test_file() -> super::DeviceWrapperAsync<std::io::Cursor<Box<[u8]>>> {
+    async fn test_file() -> super::DeviceWrapper<std::io::Cursor<Box<[u8]>>> {
         let data: Vec<u8> = (0..FILE_LEN)
             .map(|x| x % 255)
             .map(|x| u8::try_from(x).unwrap())
             .collect();
-        super::DeviceWrapperAsync::new(std::io::Cursor::new(data.into()))
+        super::DeviceWrapper::new(std::io::Cursor::new(data.into()))
             .await
             .unwrap()
     }
@@ -527,7 +522,7 @@ mod tests {
     async fn sd_card_wrapper() {
         let mut test_data = test_data();
         let mut temp_buf = vec![0; FILE_LEN].into_boxed_slice();
-        let mut sd = SdCardWrapperAsync::new(std::io::Cursor::new(temp_buf.clone()));
+        let mut sd = SdCardWrapper::new(std::io::Cursor::new(temp_buf.clone()));
 
         tokio::io::copy(&mut test_data, &mut sd).await.unwrap();
 
