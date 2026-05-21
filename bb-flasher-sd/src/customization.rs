@@ -111,6 +111,17 @@ pub struct Customization {
 }
 
 impl Customization {
+    pub(crate) fn customize_async(
+        &self,
+        dst: impl tokio::io::AsyncRead
+        + tokio::io::AsyncSeek
+        + tokio::io::AsyncWrite
+        + std::fmt::Debug
+        + Unpin,
+    ) -> Result<()> {
+        self.customize(tokio_util::io::SyncIoBridge::new(dst))
+    }
+
     pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
         let partition = self.partition.open(dst)?;
         let root = partition.root_dir();
