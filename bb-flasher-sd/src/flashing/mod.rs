@@ -287,6 +287,7 @@ pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
         }
         crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path).await?;
+            let sd = crate::helpers::SdCardWrapper::new(sd);
             flash_internal(img, bmap, sd, chan, customizations).await
         }
     }
@@ -310,24 +311,23 @@ async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
 
     chan_send(chan.as_mut(), 0.0);
 
-    let sd = crate::helpers::SdCardWrapper::new(sd);
-
     tracing::info!("Writing to SD Card");
     let sd = write_sd(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    let mut temp = crate::helpers::DeviceWrapper::new(sd).await.unwrap();
+    let sd = crate::helpers::DeviceWrapper::new(sd).await.unwrap();
+    let mut sd = tokio_util::io::SyncIoBridge::new(sd);
     let sd = tokio::task::spawn_blocking(move || {
         for c in customizations {
-            c.customize_async(&mut temp)?;
+            c.customize(&mut sd)?;
         }
-        Ok::<_, crate::Error>(temp)
+        Ok::<_, crate::Error>(sd)
     })
     .await
     .unwrap()?;
 
     tracing::info!("Ejecting SD Card");
-    let _ = sd.eject().await;
+    let _ = sd.into_inner().eject().await;
 
     Ok(())
 }

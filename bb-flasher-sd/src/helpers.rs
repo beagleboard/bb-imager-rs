@@ -1,7 +1,7 @@
 use std::{io, pin::Pin, task::Poll};
 
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite},
+    io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt},
     sync::mpsc,
 };
 
@@ -34,7 +34,15 @@ pub(crate) struct DeviceWrapper<F> {
     offset: u64,
     buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
     cache_offset: u64,
-    pending_offset: Option<u64>,
+    state: DeviceWrapperState,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum DeviceWrapperState {
+    Idle,
+    Seeking,
+    Reading(usize),
+    Writing(usize),
 }
 
 impl<F> DeviceWrapper<F> {
@@ -52,6 +60,14 @@ impl<F> DeviceWrapper<F> {
     const fn cache_buf_hit_len(&self) -> usize {
         self.buf.len() - self.cache_buf_offset()
     }
+
+    fn reset_state(&mut self) {
+        self.set_state(DeviceWrapperState::Idle);
+    }
+
+    fn set_state(&mut self, state: DeviceWrapperState) {
+        self.state = state;
+    }
 }
 
 impl<F> DeviceWrapper<F>
@@ -66,7 +82,7 @@ where
             // Hack to make reading from 0 working
             cache_offset: 1,
             buf: Box::new(DirectIoBuffer::new()),
-            pending_offset: None,
+            state: DeviceWrapperState::Idle,
         })
     }
 }
@@ -75,14 +91,77 @@ impl<F> DeviceWrapper<F>
 where
     F: AsyncRead + AsyncSeek + Unpin,
 {
-    async fn fill_cache(&mut self) -> io::Result<()> {
-        if self.cache_offset != self.block_offset() {
-            self.cache_offset = self.block_offset();
-            self.f.seek(io::SeekFrom::Start(self.cache_offset)).await?;
-            self.f.read_exact(self.buf.as_mut_slice()).await?;
+    fn poll_seek(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+        pos: io::SeekFrom,
+    ) -> Poll<io::Result<()>> {
+        loop {
+            match self.state {
+                DeviceWrapperState::Idle => {
+                    // Ensure no pending seek
+                    let mut inner = Pin::new(&mut self.f);
+                    std::task::ready!(inner.as_mut().poll_complete(cx))?;
+
+                    if let Err(e) = Pin::new(&mut self.f).as_mut().start_seek(pos) {
+                        return Poll::Ready(Err(e));
+                    }
+
+                    self.set_state(DeviceWrapperState::Seeking);
+                }
+                DeviceWrapperState::Seeking => {
+                    let mut inner = Pin::new(&mut self.f);
+                    std::task::ready!(inner.as_mut().poll_complete(cx))?;
+
+                    self.reset_state();
+                    break;
+                }
+                _ => break,
+            }
         }
 
-        Ok(())
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_fill_cache(&mut self, cx: &mut std::task::Context<'_>) -> Poll<io::Result<()>> {
+        if self.cache_offset != self.block_offset() {
+            let new_cache_offset = self.block_offset();
+            std::task::ready!(self.poll_seek(cx, io::SeekFrom::Start(new_cache_offset)))?;
+
+            loop {
+                match self.state {
+                    DeviceWrapperState::Idle => {
+                        self.set_state(DeviceWrapperState::Reading(0));
+                    }
+                    DeviceWrapperState::Reading(pos) => {
+                        if pos == self.buf.len() {
+                            self.reset_state();
+                            self.cache_offset = self.block_offset();
+                            break;
+                        }
+
+                        let mut inner = Pin::new(&mut self.f);
+                        let mut buf = tokio::io::ReadBuf::new(&mut self.buf.as_mut_slice()[pos..]);
+
+                        let before = buf.filled().len();
+                        std::task::ready!(inner.as_mut().poll_read(cx, &mut buf))?;
+                        let after = buf.filled().len();
+                        // EOF
+                        if before == after {
+                            return Poll::Ready(Err(io::Error::new(
+                                io::ErrorKind::UnexpectedEof,
+                                "Encountered EOF",
+                            )));
+                        }
+
+                        self.state = DeviceWrapperState::Reading(pos + after);
+                    }
+                    _ => break,
+                }
+            }
+        }
+
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -95,16 +174,7 @@ where
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        {
-            let fut = self.fill_cache();
-            tokio::pin!(fut);
-
-            match fut.poll(cx) {
-                Poll::Ready(Ok(())) => {}
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
-            }
-        }
+        std::task::ready!(self.poll_fill_cache(cx))?;
 
         let count = std::cmp::min(buf.remaining(), self.cache_buf_hit_len());
         let start = self.cache_buf_offset();
@@ -126,45 +196,39 @@ where
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        {
-            let fut = self.fill_cache();
-            tokio::pin!(fut);
-            match fut.poll(cx) {
-                Poll::Ready(Ok(())) => {}
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
-            }
-        }
+        std::task::ready!(self.poll_fill_cache(cx))?;
 
         let count = std::cmp::min(buf.len(), self.cache_buf_hit_len());
         let start = self.cache_buf_offset();
 
         self.buf.as_mut_slice()[start..(start + count)].copy_from_slice(&buf[..count]);
 
-        {
-            let cache_offset = self.cache_offset;
-            let (f, write_buf) = {
-                let this = &mut *self;
-                (&mut this.f, this.buf.as_slice())
-            };
+        let cache_offset = self.cache_offset;
+        std::task::ready!(self.poll_seek(cx, io::SeekFrom::Start(cache_offset)))?;
 
-            let mut inner = Pin::new(f);
+        loop {
+            match self.state {
+                DeviceWrapperState::Idle => {
+                    self.set_state(DeviceWrapperState::Writing(0));
+                }
+                DeviceWrapperState::Writing(pos) => {
+                    let (f, write_buf) = {
+                        let this = &mut *self;
+                        (&mut this.f, this.buf.as_slice())
+                    };
 
-            match inner.as_mut().start_seek(io::SeekFrom::Start(cache_offset)) {
-                Ok(()) => {}
-                Err(e) => return Poll::Ready(Err(e)),
-            }
+                    if write_buf.len() == pos {
+                        // Since writing is finished, go back to idle.
+                        self.reset_state();
+                        break;
+                    }
 
-            match inner.as_mut().poll_complete(cx) {
-                Poll::Ready(Ok(_)) => {}
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
-            }
+                    let inner = Pin::new(f);
+                    let written = std::task::ready!(inner.poll_write(cx, &write_buf[pos..]))?;
 
-            match inner.poll_write(cx, write_buf) {
-                Poll::Ready(Ok(_)) => {}
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
+                    self.set_state(DeviceWrapperState::Writing(pos + written));
+                }
+                _ => break,
             }
         }
 
@@ -195,20 +259,18 @@ where
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let new_offset = match position {
             io::SeekFrom::Start(i) => i,
-
             io::SeekFrom::Current(i) => self
                 .offset
                 .checked_add_signed(i)
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid seek"))?,
-
             io::SeekFrom::End(_) => {
                 Pin::new(&mut self.f).start_seek(position)?;
-                self.pending_offset = None;
+                self.set_state(DeviceWrapperState::Seeking);
                 return Ok(());
             }
         };
 
-        self.pending_offset = Some(new_offset);
+        self.offset = new_offset;
 
         Ok(())
     }
@@ -217,21 +279,12 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<io::Result<u64>> {
-        if let Some(offset) = self.pending_offset.take() {
-            self.offset = offset;
-            return Poll::Ready(Ok(offset));
+        if self.state == DeviceWrapperState::Seeking {
+            self.offset = std::task::ready!(Pin::new(&mut self.f).poll_complete(cx))?;
+            self.reset_state();
         }
 
-        match Pin::new(&mut self.f).poll_complete(cx) {
-            Poll::Ready(Ok(pos)) => {
-                self.offset = pos;
-                Poll::Ready(Ok(pos))
-            }
-
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-
-            Poll::Pending => Poll::Pending,
-        }
+        Poll::Ready(Ok(self.offset))
     }
 }
 
@@ -288,9 +341,7 @@ where
     }
 
     pub(crate) async fn finish(&mut self) -> io::Result<()> {
-        use tokio::io::{AsyncSeekExt, AsyncWriteExt};
-
-        self.inner.seek(io::SeekFrom::Start(0)).await?;
+        self.inner.rewind().await?;
         self.inner.write_all(self.buf.as_slice()).await?;
         self.pos = u64::try_from(self.buf.len()).unwrap();
 
@@ -451,9 +502,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::io::SeekFrom;
+    use std::io::{SeekFrom, Write};
 
-    use tokio::io::AsyncWriteExt;
+    use tokio::io::AsyncReadExt;
 
     use super::*;
 
@@ -467,20 +518,30 @@ mod tests {
         std::io::Cursor::new(data.into())
     }
 
-    async fn test_file() -> super::DeviceWrapper<std::io::Cursor<Box<[u8]>>> {
+    async fn test_file() -> super::DeviceWrapper<tokio::fs::File> {
         let data: Vec<u8> = (0..FILE_LEN)
             .map(|x| x % 255)
             .map(|x| u8::try_from(x).unwrap())
             .collect();
-        super::DeviceWrapper::new(std::io::Cursor::new(data.into()))
-            .await
-            .unwrap()
+
+        let f = tempfile::tempfile().unwrap();
+        let mut f = tokio::fs::File::from_std(f);
+
+        f.write_all(&data).await.unwrap();
+        f.flush().await.unwrap();
+        f.rewind().await.unwrap();
+
+        super::DeviceWrapper::new(f).await.unwrap()
     }
 
     #[tokio::test]
     async fn dev_wrapper_read() {
         let mut temp = test_file().await;
         let mut buf = [0u8; 50];
+
+        temp.read_exact(&mut buf).await.unwrap();
+        let ans: Vec<u8> = (0..50).collect();
+        assert_eq!(buf.as_slice(), &ans);
 
         temp.seek(SeekFrom::Start(10)).await.unwrap();
         temp.read_exact(&mut buf).await.unwrap();
@@ -503,9 +564,11 @@ mod tests {
         let mut buf = [9u8; 50];
         temp.seek(SeekFrom::Start(10)).await.unwrap();
         temp.write_all(&buf).await.unwrap();
+        temp.flush().await.unwrap();
 
         temp.seek(SeekFrom::Start(4090)).await.unwrap();
         temp.write_all(&buf).await.unwrap();
+        temp.flush().await.unwrap();
 
         temp.seek(SeekFrom::Start(10)).await.unwrap();
         temp.read_exact(&mut buf).await.unwrap();

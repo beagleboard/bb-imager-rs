@@ -82,6 +82,8 @@ impl PartitionTable {
             return Ok(PartitionTable::Mbr);
         }
 
+        tracing::debug!("{:?}", buf);
+
         Err(crate::Error::InvalidPartitionTable)
     }
 }
@@ -111,18 +113,11 @@ pub struct Customization {
 }
 
 impl Customization {
-    pub(crate) fn customize_async(
+    pub(crate) fn customize(
         &self,
-        dst: impl tokio::io::AsyncRead
-        + tokio::io::AsyncSeek
-        + tokio::io::AsyncWrite
-        + std::fmt::Debug
-        + Unpin,
+        mut dst: impl Write + Seek + Read + std::fmt::Debug,
     ) -> Result<()> {
-        self.customize(tokio_util::io::SyncIoBridge::new(dst))
-    }
-
-    pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
+        dst.rewind()?;
         let partition = self.partition.open(dst)?;
         let root = partition.root_dir();
 
@@ -138,10 +133,12 @@ impl Customization {
                 ContentType::File(path) => {
                     let mut source = std::fs::File::open(path)?;
                     std::io::copy(&mut source, &mut f)?;
+                    f.flush()?;
                 }
                 ContentType::Data(items) => {
                     f.seek(SeekFrom::End(0))?;
                     f.write_all(items)?;
+                    f.flush()?;
                 }
             }
         }

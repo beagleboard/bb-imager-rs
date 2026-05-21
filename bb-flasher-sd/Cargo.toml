@@ -24,6 +24,9 @@ tokio-util = { version = "0.7", features = ["io-util", "compat"] }
 anyhow = "1.0"
 futures = "0.3"
 
+[dev-dependencies]
+tempfile = "3.27"
+
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
 libc = "0.2"

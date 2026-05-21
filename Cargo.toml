@@ -18,9 +18,9 @@ members = [
         "bb-bmap-parser"
 ]
 
-[profile.release]
-lto = true
-codegen-units = 1
+# [profile.release]
+# lto = true
+# codegen-units = 1
 
 [workspace.package]
 version = "1.0.7"
