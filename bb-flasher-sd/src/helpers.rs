@@ -240,6 +240,15 @@ where
     }
 }
 
+impl<W> EjectAsync for DeviceWrapperAsync<W>
+where
+    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin + EjectAsync,
+{
+    async fn eject(self) -> io::Result<()> {
+        self.f.eject().await
+    }
+}
+
 #[repr(align(4096))]
 #[derive(Debug)]
 pub(crate) struct DirectIoBuffer<const N: usize>([u8; N]);

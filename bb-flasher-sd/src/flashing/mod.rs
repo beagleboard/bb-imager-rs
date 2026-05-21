@@ -313,15 +313,18 @@ async fn flash_internal_async<R: AsyncRead + Send + Unpin + 'static>(
     let sd = crate::helpers::SdCardWrapperAsync::new(sd);
 
     tracing::info!("Writing to SD Card");
-    let mut sd = write_sd_async(img, img_size, bmap, sd, chan).await?;
+    let sd = write_sd_async(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    for c in customizations {
-        let temp = crate::helpers::DeviceWrapperAsync::new(&mut sd)
-            .await
-            .unwrap();
-        c.customize_async(temp)?;
-    }
+    let mut temp = crate::helpers::DeviceWrapperAsync::new(sd).await.unwrap();
+    let sd = tokio::task::spawn_blocking(move || {
+        for c in customizations {
+            c.customize_async(&mut temp)?;
+        }
+        Ok::<_, crate::Error>(temp)
+    })
+    .await
+    .unwrap()?;
 
     tracing::info!("Ejecting SD Card");
     let _ = sd.eject().await;
