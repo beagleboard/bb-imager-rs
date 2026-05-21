@@ -34,6 +34,16 @@ impl Eject for std::fs::File {
     }
 }
 
+pub(crate) trait EjectAsync {
+    fn eject(self) -> impl Future<Output = io::Result<()>>;
+}
+
+impl EjectAsync for tokio::fs::File {
+    async fn eject(self) -> io::Result<()> {
+        self.sync_all().await
+    }
+}
+
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]
@@ -515,15 +525,13 @@ where
     }
 }
 
-impl<W> Eject for SdCardWrapperAsync<W>
+impl<W> EjectAsync for SdCardWrapperAsync<W>
 where
-    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin + Eject,
+    W: tokio::io::AsyncRead + tokio::io::AsyncWrite + tokio::io::AsyncSeek + Unpin + EjectAsync,
 {
-    fn eject(mut self) -> io::Result<()> {
-        tokio::runtime::Handle::current().block_on(async {
-            self.finish().await?;
-            self.inner.eject()
-        })
+    async fn eject(mut self) -> io::Result<()> {
+        self.finish().await?;
+        self.inner.eject().await
     }
 }
 

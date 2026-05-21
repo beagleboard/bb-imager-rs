@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_token, progress};
+use crate::helpers::{DirectIoBuffer, Eject, EjectAsync, chan_send, check_token, progress};
 
 #[cfg(test)]
 mod tests;
@@ -417,6 +417,33 @@ pub async fn flash<R: Read + Send + 'static>(
     }
 }
 
+pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
+    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
+    dst: crate::Destination,
+    chan: Option<mpsc::Sender<f32>>,
+    customizations: Vec<Customization>,
+) -> Result<()> {
+    tracing::info!("Opening Destination");
+
+    match dst {
+        crate::Destination::File(path) => {
+            let sd = tokio::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .await?;
+            flash_internal_async(img, bmap, sd, chan, customizations).await
+        }
+        crate::Destination::SdCard(path) => {
+            let sd = crate::pal::open(&path).await?;
+            flash_internal_async(img, bmap, sd, chan, customizations).await
+        }
+    }
+}
+
 async fn flash_internal<R: Read + Send + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
@@ -470,4 +497,41 @@ async fn flash_internal<R: Read + Send + 'static>(
     let _drop_guard = cancel.map(|x| x.drop_guard());
 
     res
+}
+
+async fn flash_internal_async<R: AsyncRead + Send + Unpin + 'static>(
+    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
+    sd: impl AsyncRead + AsyncWrite + AsyncSeek + EjectAsync + std::fmt::Debug + Send + Unpin + 'static,
+    mut chan: Option<mpsc::Sender<f32>>,
+    customizations: Vec<Customization>,
+) -> Result<()> {
+    tracing::info!("Resolving Image");
+    let bmap = match bmap {
+        Some(x) => {
+            Some(bb_bmap_parser::Bmap::from_xml(&x.await?).map_err(|_| crate::Error::InvalidBmap)?)
+        }
+        None => None,
+    };
+    let (img, img_size) = img.await?;
+
+    chan_send(chan.as_mut(), 0.0);
+
+    let sd = crate::helpers::SdCardWrapperAsync::new(sd);
+
+    tracing::info!("Writing to SD Card");
+    let mut sd = write_sd_async(img, img_size, bmap, sd, chan).await?;
+
+    tracing::info!("Applying customization");
+    for c in customizations {
+        let temp = crate::helpers::DeviceWrapperAsync::new(&mut sd)
+            .await
+            .unwrap();
+        c.customize_async(temp)?;
+    }
+
+    tracing::info!("Ejecting SD Card");
+    let _ = sd.eject().await;
+
+    Ok(())
 }
