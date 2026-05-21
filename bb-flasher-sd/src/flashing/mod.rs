@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::Result;
 use crate::customization::Customization;
@@ -305,7 +306,7 @@ async fn write_sd_async<Sd>(
     img_size: u64,
     bmap: Option<bb_bmap_parser::Bmap>,
     sd: Sd,
-    mut chan: Option<mpsc::Sender<f32>>,
+    chan: Option<mpsc::Sender<f32>>,
 ) -> Result<Sd>
 where
     Sd: AsyncWrite + AsyncSeek + Unpin + Send + 'static,
@@ -335,6 +336,7 @@ where
                 }
                 Err(e) => {
                     writer.abort();
+                    tracing::error!("Reader failed");
                     Err(e)
                 }
             }
@@ -348,6 +350,7 @@ where
                 }
                 Err(e) => {
                     reader.abort();
+                    tracing::error!("Writer failed");
                     Err(e)
                 }
             }
@@ -393,28 +396,19 @@ pub async fn flash<R: Read + Send + 'static>(
     dst: crate::Destination,
     chan: Option<mpsc::Sender<f32>>,
     customizations: Vec<Customization>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    _cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
-    tracing::info!("Opening Destination");
-
-    match dst {
-        crate::Destination::File(path) => {
-            let sd = tokio::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(path)
-                .await?
-                .into_std()
-                .await;
-            flash_internal(img, bmap, sd, chan, customizations, cancel).await
-        }
-        crate::Destination::SdCard(path) => {
-            let sd = crate::pal::open(&path).await?;
-            flash_internal(img, bmap, sd, chan, customizations, cancel).await
-        }
-    }
+    flash_async(
+        async move {
+            img.await
+                .map(|(r, size)| (futures::io::AllowStdIo::new(r).compat(), size))
+        },
+        bmap,
+        dst,
+        chan,
+        customizations,
+    )
+    .await
 }
 
 pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(

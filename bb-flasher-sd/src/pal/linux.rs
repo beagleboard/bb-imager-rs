@@ -1,8 +1,11 @@
-use crate::{Error, Result, helpers::Eject};
+use crate::helpers::EjectAsync;
+use crate::{Error, Result};
 
 use std::{
     io,
     path::{Path, PathBuf},
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 #[cfg(feature = "udev")]
@@ -83,7 +86,7 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
             .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
             .await?;
         let file =
-            unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
+            unsafe { tokio::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
         Ok(LinuxDrive {
             file,
@@ -104,9 +107,7 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
         .create(false)
         .custom_flags(libc::O_DIRECT)
         .open(dst)
-        .await?
-        .into_std()
-        .await;
+        .await?;
 
     Ok(LinuxDrive {
         file,
@@ -133,13 +134,13 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 
 #[derive(Debug)]
 pub(crate) struct LinuxDrive {
-    file: std::fs::File,
+    file: tokio::fs::File,
     drive: PathBuf,
 }
 
 #[cfg(feature = "udev")]
-impl Eject for LinuxDrive {
-    fn eject(self) -> io::Result<()> {
+impl EjectAsync for LinuxDrive {
+    async fn eject(self) -> io::Result<()> {
         async fn inner(dst: PathBuf) -> io::Result<()> {
             let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
@@ -180,28 +181,26 @@ impl Eject for LinuxDrive {
             Ok(())
         }
 
-        let _ = self.file.sync_all();
+        let _ = self.file.sync_all().await?;
         let dst = self.drive.clone();
 
         std::mem::drop(self);
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_io()
-            .build()
-            .unwrap();
-        rt.block_on(async move { inner(dst).await })
-            .map_err(io::Error::other)
+        inner(dst).await.map_err(io::Error::other)
     }
 }
 
 #[cfg(not(feature = "udev"))]
-impl Eject for LinuxDrive {
-    fn eject(self) -> std::io::Result<()> {
-        let _ = self.file.sync_all();
+impl EjectAsync for LinuxDrive {
+    async fn eject(self) -> std::io::Result<()> {
+        let _ = self.file.sync_all().await;
         let drive = self.drive.clone();
         std::mem::drop(self);
 
-        let output = std::process::Command::new("eject").arg(drive).output()?;
+        let output = tokio::process::Command::new("eject")
+            .arg(drive)
+            .output()
+            .await?;
 
         if output.status.success() {
             Ok(())
@@ -212,25 +211,40 @@ impl Eject for LinuxDrive {
         }
     }
 }
-
-impl io::Read for LinuxDrive {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.file.read(buf)
+impl tokio::io::AsyncRead for LinuxDrive {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.file).poll_read(cx, buf)
     }
 }
 
-impl io::Seek for LinuxDrive {
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        self.file.seek(pos)
+impl tokio::io::AsyncSeek for LinuxDrive {
+    fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
+        Pin::new(&mut self.file).start_seek(position)
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        Pin::new(&mut self.file).poll_complete(cx)
     }
 }
 
-impl io::Write for LinuxDrive {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.file.write(buf)
+impl tokio::io::AsyncWrite for LinuxDrive {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.file).poll_write(cx, buf)
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.file.flush()
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.file).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.file).poll_shutdown(cx)
     }
 }

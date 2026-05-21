@@ -20,8 +20,9 @@ mbrman = "0.6"
 gpt = "4.1"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "fs", "io-util", "macros"] }
-tokio-util = { version = "0.7", features = ["io-util"] }
+tokio-util = { version = "0.7", features = ["io-util", "compat"] }
 anyhow = "1.0"
+futures = "0.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
