@@ -119,9 +119,7 @@ impl CFDictionaryExt for CFDictionary {
                 None
             } else {
                 let cf = (value as *const CFType).as_ref()?;
-                if cf.downcast_ref::<CFString>().is_none() {
-                    return None;
-                }
+                cf.downcast_ref::<CFString>()?;
                 Some(Retained::retain(value as *mut NSString)?)
             }
         }

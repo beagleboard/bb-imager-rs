@@ -13,30 +13,24 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
 }
 
 pub(crate) trait Eject {
-    fn eject(self) -> io::Result<()>;
-}
-
-impl Eject for std::fs::File {
-    fn eject(self) -> io::Result<()> {
-        self.sync_all()
-    }
+    fn eject(self) -> impl Future<Output = io::Result<()>>;
 }
 
 impl Eject for tokio::fs::File {
-    fn eject(self) -> io::Result<()> {
-        tokio::runtime::Handle::current().block_on(async move { self.sync_all().await })
+    async fn eject(self) -> io::Result<()> {
+        self.sync_all().await
     }
 }
 
 impl<T: Eject> Eject for futures::io::AllowStdIo<T> {
-    fn eject(self) -> io::Result<()> {
-        self.into_inner().eject()
+    async fn eject(self) -> io::Result<()> {
+        self.into_inner().eject().await
     }
 }
 
 impl<T: Eject> Eject for tokio_util::compat::Compat<T> {
-    fn eject(self) -> io::Result<()> {
-        self.into_inner().eject()
+    async fn eject(self) -> io::Result<()> {
+        self.into_inner().eject().await
     }
 }
 
@@ -216,9 +210,10 @@ impl<W> Eject for SdCardWrapper<W>
 where
     W: io::Read + io::Write + io::Seek + Eject,
 {
-    fn eject(mut self) -> io::Result<()> {
+    async fn eject(mut self) -> io::Result<()> {
+        // TODO: Make finish async
         self.finish()?;
-        self.inner.eject()
+        self.inner.eject().await
     }
 }
 

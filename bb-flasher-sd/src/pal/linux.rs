@@ -139,7 +139,7 @@ pub(crate) struct LinuxDrive {
 
 #[cfg(feature = "udev")]
 impl Eject for LinuxDrive {
-    fn eject(self) -> io::Result<()> {
+    async fn eject(self) -> io::Result<()> {
         async fn inner(dst: PathBuf) -> io::Result<()> {
             let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
@@ -180,28 +180,31 @@ impl Eject for LinuxDrive {
             Ok(())
         }
 
-        let _ = self.file.sync_all();
+        let f = tokio::fs::File::from_std(self.file);
+
+        f.sync_all().await?;
         let dst = self.drive.clone();
 
-        std::mem::drop(self);
+        std::mem::drop(f);
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_io()
-            .build()
-            .unwrap();
-        rt.block_on(async move { inner(dst).await })
-            .map_err(io::Error::other)
+        inner(dst).await.map_err(io::Error::other)
     }
 }
 
 #[cfg(not(feature = "udev"))]
 impl Eject for LinuxDrive {
-    fn eject(self) -> std::io::Result<()> {
-        let _ = self.file.sync_all();
-        let drive = self.drive.clone();
-        std::mem::drop(self);
+    async fn eject(self) -> std::io::Result<()> {
+        let f = tokio::fs::File::from_std(self.file);
 
-        let output = std::process::Command::new("eject").arg(drive).output()?;
+        f.sync_all().await?;
+        let drive = self.drive.clone();
+
+        std::mem::drop(f);
+
+        let output = tokio::process::Command::new("eject")
+            .arg(drive)
+            .output()
+            .await?;
 
         if output.status.success() {
             Ok(())

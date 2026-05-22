@@ -212,9 +212,13 @@ impl Seek for WinDrive {
 
 /// TODO: Implement real eject
 impl crate::helpers::Eject for WinDrive {
-    fn eject(self) -> io::Result<()> {
-        let _ = self.drive.sync_all();
-        Ok(())
+    async fn eject(self) -> io::Result<()> {
+        tokio::task::spawn_blocking(move || {
+            self.drive.sync_all()?;
+            Ok(())
+        })
+        .await
+        .unwrap()
     }
 }
 

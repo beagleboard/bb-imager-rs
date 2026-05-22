@@ -295,18 +295,19 @@ async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
 
     tracing::info!("Applying customization");
     let sd = tokio_util::io::SyncIoBridge::new(sd);
-    tokio::task::spawn_blocking(move || {
+    let sd = tokio::task::spawn_blocking(move || {
         let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
         for c in customizations {
             c.customize(&mut sd)?;
         }
 
-        tracing::info!("Ejecting SD Card");
-        let _ = sd.into_inner().into_inner().eject();
-
-        Ok(())
+        Ok::<_, crate::Error>(sd.into_inner())
     })
     .await
-    .unwrap()
-}
+    .unwrap()?;
 
+    tracing::info!("Ejecting SD Card");
+    let _ = sd.into_inner().eject().await;
+
+    Ok(())
+}
