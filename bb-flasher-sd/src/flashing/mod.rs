@@ -265,8 +265,8 @@ pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
         }
         crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path).await?;
-            let sd = crate::helpers::SdCardWrapper::new(sd);
             let sd = futures::io::AllowStdIo::new(sd).compat();
+            let sd = crate::helpers::SdCardWrapper::new(sd);
             flash_internal(img, bmap, sd, chan, customizations).await
         }
     }
