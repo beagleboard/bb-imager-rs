@@ -42,17 +42,21 @@ impl std::fmt::Debug for MacOSFile {
     }
 }
 
-fn unmount_disk(path: &str) -> std::io::Result<()> {
-    std::process::Command::new("diskutil")
+async fn unmount_disk(path: &str) -> std::io::Result<()> {
+    tokio::process::Command::new("diskutil")
         .args(["unmountDisk", path])
         .output()
+        .await
         .map(|_| ())
 }
 
 impl crate::helpers::Eject for MacOSFile {
-    fn eject(self) -> std::io::Result<()> {
-        self.inner.sync_all()?;
-        let _ = unmount_disk(&self.path.to_string_lossy());
+    async fn eject(self) -> std::io::Result<()> {
+        let f = tokio::fs::File::from_std(self.inner);
+        f.sync_all().await?;
+        std::mem::drop(f);
+
+        let _ = unmount_disk(&self.path.to_string_lossy()).await;
         Ok(())
     }
 }
@@ -68,7 +72,7 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 #[cfg(not(feature = "macos_authopen"))]
 pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
     let dst_str = dst.to_string_lossy();
-    let _ = unmount_disk(&dst_str);
+    let _ = unmount_disk(&dst_str).await;
 
     let f = tokio::fs::OpenOptions::new()
         .read(true)
@@ -119,9 +123,6 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
             .make_external_form()
             .expect("Failed to make external form");
         let (pipe0, pipe1) = UnixStream::pair().expect("Failed to create socket");
-
-        // Use helper to unmount
-        let _ = unmount_disk(dst.to_str().unwrap());
 
         let mut cmd = Command::new("/usr/libexec/authopen")
             .args(["-stdoutpipe", "-extauth", "-o", "2", dst.to_str().unwrap()])
@@ -174,6 +175,7 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
     }
 
     let p = dst.to_owned();
+    let _ = unmount_disk(dst.to_str().unwrap()).await;
     // TODO: Make this into a real async function
     let f = tokio::task::spawn_blocking(move || inner(p))
         .await
