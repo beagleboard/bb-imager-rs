@@ -438,7 +438,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 OverlayData::Flashing(flashing_state) => flashing_state.progress_update(x),
                 _ => panic!("Unexpected message"),
             },
-            _ => panic!("Unexpected message"),
+            // Debug build can be slow.
+            _ => {}
         },
         BBImagerMessage::FlashStart | BBImagerMessage::Retry => {
             return state.start_flashing();

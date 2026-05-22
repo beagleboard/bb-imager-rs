@@ -2,8 +2,6 @@ use std::io;
 
 use tokio::sync::mpsc;
 
-use crate::Result;
-
 pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
@@ -14,13 +12,6 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
 }
 
-pub(crate) fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
-    match cancel {
-        Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),
-        _ => Ok(()),
-    }
-}
-
 pub(crate) trait Eject {
     fn eject(self) -> io::Result<()>;
 }
@@ -28,6 +19,24 @@ pub(crate) trait Eject {
 impl Eject for std::fs::File {
     fn eject(self) -> io::Result<()> {
         self.sync_all()
+    }
+}
+
+impl Eject for tokio::fs::File {
+    fn eject(self) -> io::Result<()> {
+        tokio::runtime::Handle::current().block_on(async move { self.sync_all().await })
+    }
+}
+
+impl<T: Eject> Eject for futures::io::AllowStdIo<T> {
+    fn eject(self) -> io::Result<()> {
+        self.into_inner().eject()
+    }
+}
+
+impl<T: Eject> Eject for tokio_util::compat::Compat<T> {
+    fn eject(self) -> io::Result<()> {
+        self.into_inner().eject()
     }
 }
 
@@ -56,6 +65,10 @@ impl<F> DeviceWrapper<F> {
     /// Number of bytes from `Self::cache_buf_offset` that can be used
     const fn cache_buf_hit_len(&self) -> usize {
         self.buf.len() - self.cache_buf_offset()
+    }
+
+    pub(crate) fn into_inner(self) -> F {
+        self.f
     }
 }
 
