@@ -374,7 +374,7 @@ impl<Message> canvas::Program<Message> for CircleBar {
                 position: center,
                 align_x: iced::Center.into(),
                 align_y: iced::Center.into(),
-                size: (radius / 2.0).into(),
+                size: (radius / 3.0).into(),
                 color: theme.palette().text,
                 font: constants::FONT_BOLD,
                 ..Default::default()
