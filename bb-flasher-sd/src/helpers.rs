@@ -293,12 +293,14 @@ mod tests {
         std::io::Cursor::new(data.into())
     }
 
-    fn test_file() -> super::DeviceWrapper<std::io::Cursor<Box<[u8]>>> {
-        let data: Vec<u8> = (0..FILE_LEN)
-            .map(|x| x % 255)
-            .map(|x| u8::try_from(x).unwrap())
-            .collect();
-        super::DeviceWrapper::new(std::io::Cursor::new(data.into())).unwrap()
+    fn test_file() -> super::DeviceWrapper<std::fs::File> {
+        let mut data = test_data();
+        let mut f = tempfile::tempfile().unwrap();
+
+        std::io::copy(&mut data, &mut f).unwrap();
+        f.rewind().unwrap();
+
+        super::DeviceWrapper::new(f).unwrap()
     }
 
     #[test]
