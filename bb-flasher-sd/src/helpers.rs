@@ -1,9 +1,10 @@
-use std::io;
+use std::io::{self, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio_util::io::SyncIoBridge;
 
 pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
     if let Some(c) = chan {
@@ -19,8 +20,20 @@ pub(crate) trait Eject {
     fn eject(self) -> impl Future<Output = io::Result<()>>;
 }
 
+impl Eject for std::fs::File {
+    async fn eject(mut self) -> io::Result<()> {
+        tokio::task::spawn_blocking(move || {
+            self.flush()?;
+            self.sync_all()
+        })
+        .await
+        .unwrap()
+    }
+}
+
 impl Eject for tokio::fs::File {
-    async fn eject(self) -> io::Result<()> {
+    async fn eject(mut self) -> io::Result<()> {
+        self.flush().await?;
         self.sync_all().await
     }
 }
@@ -234,12 +247,20 @@ where
     }
 }
 
+impl<W> Eject for SyncIoBridge<W>
+where
+    W: Unpin + Eject,
+{
+    async fn eject(self) -> io::Result<()> {
+        self.into_inner().eject().await
+    }
+}
+
 impl<W> Eject for SdCardWrapper<W>
 where
     W: tokio::io::AsyncWrite + AsyncSeek + Unpin + Eject,
 {
     async fn eject(mut self) -> io::Result<()> {
-        // TODO: Make finish async
         self.finish().await?;
         self.inner.eject().await
     }
@@ -326,6 +347,33 @@ where
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         self.pos = std::task::ready!(Pin::new(&mut self.inner).poll_complete(cx))?;
         Poll::Ready(Ok(self.pos))
+    }
+}
+
+pub(crate) trait IntoStdIo {
+    type Output: io::Read + io::Write + io::Seek + std::fmt::Debug + Send + Eject;
+
+    fn into_std_io(self) -> impl Future<Output = io::Result<Self::Output>>;
+}
+
+impl IntoStdIo for tokio::fs::File {
+    type Output = std::fs::File;
+
+    async fn into_std_io(self) -> io::Result<Self::Output> {
+        Ok(self.into_std().await)
+    }
+}
+
+impl<T> IntoStdIo for SdCardWrapper<tokio_util::compat::Compat<futures::io::AllowStdIo<T>>>
+where
+    T: io::Read + io::Write + io::Seek + std::fmt::Debug + Send + Eject,
+{
+    type Output = tokio_util::io::SyncIoBridge<
+        SdCardWrapper<tokio_util::compat::Compat<futures::io::AllowStdIo<T>>>,
+    >;
+
+    async fn into_std_io(self) -> io::Result<Self::Output> {
+        Ok(tokio_util::io::SyncIoBridge::new(self))
     }
 }
 
