@@ -1,4 +1,3 @@
-use std::io::Read;
 use std::time::Instant;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
@@ -215,7 +214,7 @@ where
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub async fn flash<R: Read + Send + 'static>(
+pub async fn flash<R: AsyncRead + Send + Unpin + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,
@@ -223,17 +222,7 @@ pub async fn flash<R: Read + Send + 'static>(
     customizations: Vec<Customization>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
-    let fut1 = flash_async(
-        async move {
-            img.await
-                .map(|(r, size)| (futures::io::AllowStdIo::new(r).compat(), size))
-        },
-        bmap,
-        dst,
-        chan,
-        customizations,
-    );
-
+    let fut1 = flash_async(img, bmap, dst, chan, customizations);
     match cancel {
         Some(x) => tokio::select! {
             _ = x.cancelled() => Err(crate::Error::Aborted),
