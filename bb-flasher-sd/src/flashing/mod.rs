@@ -7,7 +7,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::Result;
 use crate::customization::Customization;
-use crate::helpers::{DirectIoBuffer, Eject, chan_send, progress};
+use crate::helpers::{DirectIoBuffer, Eject, IntoStdIo, chan_send, progress};
 
 #[cfg(test)]
 mod tests;
@@ -272,13 +272,17 @@ pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
     }
 }
 
-async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
+async fn flash_internal<R, Sd>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
-    sd: impl AsyncRead + AsyncWrite + AsyncSeek + Eject + std::fmt::Debug + Send + Unpin + 'static,
+    sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
     customizations: Vec<Customization>,
-) -> Result<()> {
+) -> Result<()>
+where
+    R: AsyncRead + Send + Unpin + 'static,
+    Sd: AsyncRead + AsyncWrite + AsyncSeek + std::fmt::Debug + Send + Unpin + IntoStdIo + 'static,
+{
     tracing::info!("Resolving Image");
     let bmap = match bmap {
         Some(x) => {
@@ -294,7 +298,7 @@ async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
     let sd = write_sd(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    let sd = tokio_util::io::SyncIoBridge::new(sd);
+    let sd = sd.into_std_io().await?;
     let sd = tokio::task::spawn_blocking(move || {
         let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
         for c in customizations {
@@ -307,7 +311,7 @@ async fn flash_internal<R: AsyncRead + Send + Unpin + 'static>(
     .unwrap()?;
 
     tracing::info!("Ejecting SD Card");
-    let _ = sd.into_inner().eject().await;
+    let _ = sd.eject().await;
 
     Ok(())
 }
