@@ -24,6 +24,7 @@ async fn reader_task(
 ) -> Result<()> {
     while let Some(mut buf) = buf_rx.recv().await {
         let count = read_aligned(&mut img, buf.as_mut_slice()).await?;
+        tracing::debug!("Reading: {count} bytes");
         if count == 0 {
             break;
         }
@@ -215,24 +216,6 @@ where
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub async fn flash<R: AsyncRead + Send + Unpin + 'static>(
-    img: impl Future<Output = std::io::Result<(R, u64)>>,
-    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
-    dst: crate::Destination,
-    chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
-) -> Result<()> {
-    let fut1 = flash_async(img, bmap, dst, chan, customizations);
-    match cancel {
-        Some(x) => tokio::select! {
-            _ = x.cancelled() => Err(crate::Error::Aborted),
-            res = fut1 => res
-        },
-        None => fut1.await,
-    }
-}
-
-pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,

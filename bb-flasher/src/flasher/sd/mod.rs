@@ -268,31 +268,33 @@ where
                 .map(|(i, s)| (futures::io::AllowStdIo::new(i).compat(), s))
         };
 
-        if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+        let tx = match chan {
+            Some(chan) => {
+                let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+                tokio::spawn(async move {
+                    // Should run until tx is dropped, i.e. flasher task is done.
+                    // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
+                    while let Some(x) = rx.recv().await {
+                        let _ = chan.try_send(if x == 0.0 {
+                            DownloadFlashingStatus::Preparing
+                        } else {
+                            DownloadFlashingStatus::FlashingProgress(x)
+                        });
+                    }
+                });
 
-            let t = tokio::spawn(async move {
-                // Should run until tx is dropped, i.e. flasher task is done.
-                // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                while let Some(x) = rx.recv().await {
-                    let _ = chan.try_send(if x == 0.0 {
-                        DownloadFlashingStatus::Preparing
-                    } else {
-                        DownloadFlashingStatus::FlashingProgress(x)
-                    });
-                }
-            });
+                Some(tx)
+            }
+            None => None,
+        };
 
-            let resp =
-                bb_flasher_sd::flash(img, self.bmap, dst, Some(tx), customization, self.cancel)
-                    .await;
-
-            t.abort();
-
-            resp
-        } else {
-            bb_flasher_sd::flash(img, self.bmap, dst, None, customization, self.cancel).await
+        let fut = bb_flasher_sd::flash(img, self.bmap, dst, tx, customization);
+        match self.cancel {
+            Some(x) => tokio::select! {
+                _ = x.cancelled() => Err(anyhow::anyhow!("Aborted before completion")),
+                res = fut => res.map_err(Into::into)
+            },
+            None => fut.await.map_err(Into::into),
         }
-        .map_err(Into::into)
     }
 }
