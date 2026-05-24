@@ -259,7 +259,7 @@ where
     B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let customization = self.customization.0;
+        let customization = futures::stream::iter(self.customization.0);
         let dst = self.dst;
 
         let img = async move {

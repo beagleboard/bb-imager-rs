@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use futures::StreamExt;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -220,7 +221,7 @@ pub async fn flash<R: AsyncRead + Send + Unpin + 'static>(
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,
     chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
+    customizations: impl futures::Stream<Item = Customization> + Unpin,
 ) -> Result<()> {
     tracing::info!("Opening Destination");
 
@@ -249,7 +250,7 @@ async fn flash_internal<R, Sd>(
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
+    mut customizations: impl futures::Stream<Item = Customization> + Unpin,
 ) -> Result<()>
 where
     R: AsyncRead + Send + Unpin + 'static,
@@ -270,17 +271,16 @@ where
     let sd = write_sd(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    let sd = sd.into_std_io().await?;
-    let sd = tokio::task::spawn_blocking(move || {
-        let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-        for c in customizations {
+    let mut sd = sd.into_std_io().await?;
+    while let Some(c) = customizations.next().await {
+        sd = tokio::task::spawn_blocking(move || {
+            let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
             c.customize(&mut sd)?;
-        }
-
-        Ok::<_, crate::Error>(sd.into_inner())
-    })
-    .await
-    .unwrap()?;
+            Ok::<_, crate::Error>(sd.into_inner())
+        })
+        .await
+        .unwrap()?;
+    }
 
     tracing::info!("Ejecting SD Card");
     let _ = sd.eject().await;
