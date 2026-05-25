@@ -216,13 +216,16 @@ where
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub async fn flash<R: AsyncRead + Send + Unpin + 'static>(
+pub async fn flash<R: AsyncRead + Send + Unpin + 'static, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,
     chan: Option<mpsc::Sender<f32>>,
-    customizations: impl futures::Stream<Item = Customization> + Unpin,
-) -> Result<()> {
+    customizations: impl futures::Stream<Item = Customization<C>> + Unpin,
+) -> Result<()>
+where
+    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
+{
     tracing::info!("Opening Destination");
 
     match dst {
@@ -245,16 +248,17 @@ pub async fn flash<R: AsyncRead + Send + Unpin + 'static>(
     }
 }
 
-async fn flash_internal<R, Sd>(
+async fn flash_internal<R, Sd, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
-    mut customizations: impl futures::Stream<Item = Customization> + Unpin,
+    mut customizations: impl futures::Stream<Item = Customization<C>> + Unpin,
 ) -> Result<()>
 where
     R: AsyncRead + Send + Unpin + 'static,
     Sd: AsyncRead + AsyncWrite + AsyncSeek + std::fmt::Debug + Send + Unpin + IntoStdIo + 'static,
+    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
 {
     tracing::info!("Resolving Image");
     let bmap = match bmap {
@@ -272,7 +276,7 @@ where
 
     tracing::info!("Applying customization");
     let mut sd = sd.into_std_io().await?;
-    while let Some(c) = customizations.next().await {
+    while let Some(mut c) = customizations.next().await {
         sd = tokio::task::spawn_blocking(move || {
             let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
             c.customize(&mut sd)?;

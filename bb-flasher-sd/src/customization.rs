@@ -104,20 +104,27 @@ impl From<Box<std::path::Path>> for ContentType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Customization {
+#[derive(Clone, Debug)]
+pub struct Customization<I> {
     pub partition: ParitionType,
-    pub content: Vec<(Box<str>, ContentType)>,
+    pub content: I,
 }
 
-impl Customization {
-    pub(crate) fn customize(&self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
+impl<I> Customization<I>
+where
+    I: futures::Stream<Item = (Box<str>, ContentType)> + Unpin,
+{
+    pub(crate) fn customize(
+        &mut self,
+        dst: impl Write + Seek + Read + std::fmt::Debug,
+    ) -> Result<()> {
         let partition = self.partition.open(dst)?;
         let root = partition.root_dir();
 
-        for (path, data) in &self.content {
+        let iter = futures::executor::block_on_stream(&mut self.content);
+        for (path, data) in iter {
             let mut f =
-                root.create_file(path)
+                root.create_file(&path)
                     .map_err(|source| Error::CustomizationFileCreateFail {
                         source,
                         file: path.clone(),
@@ -130,7 +137,7 @@ impl Customization {
                 }
                 ContentType::Data(items) => {
                     f.seek(SeekFrom::End(0))?;
-                    f.write_all(items)?;
+                    f.write_all(&items)?;
                 }
             }
         }
