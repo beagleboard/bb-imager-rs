@@ -1,6 +1,7 @@
 use crate::{Error, Result};
 use fatfs::FileSystem;
 use fscommon::{BufStream, StreamSlice};
+use futures::StreamExt;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -112,36 +113,49 @@ pub struct Customization<I> {
 
 impl<I> Customization<I>
 where
-    I: futures::Stream<Item = (Box<str>, ContentType)> + Unpin,
+    I: futures::Stream<Item = (Box<str>, ContentType)> + Unpin + Send,
 {
-    pub(crate) fn customize(
-        &mut self,
-        dst: impl Write + Seek + Read + std::fmt::Debug,
-    ) -> Result<()> {
-        let partition = self.partition.open(dst)?;
-        let root = partition.root_dir();
+    pub(crate) async fn customize<D>(&mut self, dst: D) -> Result<D>
+    where
+        D: Write + Seek + Read + std::fmt::Debug + Send + 'static,
+    {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<(Box<str>, ContentType)>(4);
+        let partition = self.partition;
+        let background = tokio::task::spawn_blocking(move || {
+            let mut dst = crate::helpers::DeviceWrapper::new(dst).unwrap();
+            {
+                let partition = partition.open(&mut dst)?;
+                let root = partition.root_dir();
 
-        let iter = futures::executor::block_on_stream(&mut self.content);
-        for (path, data) in iter {
-            let mut f =
-                root.create_file(&path)
-                    .map_err(|source| Error::CustomizationFileCreateFail {
-                        source,
-                        file: path.clone(),
+                while let Some((path, data)) = rx.blocking_recv() {
+                    let mut f = root.create_file(&path).map_err(|source| {
+                        Error::CustomizationFileCreateFail {
+                            source,
+                            file: path.clone(),
+                        }
                     })?;
 
-            match data {
-                ContentType::File(path) => {
-                    let mut source = std::fs::File::open(path)?;
-                    std::io::copy(&mut source, &mut f)?;
-                }
-                ContentType::Data(items) => {
-                    f.seek(SeekFrom::End(0))?;
-                    f.write_all(&items)?;
+                    match data {
+                        ContentType::File(path) => {
+                            let mut source = std::fs::File::open(path)?;
+                            std::io::copy(&mut source, &mut f)?;
+                        }
+                        ContentType::Data(items) => {
+                            f.seek(SeekFrom::End(0))?;
+                            f.write_all(&items)?;
+                        }
+                    }
                 }
             }
-        }
 
-        Ok(())
+            Ok(dst.into_inner())
+        });
+
+        while let Some((path, data)) = self.content.next().await
+            && tx.send((path, data)).await.is_ok()
+        {}
+        std::mem::drop(tx);
+
+        background.await.unwrap()
     }
 }
