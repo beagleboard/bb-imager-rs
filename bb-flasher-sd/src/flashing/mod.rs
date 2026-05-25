@@ -277,13 +277,7 @@ where
     tracing::info!("Applying customization");
     let mut sd = sd.into_std_io().await?;
     while let Some(mut c) = customizations.next().await {
-        sd = tokio::task::spawn_blocking(move || {
-            let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-            c.customize(&mut sd)?;
-            Ok::<_, crate::Error>(sd.into_inner())
-        })
-        .await
-        .unwrap()?;
+        sd = c.customize(sd).await?;
     }
 
     tracing::info!("Ejecting SD Card");
