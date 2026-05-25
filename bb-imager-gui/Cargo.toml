@@ -31,7 +31,7 @@ bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-util = { version = "0.7" }
 semver = "1.0.28"
 anyhow = "1.0"
-sqlx = { version = "0.8", features = ["runtime-tokio", "chrono"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "chrono"] }
 tempfile = "3.26"
 const-hex = { version = "1.19", features = ["serde"] }
 
