@@ -8,6 +8,7 @@ mod cloud_init;
 
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 use tokio::sync::mpsc;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
@@ -67,7 +68,7 @@ impl BBFlasherTarget for Target {
 
 /// Linux Image post-install customization options.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FlashingSdLinuxConfig(Vec<bb_flasher_sd::Customization>);
+pub struct FlashingSdLinuxConfig(Vec<(Box<str>, Box<[u8]>)>);
 
 fn sysconf_w(sysconf: &mut Vec<u8>, key: &str, value: &str) {
     sysconf.extend(key.as_bytes());
@@ -112,30 +113,17 @@ impl FlashingSdLinuxConfig {
             Some((ssid, psk)) => {
                 sysconf_w(&mut content, "iwd_psk_file", &format!("{ssid}.psk"));
 
-                Self(vec![bb_flasher_sd::Customization {
-                    partition: bb_flasher_sd::ParitionType::Boot,
-                    content: vec![
-                        (
-                            "sysconf.txt".to_string().into(),
-                            content.into_boxed_slice().into(),
-                        ),
-                        (
-                            format!("services/{ssid}.psk").into(),
-                            format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
-                                .into_boxed_str()
-                                .into_boxed_bytes()
-                                .into(),
-                        ),
-                    ],
-                }])
+                Self(vec![
+                    ("sysconf.txt".to_string().into(), content.into()),
+                    (
+                        format!("services/{ssid}.psk").into(),
+                        format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
+                            .into_bytes()
+                            .into(),
+                    ),
+                ])
             }
-            None => Self(vec![bb_flasher_sd::Customization {
-                partition: bb_flasher_sd::ParitionType::Boot,
-                content: vec![(
-                    "sysconf.txt".to_string().into(),
-                    content.into_boxed_slice().into(),
-                )],
-            }]),
+            None => Self(vec![("sysconf.txt".to_string().into(), content.into())]),
         }
     }
 
@@ -148,20 +136,11 @@ impl FlashingSdLinuxConfig {
         ssh: Option<Box<str>>,
     ) -> Self {
         let data = cloud_init::CloudInitConfig::new(hostname, timezone, keymap, user, wifi, ssh);
-        Self(vec![bb_flasher_sd::Customization {
-            partition: bb_flasher_sd::ParitionType::Boot,
-            content: vec![(
-                "cloud-init".to_string().into(),
-                bb_flasher_sd::ContentType::Data(data.to_file_data()),
-            )],
-        }])
+        Self(vec![("cloud-init".to_string().into(), data.to_file_data())])
     }
 
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
-        Self(vec![bb_flasher_sd::Customization {
-            partition: bb_flasher_sd::ParitionType::Boot,
-            content: vec![(file_name, file_content.into_boxed_bytes().into())],
-        }])
+        Self(vec![(file_name, file_content.into_boxed_bytes().into())])
     }
 
     pub const fn none() -> Self {
@@ -258,40 +237,56 @@ where
     B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let customization = self.customization.0;
         let dst = self.dst;
+        let customization = futures::stream::iter(
+            self.customization
+                .0
+                .into_iter()
+                .map(|(p, d)| (p, bb_flasher_sd::ContentType::Data(d))),
+        );
 
-        if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+        let img = async move {
+            self.img
+                .await
+                .map(|(i, s)| (futures::io::AllowStdIo::new(i).compat(), s))
+        };
 
-            let t = tokio::spawn(async move {
-                // Should run until tx is dropped, i.e. flasher task is done.
-                // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                while let Some(x) = rx.recv().await {
-                    let _ = chan.try_send(if x == 0.0 {
-                        DownloadFlashingStatus::Preparing
-                    } else {
-                        DownloadFlashingStatus::FlashingProgress(x)
-                    });
-                }
-            });
+        let tx = match chan {
+            Some(chan) => {
+                let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+                tokio::spawn(async move {
+                    // Should run until tx is dropped, i.e. flasher task is done.
+                    // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
+                    while let Some(x) = rx.recv().await {
+                        let _ = chan.try_send(if x == 0.0 {
+                            DownloadFlashingStatus::Preparing
+                        } else {
+                            DownloadFlashingStatus::FlashingProgress(x)
+                        });
+                    }
+                });
 
-            let resp = bb_flasher_sd::flash(
-                self.img,
-                self.bmap,
-                dst,
-                Some(tx),
-                customization,
-                self.cancel,
-            )
-            .await;
+                Some(tx)
+            }
+            None => None,
+        };
 
-            t.abort();
-
-            resp
-        } else {
-            bb_flasher_sd::flash(self.img, self.bmap, dst, None, customization, self.cancel).await
+        let fut = bb_flasher_sd::flash(
+            img,
+            self.bmap,
+            dst,
+            tx,
+            futures::stream::iter([bb_flasher_sd::Customization {
+                partition: bb_flasher_sd::ParitionType::Boot,
+                content: customization,
+            }]),
+        );
+        match self.cancel {
+            Some(x) => tokio::select! {
+                _ = x.cancelled() => Err(anyhow::anyhow!("Aborted before completion")),
+                res = fut => res.map_err(Into::into)
+            },
+            None => fut.await.map_err(Into::into),
         }
-        .map_err(Into::into)
     }
 }

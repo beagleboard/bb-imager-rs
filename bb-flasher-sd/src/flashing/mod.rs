@@ -1,6 +1,6 @@
-use std::io::Read;
 use std::time::Instant;
 
+use futures::StreamExt;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -25,6 +25,7 @@ async fn reader_task(
 ) -> Result<()> {
     while let Some(mut buf) = buf_rx.recv().await {
         let count = read_aligned(&mut img, buf.as_mut_slice()).await?;
+        tracing::debug!("Reading: {count} bytes");
         if count == 0 {
             break;
         }
@@ -215,41 +216,16 @@ where
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub async fn flash<R: Read + Send + 'static>(
+pub async fn flash<R: AsyncRead + Send + Unpin + 'static, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,
     chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
-) -> Result<()> {
-    let fut1 = flash_async(
-        async move {
-            img.await
-                .map(|(r, size)| (futures::io::AllowStdIo::new(r).compat(), size))
-        },
-        bmap,
-        dst,
-        chan,
-        customizations,
-    );
-
-    match cancel {
-        Some(x) => tokio::select! {
-            _ = x.cancelled() => Err(crate::Error::Aborted),
-            res = fut1 => res
-        },
-        None => fut1.await,
-    }
-}
-
-pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
-    img: impl Future<Output = std::io::Result<(R, u64)>>,
-    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
-    dst: crate::Destination,
-    chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
-) -> Result<()> {
+    customizations: impl futures::Stream<Item = Customization<C>> + Unpin,
+) -> Result<()>
+where
+    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
+{
     tracing::info!("Opening Destination");
 
     match dst {
@@ -272,16 +248,17 @@ pub async fn flash_async<R: AsyncRead + Send + Unpin + 'static>(
     }
 }
 
-async fn flash_internal<R, Sd>(
+async fn flash_internal<R, Sd, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     sd: Sd,
     mut chan: Option<mpsc::Sender<f32>>,
-    customizations: Vec<Customization>,
+    mut customizations: impl futures::Stream<Item = Customization<C>> + Unpin,
 ) -> Result<()>
 where
     R: AsyncRead + Send + Unpin + 'static,
     Sd: AsyncRead + AsyncWrite + AsyncSeek + std::fmt::Debug + Send + Unpin + IntoStdIo + 'static,
+    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
 {
     tracing::info!("Resolving Image");
     let bmap = match bmap {
@@ -298,17 +275,16 @@ where
     let sd = write_sd(img, img_size, bmap, sd, chan).await?;
 
     tracing::info!("Applying customization");
-    let sd = sd.into_std_io().await?;
-    let sd = tokio::task::spawn_blocking(move || {
-        let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-        for c in customizations {
+    let mut sd = sd.into_std_io().await?;
+    while let Some(mut c) = customizations.next().await {
+        sd = tokio::task::spawn_blocking(move || {
+            let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
             c.customize(&mut sd)?;
-        }
-
-        Ok::<_, crate::Error>(sd.into_inner())
-    })
-    .await
-    .unwrap()?;
+            Ok::<_, crate::Error>(sd.into_inner())
+        })
+        .await
+        .unwrap()?;
+    }
 
     tracing::info!("Ejecting SD Card");
     let _ = sd.eject().await;
