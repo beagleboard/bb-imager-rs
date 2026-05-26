@@ -1,12 +1,12 @@
 use super::*;
 
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Write};
 use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 use zip::write::SimpleFileOptions;
 
-#[test]
-fn detects_uncompressed_image_and_reads_contents() {
+#[tokio::test]
+async fn detects_uncompressed_image_and_reads_contents() {
     // This is the most fundamental behavior test for OsImage:
     //
     // - verifies that non-compressed files fall back to the
@@ -22,18 +22,18 @@ fn detects_uncompressed_image_and_reads_contents() {
     file.write_all(data).unwrap();
     file.flush().unwrap();
 
-    let mut img = OsImage::from_path(file.path()).unwrap();
+    let mut img = OsImage::from_path(file.path()).await.unwrap();
 
     assert_eq!(img.size(), data.len() as u64);
 
     let mut out = Vec::new();
-    img.read_to_end(&mut out).unwrap();
+    img.read_to_end(&mut out).await.unwrap();
 
     assert_eq!(out, data);
 }
 
-#[test]
-fn detects_xz_compressed_image_and_reports_uncompressed_size() {
+#[tokio::test]
+async fn detects_xz_compressed_image_and_reports_uncompressed_size() {
     // This test validates the entire XZ detection path:
     //
     // - verifies that XZ magic bytes are detected correctly
@@ -56,18 +56,18 @@ fn detects_xz_compressed_image_and_reports_uncompressed_size() {
     file.write_all(&compressed).unwrap();
     file.flush().unwrap();
 
-    let mut img = OsImage::from_path(file.path()).unwrap();
+    let mut img = OsImage::from_path(file.path()).await.unwrap();
 
     assert_eq!(img.size(), original.len() as u64);
 
     let mut out = Vec::new();
-    img.read_to_end(&mut out).unwrap();
+    img.read_to_end(&mut out).await.unwrap();
 
     assert_eq!(out, original);
 }
 
-#[test]
-fn detects_zip_compressed_image_and_reads_first_entry_contents() {
+#[tokio::test]
+async fn detects_zip_compressed_image_and_reads_first_entry_contents() {
     // This test validates ZIP handling behavior:
     //
     // - verifies ZIP magic byte detection
@@ -106,18 +106,18 @@ fn detects_zip_compressed_image_and_reads_first_entry_contents() {
     file.write_all(zip_data.get_ref()).unwrap();
     file.flush().unwrap();
 
-    let mut img = OsImage::from_path(file.path()).unwrap();
+    let mut img = OsImage::from_path(file.path()).await.unwrap();
 
     assert_eq!(img.size(), original.len() as u64);
 
     let mut out = Vec::new();
-    img.read_to_end(&mut out).unwrap();
+    img.read_to_end(&mut out).await.unwrap();
 
     assert_eq!(out, original);
 }
 
-#[test]
-fn rejects_empty_file_during_format_detection() {
+#[tokio::test]
+async fn rejects_empty_file_during_format_detection() {
     // This test verifies behavior for completely empty inputs.
     //
     // `OsImageCompression::new()` always attempts to read 6 bytes
@@ -135,12 +135,12 @@ fn rejects_empty_file_during_format_detection() {
 
     let file = tempfile::NamedTempFile::new().unwrap();
 
-    let res = OsImage::from_path(file.path());
+    let res = OsImage::from_path(file.path()).await;
     assert!(res.is_err());
 }
 
-#[test]
-fn rejects_truncated_xz_header() {
+#[tokio::test]
+async fn rejects_truncated_xz_header() {
     // This test verifies behavior for files that *look* like XZ
     // based on magic bytes, but do not contain a valid XZ stream.
     //
@@ -166,14 +166,14 @@ fn rejects_truncated_xz_header() {
 
     // Construction itself may succeed because decoding is lazy.
     // The important part is that actual usage must fail.
-    let result = OsImage::from_path(file.path());
+    let result = OsImage::from_path(file.path()).await;
 
     match result {
         Ok(mut img) => {
             let mut out = Vec::new();
 
             assert!(
-                img.read_to_end(&mut out).is_err(),
+                img.read_to_end(&mut out).await.is_err(),
                 "truncated XZ stream unexpectedly succeeded"
             );
         }
@@ -207,19 +207,17 @@ async fn file_stream_uncompressed_image_reads_contents() {
     writer.flush().await.unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, data.len() as u64).unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img = OsImage::from_piped(reader, abort, data.len() as u64)
+        .await
+        .unwrap();
 
-        assert_eq!(img.size(), data.len() as u64);
+    assert_eq!(img.size(), data.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).await.unwrap();
 
-        assert_eq!(out, data);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, data);
 }
 
 #[tokio::test]
@@ -249,19 +247,17 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
     writer.flush().await.unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, original.len() as u64).unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img = OsImage::from_piped(reader, abort, original.len() as u64)
+        .await
+        .unwrap();
 
-        assert_eq!(img.size(), original.len() as u64);
+    assert_eq!(img.size(), original.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).await.unwrap();
 
-        assert_eq!(out, original);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, original);
 }
 
 #[tokio::test]
@@ -295,17 +291,15 @@ async fn file_stream_zip_image_reads_first_entry_contents() {
     writer.flush().await.unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, original.len() as u64).unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img = OsImage::from_piped(reader, abort, original.len() as u64)
+        .await
+        .unwrap();
 
-        assert_eq!(img.size(), original.len() as u64);
+    assert_eq!(img.size(), original.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).await.unwrap();
 
-        assert_eq!(out, original);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, original);
 }

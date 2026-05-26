@@ -139,7 +139,7 @@ impl FlashingSdLinuxConfig {
     }
 
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
-        Self(vec![(file_name, file_content.into_boxed_bytes().into())])
+        Self(vec![(file_name, file_content.into_boxed_bytes())])
     }
 
     pub const fn none() -> Self {
