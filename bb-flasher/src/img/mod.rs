@@ -1,12 +1,16 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
 use bb_helper::file_stream::ReaderFileStream;
+use futures::io::AllowStdIo;
 use rc_zip_sync::ReadZipStreaming;
 use std::{
     io::{self, Read, Seek, SeekFrom},
     path::Path,
+    pin::Pin,
+    task::{Context, Poll},
 };
-use tokio_util::task::AbortOnDropHandle;
+use tokio::io::{AsyncRead, ReadBuf};
+use tokio_util::{compat::FuturesAsyncReadCompatExt, task::AbortOnDropHandle};
 
 #[cfg(test)]
 mod test;
@@ -25,12 +29,12 @@ impl OsImage {
 
         let size = match &mut img {
             OsImageCompression::Xz(x) => {
-                let size = liblzma::uncompressed_size(x.get_mut())?;
-                x.get_mut().rewind()?;
+                let size = liblzma::uncompressed_size(x.get_mut().get_mut().get_mut())?;
+                x.get_mut().get_mut().get_mut().rewind()?;
                 size
             }
-            OsImageCompression::Zip(x) => x.entry().uncompressed_size,
-            OsImageCompression::Uncompressed(x) => match x.get_ref() {
+            OsImageCompression::Zip(x) => x.get_ref().get_ref().entry().uncompressed_size,
+            OsImageCompression::Uncompressed(x) => match x.get_ref().get_ref().get_ref() {
                 OsImageSource::File(file) => file.metadata()?.len(),
                 OsImageSource::FileStream { .. } => unreachable!(),
             },
@@ -58,21 +62,23 @@ impl OsImage {
     }
 }
 
-impl Read for OsImage {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match &mut self.img {
-            OsImageCompression::Xz(x) => x.read(buf),
-            OsImageCompression::Zip(x) => x.read(buf),
-            OsImageCompression::Uncompressed(x) => x.read(buf),
-        }
+impl AsyncRead for OsImage {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.img).poll_read(cx, buf)
     }
 }
 
+type TokioAllowStdIo<T> = tokio_util::compat::Compat<AllowStdIo<T>>;
+
 #[allow(clippy::large_enum_variant)]
 enum OsImageCompression<I: Read> {
-    Xz(liblzma::read::XzDecoder<I>),
-    Zip(rc_zip_sync::StreamingEntryReader<I>),
-    Uncompressed(io::BufReader<I>),
+    Xz(TokioAllowStdIo<liblzma::read::XzDecoder<I>>),
+    Zip(TokioAllowStdIo<rc_zip_sync::StreamingEntryReader<I>>),
+    Uncompressed(TokioAllowStdIo<io::BufReader<I>>),
 }
 
 impl<I: Read + Seek> OsImageCompression<I> {
@@ -82,22 +88,34 @@ impl<I: Read + Seek> OsImageCompression<I> {
         img.rewind()?;
 
         match magic {
-            XZ_MAGIC => Ok(Self::Xz(liblzma::read::XzDecoder::new_parallel(img))),
+            XZ_MAGIC => Ok(Self::Xz(
+                AllowStdIo::new(liblzma::read::XzDecoder::new_parallel(img)).compat(),
+            )),
             [0x50, 0x4b, 0x03, 0x04, _, _] => img
                 .stream_zip_entries_throwing_caution_to_the_wind()
+                .map(|x| AllowStdIo::new(x).compat())
                 .map(Self::Zip)
                 .map_err(Into::into),
-            _ => Ok(Self::Uncompressed(std::io::BufReader::new(img))),
+            _ => Ok(Self::Uncompressed(
+                AllowStdIo::new(std::io::BufReader::new(img)).compat(),
+            )),
         }
     }
 }
 
-impl<I: Read> Read for OsImageCompression<I> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            OsImageCompression::Xz(x) => x.read(buf),
-            OsImageCompression::Zip(x) => x.read(buf),
-            OsImageCompression::Uncompressed(x) => x.read(buf),
+impl<I> AsyncRead for OsImageCompression<I>
+where
+    I: Read,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            OsImageCompression::Xz(x) => Pin::new(x).poll_read(cx, buf),
+            OsImageCompression::Zip(x) => Pin::new(x).poll_read(cx, buf),
+            OsImageCompression::Uncompressed(x) => Pin::new(x).poll_read(cx, buf),
         }
     }
 }

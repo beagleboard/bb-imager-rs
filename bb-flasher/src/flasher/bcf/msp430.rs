@@ -4,7 +4,8 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
-use std::{borrow::Cow, ffi::CString, fmt::Display, io::Read};
+use std::{borrow::Cow, ffi::CString, fmt::Display};
+use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
@@ -96,15 +97,13 @@ where
                 .await
                 .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-            tokio::task::spawn_blocking(move || {
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)?;
-                Ok::<Vec<u8>, std::io::Error>(data)
-            })
-            .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        }?;
+            let mut data = Vec::new();
+            img.read_to_end(&mut data)
+                .await
+                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
+
+            data
+        };
 
         let flasher_task = if let Some(chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);

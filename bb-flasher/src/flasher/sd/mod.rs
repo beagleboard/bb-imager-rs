@@ -8,7 +8,6 @@ mod cloud_init;
 
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 use tokio::sync::mpsc;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
@@ -245,12 +244,6 @@ where
                 .map(|(p, d)| (p, bb_flasher_sd::ContentType::Data(d))),
         );
 
-        let img = async move {
-            self.img
-                .await
-                .map(|(i, s)| (futures::io::AllowStdIo::new(i).compat(), s))
-        };
-
         let tx = match chan {
             Some(chan) => {
                 let (tx, mut rx) = tokio::sync::mpsc::channel(2);
@@ -272,7 +265,7 @@ where
         };
 
         let fut = bb_flasher_sd::flash(
-            img,
+            self.img,
             self.bmap,
             dst,
             tx,
