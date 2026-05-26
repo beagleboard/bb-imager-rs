@@ -4,13 +4,13 @@ use bb_helper::file_stream::ReaderFileStream;
 use futures::io::AllowStdIo;
 use rc_zip_tokio::ReadZipStreaming;
 use std::{
-    io::{self, Read, Seek, SeekFrom},
+    io::{self, SeekFrom},
     num::NonZeroU32,
     path::Path,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::io::{AsyncRead, ReadBuf};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, ReadBuf};
 use tokio_util::{compat::FuturesAsyncReadCompatExt, task::AbortOnDropHandle};
 
 #[cfg(test)]
@@ -25,7 +25,7 @@ pub struct OsImage {
 
 impl OsImage {
     pub async fn from_path(path: &Path) -> io::Result<Self> {
-        let file = std::fs::File::open(path)?;
+        let file = tokio::fs::File::open(path).await?;
         let mut img = OsImageCompression::new(OsImageSource::from(file)).await?;
 
         let size = match &mut img {
@@ -39,8 +39,8 @@ impl OsImage {
                 .unwrap()?
             }
             OsImageCompression::Zip(x) => x.entry().uncompressed_size,
-            OsImageCompression::Uncompressed(x) => match x.get_ref().get_ref().get_ref() {
-                OsImageSource::File(file) => file.metadata()?.len(),
+            OsImageCompression::Uncompressed(x) => match x.get_ref() {
+                OsImageSource::File(file) => file.metadata().await?.len(),
                 OsImageSource::FileStream { .. } => unreachable!(),
             },
         };
@@ -56,7 +56,7 @@ impl OsImage {
         Ok(Self {
             size,
             img: OsImageCompression::new(OsImageSource::FileStream {
-                reader: img,
+                reader: AllowStdIo::new(img).compat(),
                 _background: AbortOnDropHandle::new(abort_handle),
             })
             .await?,
@@ -81,41 +81,38 @@ impl AsyncRead for OsImage {
 type TokioAllowStdIo<T> = tokio_util::compat::Compat<AllowStdIo<T>>;
 
 #[allow(clippy::large_enum_variant)]
-enum OsImageCompression<I: Read> {
-    Xz(async_compression::tokio::bufread::XzDecoder<tokio::io::BufReader<TokioAllowStdIo<I>>>),
-    Zip(rc_zip_tokio::StreamingEntryReader<TokioAllowStdIo<I>>),
-    Uncompressed(tokio::io::BufReader<TokioAllowStdIo<I>>),
+enum OsImageCompression<I: AsyncRead> {
+    Xz(async_compression::tokio::bufread::XzDecoder<tokio::io::BufReader<I>>),
+    Zip(rc_zip_tokio::StreamingEntryReader<I>),
+    Uncompressed(tokio::io::BufReader<I>),
 }
 
-impl<I: Read + Seek> OsImageCompression<I> {
+impl<I: AsyncRead + AsyncSeek + Unpin> OsImageCompression<I> {
     async fn new(mut img: I) -> io::Result<Self> {
         let mut magic = [0u8; 6];
-        img.read_exact(&mut magic)?;
-        img.rewind()?;
+        img.read_exact(&mut magic).await?;
+        img.rewind().await?;
 
         match magic {
             XZ_MAGIC => Ok(Self::Xz(
                 async_compression::tokio::bufread::XzDecoder::parallel(
-                    tokio::io::BufReader::new(AllowStdIo::new(img).compat()),
+                    tokio::io::BufReader::new(img),
                     NonZeroU32::new(2).unwrap(),
                 ),
             )),
-            [0x50, 0x4b, 0x03, 0x04, _, _] => AllowStdIo::new(img)
-                .compat()
+            [0x50, 0x4b, 0x03, 0x04, _, _] => img
                 .stream_zip_entries_throwing_caution_to_the_wind()
                 .await
                 .map(Self::Zip)
                 .map_err(Into::into),
-            _ => Ok(Self::Uncompressed(tokio::io::BufReader::new(
-                AllowStdIo::new(img).compat(),
-            ))),
+            _ => Ok(Self::Uncompressed(tokio::io::BufReader::new(img))),
         }
     }
 }
 
 impl<I> AsyncRead for OsImageCompression<I>
 where
-    I: Read,
+    I: AsyncRead + Unpin,
 {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -131,33 +128,44 @@ where
 }
 
 enum OsImageSource {
-    File(std::fs::File),
+    File(tokio::fs::File),
     FileStream {
-        reader: ReaderFileStream,
+        reader: TokioAllowStdIo<ReaderFileStream>,
         _background: AbortOnDropHandle<io::Result<()>>,
     },
 }
 
-impl From<std::fs::File> for OsImageSource {
-    fn from(value: std::fs::File) -> Self {
+impl From<tokio::fs::File> for OsImageSource {
+    fn from(value: tokio::fs::File) -> Self {
         Self::File(value)
     }
 }
 
-impl Read for OsImageSource {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            OsImageSource::File(x) => x.read(buf),
-            OsImageSource::FileStream { reader, .. } => reader.read(buf),
+impl AsyncRead for OsImageSource {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            OsImageSource::File(x) => Pin::new(x).poll_read(cx, buf),
+            OsImageSource::FileStream { reader, .. } => Pin::new(reader).poll_read(cx, buf),
         }
     }
 }
 
-impl Seek for OsImageSource {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        match self {
-            OsImageSource::File(file) => file.seek(pos),
-            OsImageSource::FileStream { reader, .. } => reader.seek(pos),
+impl AsyncSeek for OsImageSource {
+    fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()> {
+        match self.get_mut() {
+            OsImageSource::File(x) => Pin::new(x).start_seek(position),
+            OsImageSource::FileStream { reader, .. } => Pin::new(reader).start_seek(position),
+        }
+    }
+
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        match self.get_mut() {
+            OsImageSource::File(x) => Pin::new(x).poll_complete(cx),
+            OsImageSource::FileStream { reader, .. } => Pin::new(reader).poll_complete(cx),
         }
     }
 }
