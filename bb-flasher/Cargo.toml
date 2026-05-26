@@ -11,7 +11,8 @@ keywords = ["beagle", "flasher"]
 categories = ["development-tools", "embedded", "hardware-support"]
 
 [dependencies]
-liblzma = { version = "0.4", features = ["parallel"] }
+liblzma = "0.4"
+async-compression = { version = "0.4", features = ["tokio", "xz-parallel"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 yaml_serde = { version = "0.10", optional = true }
 thiserror = { version = "2.0" }
@@ -23,7 +24,7 @@ bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
 bin_file = { version = "0.1", optional = true }
 tokio-util = { version = "0.7", features = ["rt"] }
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
-rc-zip-sync = "4.4"
+rc-zip-tokio = "4.3"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 bb-flasher-mspm0 = { path = "../bb-flasher-mspm0", optional = true }

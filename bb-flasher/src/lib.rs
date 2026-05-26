@@ -68,9 +68,7 @@ impl LocalImage {
 
     pub async fn into_image_future(self) -> std::io::Result<(OsImage, u64)> {
         let p = self.0.clone();
-        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
-            .await
-            .unwrap()?;
+        let img = OsImage::from_path(&p).await?;
         let size = img.size();
 
         Ok((img, size))

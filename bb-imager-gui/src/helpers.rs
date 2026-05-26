@@ -292,7 +292,10 @@ impl IntoFuture for RemoteImage {
                 .await
             {
                 tracing::info!("Found the remote image in cache");
-                Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size))
+                Ok((
+                    bb_flasher::OsImage::from_path(&path).await?,
+                    self.extract_size,
+                ))
             } else {
                 tracing::info!("Remote image not found in cache. Downloading");
                 let (tx, rx) = bb_helper::file_stream::file_stream()?;
@@ -313,11 +316,7 @@ impl IntoFuture for RemoteImage {
                 });
 
                 let extract_size = self.extract_size;
-                let img = tokio::task::spawn_blocking(move || {
-                    bb_flasher::OsImage::from_piped(rx, t, extract_size)
-                })
-                .await
-                .unwrap()?;
+                let img = bb_flasher::OsImage::from_piped(rx, t, extract_size).await?;
                 Ok((img, self.extract_size))
             }
         })

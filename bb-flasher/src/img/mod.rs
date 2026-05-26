@@ -2,9 +2,10 @@
 
 use bb_helper::file_stream::ReaderFileStream;
 use futures::io::AllowStdIo;
-use rc_zip_sync::ReadZipStreaming;
+use rc_zip_tokio::ReadZipStreaming;
 use std::{
     io::{self, Read, Seek, SeekFrom},
+    num::NonZeroU32,
     path::Path,
     pin::Pin,
     task::{Context, Poll},
@@ -23,17 +24,21 @@ pub struct OsImage {
 }
 
 impl OsImage {
-    pub fn from_path(path: &Path) -> io::Result<Self> {
+    pub async fn from_path(path: &Path) -> io::Result<Self> {
         let file = std::fs::File::open(path)?;
-        let mut img = OsImageCompression::new(OsImageSource::from(file))?;
+        let mut img = OsImageCompression::new(OsImageSource::from(file)).await?;
 
         let size = match &mut img {
-            OsImageCompression::Xz(x) => {
-                let size = liblzma::uncompressed_size(x.get_mut().get_mut().get_mut())?;
-                x.get_mut().get_mut().get_mut().rewind()?;
-                size
+            OsImageCompression::Xz(_) => {
+                let p = path.to_owned();
+                tokio::task::spawn_blocking(move || {
+                    let file = std::fs::File::open(p)?;
+                    liblzma::uncompressed_size(file)
+                })
+                .await
+                .unwrap()?
             }
-            OsImageCompression::Zip(x) => x.get_ref().get_ref().entry().uncompressed_size,
+            OsImageCompression::Zip(x) => x.entry().uncompressed_size,
             OsImageCompression::Uncompressed(x) => match x.get_ref().get_ref().get_ref() {
                 OsImageSource::File(file) => file.metadata()?.len(),
                 OsImageSource::FileStream { .. } => unreachable!(),
@@ -43,7 +48,7 @@ impl OsImage {
         Ok(Self { size, img })
     }
 
-    pub fn from_piped(
+    pub async fn from_piped(
         img: ReaderFileStream,
         abort_handle: tokio::task::JoinHandle<io::Result<()>>,
         size: u64,
@@ -53,7 +58,8 @@ impl OsImage {
             img: OsImageCompression::new(OsImageSource::FileStream {
                 reader: img,
                 _background: AbortOnDropHandle::new(abort_handle),
-            })?,
+            })
+            .await?,
         })
     }
 
@@ -76,24 +82,28 @@ type TokioAllowStdIo<T> = tokio_util::compat::Compat<AllowStdIo<T>>;
 
 #[allow(clippy::large_enum_variant)]
 enum OsImageCompression<I: Read> {
-    Xz(TokioAllowStdIo<liblzma::read::XzDecoder<I>>),
-    Zip(TokioAllowStdIo<rc_zip_sync::StreamingEntryReader<I>>),
+    Xz(async_compression::tokio::bufread::XzDecoder<tokio::io::BufReader<TokioAllowStdIo<I>>>),
+    Zip(rc_zip_tokio::StreamingEntryReader<TokioAllowStdIo<I>>),
     Uncompressed(tokio::io::BufReader<TokioAllowStdIo<I>>),
 }
 
 impl<I: Read + Seek> OsImageCompression<I> {
-    fn new(mut img: I) -> io::Result<Self> {
+    async fn new(mut img: I) -> io::Result<Self> {
         let mut magic = [0u8; 6];
         img.read_exact(&mut magic)?;
         img.rewind()?;
 
         match magic {
             XZ_MAGIC => Ok(Self::Xz(
-                AllowStdIo::new(liblzma::read::XzDecoder::new_parallel(img)).compat(),
+                async_compression::tokio::bufread::XzDecoder::parallel(
+                    tokio::io::BufReader::new(AllowStdIo::new(img).compat()),
+                    NonZeroU32::new(2).unwrap(),
+                ),
             )),
-            [0x50, 0x4b, 0x03, 0x04, _, _] => img
+            [0x50, 0x4b, 0x03, 0x04, _, _] => AllowStdIo::new(img)
+                .compat()
                 .stream_zip_entries_throwing_caution_to_the_wind()
-                .map(|x| AllowStdIo::new(x).compat())
+                .await
                 .map(Self::Zip)
                 .map_err(Into::into),
             _ => Ok(Self::Uncompressed(tokio::io::BufReader::new(

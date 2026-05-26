@@ -297,6 +297,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compression"
+version = "0.4.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e79b3f8a79cccc2898f31920fc69f304859b3bd567490f75ebf51ae1c792a9ac"
+dependencies = [
+ "compression-codecs",
+ "compression-core",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "async-executor"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -560,6 +572,7 @@ name = "bb-flasher"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-compression",
  "bb-flasher-bcf",
  "bb-flasher-dfu",
  "bb-flasher-mspm0",
@@ -570,7 +583,7 @@ dependencies = [
  "futures",
  "liblzma",
  "nix 0.31.3",
- "rc-zip-sync",
+ "rc-zip-tokio",
  "serde",
  "tempfile",
  "thiserror 2.0.18",
@@ -1237,6 +1250,22 @@ dependencies = [
  "bytes",
  "memchr",
 ]
+
+[[package]]
+name = "compression-codecs"
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce2548391e9c1929c21bf6aa2680af86fe4c1b33e6cea9ac1cfeec0bd11218cf"
+dependencies = [
+ "compression-core",
+ "liblzma",
+]
+
+[[package]]
+name = "compression-core"
+version = "0.4.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc14f565cf027a105f7a44ccf9e5b424348421a1d8952a8fc9d499d313107789"
 
 [[package]]
 name = "concurrent-queue"
@@ -5443,14 +5472,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "rc-zip-sync"
-version = "4.4.2"
+name = "rc-zip-tokio"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa6adff915a3efce163d0d8a06d7e72ac6fa5a9da0c76e979895eca0c6ac000"
+checksum = "703293f032e2a5452322c3637457651711dad61aefc696797f63152cf2e64f92"
 dependencies = [
+ "futures-util",
  "oval",
+ "pin-project-lite",
  "positioned-io",
  "rc-zip",
+ "tokio",
  "tracing",
 ]
 
