@@ -78,7 +78,7 @@ type TokioAllowStdIo<T> = tokio_util::compat::Compat<AllowStdIo<T>>;
 enum OsImageCompression<I: Read> {
     Xz(TokioAllowStdIo<liblzma::read::XzDecoder<I>>),
     Zip(TokioAllowStdIo<rc_zip_sync::StreamingEntryReader<I>>),
-    Uncompressed(TokioAllowStdIo<io::BufReader<I>>),
+    Uncompressed(tokio::io::BufReader<TokioAllowStdIo<I>>),
 }
 
 impl<I: Read + Seek> OsImageCompression<I> {
@@ -96,9 +96,9 @@ impl<I: Read + Seek> OsImageCompression<I> {
                 .map(|x| AllowStdIo::new(x).compat())
                 .map(Self::Zip)
                 .map_err(Into::into),
-            _ => Ok(Self::Uncompressed(
-                AllowStdIo::new(std::io::BufReader::new(img)).compat(),
-            )),
+            _ => Ok(Self::Uncompressed(tokio::io::BufReader::new(
+                AllowStdIo::new(img).compat(),
+            ))),
         }
     }
 }
