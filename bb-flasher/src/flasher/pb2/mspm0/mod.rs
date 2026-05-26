@@ -9,7 +9,7 @@ use raw::*;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::io::Read;
+use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
@@ -67,6 +67,21 @@ impl<I> Flasher<I> {
     }
 }
 
+impl<I> Flasher<I>
+where
+    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+{
+    async fn create_bin(img: I) -> std::io::Result<bin_file::BinFile> {
+        let (mut img, _) = img.await?;
+
+        let mut data = String::new();
+        img.read_to_string(&mut data).await?;
+
+        data.parse()
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware"))
+    }
+}
+
 impl<I> BBFlasher for Flasher<I>
 where
     I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
@@ -75,23 +90,9 @@ where
         self,
         chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
-        let bin = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            tokio::task::spawn_blocking(move || {
-                let mut data = String::new();
-                img.read_to_string(&mut data)?;
-                data.parse().map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
-                })
-            })
+        let bin = Self::create_bin(self.img)
             .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        }?;
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
         flash(bin, chan, self.persist_eeprom)
             .await

@@ -85,7 +85,7 @@ pub async fn flash<R, I>(
 ) -> Result<()>
 where
     R: Future<Output = std::io::Result<(I, u64)>>,
-    I: io::Read + Send + 'static,
+    I: tokio::io::AsyncRead + Send + Unpin + 'static,
 {
     let imgs_count = imgs.len();
 
@@ -97,6 +97,7 @@ where
             .1
             .await
             .map_err(|e| Error::ImgResolveFail { source: e })?;
+        let img_reader = tokio_util::io::SyncIoBridge::new(img_reader);
 
         let res = match chan.clone() {
             Some(c) => {
