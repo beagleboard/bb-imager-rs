@@ -23,7 +23,7 @@ whoami = "2.1"
 localzone = "0.3.1"
 tokio-stream = "0.1.18"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149" }
+serde_json = { version = "1.0.150" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
