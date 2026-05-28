@@ -22,12 +22,13 @@ bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
 bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
 bin_file = { version = "0.1", optional = true }
 tokio-util = { version = "0.7", features = ["rt"] }
-bb-helper = { path = "../bb-helper", features = ["file_stream"] }
+bb-helper = { path = "../bb-helper", features = ["file_stream", "reader_progress"] }
 rc-zip-sync = "4.4"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 bb-flasher-mspm0 = { path = "../bb-flasher-mspm0", optional = true }
 futures = "0.3"
+tar = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "sync", "net", "time", "macros"] }

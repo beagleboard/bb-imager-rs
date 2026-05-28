@@ -1,10 +1,12 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use bb_helper::file_stream::ReaderFileStream;
+use bb_flasher_sd::bootfs_update::ContentType;
+use bb_helper::{file_stream::ReaderFileStream, reader_progress::ReaderWithProgress};
 use rc_zip_sync::ReadZipStreaming;
 use std::{
     io::{self, Read, Seek, SeekFrom},
     path::Path,
+    sync::mpsc,
 };
 use tokio_util::task::AbortOnDropHandle;
 
@@ -12,6 +14,85 @@ use tokio_util::task::AbortOnDropHandle;
 mod test;
 
 const XZ_MAGIC: [u8; 6] = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00];
+
+pub struct OsArchive {
+    inner: OsArchiveCompression,
+}
+
+impl OsArchive {
+    pub fn from_path(path: &Path, chan: Option<mpsc::SyncSender<f32>>) -> io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let len = file.metadata()?.len();
+
+        let img = OsImageSource::from(file);
+        let img = ReaderWithProgress::new(img, len, chan);
+        let img = OsArchiveCompression::new(img)?;
+
+        Ok(Self { inner: img })
+    }
+}
+
+impl<'a> IntoIterator for &'a mut OsArchive {
+    type Item = (Box<str>, ContentType<'a>);
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &mut self.inner {
+            OsArchiveCompression::TarXz(archive) => {
+                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
+            }
+            OsArchiveCompression::Tar(archive) => {
+                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
+            }
+        }
+    }
+}
+
+fn flat_map_with_log<'a, R: Read>(
+    entry: io::Result<tar::Entry<'a, R>>,
+) -> Option<(Box<str>, ContentType<'a>)> {
+    match entry {
+        Ok(x) => Some(tar_entry_map(x)),
+        Err(e) => {
+            tracing::warn!("Dropping archive entry: {}", e);
+            None
+        }
+    }
+}
+
+fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentType<'a>) {
+    let p = entry.path().unwrap().to_string_lossy().to_string().into();
+    let f = if entry.header().entry_type().is_dir() {
+        ContentType::Dir
+    } else {
+        let temp: Box<dyn Read + 'a> = Box::new(entry);
+        ContentType::File(temp)
+    };
+
+    (p, f)
+}
+
+type ProgressSource = ReaderWithProgress<OsImageSource>;
+
+enum OsArchiveCompression {
+    TarXz(tar::Archive<liblzma::read::XzDecoder<ProgressSource>>),
+    Tar(tar::Archive<io::BufReader<ProgressSource>>),
+}
+
+impl OsArchiveCompression {
+    fn new(mut img: ProgressSource) -> io::Result<Self> {
+        let mut magic = [0u8; 6];
+        img.read_exact(&mut magic)?;
+        img.rewind()?;
+
+        match magic {
+            XZ_MAGIC => Ok(Self::TarXz(tar::Archive::new(
+                liblzma::read::XzDecoder::new_parallel(img),
+            ))),
+            _ => Ok(Self::Tar(tar::Archive::new(io::BufReader::new(img)))),
+        }
+    }
+}
 
 pub struct OsImage {
     size: u64,
