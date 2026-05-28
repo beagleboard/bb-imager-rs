@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::without_bmap(img.into_future(), target, customization, None)
+//!     let flasher = bb_flasher::sd::Flasher::without_bmap(img.into_image_future(), target, customization, None)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
