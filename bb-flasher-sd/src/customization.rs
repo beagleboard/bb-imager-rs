@@ -10,7 +10,7 @@ pub enum ParitionType {
 }
 
 impl ParitionType {
-    fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
+    pub(crate) fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
     where
         T: Write + Seek + Read + std::fmt::Debug,
     {
