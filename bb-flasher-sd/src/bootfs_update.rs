@@ -79,23 +79,27 @@ where
     let mut sd = crate::helpers::DeviceWrapper::new(sd)?;
     {
         let boot_part = crate::customization::ParitionType::Boot.open(&mut sd)?;
-        let root = boot_part.root_dir();
+        {
+            let root = boot_part.root_dir();
 
-        for (path, c) in imgs {
-            tracing::info!("Creating {path}");
-            check_cancel(cancel.as_deref())?;
+            for (path, c) in imgs {
+                tracing::info!("Creating {path}");
+                check_cancel(cancel.as_deref())?;
 
-            match c {
-                ContentType::Dir => {
-                    root.create_dir(&path)?;
-                }
-                ContentType::File(mut reader) => {
-                    let mut dst = root.create_file(&path)?;
-                    dst.truncate()?;
-                    std::io::copy(&mut reader, &mut dst)?;
+                match c {
+                    ContentType::Dir => {
+                        root.create_dir(&path)?;
+                    }
+                    ContentType::File(mut reader) => {
+                        let mut dst = root.create_file(&path)?;
+                        dst.truncate()?;
+                        std::io::copy(&mut reader, &mut dst)?;
+                    }
                 }
             }
         }
+
+        boot_part.unmount()?;
     }
 
     sd.flush()?;
