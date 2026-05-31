@@ -15,3 +15,4 @@ tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 
 [features]
 file_stream = ["tokio/fs", "tokio/io-util"]
+reader_progress = []

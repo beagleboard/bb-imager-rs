@@ -6,7 +6,12 @@
 
 mod cloud_init;
 
-use std::{borrow::Cow, fmt::Display, path::PathBuf};
+use std::{
+    borrow::Cow,
+    fmt::Display,
+    path::PathBuf,
+    sync::{Arc, atomic::AtomicBool},
+};
 use tokio::sync::mpsc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
@@ -140,7 +145,7 @@ impl FlashingSdLinuxConfig {
     }
 
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
-        Self(vec![(file_name, file_content.into_boxed_bytes().into())])
+        Self(vec![(file_name, file_content.into_boxed_bytes())])
     }
 
     pub const fn none() -> Self {
@@ -288,5 +293,37 @@ where
             },
             None => fut.await.map_err(Into::into),
         }
+    }
+}
+
+/// Flasher of updaing BOOT partition on pre-flashed SD Card
+pub struct UpdateBootFlasher<I> {
+    img: I,
+    dst: bb_flasher_sd::Destination,
+    cancel: Option<Arc<AtomicBool>>,
+}
+
+impl<F> UpdateBootFlasher<F>
+where
+    F: FnOnce() -> std::io::Result<crate::img::OsArchive>,
+{
+    const fn new(
+        img: F,
+        dst: bb_flasher_sd::Destination,
+        cancel: Option<Arc<AtomicBool>>,
+    ) -> Self {
+        Self { img, dst, cancel }
+    }
+
+    pub fn with_file_dest(img: F, dst: PathBuf, cancel: Option<Arc<AtomicBool>>) -> Self {
+        Self::new(
+            img,
+            bb_flasher_sd::Destination::File(dst.into_boxed_path()),
+            cancel,
+        )
+    }
+
+    pub fn flash(self) -> anyhow::Result<()> {
+        bb_flasher_sd::bootfs_update::flash(self.img, self.dst, self.cancel).map_err(Into::into)
     }
 }

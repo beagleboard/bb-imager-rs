@@ -131,6 +131,14 @@ pub enum TargetCommands {
         /// provides. However, this will change in future. So best to explicitly set the flag.
         sysconfig: bool,
     },
+    /// Update boot partition with contents from archive
+    SdBootUpdate {
+        /// Local path to bootfs archive.
+        img: Box<Path>,
+
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: PathBuf,
+    },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
     Msp430 {

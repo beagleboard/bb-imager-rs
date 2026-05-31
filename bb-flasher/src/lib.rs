@@ -47,6 +47,8 @@ pub use common::*;
 pub use flasher::*;
 pub use img::OsImage;
 
+use crate::img::OsArchive;
+
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -74,6 +76,10 @@ impl LocalImage {
         let size = img.size();
 
         Ok((img, size))
+    }
+
+    pub fn into_archive_fn(self, tx: Option<std::sync::mpsc::SyncSender<f32>>) -> impl FnOnce() -> std::io::Result<OsArchive> {
+        move || OsArchive::from_path(&self.0, tx)
     }
 }
 

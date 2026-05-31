@@ -51,6 +51,7 @@ use std::{
 
 use thiserror::Error;
 
+pub mod bootfs_update;
 pub(crate) mod customization;
 mod flashing;
 mod helpers;

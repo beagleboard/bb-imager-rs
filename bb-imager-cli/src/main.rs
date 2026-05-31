@@ -175,6 +175,35 @@ async fn flash_internal(
             .flash(chan)
             .await
         }
+        TargetCommands::SdBootUpdate { img, dst } => {
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        // Safeguard for initial rewinds
+                        if msg > 0.01 {
+                            let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                        }
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::UpdateBootFlasher::with_file_dest(
+                    LocalImage::new(img).into_archive_fn(tx),
+                    dst,
+                    None,
+                )
+                .flash()
+            })
+            .await
+            .unwrap()
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         TargetCommands::Bcf {
             img,
