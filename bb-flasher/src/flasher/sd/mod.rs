@@ -223,6 +223,10 @@ impl<I, B> Flasher<I, B> {
             cancel,
         }
     }
+
+    const fn is_file_dest(&self) -> bool {
+        matches!(self.dst, bb_flasher_sd::Destination::File(_))
+    }
 }
 
 impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
@@ -242,6 +246,7 @@ where
     B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
+        let is_file_dest = self.is_file_dest();
         let dst = self.dst;
         let customization = futures::stream::iter(
             self.customization
@@ -265,6 +270,8 @@ where
                     while let Some(x) = rx.recv().await {
                         let _ = chan.try_send(if x == 0.0 {
                             DownloadFlashingStatus::Preparing
+                        } else if is_file_dest {
+                            DownloadFlashingStatus::DownloadingProgress(x)
                         } else {
                             DownloadFlashingStatus::FlashingProgress(x)
                         });
@@ -307,11 +314,7 @@ impl<F> UpdateBootFlasher<F>
 where
     F: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
-    const fn new(
-        img: F,
-        dst: bb_flasher_sd::Destination,
-        cancel: Option<Arc<AtomicBool>>,
-    ) -> Self {
+    const fn new(img: F, dst: bb_flasher_sd::Destination, cancel: Option<Arc<AtomicBool>>) -> Self {
         Self { img, dst, cancel }
     }
 
