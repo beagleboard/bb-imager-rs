@@ -974,10 +974,24 @@ impl<'a> std::fmt::Display for DestinationItem<'a> {
     }
 }
 
+fn normalize_file_dest(name: &str) -> String {
+    if let Some(stripped) = name.strip_suffix(".zip") {
+        return stripped.to_string();
+    }
+
+    if let Some(pos) = name.rfind(".img.") {
+        return name[..pos + 4].to_string();
+    }
+
+    name.to_string()
+}
+
 impl<'a> DestinationItem<'a> {
     pub(crate) fn msg(&'a self) -> BBImagerMessage {
         match self {
-            DestinationItem::SaveToFile(x) => BBImagerMessage::SelectFileDest(x.clone()),
+            DestinationItem::SaveToFile(x) => {
+                BBImagerMessage::SelectFileDest(normalize_file_dest(x))
+            }
             DestinationItem::Destination(d) => BBImagerMessage::SelectDest((*d).clone()),
         }
     }
