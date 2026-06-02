@@ -78,12 +78,12 @@ async fn add_config_inserts_new_remote_configs() {
     // Create a minimal config with only remote_configs
     let new_config = Config {
         imager: bb_config::config::Imager {
-            remote_configs: HashSet::from([
+            remote_configs: vec![
                 "https://example.com/test-os-list.json".try_into().unwrap(),
                 "https://example.com/another-os-list.json"
                     .try_into()
                     .unwrap(),
-            ]),
+            ],
             devices: vec![],
         },
         os_list: vec![],
@@ -150,7 +150,7 @@ async fn add_config_does_not_duplicate_remote_configs() {
 
     // Create config with already existing remote config
     let mut imager = bb_config::config::Imager::default();
-    imager.remote_configs.insert(existing_url.into());
+    imager.remote_configs.push(existing_url.into());
 
     let new_config = Config {
         imager,

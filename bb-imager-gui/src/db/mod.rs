@@ -259,7 +259,7 @@ impl Db {
         while let Some((pid, img)) = imgs.pop() {
             match img {
                 config::OsListItem::Image(os_image) => {
-                    let id = Self::insert_image(exec, os_image, pid).await?;
+                    let id = Self::insert_image(exec, os_image, pid, remote_config_id).await?;
                     if let Some(p) = pid {
                         Self::insert_sublist_boards(exec, p, id).await?
                     }
@@ -438,13 +438,14 @@ impl Db {
         exec: &mut sqlx::SqliteConnection,
         img: &config::OsImage,
         parent_id: Option<i64>,
+        remote_config_id: Option<i64>,
     ) -> sqlx::Result<i64> {
         let id = sqlx::query(
             r#"
             INSERT INTO os_images(name, parent_id, description, icon, url, 
                 image_download_size, image_download_sha256, extract_size, 
-                release_date, init_format, bmap, info_text) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                release_date, init_format, bmap, info_text, remote_config_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             "#,
         )
         .bind(&img.name)
@@ -459,6 +460,7 @@ impl Db {
         .bind(img.init_format)
         .bind(img.bmap.as_ref().map(|x| x.as_str()))
         .bind(&img.info_text)
+        .bind(remote_config_id)
         .execute(&mut *exec)
         .await?
         .last_insert_rowid();
@@ -598,7 +600,8 @@ impl Db {
                 AND (
                         ($2 IS NULL AND oi.parent_id IS NULL) 
                         OR oi.parent_id = $2
-                )"#,
+                )
+            ORDER BY oi.remote_config_id NULLS LAST"#,
         )
         .bind(board_id)
         .bind(parent_id)
@@ -620,7 +623,8 @@ impl Db {
               AND (
                     ($2 IS NULL AND s.parent_id IS NULL)
                  OR s.parent_id = $2
-              )"#,
+              )
+            ORDER BY s.remote_config_id NULLS LAST"#,
         )
         .bind(board_id)
         .bind(parent_id)

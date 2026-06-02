@@ -70,8 +70,10 @@ CREATE TABLE os_images(
 	init_format TEXT NOT NULL,
 	bmap TEXT,
 	info_text TEXT,
+        remote_config_id INTEGER DEFAULT NULL,
 
 	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE,
+        FOREIGN KEY (remote_config_id) REFERENCES remote_configs(id) ON DELETE CASCADE
         UNIQUE(name, description, icon, url, init_format)
 ) STRICT;
 
