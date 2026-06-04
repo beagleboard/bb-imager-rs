@@ -4,7 +4,7 @@ use std::{
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, sd::FlashingSdLinuxConfig};
+use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 use iced::widget;
 use tokio::sync::mpsc;
 use url::Url;
@@ -255,29 +255,6 @@ impl RemoteImage {
     fn file_name(&self) -> &str {
         self.url.path_segments().unwrap().next_back().unwrap()
     }
-
-    async fn save(
-        &self,
-        path: &std::path::Path,
-        chan: mpsc::Sender<DownloadFlashingStatus>,
-    ) -> std::io::Result<()> {
-        let (tx, mut rx) = mpsc::channel(5);
-
-        let handle = tokio::spawn(async move {
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(x));
-            }
-        });
-
-        let p = self
-            .downloader
-            .download_with_sha(*self.url.clone(), self.extract_sha256, Some(tx))
-            .await?;
-        tokio::fs::copy(p, path).await?;
-        handle.abort();
-
-        Ok(())
-    }
 }
 
 impl IntoFuture for RemoteImage {
@@ -362,17 +339,6 @@ impl SelectedImage {
             Self::RemoteImage(x) => x.file_name().to_string(),
         }
     }
-
-    async fn save(
-        &self,
-        path: &std::path::Path,
-        chan: mpsc::Sender<DownloadFlashingStatus>,
-    ) -> std::io::Result<()> {
-        match self {
-            Self::LocalImage(x) => tokio::fs::copy(x.path(), path).await.map(|_| ()),
-            Self::RemoteImage(x) => x.save(path, chan).await,
-        }
-    }
 }
 
 impl IntoFuture for SelectedImage {
@@ -416,84 +382,28 @@ pub(crate) async fn flash(
     cancel: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
-        (
-            BoardImage::Image { img, bmap, .. },
-            FlashingCustomization::LinuxSdSysconfig(customization),
-            Destination::LocalFile(f),
-        ) => {
-            bb_flasher::sd::Flasher::with_file_dest(
-                img.into_future(),
-                bmap.map(IntoFuture::into_future),
-                f,
-                customization.sysconfig(),
-                Some(cancel),
-            )
-            .flash(Some(chan))
-            .await
-        }
-        (
-            BoardImage::Image { img, bmap, .. },
-            FlashingCustomization::LinuxSdCloudInit(customization),
-            Destination::LocalFile(f),
-        ) => {
-            bb_flasher::sd::Flasher::with_file_dest(
-                img.into_future(),
-                bmap.map(IntoFuture::into_future),
-                f,
-                customization.cloudinit(),
-                Some(cancel),
-            )
-            .flash(Some(chan))
-            .await
-        }
-        (BoardImage::Image { img, .. }, _, Destination::LocalFile(f)) => {
-            img.save(&f, chan).await.map_err(Into::into)
-        }
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
             bb_flasher::sd::FormatFlasher::new(t)
                 .flash(Some(chan))
                 .await
         }
-        (
-            BoardImage::Image { img, bmap, .. },
-            FlashingCustomization::LinuxSdSysconfig(customization),
-            Destination::SdCard(t),
-        ) => {
-            bb_flasher::sd::Flasher::new(
+        (BoardImage::Image { img, bmap, .. }, customization, Destination::LocalFile(f)) => {
+            bb_flasher::sd::Flasher::with_file_dest(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
-                t,
-                customization.sysconfig(),
+                f,
+                customization.sd_customization(),
                 Some(cancel),
             )
             .flash(Some(chan))
             .await
         }
-        (
-            BoardImage::Image { img, bmap, .. },
-            FlashingCustomization::LinuxSdCloudInit(customization),
-            Destination::SdCard(t),
-        ) => {
+        (BoardImage::Image { img, bmap, .. }, customization, Destination::SdCard(t)) => {
             bb_flasher::sd::Flasher::new(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
                 t,
-                customization.cloudinit(),
-                Some(cancel),
-            )
-            .flash(Some(chan))
-            .await
-        }
-        (
-            BoardImage::Image { img, bmap, .. },
-            FlashingCustomization::NoneSd,
-            Destination::SdCard(t),
-        ) => {
-            bb_flasher::sd::Flasher::new(
-                img.into_future(),
-                bmap.map(IntoFuture::into_future),
-                t,
-                FlashingSdLinuxConfig::none(),
+                customization.sd_customization(),
                 Some(cancel),
             )
             .flash(Some(chan))
@@ -722,6 +632,17 @@ impl FlashingCustomization {
                 sd_customization.validate_user()
             }
             _ => true,
+        }
+    }
+
+    fn sd_customization(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
+        match self {
+            FlashingCustomization::LinuxSdSysconfig(c) => c.sysconfig(),
+            FlashingCustomization::LinuxSdCloudInit(c) => c.cloudinit(),
+            FlashingCustomization::NoneSd => bb_flasher::sd::FlashingSdLinuxConfig::none(),
+            FlashingCustomization::Bcf(_)
+            | FlashingCustomization::Msp430
+            | FlashingCustomization::Zepto(_) => unreachable!(),
         }
     }
 }
