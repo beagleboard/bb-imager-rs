@@ -266,15 +266,23 @@ impl Db {
                     }
                 }
                 config::OsListItem::SubList(os_sub_list) => {
-                    let id =
-                        Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id).await?;
-                    imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
+                    if crate::helpers::flasher_supported(os_sub_list.flasher) {
+                        let id =
+                            Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id).await?;
+                        imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
+                    }
                 }
                 config::OsListItem::RemoteSubList(os_remote_sub_list) => {
-                    let id =
-                        Self::insert_remote_image(exec, os_remote_sub_list, pid, remote_config_id)
-                            .await?;
-                    Self::insert_remote_sublist_boards(exec, id).await?;
+                    if crate::helpers::flasher_supported(os_remote_sub_list.flasher) {
+                        let id = Self::insert_remote_image(
+                            exec,
+                            os_remote_sub_list,
+                            pid,
+                            remote_config_id,
+                        )
+                        .await?;
+                        Self::insert_remote_sublist_boards(exec, id).await?;
+                    }
                 }
             }
         }
