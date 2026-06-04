@@ -824,7 +824,7 @@ pub(crate) enum OsImageId {
     Local(config::Flasher),
     // points to OsImage
     OsImage(i64),
-    OsSublist(i64),
+    OsSublist((i64, config::Flasher)),
 }
 
 #[derive(Debug, Clone)]
@@ -847,7 +847,7 @@ impl From<crate::db::OsImageListItem> for OsImageItem {
 impl From<crate::db::OsSublistListItem> for OsImageItem {
     fn from(value: crate::db::OsSublistListItem) -> Self {
         Self {
-            id: OsImageId::OsSublist(value.id),
+            id: OsImageId::OsSublist((value.id, value.flasher)),
             icon: Some(value.icon.into()),
             label: Cow::Owned(value.name),
         }

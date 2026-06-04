@@ -103,6 +103,7 @@ pub(crate) struct OsSublistListItem {
     pub(crate) id: i64,
     pub(crate) icon: Url,
     pub(crate) name: String,
+    pub(crate) flasher: bb_config::config::Flasher,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -616,7 +617,7 @@ impl Db {
     ) -> sqlx::Result<Vec<OsSublistListItem>> {
         sqlx::query_as(
             r#"
-            SELECT s.id, s.name, s.icon
+            SELECT s.id, s.name, s.icon, s.flasher
             FROM os_sublists s
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
             WHERE sb.board_id = $1

@@ -195,8 +195,13 @@ impl ChooseOsState {
         self.refresh_image_list()
     }
 
-    pub fn update_pos(&mut self, pos: Option<i64>) -> Task<BBImagerMessage> {
+    pub fn update_pos(
+        &mut self,
+        pos: Option<i64>,
+        flasher: config::Flasher,
+    ) -> Task<BBImagerMessage> {
         self.pos = pos;
+        self.flasher = flasher;
         self.refresh_image_list()
     }
 }
