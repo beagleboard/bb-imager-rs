@@ -45,9 +45,7 @@ use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
-pub use img::OsImage;
-
-use crate::img::OsArchive;
+pub use img::{OsImage, OsArchive};
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
