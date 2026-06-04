@@ -182,7 +182,6 @@ pub struct OsImage {
 
 /// Types of flashers Os Image(s) support
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize, sqlx::Type)]
-#[non_exhaustive]
 pub enum Flasher {
     #[default]
     /// Image needs to be written to SD Card
