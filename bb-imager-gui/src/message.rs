@@ -174,8 +174,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 helpers::OsImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
                     return Task::batch([
-                        inner.resolve_remote_sublists(board_id, Some(id)),
-                        inner.update_pos(Some(id)),
+                        inner.resolve_remote_sublists(board_id, Some(id.0)),
+                        inner.update_pos(Some(id.0), id.1),
                     ]);
                 }
             },
