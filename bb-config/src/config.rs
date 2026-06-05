@@ -186,6 +186,8 @@ pub enum Flasher {
     #[default]
     /// Image needs to be written to SD Card
     SdCard,
+    /// Archive for updated bootfs
+    SdCardBootfs,
     /// BeagleConnect Freedom CC1352P7 Firmware
     BeagleConnectFreedom,
     /// BeagleConnect Freedom Msp430 Firmware

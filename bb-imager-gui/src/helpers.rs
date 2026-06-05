@@ -255,6 +255,47 @@ impl RemoteImage {
     fn file_name(&self) -> &str {
         self.url.path_segments().unwrap().next_back().unwrap()
     }
+
+    fn into_archive_fn(
+        self,
+        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+    ) -> impl FnOnce() -> std::io::Result<bb_flasher::OsArchive> {
+        move || {
+            let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+
+            let downloader = self.downloader.clone();
+            let cache =
+                rt.block_on(
+                    async move { downloader.check_cache_from_sha(self.extract_sha256).await },
+                );
+
+            if let Some(path) = cache {
+                tracing::info!("Found the remote image in cache");
+                return bb_flasher::OsArchive::from_path(&path, tx);
+            }
+
+            tracing::info!("Remote image not found in cache. Downloading");
+            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
+            let downloader = self.downloader.clone();
+            let url = self.url.clone();
+            let sha = self.extract_sha256;
+
+            let t: tokio::task::JoinHandle<std::io::Result<()>> = rt.spawn(async move {
+                downloader
+                    .download_to_stream(*url, sha, tx_stream)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error while downloading Os Image: {e}");
+                        tracing::error!("{}", &msg);
+                        std::io::Error::other(msg)
+                    })?;
+                tracing::info!("Image download finished");
+                Ok(())
+            });
+
+            bb_flasher::OsArchive::from_piped(rx, t, self.extract_size, tx)
+        }
+    }
 }
 
 impl IntoFuture for RemoteImage {
@@ -339,6 +380,16 @@ impl SelectedImage {
             Self::RemoteImage(x) => x.file_name().to_string(),
         }
     }
+
+    fn into_archive_fn(
+        self,
+        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+    ) -> Box<dyn FnOnce() -> std::io::Result<bb_flasher::OsArchive>> {
+        match self {
+            SelectedImage::LocalImage(x) => Box::new(x.into_archive_fn(tx)),
+            SelectedImage::RemoteImage(x) => Box::new(x.into_archive_fn(tx)),
+        }
+    }
 }
 
 impl IntoFuture for SelectedImage {
@@ -387,7 +438,13 @@ pub(crate) async fn flash(
                 .flash(Some(chan))
                 .await
         }
-        (BoardImage::Image { img, bmap, .. }, customization, Destination::LocalFile(f)) => {
+        (
+            BoardImage::Image {
+                img, bmap, flasher, ..
+            },
+            customization,
+            Destination::LocalFile(f),
+        ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::with_file_dest(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
@@ -398,7 +455,13 @@ pub(crate) async fn flash(
             .flash(Some(chan))
             .await
         }
-        (BoardImage::Image { img, bmap, .. }, customization, Destination::SdCard(t)) => {
+        (
+            BoardImage::Image {
+                img, bmap, flasher, ..
+            },
+            customization,
+            Destination::SdCard(t),
+        ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::new(
                 img.into_future(),
                 bmap.map(IntoFuture::into_future),
@@ -408,6 +471,42 @@ pub(crate) async fn flash(
             )
             .flash(Some(chan))
             .await
+        }
+        (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
+            if flasher == config::Flasher::SdCardBootfs =>
+        {
+            let (tx, rx) = std::sync::mpsc::sync_channel(4);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(DownloadFlashingStatus::FlashingProgress(msg));
+                }
+            });
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::UpdateBootFlasher::new(img.into_archive_fn(Some(tx)), t, None)
+                    .flash()
+            })
+            .await
+            .unwrap()
+        }
+        (BoardImage::Image { img, flasher, .. }, _, Destination::LocalFile(t))
+            if flasher == config::Flasher::SdCardBootfs =>
+        {
+            let (tx, rx) = std::sync::mpsc::sync_channel(4);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(DownloadFlashingStatus::FlashingProgress(msg));
+                }
+            });
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::UpdateBootFlasher::with_file_dest(
+                    img.into_archive_fn(Some(tx)),
+                    t,
+                    None,
+                )
+                .flash()
+            })
+            .await
+            .unwrap()
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (
@@ -509,11 +608,13 @@ impl Destination {
 
 pub(crate) async fn destinations(flasher: config::Flasher, filter: bool) -> Vec<Destination> {
     match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::destinations(filter)
-            .await
-            .into_iter()
-            .map(Destination::SdCard)
-            .collect(),
+        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
+            bb_flasher::sd::Target::destinations(filter)
+                .await
+                .into_iter()
+                .map(Destination::SdCard)
+                .collect()
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => {
             bb_flasher::bcf::cc1352p7::Target::destinations(filter)
@@ -540,7 +641,9 @@ pub(crate) async fn destinations(flasher: config::Flasher, filter: bool) -> Vec<
 
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
-        config::Flasher::SdCard => bb_flasher::sd::Target::FILE_TYPES,
+        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
+            bb_flasher::sd::Target::FILE_TYPES
+        }
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
@@ -553,7 +656,7 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
 
 pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
-        config::Flasher::SdCard => true,
+        config::Flasher::SdCard | config::Flasher::SdCardBootfs => true,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
@@ -599,7 +702,7 @@ impl FlashingCustomization {
                         .unwrap_or_default(),
                 )
             }
-            config::Flasher::SdCard => Self::NoneSd,
+            config::Flasher::SdCard | config::Flasher::SdCardBootfs => Self::NoneSd,
             config::Flasher::BeagleConnectFreedom => {
                 Self::Bcf(app_config.bcf_customization.clone().unwrap_or_default())
             }
@@ -793,7 +896,9 @@ pub(crate) fn no_customization(
         {
             None
         }
-        config::Flasher::SdCard => Some(FlashingCustomization::NoneSd),
+        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
+            Some(FlashingCustomization::NoneSd)
+        }
         config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
         _ => None,
     }

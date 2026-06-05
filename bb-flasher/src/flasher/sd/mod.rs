@@ -314,16 +314,20 @@ impl<F> UpdateBootFlasher<F>
 where
     F: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
-    const fn new(img: F, dst: bb_flasher_sd::Destination, cancel: Option<Arc<AtomicBool>>) -> Self {
-        Self { img, dst, cancel }
+    pub fn new(img: F, dst: Target, cancel: Option<Arc<AtomicBool>>) -> Self {
+        Self {
+            img,
+            dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
+            cancel,
+        }
     }
 
     pub fn with_file_dest(img: F, dst: PathBuf, cancel: Option<Arc<AtomicBool>>) -> Self {
-        Self::new(
+        Self {
             img,
-            bb_flasher_sd::Destination::File(dst.into_boxed_path()),
+            dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
             cancel,
-        )
+        }
     }
 
     pub fn flash(self) -> anyhow::Result<()> {

@@ -20,15 +20,31 @@ pub struct OsArchive {
 }
 
 impl OsArchive {
+    fn new(img: OsImageSource, chan: Option<mpsc::SyncSender<f32>>, size: u64) -> io::Result<Self> {
+        let img = ReaderWithProgress::new(img, size, chan);
+        let img = OsArchiveCompression::new(img)?;
+        Ok(Self { inner: img })
+    }
+
     pub fn from_path(path: &Path, chan: Option<mpsc::SyncSender<f32>>) -> io::Result<Self> {
         let file = std::fs::File::open(path)?;
         let len = file.metadata()?.len();
 
         let img = OsImageSource::from(file);
-        let img = ReaderWithProgress::new(img, len, chan);
-        let img = OsArchiveCompression::new(img)?;
+        Self::new(img, chan, len)
+    }
 
-        Ok(Self { inner: img })
+    pub fn from_piped(
+        img: ReaderFileStream,
+        abort_handle: tokio::task::JoinHandle<io::Result<()>>,
+        size: u64,
+        chan: Option<mpsc::SyncSender<f32>>,
+    ) -> io::Result<Self> {
+        let img = OsImageSource::FileStream {
+            reader: img,
+            _background: AbortOnDropHandle::new(abort_handle),
+        };
+        Self::new(img, chan, size)
     }
 }
 
