@@ -431,6 +431,7 @@ pub(crate) async fn flash(
     dst: Destination,
     chan: mpsc::Sender<DownloadFlashingStatus>,
     cancel: tokio_util::sync::CancellationToken,
+    cancel_sync: bb_helper::cancel::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
@@ -482,8 +483,12 @@ pub(crate) async fn flash(
                 }
             });
             tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::UpdateBootFlasher::new(img.into_archive_fn(Some(tx)), t, None)
-                    .flash()
+                bb_flasher::sd::UpdateBootFlasher::new(
+                    img.into_archive_fn(Some(tx)),
+                    t,
+                    Some(cancel_sync),
+                )
+                .flash()
             })
             .await
             .unwrap()
@@ -501,7 +506,7 @@ pub(crate) async fn flash(
                 bb_flasher::sd::UpdateBootFlasher::with_file_dest(
                     img.into_archive_fn(Some(tx)),
                     t,
-                    None,
+                    Some(cancel_sync),
                 )
                 .flash()
             })
