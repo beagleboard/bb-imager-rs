@@ -120,6 +120,7 @@ pub(crate) struct OsImage {
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Url>,
     pub(crate) info_text: Option<String>,
+    pub(crate) support: Option<Url>
 }
 
 impl FromRow<'_, SqliteRow> for OsImage {
@@ -139,6 +140,7 @@ impl FromRow<'_, SqliteRow> for OsImage {
             init_format: row.try_get("init_format")?,
             bmap: row.try_get("bmap")?,
             info_text: row.try_get("info_text")?,
+            support: row.try_get("support")?,
         })
     }
 }
@@ -451,10 +453,10 @@ impl Db {
     ) -> sqlx::Result<i64> {
         let id = sqlx::query(
             r#"
-            INSERT INTO os_images(name, parent_id, description, icon, url, 
-                image_download_size, image_download_sha256, extract_size, 
-                release_date, init_format, bmap, info_text, remote_config_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            INSERT INTO os_images(name, parent_id, description, icon, url,
+                image_download_size, image_download_sha256, extract_size,
+                release_date, init_format, bmap, info_text, remote_config_id, support)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
         )
         .bind(&img.name)
@@ -470,6 +472,7 @@ impl Db {
         .bind(img.bmap.as_ref().map(|x| x.as_str()))
         .bind(&img.info_text)
         .bind(remote_config_id)
+        .bind(img.support.as_ref().map(|x| x.as_str()))
         .execute(&mut *exec)
         .await?
         .last_insert_rowid();
@@ -573,7 +576,7 @@ impl Db {
             r#"
             SELECT id, name, description, icon, url, image_download_size,
                 image_download_sha256, extract_size, release_date, init_format,
-                bmap, info_text 
+                bmap, info_text, support
             FROM os_images WHERE id = $1"#,
         )
         .bind(id)

@@ -212,6 +212,13 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 col = col.push(detail_entry("Init Format", init_formats[0].to_string()))
             }
 
+            if let Some(x) = img.support() {
+                let row =
+                    widget::row![button("SUPPORT").on_press(BBImagerMessage::OpenUrl(x.clone()))]
+                        .spacing(16);
+                col = col.push(widget::center(row));
+            }
+
             widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
                 .id(state.common.scroll_id.clone())
                 .into()

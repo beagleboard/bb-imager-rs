@@ -178,6 +178,8 @@ pub struct OsImage {
     pub bmap: Option<Url>,
     /// Special Instructions for flashing board.
     pub info_text: Option<String>,
+    /// URL to support page for image. This is where issues should be reported.
+    pub support: Option<Url>,
 }
 
 /// Types of flashers Os Image(s) support
