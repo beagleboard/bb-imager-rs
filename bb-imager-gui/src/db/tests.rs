@@ -404,6 +404,7 @@ async fn add_config_inserts_os_image_for_board() {
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
+        support: None,
     };
 
     let config = Config {
@@ -483,6 +484,11 @@ async fn os_image_by_id_returns_correct_data() {
         init_format: bb_config::config::InitFormat::None,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
         info_text: Some("Test info".to_string()),
+        support: Some(
+            "https://github.com/beagleboard/bb-imager-rs"
+                .try_into()
+                .unwrap(),
+        ),
     };
 
     let config = Config {
@@ -582,6 +588,7 @@ async fn add_config_inserts_os_sublist_for_board() {
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
+        support: None,
     };
 
     let sublist = bb_config::config::OsSubList {
@@ -670,6 +677,7 @@ async fn nested_os_sublists_propagate_board_support() {
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
+        support: None,
     };
 
     let child_sublist = bb_config::config::OsSubList {
@@ -896,6 +904,7 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
+        support: None,
     };
 
     db.os_remote_sublist_resolve(
@@ -1004,6 +1013,7 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
+        support: None,
     };
 
     // First resolve

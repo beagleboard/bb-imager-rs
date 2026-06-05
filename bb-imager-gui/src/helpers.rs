@@ -31,6 +31,7 @@ pub(crate) enum BoardImage {
         description: Option<String>,
         icon: BoardImageIcon,
         details: Vec<(&'static str, String)>,
+        support: Option<Url>,
     },
 }
 
@@ -52,6 +53,7 @@ impl BoardImage {
             description: None,
             icon: BoardImageIcon::Local,
             details,
+            support: None,
         }
     }
 
@@ -88,6 +90,7 @@ impl BoardImage {
             description: Some(image.description),
             icon: BoardImageIcon::Remote(image.icon.into()),
             details,
+            support: image.support.map(Into::into),
         }
     }
 
@@ -178,6 +181,13 @@ impl BoardImage {
             BoardImage::Image { init_format, .. } => {
                 *init_format = f;
             }
+        }
+    }
+
+    pub(crate) fn support(&self) -> Option<&Url> {
+        match self {
+            BoardImage::SdFormat { .. } => None,
+            BoardImage::Image { support, .. } => support.as_ref(),
         }
     }
 }
