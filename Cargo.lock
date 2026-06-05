@@ -633,6 +633,7 @@ dependencies = [
  "anyhow",
  "bb-bmap-parser",
  "bb-drivelist",
+ "bb-helper",
  "fatfs",
  "fscommon",
  "futures",

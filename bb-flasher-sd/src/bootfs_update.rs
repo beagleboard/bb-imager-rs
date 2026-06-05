@@ -1,10 +1,6 @@
-use std::{
-    io::{Read, Seek, Write},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::io::{Read, Seek, Write};
+
+use bb_helper::cancel::CancellationToken;
 
 use crate::{Result, helpers::Eject};
 
@@ -13,9 +9,9 @@ pub enum ContentType<'a> {
     File(Box<dyn Read + 'a>),
 }
 
-fn check_cancel(tkn: Option<&AtomicBool>) -> crate::Result<()> {
+fn check_cancel(tkn: Option<&CancellationToken>) -> crate::Result<()> {
     if let Some(t) = tkn
-        && t.load(Ordering::Relaxed)
+        && t.is_cancelled()
     {
         Err(crate::Error::Aborted)
     } else {
@@ -23,7 +19,7 @@ fn check_cancel(tkn: Option<&AtomicBool>) -> crate::Result<()> {
     }
 }
 
-pub fn flash<F, I>(img: F, dst: crate::Destination, cancel: Option<Arc<AtomicBool>>) -> Result<()>
+pub fn flash<F, I>(img: F, dst: crate::Destination, cancel: Option<CancellationToken>) -> Result<()>
 where
     F: FnOnce() -> std::io::Result<I>,
     for<'b> &'b mut I: IntoIterator<Item = (Box<str>, ContentType<'b>)>,
@@ -48,7 +44,7 @@ where
     }
 }
 
-fn common<F, I, S>(img: F, mut sd: S, cancel: Option<Arc<AtomicBool>>) -> Result<()>
+fn common<F, I, S>(img: F, mut sd: S, cancel: Option<CancellationToken>) -> Result<()>
 where
     F: FnOnce() -> std::io::Result<I>,
     S: Read + Write + Seek + std::fmt::Debug + Eject,
@@ -57,7 +53,7 @@ where
     tracing::info!("Opening Image");
     let mut img = img()?;
 
-    check_cancel(cancel.as_deref())?;
+    check_cancel(cancel.as_ref())?;
 
     internal((&mut img).into_iter(), &mut sd, cancel)?;
 
@@ -69,7 +65,7 @@ where
     Ok(())
 }
 
-fn internal<'a, I, S>(imgs: I, sd: S, cancel: Option<Arc<AtomicBool>>) -> Result<()>
+fn internal<'a, I, S>(imgs: I, sd: S, cancel: Option<CancellationToken>) -> Result<()>
 where
     S: Read + Write + Seek + std::fmt::Debug,
     I: 'a,
@@ -84,7 +80,7 @@ where
 
             for (path, c) in imgs {
                 tracing::info!("Creating {path}");
-                check_cancel(cancel.as_deref())?;
+                check_cancel(cancel.as_ref())?;
 
                 match c {
                     ContentType::Dir => {

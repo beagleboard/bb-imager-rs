@@ -6,12 +6,8 @@
 
 mod cloud_init;
 
-use std::{
-    borrow::Cow,
-    fmt::Display,
-    path::PathBuf,
-    sync::{Arc, atomic::AtomicBool},
-};
+use bb_helper::cancel::CancellationToken;
+use std::{borrow::Cow, fmt::Display, path::PathBuf};
 use tokio::sync::mpsc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
@@ -307,14 +303,14 @@ where
 pub struct UpdateBootFlasher<I> {
     img: I,
     dst: bb_flasher_sd::Destination,
-    cancel: Option<Arc<AtomicBool>>,
+    cancel: Option<CancellationToken>,
 }
 
 impl<F> UpdateBootFlasher<F>
 where
     F: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
-    pub fn new(img: F, dst: Target, cancel: Option<Arc<AtomicBool>>) -> Self {
+    pub fn new(img: F, dst: Target, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
             dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
@@ -322,7 +318,7 @@ where
         }
     }
 
-    pub fn with_file_dest(img: F, dst: PathBuf, cancel: Option<Arc<AtomicBool>>) -> Self {
+    pub fn with_file_dest(img: F, dst: PathBuf, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
             dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
