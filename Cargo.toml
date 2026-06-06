@@ -23,7 +23,7 @@ lto = true
 codegen-units = 1
 
 [workspace.package]
-version = "1.0.7"
+version = "1.0.8"
 edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://github.com/beagleboard/bb-imager-rs"
