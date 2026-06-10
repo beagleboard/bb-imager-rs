@@ -1,10 +1,10 @@
 use std::io::{self, Write};
 
 use bb_helper::cancel::CancellationToken;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 
-pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
+pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<f32>>, msg: f32) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
     }
