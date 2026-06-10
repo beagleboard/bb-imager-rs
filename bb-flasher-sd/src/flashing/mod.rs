@@ -224,7 +224,7 @@ pub async fn flash<R: AsyncRead + Send + Unpin + 'static, C>(
     customizations: impl futures::Stream<Item = Customization<C>> + Unpin,
 ) -> Result<()>
 where
-    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
+    C: Iterator<Item = (Box<str>, crate::ContentType)> + Send + 'static,
 {
     tracing::info!("Opening Destination");
 
@@ -258,7 +258,7 @@ async fn flash_internal<R, Sd, C>(
 where
     R: AsyncRead + Send + Unpin + 'static,
     Sd: AsyncRead + AsyncWrite + AsyncSeek + std::fmt::Debug + Send + Unpin + IntoStdIo + 'static,
-    C: futures::Stream<Item = (Box<str>, crate::ContentType)> + Unpin + Send + 'static,
+    C: Iterator<Item = (Box<str>, crate::ContentType)> + Send + 'static,
 {
     tracing::info!("Resolving Image");
     let bmap = match bmap {
@@ -276,7 +276,7 @@ where
 
     tracing::info!("Applying customization");
     let mut sd = sd.into_std_io().await?;
-    while let Some(mut c) = customizations.next().await {
+    while let Some(c) = customizations.next().await {
         sd = tokio::task::spawn_blocking(move || {
             let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
             c.customize(&mut sd)?;

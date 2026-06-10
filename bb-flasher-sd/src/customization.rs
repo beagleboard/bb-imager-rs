@@ -112,17 +112,13 @@ pub struct Customization<I> {
 
 impl<I> Customization<I>
 where
-    I: futures::Stream<Item = (Box<str>, ContentType)> + Unpin,
+    I: Iterator<Item = (Box<str>, ContentType)>,
 {
-    pub(crate) fn customize(
-        &mut self,
-        dst: impl Write + Seek + Read + std::fmt::Debug,
-    ) -> Result<()> {
+    pub(crate) fn customize(self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
         let partition = self.partition.open(dst)?;
         let root = partition.root_dir();
 
-        let iter = futures::executor::block_on_stream(&mut self.content);
-        for (path, data) in iter {
+        for (path, data) in self.content {
             let mut f =
                 root.create_file(&path)
                     .map_err(|source| Error::CustomizationFileCreateFail {
