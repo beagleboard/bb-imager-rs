@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 
+use bb_helper::cancel::CancellationToken;
 use tokio::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 
@@ -11,6 +12,16 @@ pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
 
 pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
+}
+
+pub(crate) fn check_cancel(tkn: Option<&CancellationToken>) -> crate::Result<()> {
+    if let Some(t) = tkn
+        && t.is_cancelled()
+    {
+        Err(crate::Error::Aborted)
+    } else {
+        Ok(())
+    }
 }
 
 pub(crate) trait Eject {

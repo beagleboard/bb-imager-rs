@@ -1,4 +1,5 @@
 use crate::{Error, Result};
+use bb_helper::cancel::CancellationToken;
 use fatfs::FileSystem;
 use fscommon::{BufStream, StreamSlice};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -86,19 +87,20 @@ impl PartitionTable {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ContentType {
+pub enum ContentType<'a> {
+    Dir,
+    Reader(Box<dyn Read + 'a>),
     File(Box<std::path::Path>),
-    Data(Box<[u8]>),
+    DataAppend(Box<[u8]>),
 }
 
-impl From<Box<[u8]>> for ContentType {
+impl<'a> From<Box<[u8]>> for ContentType<'a> {
     fn from(value: Box<[u8]>) -> Self {
-        Self::Data(value)
+        Self::DataAppend(value)
     }
 }
 
-impl From<Box<std::path::Path>> for ContentType {
+impl<'a> From<Box<std::path::Path>> for ContentType<'a> {
     fn from(value: Box<std::path::Path>) -> Self {
         Self::File(value)
     }
@@ -110,33 +112,50 @@ pub struct Customization<I> {
     pub content: I,
 }
 
-impl<I> Customization<I>
+impl<'a, I> Customization<I>
 where
-    I: Iterator<Item = (Box<str>, ContentType)>,
+    I: Iterator<Item = (Box<str>, ContentType<'a>)>,
 {
-    pub(crate) fn customize(self, dst: impl Write + Seek + Read + std::fmt::Debug) -> Result<()> {
+    pub(crate) fn customize(
+        self,
+        dst: impl Write + Seek + Read + std::fmt::Debug,
+        cancel: Option<CancellationToken>,
+    ) -> Result<()> {
         let partition = self.partition.open(dst)?;
-        let root = partition.root_dir();
+        {
+            let root = partition.root_dir();
 
-        for (path, data) in self.content {
-            let mut f =
-                root.create_file(&path)
-                    .map_err(|source| Error::CustomizationFileCreateFail {
-                        source,
-                        file: path.clone(),
-                    })?;
+            for (path, data) in self.content {
+                let customization_err = |source| Error::CustomizationFileCreateFail {
+                    source,
+                    file: path.clone(),
+                };
+                crate::helpers::check_cancel(cancel.as_ref())?;
 
-            match data {
-                ContentType::File(path) => {
-                    let mut source = std::fs::File::open(path)?;
-                    std::io::copy(&mut source, &mut f)?;
-                }
-                ContentType::Data(items) => {
-                    f.seek(SeekFrom::End(0))?;
-                    f.write_all(&items)?;
+                match data {
+                    ContentType::File(spath) => {
+                        let mut f = root.create_file(&path).map_err(customization_err)?;
+                        let mut source = std::fs::File::open(spath)?;
+                        std::io::copy(&mut source, &mut f)?;
+                    }
+                    ContentType::DataAppend(items) => {
+                        let mut f = root.create_file(&path).map_err(customization_err)?;
+                        f.seek(SeekFrom::End(0))?;
+                        f.write_all(&items)?;
+                    }
+                    ContentType::Dir => {
+                        root.create_dir(&path)?;
+                    }
+                    ContentType::Reader(mut reader) => {
+                        let mut dst = root.create_file(&path).map_err(customization_err)?;
+                        dst.truncate()?;
+                        std::io::copy(&mut reader, &mut dst)?;
+                    }
                 }
             }
         }
+
+        partition.unmount()?;
 
         Ok(())
     }

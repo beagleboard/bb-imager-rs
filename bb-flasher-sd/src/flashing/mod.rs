@@ -223,7 +223,7 @@ pub async fn flash<R: AsyncRead + Send + Unpin + 'static, C>(
     customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
 ) -> Result<()>
 where
-    C: Iterator<Item = (Box<str>, crate::ContentType)> + Send + 'static,
+    C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
 {
     tracing::info!("Opening Destination");
 
@@ -257,7 +257,7 @@ async fn flash_internal<R, Sd, C>(
 where
     R: AsyncRead + Send + Unpin + 'static,
     Sd: AsyncRead + AsyncWrite + AsyncSeek + std::fmt::Debug + Send + Unpin + IntoStdIo + 'static,
-    C: Iterator<Item = (Box<str>, crate::ContentType)> + Send + 'static,
+    C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
 {
     tracing::info!("Resolving Image");
     let bmap = match bmap {
@@ -278,7 +278,7 @@ where
     tokio::task::spawn_blocking(move || {
         let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
         for c in customizations {
-            c.customize(&mut sd)?;
+            c.customize(&mut sd, None)?;
         }
 
         tracing::info!("Ejecting SD Card");
