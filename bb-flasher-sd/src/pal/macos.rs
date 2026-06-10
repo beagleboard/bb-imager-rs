@@ -42,21 +42,18 @@ impl std::fmt::Debug for MacOSFile {
     }
 }
 
-async fn unmount_disk(path: &str) -> std::io::Result<()> {
-    tokio::process::Command::new("diskutil")
+fn unmount_disk(path: &str) -> std::io::Result<()> {
+    std::process::Command::new("diskutil")
         .args(["unmountDisk", path])
         .output()
-        .await
         .map(|_| ())
 }
 
 impl crate::helpers::Eject for MacOSFile {
-    async fn eject(self) -> std::io::Result<()> {
-        let f = tokio::fs::File::from_std(self.inner);
-        f.sync_all().await?;
-        std::mem::drop(f);
+    fn eject(self) -> std::io::Result<()> {
+        self.inner.sync_all()?;
+        let _ = unmount_disk(&self.path.to_string_lossy());
 
-        let _ = unmount_disk(&self.path.to_string_lossy()).await;
         Ok(())
     }
 }
@@ -72,7 +69,7 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 #[cfg(not(feature = "macos_authopen"))]
 pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
     let dst_str = dst.to_string_lossy();
-    let _ = unmount_disk(&dst_str).await;
+    let _ = unmount_disk(&dst_str);
 
     let f = tokio::fs::OpenOptions::new()
         .read(true)
@@ -175,7 +172,7 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
     }
 
     let p = dst.to_owned();
-    let _ = unmount_disk(dst.to_str().unwrap()).await;
+    let _ = unmount_disk(dst.to_str().unwrap());
     // TODO: Make this into a real async function
     let f = tokio::task::spawn_blocking(move || inner(p))
         .await

@@ -58,9 +58,7 @@ where
     internal((&mut img).into_iter(), &mut sd, cancel)?;
 
     tracing::info!("Ejecting SD Card");
-    tokio::runtime::Handle::current().block_on(async move {
-        let _ = sd.eject().await;
-    });
+    let _ = sd.eject();
 
     Ok(())
 }
