@@ -1,8 +1,6 @@
 use std::io::{self, Write};
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
-use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 
@@ -199,7 +197,6 @@ pub(crate) struct SdCardWrapper<W> {
     inner: W,
     buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
     pos: u64,
-    seeking: bool,
 }
 
 impl<W> SdCardWrapper<W> {
@@ -208,42 +205,88 @@ impl<W> SdCardWrapper<W> {
             inner,
             buf: Box::new(DirectIoBuffer::new()),
             pos: 0,
-            seeking: false,
         }
     }
 }
 
 impl<W> SdCardWrapper<W>
 where
-    W: AsyncSeek + Unpin,
+    W: io::Write + io::Seek,
 {
-    fn poll_seek_from_start(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context,
-        pos: u64,
-    ) -> Poll<io::Result<u64>> {
-        if self.pos != pos && !self.seeking {
-            self.as_mut().start_seek(io::SeekFrom::Start(pos))?;
-            self.seeking = true;
-        }
-        let res = std::task::ready!(self.as_mut().poll_complete(cx))?;
-        self.seeking = false;
-
-        Poll::Ready(Ok(res))
-    }
-}
-
-impl<W> SdCardWrapper<W>
-where
-    W: tokio::io::AsyncWrite + AsyncSeek + Unpin,
-{
-    async fn finish(&mut self) -> io::Result<()> {
-        self.inner.seek(io::SeekFrom::Start(0)).await?;
-        self.inner.write_all(self.buf.as_slice()).await?;
-        self.inner.flush().await?;
+    fn finish(&mut self) -> io::Result<()> {
+        self.inner.seek(io::SeekFrom::Start(0))?;
+        self.inner.write_all(self.buf.as_slice())?;
         self.pos = u64::try_from(self.buf.len()).unwrap();
 
         Ok(())
+    }
+}
+
+impl<W> io::Read for SdCardWrapper<W>
+where
+    W: io::Read + io::Seek,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let pos = usize::try_from(self.pos).unwrap();
+
+        let count = if pos < self.buf.len() {
+            let count = std::cmp::min(self.buf.len() - pos, buf.len());
+            self.inner
+                .seek(io::SeekFrom::Current(i64::try_from(count).unwrap()))?;
+            buf[..count].copy_from_slice(&self.buf.as_slice()[pos..(pos + count)]);
+            count
+        } else {
+            self.inner.read(buf)?
+        };
+
+        self.pos += u64::try_from(count).unwrap();
+        Ok(count)
+    }
+}
+
+impl<W> io::Write for SdCardWrapper<W>
+where
+    W: io::Write + io::Seek,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let pos = usize::try_from(self.pos).unwrap();
+
+        let count = if pos < self.buf.len() {
+            let count = std::cmp::min(self.buf.len() - pos, buf.len());
+            self.inner
+                .seek(io::SeekFrom::Current(i64::try_from(count).unwrap()))?;
+            self.buf.as_mut_slice()[pos..(pos + count)].copy_from_slice(&buf[..count]);
+            count
+        } else {
+            self.inner.write(buf)?
+        };
+
+        self.pos += u64::try_from(count).unwrap();
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<W> io::Seek for SdCardWrapper<W>
+where
+    W: io::Seek,
+{
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.pos = self.inner.seek(pos)?;
+        Ok(self.pos)
+    }
+}
+
+impl<W> Eject for SdCardWrapper<W>
+where
+    W: io::Write + io::Seek + Eject,
+{
+    async fn eject(mut self) -> io::Result<()> {
+        self.finish()?;
+        self.inner.eject().await
     }
 }
 
@@ -253,100 +296,6 @@ where
 {
     async fn eject(self) -> io::Result<()> {
         self.into_inner().eject().await
-    }
-}
-
-impl<W> Eject for SdCardWrapper<W>
-where
-    W: tokio::io::AsyncWrite + AsyncSeek + Unpin + Eject,
-{
-    async fn eject(mut self) -> io::Result<()> {
-        self.finish().await?;
-        self.inner.eject().await
-    }
-}
-
-impl<W> tokio::io::AsyncRead for SdCardWrapper<W>
-where
-    W: tokio::io::AsyncRead + AsyncSeek + Unpin,
-{
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        let pos = usize::try_from(self.pos).unwrap();
-
-        if pos < self.buf.len() {
-            let count = std::cmp::min(self.buf.len() - pos, buf.remaining());
-
-            // pos is also updated by poll_seek
-            let new_pos = self.pos + u64::try_from(count).unwrap();
-            std::task::ready!(self.as_mut().poll_seek_from_start(cx, new_pos))?;
-
-            buf.put_slice(&self.buf.as_slice()[pos..(pos + count)]);
-        } else {
-            let before = buf.filled().len();
-            std::task::ready!(Pin::new(&mut self.inner).poll_read(cx, buf))?;
-            let after = buf.filled().len();
-
-            let count = after - before;
-            self.pos += u64::try_from(count).unwrap();
-        };
-
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl<W> tokio::io::AsyncWrite for SdCardWrapper<W>
-where
-    W: tokio::io::AsyncWrite + AsyncSeek + Unpin,
-{
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        let pos = usize::try_from(self.pos).unwrap();
-
-        let count = if pos < self.buf.len() {
-            let count = std::cmp::min(self.buf.len() - pos, buf.len());
-
-            // pos is also updated by poll_seek
-            let new_pos = self.pos + u64::try_from(count).unwrap();
-            std::task::ready!(self.as_mut().poll_seek_from_start(cx, new_pos))?;
-
-            self.buf.as_mut_slice()[pos..(pos + count)].copy_from_slice(&buf[..count]);
-            count
-        } else {
-            let count = std::task::ready!(Pin::new(&mut self.inner).poll_write(cx, buf))?;
-            self.pos += u64::try_from(count).unwrap();
-            count
-        };
-
-        Poll::Ready(Ok(count))
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
-    }
-}
-
-impl<W> AsyncSeek for SdCardWrapper<W>
-where
-    W: AsyncSeek + Unpin,
-{
-    fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
-        Pin::new(&mut self.inner).start_seek(position)
-    }
-
-    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        self.pos = std::task::ready!(Pin::new(&mut self.inner).poll_complete(cx))?;
-        Poll::Ready(Ok(self.pos))
     }
 }
 
@@ -364,24 +313,20 @@ impl IntoStdIo for tokio::fs::File {
     }
 }
 
-impl<T> IntoStdIo for SdCardWrapper<tokio_util::compat::Compat<futures::io::AllowStdIo<T>>>
+impl<T> IntoStdIo for tokio_util::compat::Compat<futures::io::AllowStdIo<SdCardWrapper<T>>>
 where
     T: io::Read + io::Write + io::Seek + std::fmt::Debug + Send + Eject,
 {
-    type Output = tokio_util::io::SyncIoBridge<
-        SdCardWrapper<tokio_util::compat::Compat<futures::io::AllowStdIo<T>>>,
-    >;
+    type Output = SdCardWrapper<T>;
 
     async fn into_std_io(self) -> io::Result<Self::Output> {
-        Ok(tokio_util::io::SyncIoBridge::new(self))
+        Ok(self.into_inner().into_inner())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Seek, SeekFrom, Write};
-
-    use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
     use crate::helpers::BLOCK_SIZE;
 
@@ -448,21 +393,21 @@ mod tests {
         assert_eq!(ans, buf);
     }
 
-    #[tokio::test]
-    async fn sd_card_wrapper() {
+    #[test]
+    fn sd_card_wrapper() {
         let mut test_data = test_data();
         let mut temp_buf = Vec::with_capacity(FILE_LEN);
 
-        let f = tokio::fs::File::from_std(tempfile::tempfile().unwrap());
-        f.set_len(FILE_LEN as u64).await.unwrap();
+        let f = tempfile::tempfile().unwrap();
+        f.set_len(FILE_LEN as u64).unwrap();
         let mut sd = SdCardWrapper::new(f);
 
-        tokio::io::copy(&mut test_data, &mut sd).await.unwrap();
-        sd.flush().await.unwrap();
+        std::io::copy(&mut test_data, &mut sd).unwrap();
+        sd.flush().unwrap();
 
         // Read underlying file contents directly
-        sd.inner.rewind().await.unwrap();
-        sd.inner.read_to_end(&mut temp_buf).await.unwrap();
+        sd.inner.rewind().unwrap();
+        sd.inner.read_to_end(&mut temp_buf).unwrap();
 
         // Everything after the cached block should already be flushed
         assert_eq!(&test_data.get_ref()[BLOCK_SIZE..], &temp_buf[BLOCK_SIZE..]);
@@ -476,17 +421,17 @@ mod tests {
         temp_buf.clear();
 
         // Logical reads should still see full data
-        sd.rewind().await.unwrap();
-        sd.read_to_end(&mut temp_buf).await.unwrap();
+        sd.rewind().unwrap();
+        sd.read_to_end(&mut temp_buf).unwrap();
         assert_eq!(temp_buf.as_slice(), test_data.get_ref().as_ref());
 
         // finish() flushes cached block
-        sd.finish().await.unwrap();
+        sd.finish().unwrap();
 
         temp_buf.clear();
 
-        sd.inner.rewind().await.unwrap();
-        sd.inner.read_to_end(&mut temp_buf).await.unwrap();
+        sd.inner.rewind().unwrap();
+        sd.inner.read_to_end(&mut temp_buf).unwrap();
         assert_eq!(temp_buf.as_slice(), test_data.get_ref().as_ref());
     }
 }
