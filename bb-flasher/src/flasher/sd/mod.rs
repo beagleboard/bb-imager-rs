@@ -283,10 +283,11 @@ where
             self.bmap,
             dst,
             tx,
-            futures::stream::iter([bb_flasher_sd::Customization {
+            [bb_flasher_sd::Customization {
                 partition: bb_flasher_sd::ParitionType::Boot,
                 content: customization,
-            }]),
+            }]
+            .into_iter(),
         );
         match self.cancel {
             Some(x) => tokio::select! {
