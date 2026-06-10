@@ -1,6 +1,6 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
-use bb_flasher_sd::bootfs_update::ContentType;
+use bb_flasher_sd::ContentType;
 use bb_helper::{file_stream::ReaderFileStream, reader_progress::ReaderWithProgress};
 use rc_zip_sync::ReadZipStreaming;
 use std::{
@@ -82,7 +82,7 @@ fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentTyp
         ContentType::Dir
     } else {
         let temp: Box<dyn Read + 'a> = Box::new(entry);
-        ContentType::File(temp)
+        ContentType::Reader(temp)
     };
 
     (p, f)

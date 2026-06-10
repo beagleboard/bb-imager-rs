@@ -244,11 +244,7 @@ where
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let is_file_dest = self.is_file_dest();
         let dst = self.dst;
-        let customization = self
-            .customization
-            .0
-            .into_iter()
-            .map(|(p, d)| (p, bb_flasher_sd::ContentType::Data(d)));
+        let customization = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
 
         let img = async move {
             self.img

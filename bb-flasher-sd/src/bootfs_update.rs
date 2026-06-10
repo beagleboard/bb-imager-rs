@@ -2,12 +2,7 @@ use std::io::{Read, Seek, Write};
 
 use bb_helper::cancel::CancellationToken;
 
-use crate::{Result, helpers::Eject};
-
-pub enum ContentType<'a> {
-    Dir,
-    File(Box<dyn Read + 'a>),
-}
+use crate::{ContentType, Result, helpers::Eject};
 
 fn check_cancel(tkn: Option<&CancellationToken>) -> crate::Result<()> {
     if let Some(t) = tkn
@@ -66,36 +61,16 @@ where
 fn internal<'a, I, S>(imgs: I, sd: S, cancel: Option<CancellationToken>) -> Result<()>
 where
     S: Read + Write + Seek + std::fmt::Debug,
-    I: 'a,
     I: Iterator<Item = (Box<str>, ContentType<'a>)>,
 {
     tracing::info!("Starting bootfs update");
     let mut sd = crate::helpers::DeviceWrapper::new(sd)?;
-    {
-        let boot_part = crate::customization::ParitionType::Boot.open(&mut sd)?;
-        {
-            let root = boot_part.root_dir();
+    let customization = crate::Customization {
+        partition: crate::ParitionType::Boot,
+        content: imgs,
+    };
 
-            for (path, c) in imgs {
-                tracing::info!("Creating {path}");
-                check_cancel(cancel.as_ref())?;
-
-                match c {
-                    ContentType::Dir => {
-                        root.create_dir(&path)?;
-                    }
-                    ContentType::File(mut reader) => {
-                        let mut dst = root.create_file(&path)?;
-                        dst.truncate()?;
-                        std::io::copy(&mut reader, &mut dst)?;
-                    }
-                }
-            }
-        }
-
-        boot_part.unmount()?;
-    }
-
+    customization.customize(&mut sd, cancel)?;
     sd.flush()?;
 
     Ok(())
@@ -137,7 +112,7 @@ mod test {
                     .map(|(p, f)| match f {
                         Some(x) => (
                             p.clone(),
-                            ContentType::File(Box::new(std::io::Cursor::new(x.clone()))),
+                            ContentType::Reader(Box::new(std::io::Cursor::new(x.clone()))),
                         ),
                         None => (p.clone(), ContentType::Dir),
                     })
@@ -209,7 +184,7 @@ mod test {
                 ContentType::Dir => {
                     root.open_dir(&path).unwrap();
                 }
-                ContentType::File(mut read) => {
+                ContentType::Reader(mut read) => {
                     let mut dst = root.open_file(&path).unwrap();
                     let mut expected = Vec::new();
                     let mut actual = Vec::new();
@@ -219,6 +194,7 @@ mod test {
 
                     assert_eq!(actual, expected);
                 }
+                _ => unreachable!(),
             }
         }
     }
