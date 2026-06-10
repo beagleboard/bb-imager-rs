@@ -1,6 +1,5 @@
 use std::io::{self, Write};
 
-use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 
@@ -15,36 +14,13 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
 }
 
 pub(crate) trait Eject {
-    fn eject(self) -> impl Future<Output = io::Result<()>>;
+    fn eject(self) -> io::Result<()>;
 }
 
 impl Eject for std::fs::File {
-    async fn eject(mut self) -> io::Result<()> {
-        tokio::task::spawn_blocking(move || {
-            self.flush()?;
-            self.sync_all()
-        })
-        .await
-        .unwrap()
-    }
-}
-
-impl Eject for tokio::fs::File {
-    async fn eject(mut self) -> io::Result<()> {
-        self.flush().await?;
-        self.sync_all().await
-    }
-}
-
-impl<T: Eject> Eject for futures::io::AllowStdIo<T> {
-    async fn eject(self) -> io::Result<()> {
-        self.into_inner().eject().await
-    }
-}
-
-impl<T: Eject> Eject for tokio_util::compat::Compat<T> {
-    async fn eject(self) -> io::Result<()> {
-        self.into_inner().eject().await
+    fn eject(mut self) -> io::Result<()> {
+        self.flush()?;
+        self.sync_all()
     }
 }
 
@@ -284,9 +260,9 @@ impl<W> Eject for SdCardWrapper<W>
 where
     W: io::Write + io::Seek + Eject,
 {
-    async fn eject(mut self) -> io::Result<()> {
+    fn eject(mut self) -> io::Result<()> {
         self.finish()?;
-        self.inner.eject().await
+        self.inner.eject()
     }
 }
 
@@ -294,8 +270,8 @@ impl<W> Eject for SyncIoBridge<W>
 where
     W: Unpin + Eject,
 {
-    async fn eject(self) -> io::Result<()> {
-        self.into_inner().eject().await
+    fn eject(self) -> io::Result<()> {
+        self.into_inner().eject()
     }
 }
 

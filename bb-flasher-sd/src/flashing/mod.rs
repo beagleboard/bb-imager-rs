@@ -281,7 +281,7 @@ where
     }
 
     tracing::info!("Ejecting SD Card");
-    let _ = sd.eject().await;
+    let _ = sd.eject();
 
     Ok(())
 }
