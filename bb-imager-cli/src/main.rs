@@ -165,15 +165,32 @@ async fn flash_internal(
                 )]);
             }
 
-            bb_flasher::sd::Flasher::new(
-                LocalImage::new(img).into_image_fn(),
-                bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
-                dst.try_into().unwrap(),
-                customization,
-                None,
-            )
-            .flash(chan)
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        // Safeguard for initial rewinds
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::Flasher::new(
+                    LocalImage::new(img).into_image_fn(),
+                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                    dst.try_into().unwrap(),
+                    customization,
+                )
+                .flash(tx, None)
+            })
             .await
+            .unwrap()
         }
         TargetCommands::SdBootUpdate { img, dst } => {
             let tx = if let Some(chan) = chan {
