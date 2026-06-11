@@ -7,7 +7,7 @@ use thiserror::Error;
 use flashing::dfu_write;
 use helpers::{check_token, is_dfu_device};
 
-use bb_helper::reader_progress::ReaderWithProgress;
+use bb_helper::{cancel::CancellationToken, reader_progress::ReaderWithProgress};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -80,7 +80,7 @@ pub fn flash<R, I>(
     bus_num: u8,
     port_num: u8,
     chan: Option<mpsc::SyncSender<f32>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
 ) -> Result<()>
 where
     R: FnOnce() -> std::io::Result<(I, u64)>,

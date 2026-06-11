@@ -1,5 +1,5 @@
 pub(crate) fn check_token(
-    cancel: Option<&tokio_util::sync::CancellationToken>,
+    cancel: Option<&bb_helper::cancel::CancellationToken>,
 ) -> crate::Result<()> {
     match cancel {
         Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),

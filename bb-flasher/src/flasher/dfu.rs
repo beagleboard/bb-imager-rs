@@ -5,6 +5,8 @@ use std::collections::HashSet;
 use std::io;
 use std::sync::mpsc;
 
+use bb_helper::cancel::CancellationToken;
+
 #[derive(Hash, Eq, PartialEq)]
 pub struct Target(bb_flasher_dfu::Device);
 
@@ -64,7 +66,7 @@ pub struct Flasher<R> {
     product_id: u16,
     bus_num: u8,
     port_num: u8,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
 }
 
 impl<R> Flasher<R> {
@@ -74,7 +76,7 @@ impl<R> Flasher<R> {
         port_num: u8,
         vendor_id: u16,
         product_id: u16,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
     ) -> Self {
         Self {
             imgs,
@@ -89,7 +91,7 @@ impl<R> Flasher<R> {
     pub fn from_identifier(
         imgs: Vec<(String, R)>,
         id: &str,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
     ) -> io::Result<Self> {
         let ids = id.split(":").map(|x| x.trim()).collect::<Vec<_>>();
         if ids.len() != 4 {
