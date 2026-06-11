@@ -201,41 +201,36 @@ fn write_sd(
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub async fn flash<R: Read + Send + 'static, B, C>(
-    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send + 'static,
+pub fn flash<'a, R, B, C>(
+    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send,
     bmap: Option<B>,
     dst: crate::Destination,
     chan: Option<mpsc::SyncSender<f32>>,
-    customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
+    customizations: impl Iterator<Item = Customization<C>> + Send,
+    cancel: Option<CancellationToken>,
 ) -> Result<()>
 where
-    C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
-    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
+    R: Read + Send,
+    C: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send,
 {
     tracing::info!("Opening Destination");
 
     match dst {
         crate::Destination::File(path) => {
-            let sd = tokio::fs::OpenOptions::new()
+            let sd = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .open(path)
-                .await?
-                .into_std()
-                .await;
-            tokio::task::spawn_blocking(move || flash_internal(img, bmap, sd, chan, customizations))
-                .await
-                .unwrap()
+                .open(path)?;
+            flash_internal(img, bmap, sd, chan, customizations, cancel)
         }
-        crate::Destination::SdCard(path) => tokio::task::spawn_blocking(move || {
+        crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path)?;
             let sd = crate::helpers::SdCardWrapper::new(sd);
-            flash_internal(img, bmap, sd, chan, customizations)
-        })
-        .await
-        .unwrap(),
+            flash_internal(img, bmap, sd, chan, customizations, cancel)
+        }
     }
 }
 
@@ -245,6 +240,7 @@ fn flash_internal<'a, R, B, Sd, C>(
     mut sd: Sd,
     mut chan: Option<mpsc::SyncSender<f32>>,
     customizations: impl Iterator<Item = Customization<C>> + Send,
+    cancel: Option<CancellationToken>,
 ) -> Result<()>
 where
     R: Read + Send,
@@ -264,11 +260,12 @@ where
     chan_send(chan.as_mut(), 0.0);
 
     tracing::info!("Writing to SD Card");
-    write_sd(img, img_size, bmap, &mut sd, chan, None)?;
+    write_sd(img, img_size, bmap, &mut sd, chan, cancel.clone())?;
 
     tracing::info!("Applying customization");
     let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
     for c in customizations {
+        check_cancel(cancel.as_ref())?;
         c.customize(&mut sd, None)?;
     }
 

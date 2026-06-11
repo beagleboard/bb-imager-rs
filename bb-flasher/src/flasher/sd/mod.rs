@@ -183,23 +183,15 @@ pub struct Flasher<I, B> {
     bmap: Option<B>,
     dst: bb_flasher_sd::Destination,
     customization: FlashingSdLinuxConfig,
-    cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 impl<I, B> Flasher<I, B> {
-    pub fn new(
-        img: I,
-        bmap: Option<B>,
-        dst: Target,
-        customization: FlashingSdLinuxConfig,
-        cancel: Option<tokio_util::sync::CancellationToken>,
-    ) -> Self {
+    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
         Self {
             img,
             bmap,
             dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
             customization,
-            cancel,
         }
     }
 
@@ -208,14 +200,12 @@ impl<I, B> Flasher<I, B> {
         bmap: Option<B>,
         dst: PathBuf,
         customization: FlashingSdLinuxConfig,
-        cancel: Option<tokio_util::sync::CancellationToken>,
     ) -> Self {
         Self {
             img,
             bmap,
             dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
             customization,
-            cancel,
         }
     }
 
@@ -225,22 +215,21 @@ impl<I, B> Flasher<I, B> {
 }
 
 impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
-    pub fn without_bmap(
-        img: I,
-        dst: Target,
-        customization: FlashingSdLinuxConfig,
-        cancel: Option<tokio_util::sync::CancellationToken>,
-    ) -> Self {
-        Self::new(img, None, dst, customization, cancel)
+    pub fn without_bmap(img: I, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+        Self::new(img, None, dst, customization)
     }
 }
 
-impl<I, B> BBFlasher for Flasher<I, B>
+impl<I, B> Flasher<I, B>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
-    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send,
 {
-    async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
+    pub fn flash(
+        self,
+        chan: Option<std::sync::mpsc::SyncSender<DownloadFlashingStatus>>,
+        cancel: Option<CancellationToken>,
+    ) -> anyhow::Result<()> {
         let is_file_dest = self.is_file_dest();
         let customization = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
 
@@ -266,7 +255,7 @@ where
             None => None,
         };
 
-        let fut = bb_flasher_sd::flash(
+        bb_flasher_sd::flash(
             self.img,
             self.bmap,
             self.dst,
@@ -276,14 +265,9 @@ where
                 content: customization,
             }]
             .into_iter(),
-        );
-        match self.cancel {
-            Some(x) => tokio::select! {
-                _ = x.cancelled() => Err(anyhow::anyhow!("Aborted before completion")),
-                res = fut => res.map_err(Into::into)
-            },
-            None => fut.await.map_err(Into::into),
-        }
+            cancel,
+        )
+        .map_err(Into::into)
     }
 }
 

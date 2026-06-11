@@ -450,15 +450,24 @@ pub(crate) async fn flash(
             customization,
             Destination::LocalFile(f),
         ) if flasher == config::Flasher::SdCard => {
-            bb_flasher::sd::Flasher::with_file_dest(
-                img.into_image_fn(),
-                bmap.map(|x| x.into_fn()),
-                f,
-                customization.sd_customization(),
-                Some(cancel),
-            )
-            .flash(Some(chan))
+            let (tx, rx) = std::sync::mpsc::sync_channel(2);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(msg);
+                }
+            });
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::Flasher::with_file_dest(
+                    img.into_image_fn(),
+                    bmap.map(|x| x.into_fn()),
+                    f,
+                    customization.sd_customization(),
+                )
+                .flash(Some(tx), Some(cancel_sync))
+            })
             .await
+            .unwrap()
         }
         (
             BoardImage::Image {
@@ -467,15 +476,24 @@ pub(crate) async fn flash(
             customization,
             Destination::SdCard(t),
         ) if flasher == config::Flasher::SdCard => {
-            bb_flasher::sd::Flasher::new(
-                img.into_image_fn(),
-                bmap.map(|x| x.into_fn()),
-                t,
-                customization.sd_customization(),
-                Some(cancel),
-            )
-            .flash(Some(chan))
+            let (tx, rx) = std::sync::mpsc::sync_channel(2);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(msg);
+                }
+            });
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::Flasher::new(
+                    img.into_image_fn(),
+                    bmap.map(|x| x.into_fn()),
+                    t,
+                    customization.sd_customization(),
+                )
+                .flash(Some(tx), Some(cancel_sync))
+            })
             .await
+            .unwrap()
         }
         (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
             if flasher == config::Flasher::SdCardBootfs =>
