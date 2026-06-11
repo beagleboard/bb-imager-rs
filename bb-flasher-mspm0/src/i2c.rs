@@ -1,10 +1,9 @@
-use std::{
-    os::unix::fs::MetadataExt,
-    path::{Path, PathBuf},
-};
+use std::os::unix::fs::MetadataExt;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 
 use i2cdev::core::I2CDevice;
-use tokio::sync::mpsc;
+use bb_helper::cancel::CancellationToken;
 
 use crate::{Error, Result, Status};
 
@@ -42,8 +41,8 @@ pub fn flash(
     firmware: &[u8],
     port: &Path,
     verify: bool,
-    chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
     prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     crate::helpers::flash(
