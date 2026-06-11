@@ -3,7 +3,6 @@
 use std::{borrow::Cow, collections::HashSet, io::Read};
 
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 #[derive(Error, Debug)]
 pub(crate) enum FlasherError {
@@ -24,18 +23,6 @@ pub enum DownloadFlashingStatus {
     FlashingProgress(f32),
     Verifying,
     Customizing,
-}
-
-/// A trait for modeling flashers. Also provides optional live status using channels.
-pub trait BBFlasher {
-    /// Start flashing. Generally, any image downloading should also be done as part of this
-    /// function with the help of [ImageFile]
-    ///
-    /// [ImageFile]: crate::ImageFile
-    fn flash(
-        self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = anyhow::Result<()>>;
 }
 
 /// A trait for modeling flasher targets.
