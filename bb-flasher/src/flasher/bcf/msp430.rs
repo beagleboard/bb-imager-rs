@@ -4,10 +4,10 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
+use std::sync::mpsc;
 use std::{borrow::Cow, ffi::CString, fmt::Display};
-use tokio::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget};
+use crate::BBFlasherTarget;
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -81,37 +81,31 @@ impl<I> Flasher<I> {
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let dst = self.port;
-        let img = self.img;
-        let img = tokio::task::spawn_blocking(move || crate::common::resolve_img(img))
-            .await
-            .unwrap()?;
+        let img = crate::common::resolve_img(self.img)?;
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-            let flasher_task = tokio::task::spawn_blocking(move || {
+        if let Some(chan) = chan {
+            std::thread::scope(|s| {
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_bcf::Status>(2);
+                s.spawn(move || {
+                    while let Ok(x) = rx.recv() {
+                        let _ = chan.try_send(x.into());
+                    }
+                });
+
                 bb_flasher_bcf::msp430::flash(&img, &dst, Some(tx))
-            });
-
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(x.into());
-            }
-
-            flasher_task
+            })
         } else {
-            tokio::task::spawn_blocking(move || bb_flasher_bcf::msp430::flash(&img, &dst, None))
-        };
-
-        flasher_task.await.unwrap().map_err(Into::into)
+            bb_flasher_bcf::msp430::flash(&img, &dst, None)
+        }
+        .map_err(Into::into)
     }
 }
