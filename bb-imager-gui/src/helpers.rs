@@ -439,9 +439,9 @@ pub(crate) async fn flash(
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
-            bb_flasher::sd::FormatFlasher::new(t)
-                .flash(Some(chan))
+            tokio::task::spawn_blocking(move || bb_flasher::sd::FormatFlasher::new(t).flash())
                 .await
+                .unwrap()
         }
         (
             BoardImage::Image {

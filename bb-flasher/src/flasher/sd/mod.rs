@@ -8,9 +8,8 @@ mod cloud_init;
 
 use bb_helper::cancel::CancellationToken;
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
-use tokio::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
+use crate::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// SD Card
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -162,12 +161,9 @@ impl FormatFlasher {
     pub fn new(p: Target) -> Self {
         Self(p.0.path)
     }
-}
 
-impl BBFlasher for FormatFlasher {
-    async fn flash(self, _: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let p = self.0;
-        bb_flasher_sd::format(p.as_path()).await.map_err(Into::into)
+    pub fn flash(self) -> anyhow::Result<()> {
+        bb_flasher_sd::format(self.0.as_path()).map_err(Into::into)
     }
 }
 

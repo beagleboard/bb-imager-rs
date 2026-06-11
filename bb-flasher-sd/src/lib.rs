@@ -137,8 +137,8 @@ impl Device {
 }
 
 /// Format SD card to fat32
-pub async fn format(dst: &std::path::Path) -> Result<()> {
-    crate::pal::format(dst).await
+pub fn format(dst: &std::path::Path) -> Result<()> {
+    crate::pal::format(dst)
 }
 
 #[derive(Debug, Clone)]
