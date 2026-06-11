@@ -279,25 +279,22 @@ impl BBImager {
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
 
-        let cancel = tokio_util::sync::CancellationToken::new();
-        let cancel_sync = bb_helper::cancel::CancellationToken::default();
+        let cancel = bb_helper::cancel::CancellationToken::default();
 
-        let s = iced::stream::channel(20, async move |mut chan| {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(19);
+        let s = iced::stream::channel(2, async move |mut chan| {
+            let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
-            let cancel_child = cancel.child_token();
-            let cancel_sync_child = cancel_sync.clone();
+            let cancel_child = cancel.clone();
             let flash_task = tokio::spawn(async move {
-                helpers::flash(img, customization, dst, tx, cancel_child, cancel_sync_child).await
+                helpers::flash(img, customization, dst, tx, cancel_child).await
             });
             let mut chan_clone = chan.clone();
-            let progress_task = tokio::spawn(async move {
-                while let Some(progress) = rx.recv().await {
+            let progress_task = tokio::task::spawn_blocking(move || {
+                while let Ok(progress) = rx.recv() {
                     let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(progress));
                 }
             });
             let _guard = cancel.drop_guard();
-            let _guard_sync = cancel_sync.drop_guard();
 
             let res = flash_task
                 .await

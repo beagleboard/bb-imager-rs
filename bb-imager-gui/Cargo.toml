@@ -28,7 +28,6 @@ directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
-tokio-util = { version = "0.7" }
 semver = "1.0.28"
 anyhow = "1.0"
 sqlx = { version = "0.9", features = ["runtime-tokio", "chrono"] }
