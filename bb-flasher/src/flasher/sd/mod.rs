@@ -9,7 +9,6 @@ mod cloud_init;
 use bb_helper::cancel::CancellationToken;
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 use tokio::sync::mpsc;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
 
@@ -243,14 +242,7 @@ where
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let is_file_dest = self.is_file_dest();
-        let dst = self.dst;
         let customization = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
-
-        let img = async move {
-            self.img
-                .await
-                .map(|(i, s)| (futures::io::AllowStdIo::new(i).compat(), s))
-        };
 
         let tx = match chan {
             Some(chan) => {
@@ -275,9 +267,9 @@ where
         };
 
         let fut = bb_flasher_sd::flash(
-            img,
+            self.img,
             self.bmap,
-            dst,
+            self.dst,
             tx,
             [bb_flasher_sd::Customization {
                 partition: bb_flasher_sd::ParitionType::Boot,

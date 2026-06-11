@@ -286,31 +286,6 @@ where
     }
 }
 
-pub(crate) trait IntoStdIo {
-    type Output: io::Read + io::Write + io::Seek + std::fmt::Debug + Send + Eject;
-
-    fn into_std_io(self) -> impl Future<Output = io::Result<Self::Output>>;
-}
-
-impl IntoStdIo for tokio::fs::File {
-    type Output = std::fs::File;
-
-    async fn into_std_io(self) -> io::Result<Self::Output> {
-        Ok(self.into_std().await)
-    }
-}
-
-impl<T> IntoStdIo for tokio_util::compat::Compat<futures::io::AllowStdIo<SdCardWrapper<T>>>
-where
-    T: io::Read + io::Write + io::Seek + std::fmt::Debug + Send + Eject,
-{
-    type Output = SdCardWrapper<T>;
-
-    async fn into_std_io(self) -> io::Result<Self::Output> {
-        Ok(self.into_inner().into_inner())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Seek, SeekFrom, Write};
