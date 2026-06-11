@@ -6,7 +6,7 @@ use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use helpers::LocalStringFile;
 use std::path::PathBuf;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -43,8 +43,8 @@ async fn flash(target: TargetCommands, quite: bool) {
     if quite {
         flash_internal(target, None).await
     } else {
-        let (tx, mut rx) = mpsc::channel(20);
-        tokio::task::spawn(async move {
+        let (tx, rx) = mpsc::sync_channel(2);
+        tokio::task::spawn_blocking(move || {
             let term = console::Term::stdout();
             let bar_style =
                 indicatif::ProgressStyle::with_template("{msg:15}  [{wide_bar}] [{percent:3} %]")
@@ -59,7 +59,7 @@ async fn flash(target: TargetCommands, quite: bool) {
             term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
                 .unwrap();
 
-            while let Some(progress) = rx.recv().await {
+            while let Ok(progress) = rx.recv() {
                 // Skip if no change in stage
                 if progress == last_state {
                     continue;
@@ -120,7 +120,7 @@ async fn flash(target: TargetCommands, quite: bool) {
 
 async fn flash_internal(
     target: TargetCommands,
-    chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
+    chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
 ) -> anyhow::Result<()> {
     match target {
         TargetCommands::Sd {
@@ -165,21 +165,6 @@ async fn flash_internal(
                 )]);
             }
 
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        // Safeguard for initial rewinds
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
             tokio::task::spawn_blocking(move || {
                 bb_flasher::sd::Flasher::new(
                     LocalImage::new(img).into_image_fn(),
@@ -187,14 +172,14 @@ async fn flash_internal(
                     dst.try_into().unwrap(),
                     customization,
                 )
-                .flash(tx, None)
+                .flash(chan, None)
             })
             .await
             .unwrap()
         }
         TargetCommands::SdBootUpdate { img, dst } => {
             let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                let (tx, rx) = mpsc::sync_channel(4);
                 tokio::task::spawn_blocking(move || {
                     let _ = chan.try_send(DownloadFlashingStatus::Preparing);
                     while let Ok(msg) = rx.recv() {
@@ -226,85 +211,31 @@ async fn flash_internal(
             img,
             dst,
             no_verify,
-        } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::bcf::cc1352p7::Flasher::new(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                )
-                .flash(tx)
-            })
-            .await
-            .unwrap()
-        }
+        } => tokio::task::spawn_blocking(move || {
+            bb_flasher::bcf::cc1352p7::Flasher::new(
+                LocalImage::new(img).into_image_fn(),
+                dst.into(),
+                !no_verify,
+                None,
+            )
+            .flash(chan)
+        })
+        .await
+        .unwrap(),
         #[cfg(feature = "bcf_msp430")]
-        TargetCommands::Msp430 { img, dst } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::bcf::msp430::Flasher::new(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                )
-                .flash(tx)
-            })
-            .await
-            .unwrap()
-        }
+        TargetCommands::Msp430 { img, dst } => tokio::task::spawn_blocking(move || {
+            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_image_fn(), dst.into())
+                .flash(chan)
+        })
+        .await
+        .unwrap(),
         #[cfg(feature = "pb2_mspm0")]
-        TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::pb2::mspm0::Flasher::new(
-                    LocalImage::new(img).into_image_fn(),
-                    !no_eeprom,
-                )
-                .flash(tx)
-            })
-            .await
-            .unwrap()
-        }
+        TargetCommands::Pb2Mspm0 { no_eeprom, img } => tokio::task::spawn_blocking(move || {
+            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_image_fn(), !no_eeprom)
+                .flash(chan)
+        })
+        .await
+        .unwrap(),
         #[cfg(feature = "dfu")]
         TargetCommands::Dfu { identifier, imgs } => {
             if imgs.len() % 2 == 1 {
@@ -321,25 +252,10 @@ async fn flash_internal(
                 })
                 .collect();
 
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        // Safeguard for initial rewinds
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
             tokio::task::spawn_blocking(move || {
                 bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
                     .unwrap()
-                    .flash(tx)
+                    .flash(chan)
             })
             .await
             .unwrap()
@@ -352,34 +268,17 @@ async fn flash_internal(
             img,
             dst,
             no_verify,
-        } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        // Safeguard for initial rewinds
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::mspm0::Flasher::no_prep(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                )
-                .flash(tx)
-            })
-            .await
-            .unwrap()
-        }
+        } => tokio::task::spawn_blocking(move || {
+            bb_flasher::mspm0::Flasher::no_prep(
+                LocalImage::new(img).into_image_fn(),
+                dst.into(),
+                !no_verify,
+                None,
+            )
+            .flash(chan)
+        })
+        .await
+        .unwrap(),
         #[cfg(all(
             any(feature = "zepto_uart", feature = "zepto_i2c"),
             target_os = "linux"
@@ -390,50 +289,33 @@ async fn flash_internal(
             no_verify,
             reset_gpio,
             bsl_gpio,
-        } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = std::sync::mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        // Safeguard for initial rewinds
-                        let _ = chan.try_send(msg);
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            match (reset_gpio, bsl_gpio) {
-                (Some(reset), Some(bsl)) => tokio::task::spawn_blocking(move || {
-                    bb_flasher::mspm0::Flasher::gpio_by_name(
-                        LocalImage::new(img).into_image_fn(),
-                        dst.into(),
-                        !no_verify,
-                        None,
-                        reset,
-                        bsl,
-                    )
-                    .flash(tx)
-                })
-                .await
-                .unwrap(),
-                (None, None) => tokio::task::spawn_blocking(move || {
-                    bb_flasher::mspm0::Flasher::no_prep(
-                        LocalImage::new(img).into_image_fn(),
-                        dst.into(),
-                        !no_verify,
-                        None,
-                    )
-                    .flash(tx)
-                })
-                .await
-                .unwrap(),
-                _ => panic!("Invalid arguments"),
-            }
-        }
+        } => match (reset_gpio, bsl_gpio) {
+            (Some(reset), Some(bsl)) => tokio::task::spawn_blocking(move || {
+                bb_flasher::mspm0::Flasher::gpio_by_name(
+                    LocalImage::new(img).into_image_fn(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                    reset,
+                    bsl,
+                )
+                .flash(chan)
+            })
+            .await
+            .unwrap(),
+            (None, None) => tokio::task::spawn_blocking(move || {
+                bb_flasher::mspm0::Flasher::no_prep(
+                    LocalImage::new(img).into_image_fn(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                )
+                .flash(chan)
+            })
+            .await
+            .unwrap(),
+            _ => panic!("Invalid arguments"),
+        },
     }
 }
 
