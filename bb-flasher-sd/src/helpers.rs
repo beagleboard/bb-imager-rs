@@ -2,7 +2,6 @@ use std::io::{self, Write};
 
 use bb_helper::cancel::CancellationToken;
 use std::sync::mpsc;
-use tokio_util::io::SyncIoBridge;
 
 pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<f32>>, msg: f32) {
     if let Some(c) = chan {
@@ -274,15 +273,6 @@ where
     fn eject(mut self) -> io::Result<()> {
         self.finish()?;
         self.inner.eject()
-    }
-}
-
-impl<W> Eject for SyncIoBridge<W>
-where
-    W: Unpin + Eject,
-{
-    fn eject(self) -> io::Result<()> {
-        self.into_inner().eject()
     }
 }
 

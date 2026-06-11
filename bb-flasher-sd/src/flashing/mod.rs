@@ -72,10 +72,7 @@ fn writer_task_bmap(
             pos += count as u64;
             // Clippy warning is simply wrong here
             #[allow(clippy::option_map_or_none)]
-            chan_send(
-                chan.as_mut().map_or(None, |p| Some(p)),
-                progress(bytes_written, img_size),
-            );
+            chan_send(chan.as_mut(), progress(bytes_written, img_size));
             check_cancel(cancel.as_ref())?;
 
             match buf_rx.recv() {
