@@ -225,55 +225,55 @@ where
                 .await?
                 .into_std()
                 .await;
-            flash_internal(img, bmap, sd, chan, customizations).await
+            tokio::task::spawn_blocking(move || flash_internal(img, bmap, sd, chan, customizations))
+                .await
+                .unwrap()
         }
         crate::Destination::SdCard(path) => {
             let sd = crate::pal::open(&path).await?;
             let sd = crate::helpers::SdCardWrapper::new(sd);
-            flash_internal(img, bmap, sd, chan, customizations).await
+            tokio::task::spawn_blocking(move || flash_internal(img, bmap, sd, chan, customizations))
+                .await
+                .unwrap()
         }
     }
 }
 
-async fn flash_internal<R, B, Sd, C>(
-    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send + 'static,
+fn flash_internal<'a, R, B, Sd, C>(
+    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send,
     bmap: Option<B>,
     mut sd: Sd,
     mut chan: Option<mpsc::SyncSender<f32>>,
-    customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
+    customizations: impl Iterator<Item = Customization<C>> + Send,
 ) -> Result<()>
 where
-    R: Read + Send + 'static,
-    Sd: Read + Write + Seek + Eject + std::fmt::Debug + Send + 'static,
-    C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
-    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
+    R: Read + Send,
+    Sd: Read + Write + Seek + Eject + std::fmt::Debug,
+    C: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send,
 {
-    tokio::task::spawn_blocking(move || {
-        tracing::info!("Resolving Image");
-        let bmap = match bmap {
-            Some(x) => {
-                Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
-            }
-            None => None,
-        };
-        let (img, img_size) = img()?;
-
-        chan_send(chan.as_mut(), 0.0);
-
-        tracing::info!("Writing to SD Card");
-        write_sd(img, img_size, bmap, &mut sd, chan, None)?;
-
-        tracing::info!("Applying customization");
-        let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-        for c in customizations {
-            c.customize(&mut sd, None)?;
+    tracing::info!("Resolving Image");
+    let bmap = match bmap {
+        Some(x) => {
+            Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
         }
+        None => None,
+    };
+    let (img, img_size) = img()?;
 
-        tracing::info!("Ejecting SD Card");
-        let _ = sd.into_inner().eject();
+    chan_send(chan.as_mut(), 0.0);
 
-        Ok(())
-    })
-    .await
-    .unwrap()
+    tracing::info!("Writing to SD Card");
+    write_sd(img, img_size, bmap, &mut sd, chan, None)?;
+
+    tracing::info!("Applying customization");
+    let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
+    for c in customizations {
+        c.customize(&mut sd, None)?;
+    }
+
+    tracing::info!("Ejecting SD Card");
+    let _ = sd.into_inner().eject();
+
+    Ok(())
 }
