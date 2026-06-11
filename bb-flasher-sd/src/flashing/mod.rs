@@ -1,7 +1,7 @@
+use std::sync::mpsc;
 use std::time::Instant;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
-use tokio::sync::mpsc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::Result;
@@ -19,8 +19,8 @@ const BUFFER_SIZE: usize = 8 * 1024;
 
 async fn reader_task(
     mut img: impl AsyncRead + Unpin,
-    mut buf_rx: mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
-    buf_tx: mpsc::Sender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    mut buf_rx: tokio::sync::mpsc::Receiver<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    buf_tx: tokio::sync::mpsc::Sender<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
 ) -> Result<()> {
     while let Some(mut buf) = buf_rx.recv().await {
         let count = read_aligned(&mut img, buf.as_mut_slice()).await?;
@@ -46,9 +46,9 @@ async fn reader_task(
 async fn writer_task_bmap<Sd>(
     bmap: bb_bmap_parser::Bmap,
     mut sd: Sd,
-    mut chan: Option<mpsc::Sender<f32>>,
-    mut buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
-    buf_tx: mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    mut chan: Option<mpsc::SyncSender<f32>>,
+    mut buf_rx: tokio::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: tokio::sync::mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
 ) -> Result<Sd>
 where
     Sd: AsyncWrite + AsyncSeek + Unpin,
@@ -94,9 +94,9 @@ where
 async fn writer_task<Sd>(
     img_size: u64,
     mut sd: Sd,
-    mut chan: Option<mpsc::Sender<f32>>,
-    mut buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
-    buf_tx: mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
+    mut chan: Option<mpsc::SyncSender<f32>>,
+    mut buf_rx: tokio::sync::mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
+    buf_tx: tokio::sync::mpsc::Sender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
 ) -> Result<Sd>
 where
     Sd: AsyncWrite + Unpin,
@@ -145,15 +145,15 @@ async fn write_sd<Sd>(
     img_size: u64,
     bmap: Option<bb_bmap_parser::Bmap>,
     sd: Sd,
-    chan: Option<mpsc::Sender<f32>>,
+    chan: Option<mpsc::SyncSender<f32>>,
 ) -> Result<Sd>
 where
     Sd: AsyncWrite + AsyncSeek + Unpin + Send + 'static,
 {
     const NUM_BUFFERS: usize = 4;
 
-    let (tx1, rx1) = mpsc::channel(NUM_BUFFERS);
-    let (tx2, rx2) = mpsc::channel(NUM_BUFFERS);
+    let (tx1, rx1) = tokio::sync::mpsc::channel(NUM_BUFFERS);
+    let (tx2, rx2) = tokio::sync::mpsc::channel(NUM_BUFFERS);
     let global_start = Instant::now();
 
     // Starting buffers
@@ -219,7 +219,7 @@ pub async fn flash<R: AsyncRead + Send + Unpin + 'static, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     dst: crate::Destination,
-    chan: Option<mpsc::Sender<f32>>,
+    chan: Option<mpsc::SyncSender<f32>>,
     customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
 ) -> Result<()>
 where
@@ -251,7 +251,7 @@ async fn flash_internal<R, Sd, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
     bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
     sd: Sd,
-    mut chan: Option<mpsc::Sender<f32>>,
+    mut chan: Option<mpsc::SyncSender<f32>>,
     customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
 ) -> Result<()>
 where
