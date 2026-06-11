@@ -32,8 +32,7 @@ where
             common(img, sd, cancel)
         }
         crate::Destination::SdCard(path) => {
-            let sd = tokio::runtime::Handle::current()
-                .block_on(async move { crate::pal::open(&path).await })?;
+            let sd = crate::pal::open(&path)?;
             common(img, sd, cancel)
         }
     }

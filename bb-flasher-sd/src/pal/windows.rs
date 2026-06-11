@@ -1,10 +1,10 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::{self, Read, Seek, SeekFrom, Write},
-    os::windows::io::AsRawHandle,
-    path::Path,
-    process::Stdio,
-};
+use std::fs::{File, OpenOptions};
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::os::windows::fs::OpenOptionsExt;
+use std::os::windows::io::AsRawHandle;
+use std::path::Path;
+use std::process::Stdio;
+
 use tokio::io::AsyncWriteExt;
 use windows::Win32::{
     Foundation::HANDLE,
@@ -24,33 +24,26 @@ const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
 const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
 
 impl WinDrive {
-    pub(crate) async fn open(path: &Path) -> anyhow::Result<Self> {
+    pub(crate) fn open(path: &Path) -> anyhow::Result<Self> {
         tracing::info!("Trying to find {}", path.display());
         let vol_path = physical_drive_to_volume(path)?;
 
         let volume = if let Some(vol_path) = vol_path {
             tracing::info!("Trying to open {vol_path}");
-            Some(
-                tokio::task::spawn_blocking(move || open_and_lock_volume(&vol_path))
-                    .await
-                    .unwrap()?,
-            )
+            Some(open_and_lock_volume(&vol_path)?)
         } else {
             None
         };
 
         tracing::info!("Trying to clean {:?}", path);
-        diskpart_clean(path).await?;
+        diskpart_clean(path)?;
 
         tracing::info!("Trying to open {:?}", path);
-        let drive = tokio::fs::OpenOptions::new()
+        let drive = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .custom_flags(FILE_FLAG_WRITE_THROUGH | FILE_FLAG_NO_BUFFERING)
-            .open(path)
-            .await?
-            .into_std()
-            .await;
+            .open(path)?;
 
         Ok(Self { drive, volume })
     }
@@ -129,14 +122,14 @@ fn physical_drive_to_volume(drive: &Path) -> anyhow::Result<Option<String>> {
     }
 }
 
-async fn diskpart_clean(path: &Path) -> Result<()> {
+fn diskpart_clean(path: &Path) -> Result<()> {
     let disk_num = path
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
         .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?;
 
-    let resp = tokio::process::Command::new("powershell")
+    let resp = std::process::Command::new("powershell")
         .args(&[
             "Clear-Disk",
             "-Number",
@@ -144,8 +137,7 @@ async fn diskpart_clean(path: &Path) -> Result<()> {
             "-RemoveData",
             "-Confirm:$false",
         ])
-        .output()
-        .await?;
+        .output()?;
     tracing::info!("Disk Clear Response: {:#?}", resp);
 
     if resp.status.success() {
@@ -224,8 +216,6 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
         .map_err(|source| Error::FailedToFormat { source })
 }
 
-pub(crate) async fn open(dst: &Path) -> Result<WinDrive> {
-    WinDrive::open(dst)
-        .await
-        .map_err(|e| Error::FailedToOpenDestination { source: e })
+pub(crate) fn open(dst: &Path) -> Result<WinDrive> {
+    WinDrive::open(dst).map_err(|e| Error::FailedToOpenDestination { source: e })
 }

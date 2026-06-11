@@ -229,13 +229,13 @@ where
                 .await
                 .unwrap()
         }
-        crate::Destination::SdCard(path) => {
-            let sd = crate::pal::open(&path).await?;
+        crate::Destination::SdCard(path) => tokio::task::spawn_blocking(move || {
+            let sd = crate::pal::open(&path)?;
             let sd = crate::helpers::SdCardWrapper::new(sd);
-            tokio::task::spawn_blocking(move || flash_internal(img, bmap, sd, chan, customizations))
-                .await
-                .unwrap()
-        }
+            flash_internal(img, bmap, sd, chan, customizations)
+        })
+        .await
+        .unwrap(),
     }
 }
 

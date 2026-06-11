@@ -59,7 +59,7 @@ impl crate::helpers::Eject for MacOSFile {
 }
 
 pub(crate) async fn format(dst: &Path) -> Result<()> {
-    let sd = open(dst).await?;
+    let sd = open(dst)?;
     tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
         .await
         .unwrap()
@@ -67,19 +67,16 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 }
 
 #[cfg(not(feature = "macos_authopen"))]
-pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
+pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
     let dst_str = dst.to_string_lossy();
     let _ = unmount_disk(&dst_str);
 
-    let f = tokio::fs::OpenOptions::new()
+    let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .open(dst)
-        .await
-        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?
-        .into_std()
-        .await;
+        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?;
 
     Ok(MacOSFile {
         inner: f,
@@ -88,7 +85,7 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
 }
 
 #[cfg(feature = "macos_authopen")]
-pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
+pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
     fn inner(dst: PathBuf) -> anyhow::Result<File> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
@@ -174,10 +171,7 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
     let p = dst.to_owned();
     let _ = unmount_disk(dst.to_str().unwrap());
     // TODO: Make this into a real async function
-    let f = tokio::task::spawn_blocking(move || inner(p))
-        .await
-        .unwrap()
-        .map_err(|e| Error::FailedToOpenDestination { source: e })?;
+    let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
 
     Ok(MacOSFile {
         inner: f,

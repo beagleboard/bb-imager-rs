@@ -1,9 +1,7 @@
 use crate::{Error, Result, helpers::Eject};
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
+use std::io;
+use std::path::{Path, PathBuf};
 
 #[cfg(feature = "udev")]
 use std::{
@@ -56,7 +54,7 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 }
 
 #[cfg(feature = "udev")]
-pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
     async fn open_inner(dst: &Path) -> anyhow::Result<LinuxDrive> {
         let dbus_client = udisks2::Client::new().await?;
 
@@ -91,22 +89,24 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
         })
     }
 
-    open_inner(dst)
-        .await
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()
+        .unwrap();
+    rt.block_on(async move { open_inner(dst).await })
         .map_err(|e| Error::FailedToOpenDestination { source: e })
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
-    let file = tokio::fs::OpenOptions::new()
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .custom_flags(libc::O_DIRECT)
-        .open(dst)
-        .await?
-        .into_std()
-        .await;
+        .open(dst)?;
 
     Ok(LinuxDrive {
         file,
