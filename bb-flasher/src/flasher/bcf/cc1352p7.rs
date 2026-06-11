@@ -3,7 +3,7 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [CC1352P7]: https://www.ti.com/product/CC1352P7
 
-use std::{borrow::Cow, fmt::Display, io::Read};
+use std::{borrow::Cow, fmt::Display};
 use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
@@ -80,7 +80,7 @@ impl<I> Flasher<I> {
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
     async fn flash(
         self,
@@ -88,21 +88,10 @@ where
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
-        let img = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            tokio::task::spawn_blocking(move || {
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)?;
-                Ok::<Vec<u8>, std::io::Error>(data)
-            })
+        let img = self.img;
+        let img = tokio::task::spawn_blocking(move || crate::common::resolve_img(img))
             .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
-        };
+            .unwrap()?;
 
         let flasher_task = if let Some(chan) = chan {
             let (tx, mut rx) = tokio::sync::mpsc::channel(20);

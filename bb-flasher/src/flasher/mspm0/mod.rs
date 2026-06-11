@@ -1,6 +1,6 @@
 #[cfg(feature = "mspm0_i2c")]
 use std::path::PathBuf;
-use std::{borrow::Cow, fmt::Display, io::Read};
+use std::{borrow::Cow, fmt::Display};
 use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
@@ -153,7 +153,7 @@ impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
 
 impl<I, P> BBFlasher for Flasher<I, P>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
     P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
     async fn flash(
@@ -162,21 +162,10 @@ where
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
-        let img = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            tokio::task::spawn_blocking(move || {
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)?;
-                Ok::<Vec<u8>, std::io::Error>(data)
-            })
+        let img = self.img;
+        let img = tokio::task::spawn_blocking(move || crate::common::resolve_img(img))
             .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
-        };
+            .unwrap()?;
 
         let curry = move |chan| match port {
             #[cfg(feature = "mspm0_uart")]

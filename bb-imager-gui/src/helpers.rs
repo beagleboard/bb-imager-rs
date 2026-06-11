@@ -306,49 +306,44 @@ impl RemoteImage {
             bb_flasher::OsArchive::from_piped(rx, t, self.extract_size, tx)
         }
     }
-}
 
-impl IntoFuture for RemoteImage {
-    type Output = std::io::Result<(bb_flasher::OsImage, u64)>;
-    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
+    fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(bb_flasher::OsImage, u64)> {
+        move || {
+            let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
 
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            if let Some(path) = self
-                .downloader
-                .check_cache_from_sha(self.extract_sha256)
-                .await
-            {
+            let downloader = self.downloader.clone();
+            let cache =
+                rt.block_on(
+                    async move { downloader.check_cache_from_sha(self.extract_sha256).await },
+                );
+
+            if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
-                Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size))
-            } else {
-                tracing::info!("Remote image not found in cache. Downloading");
-                let (tx, rx) = bb_helper::file_stream::file_stream()?;
-                let downloader = self.downloader.clone();
-                let url = self.url.clone();
-                let sha = self.extract_sha256;
-                let t: tokio::task::JoinHandle<std::io::Result<()>> = tokio::spawn(async move {
-                    downloader
-                        .download_to_stream(*url, sha, tx)
-                        .await
-                        .map_err(|e| {
-                            let msg = format!("Error while downloading Os Image: {e}");
-                            tracing::error!("{}", &msg);
-                            std::io::Error::other(msg)
-                        })?;
-                    tracing::info!("Image download finished");
-                    Ok(())
-                });
-
-                let extract_size = self.extract_size;
-                let img = tokio::task::spawn_blocking(move || {
-                    bb_flasher::OsImage::from_piped(rx, t, extract_size)
-                })
-                .await
-                .unwrap()?;
-                Ok((img, self.extract_size))
+                return Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size));
             }
-        })
+
+            tracing::info!("Remote image not found in cache. Downloading");
+            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
+            let downloader = self.downloader.clone();
+            let url = self.url.clone();
+            let sha = self.extract_sha256;
+
+            let t: tokio::task::JoinHandle<std::io::Result<()>> = rt.spawn(async move {
+                downloader
+                    .download_to_stream(*url, sha, tx_stream)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error while downloading Os Image: {e}");
+                        tracing::error!("{}", &msg);
+                        std::io::Error::other(msg)
+                    })?;
+                tracing::info!("Image download finished");
+                Ok(())
+            });
+
+            let img = bb_flasher::OsImage::from_piped(rx, t, self.extract_size)?;
+            Ok((img, self.extract_size))
+        }
     }
 }
 
@@ -402,16 +397,13 @@ impl SelectedImage {
             SelectedImage::RemoteImage(x) => Box::new(x.into_archive_fn(tx)),
         }
     }
-}
 
-impl IntoFuture for SelectedImage {
-    type Output = std::io::Result<(bb_flasher::OsImage, u64)>;
-    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
-
-    fn into_future(self) -> Self::IntoFuture {
+    fn into_image_fn(
+        self,
+    ) -> Box<dyn FnOnce() -> std::io::Result<(bb_flasher::OsImage, u64)> + Send> {
         match self {
-            SelectedImage::LocalImage(x) => Box::pin(x.into_image_future()),
-            SelectedImage::RemoteImage(x) => x.into_future(),
+            SelectedImage::LocalImage(x) => Box::new(x.into_image_fn()),
+            SelectedImage::RemoteImage(x) => Box::new(x.into_image_fn()),
         }
     }
 }
@@ -459,7 +451,7 @@ pub(crate) async fn flash(
             Destination::LocalFile(f),
         ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::with_file_dest(
-                img.into_future(),
+                img.into_image_fn(),
                 bmap.map(|x| x.into_fn()),
                 f,
                 customization.sd_customization(),
@@ -476,7 +468,7 @@ pub(crate) async fn flash(
             Destination::SdCard(t),
         ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::new(
-                img.into_future(),
+                img.into_image_fn(),
                 bmap.map(|x| x.into_fn()),
                 t,
                 customization.sd_customization(),
@@ -532,7 +524,7 @@ pub(crate) async fn flash(
             Destination::BeagleConnectFreedom(t),
         ) => {
             bb_flasher::bcf::cc1352p7::Flasher::new(
-                img.into_future(),
+                img.into_image_fn(),
                 t,
                 customization.verify,
                 Some(cancel),
@@ -542,7 +534,7 @@ pub(crate) async fn flash(
         }
         #[cfg(feature = "bcf_msp430")]
         (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            bb_flasher::bcf::msp430::Flasher::new(img.into_future(), t)
+            bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t)
                 .flash(Some(chan))
                 .await
         }
@@ -553,7 +545,7 @@ pub(crate) async fn flash(
             Destination::Mspm0(t),
         ) => {
             bb_flasher::mspm0::Flasher::no_prep(
-                img.into_future(),
+                img.into_image_fn(),
                 t,
                 customization.verify,
                 Some(cancel),

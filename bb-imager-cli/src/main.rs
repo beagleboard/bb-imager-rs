@@ -166,7 +166,7 @@ async fn flash_internal(
             }
 
             bb_flasher::sd::Flasher::new(
-                LocalImage::new(img).into_image_future(),
+                LocalImage::new(img).into_image_fn(),
                 bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
                 dst.try_into().unwrap(),
                 customization,
@@ -211,7 +211,7 @@ async fn flash_internal(
             no_verify,
         } => {
             bb_flasher::bcf::cc1352p7::Flasher::new(
-                LocalImage::new(img).into_image_future(),
+                LocalImage::new(img).into_image_fn(),
                 dst.into(),
                 !no_verify,
                 None,
@@ -221,21 +221,15 @@ async fn flash_internal(
         }
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {
-            bb_flasher::bcf::msp430::Flasher::new(
-                LocalImage::new(img).into_image_future(),
-                dst.into(),
-            )
-            .flash(chan)
-            .await
+            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_image_fn(), dst.into())
+                .flash(chan)
+                .await
         }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            bb_flasher::pb2::mspm0::Flasher::new(
-                LocalImage::new(img).into_image_future(),
-                !no_eeprom,
-            )
-            .flash(chan)
-            .await
+            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_image_fn(), !no_eeprom)
+                .flash(chan)
+                .await
         }
         #[cfg(feature = "dfu")]
         TargetCommands::Dfu { identifier, imgs } => {
@@ -248,7 +242,7 @@ async fn flash_internal(
                 .map(|x| {
                     (
                         x[0].to_string(),
-                        LocalImage::new(PathBuf::from(&x[1]).into()).into_image_future(),
+                        LocalImage::new(PathBuf::from(&x[1]).into()).into_image_fn(),
                     )
                 })
                 .collect();
@@ -268,7 +262,7 @@ async fn flash_internal(
             no_verify,
         } => {
             bb_flasher::mspm0::Flasher::no_prep(
-                LocalImage::new(img).into_image_future(),
+                LocalImage::new(img).into_image_fn(),
                 dst.into(),
                 !no_verify,
                 None,
@@ -289,7 +283,7 @@ async fn flash_internal(
         } => match (reset_gpio, bsl_gpio) {
             (Some(reset), Some(bsl)) => {
                 bb_flasher::mspm0::Flasher::gpio_by_name(
-                    LocalImage::new(img).into_image_future(),
+                    LocalImage::new(img).into_image_fn(),
                     dst.into(),
                     !no_verify,
                     None,
@@ -301,7 +295,7 @@ async fn flash_internal(
             }
             (None, None) => {
                 bb_flasher::mspm0::Flasher::no_prep(
-                    LocalImage::new(img).into_image_future(),
+                    LocalImage::new(img).into_image_fn(),
                     dst.into(),
                     !no_verify,
                     None,

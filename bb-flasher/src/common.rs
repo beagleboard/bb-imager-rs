@@ -1,25 +1,11 @@
 //! Stuff common to all the flashers
 
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, io::Read};
 
-#[cfg(any(
-    feature = "bcf",
-    feature = "bcf_msp430",
-    feature = "pb2_mspm0",
-    feature = "mspm0_uart",
-    feature = "mspm0_i2c"
-))]
 use thiserror::Error;
 use tokio::sync::mpsc;
 
 #[derive(Error, Debug)]
-#[cfg(any(
-    feature = "bcf",
-    feature = "bcf_msp430",
-    feature = "pb2_mspm0",
-    feature = "mspm0_uart",
-    feature = "mspm0_i2c"
-))]
 pub(crate) enum FlasherError {
     #[error("Failed to fetch image.")]
     ImageResolvingError {
@@ -69,4 +55,17 @@ where
 
     /// A sort of device ID (mostly a Path).
     fn identifier<'a>(&'a self) -> Cow<'a, str>;
+}
+
+// Should only be used when image is expected to rather small and can fit in heap.
+pub(crate) fn resolve_img(
+    img: impl FnOnce() -> std::io::Result<(crate::OsImage, u64)>,
+) -> Result<Vec<u8>, FlasherError> {
+    let (mut img, _) = img().map_err(|source| FlasherError::ImageResolvingError { source })?;
+
+    let mut data = Vec::new();
+    img.read_to_end(&mut data)
+        .map_err(|source| FlasherError::ImageResolvingError { source })?;
+
+    Ok(data)
 }
