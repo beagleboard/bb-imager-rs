@@ -365,15 +365,17 @@ pub(crate) struct Bmap {
     downloader: bb_downloader::Downloader,
 }
 
-impl IntoFuture for Bmap {
-    type Output = std::io::Result<Box<str>>;
-    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let p = self.downloader.download(*self.url.clone()).await?;
-            tokio::fs::read_to_string(p).await.map(Into::into)
-        })
+impl Bmap {
+    fn into_fn(self) -> impl FnOnce() -> std::io::Result<Box<str>> {
+        move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_io()
+                .build()
+                .unwrap();
+            let res =
+                rt.block_on(async move { self.downloader.download(*self.url.clone()).await })?;
+            std::fs::read_to_string(res).map(Into::into)
+        }
     }
 }
 
@@ -458,7 +460,7 @@ pub(crate) async fn flash(
         ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::with_file_dest(
                 img.into_future(),
-                bmap.map(IntoFuture::into_future),
+                bmap.map(|x| x.into_fn()),
                 f,
                 customization.sd_customization(),
                 Some(cancel),
@@ -475,7 +477,7 @@ pub(crate) async fn flash(
         ) if flasher == config::Flasher::SdCard => {
             bb_flasher::sd::Flasher::new(
                 img.into_future(),
-                bmap.map(IntoFuture::into_future),
+                bmap.map(|x| x.into_fn()),
                 t,
                 customization.sd_customization(),
                 Some(cancel),

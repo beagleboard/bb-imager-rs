@@ -167,7 +167,7 @@ async fn flash_internal(
 
             bb_flasher::sd::Flasher::new(
                 LocalImage::new(img).into_image_future(),
-                bmap.map(LocalStringFile::new).map(IntoFuture::into_future),
+                bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
                 dst.try_into().unwrap(),
                 customization,
                 None,

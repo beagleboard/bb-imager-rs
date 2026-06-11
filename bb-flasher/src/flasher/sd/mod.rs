@@ -238,7 +238,7 @@ impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
 impl<I, B> BBFlasher for Flasher<I, B>
 where
     I: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
-    B: Future<Output = std::io::Result<Box<str>>> + Send + 'static,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let is_file_dest = self.is_file_dest();
