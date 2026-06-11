@@ -6,7 +6,7 @@ use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use iced::widget;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 use url::Url;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -268,7 +268,7 @@ impl RemoteImage {
 
     fn into_archive_fn(
         self,
-        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+        tx: Option<mpsc::SyncSender<f32>>,
     ) -> impl FnOnce() -> std::io::Result<bb_flasher::OsArchive> {
         move || {
             let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
@@ -390,7 +390,7 @@ impl SelectedImage {
 
     fn into_archive_fn(
         self,
-        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+        tx: Option<mpsc::SyncSender<f32>>,
     ) -> Box<dyn FnOnce() -> std::io::Result<bb_flasher::OsArchive>> {
         match self {
             SelectedImage::LocalImage(x) => Box::new(x.into_archive_fn(tx)),
@@ -433,8 +433,7 @@ pub(crate) async fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
-    chan: mpsc::Sender<DownloadFlashingStatus>,
-    cancel: tokio_util::sync::CancellationToken,
+    chan: mpsc::SyncSender<DownloadFlashingStatus>,
     cancel_sync: bb_helper::cancel::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
@@ -449,59 +448,41 @@ pub(crate) async fn flash(
             },
             customization,
             Destination::LocalFile(f),
-        ) if flasher == config::Flasher::SdCard => {
-            let (tx, rx) = std::sync::mpsc::sync_channel(2);
-            tokio::task::spawn_blocking(move || {
-                while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(msg);
-                }
-            });
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::Flasher::with_file_dest(
-                    img.into_image_fn(),
-                    bmap.map(|x| x.into_fn()),
-                    f,
-                    customization.sd_customization(),
-                )
-                .flash(Some(tx), Some(cancel_sync))
-            })
-            .await
-            .unwrap()
-        }
+        ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
+            bb_flasher::sd::Flasher::with_file_dest(
+                img.into_image_fn(),
+                bmap.map(|x| x.into_fn()),
+                f,
+                customization.sd_customization(),
+            )
+            .flash(Some(chan), Some(cancel_sync))
+        })
+        .await
+        .unwrap(),
         (
             BoardImage::Image {
                 img, bmap, flasher, ..
             },
             customization,
             Destination::SdCard(t),
-        ) if flasher == config::Flasher::SdCard => {
-            let (tx, rx) = std::sync::mpsc::sync_channel(2);
-            tokio::task::spawn_blocking(move || {
-                while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(msg);
-                }
-            });
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::Flasher::new(
-                    img.into_image_fn(),
-                    bmap.map(|x| x.into_fn()),
-                    t,
-                    customization.sd_customization(),
-                )
-                .flash(Some(tx), Some(cancel_sync))
-            })
-            .await
-            .unwrap()
-        }
+        ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
+            bb_flasher::sd::Flasher::new(
+                img.into_image_fn(),
+                bmap.map(|x| x.into_fn()),
+                t,
+                customization.sd_customization(),
+            )
+            .flash(Some(chan), Some(cancel_sync))
+        })
+        .await
+        .unwrap(),
         (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
             if flasher == config::Flasher::SdCardBootfs =>
         {
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
             tokio::task::spawn_blocking(move || {
                 while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(DownloadFlashingStatus::FlashingProgress(msg));
+                    let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
                 }
             });
             tokio::task::spawn_blocking(move || {
@@ -521,7 +502,7 @@ pub(crate) async fn flash(
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
             tokio::task::spawn_blocking(move || {
                 while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(DownloadFlashingStatus::FlashingProgress(msg));
+                    let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
                 }
             });
             tokio::task::spawn_blocking(move || {
@@ -540,37 +521,21 @@ pub(crate) async fn flash(
             BoardImage::Image { img, .. },
             FlashingCustomization::Bcf(customization),
             Destination::BeagleConnectFreedom(t),
-        ) => {
-            let (tx, rx) = std::sync::mpsc::sync_channel(4);
-            tokio::task::spawn_blocking(move || {
-                while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(msg);
-                }
-            });
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::bcf::cc1352p7::Flasher::new(
-                    img.into_image_fn(),
-                    t,
-                    customization.verify,
-                    Some(cancel_sync),
-                )
-                .flash(Some(tx))
-            })
-            .await
-            .unwrap()
-        }
+        ) => tokio::task::spawn_blocking(move || {
+            bb_flasher::bcf::cc1352p7::Flasher::new(
+                img.into_image_fn(),
+                t,
+                customization.verify,
+                Some(cancel_sync),
+            )
+            .flash(Some(chan))
+        })
+        .await
+        .unwrap(),
         #[cfg(feature = "bcf_msp430")]
         (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            let (tx, rx) = std::sync::mpsc::sync_channel(4);
             tokio::task::spawn_blocking(move || {
-                while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(msg);
-                }
-            });
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(tx))
+                bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(chan))
             })
             .await
             .unwrap()
@@ -580,26 +545,17 @@ pub(crate) async fn flash(
             BoardImage::Image { img, .. },
             FlashingCustomization::Zepto(customization),
             Destination::Mspm0(t),
-        ) => {
-            let (tx, rx) = std::sync::mpsc::sync_channel(4);
-            tokio::task::spawn_blocking(move || {
-                while let Ok(msg) = rx.recv() {
-                    let _ = chan.blocking_send(msg);
-                }
-            });
-
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::mspm0::Flasher::no_prep(
-                    img.into_image_fn(),
-                    t,
-                    customization.verify,
-                    Some(cancel_sync),
-                )
-                .flash(Some(tx))
-            })
-            .await
-            .unwrap()
-        }
+        ) => tokio::task::spawn_blocking(move || {
+            bb_flasher::mspm0::Flasher::no_prep(
+                img.into_image_fn(),
+                t,
+                customization.verify,
+                Some(cancel_sync),
+            )
+            .flash(Some(chan))
+        })
+        .await
+        .unwrap(),
         _ => unimplemented!(),
     }
 }
