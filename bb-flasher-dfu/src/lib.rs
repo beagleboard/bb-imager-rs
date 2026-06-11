@@ -7,7 +7,7 @@ use thiserror::Error;
 use flashing::dfu_write;
 use helpers::{check_token, is_dfu_device};
 
-use crate::helpers::ReaderWithProgress;
+use bb_helper::reader_progress::ReaderWithProgress;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -73,7 +73,7 @@ pub fn devices(filter: bool) -> HashSet<Device> {
         .collect()
 }
 
-pub async fn flash<R, I>(
+pub fn flash<R, I>(
     imgs: Vec<(String, R)>,
     vendor_id: u16,
     product_id: u16,
@@ -83,8 +83,8 @@ pub async fn flash<R, I>(
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()>
 where
-    R: FnOnce() -> std::io::Result<(I, u64)> + Send + 'static,
-    I: io::Read + Send + 'static,
+    R: FnOnce() -> std::io::Result<(I, u64)>,
+    I: io::Read,
 {
     let imgs_count = imgs.len();
 
@@ -92,53 +92,41 @@ where
         check_token(cancel.as_ref())?;
 
         let name = img.0.clone();
-        let i = img.1;
-        let (img_reader, size) = tokio::task::spawn_blocking(i)
-            .await
-            .unwrap()
-            .map_err(|e| Error::ImgResolveFail { source: e })?;
+        let (img_reader, size) = img.1().map_err(|e| Error::ImgResolveFail { source: e })?;
 
         let res = match chan.clone() {
-            Some(c) => {
-                let (tx, mut rx) = tokio::sync::mpsc::channel::<f32>(1);
+            Some(c) => std::thread::scope(|s| {
+                let (tx, rx) = mpsc::sync_channel::<f32>(1);
 
-                tokio::spawn(async move {
+                s.spawn(move || {
                     let partition: f32 = 1.0 / (imgs_count as f32);
                     let offset = idx as f32 * partition;
 
-                    while let Some(x) = rx.recv().await {
+                    while let Ok(x) = rx.recv() {
                         let res = offset + x * partition;
                         let _ = c.try_send(res);
                     }
                 });
 
-                tokio::task::spawn_blocking(move || {
-                    dfu_write(
-                        vendor_id,
-                        product_id,
-                        bus_num,
-                        port_num,
-                        name,
-                        ReaderWithProgress::new(img_reader, size, tx),
-                        size.try_into().unwrap(),
-                    )
-                })
-                .await
-                .unwrap()
-            }
-            None => tokio::task::spawn_blocking(move || {
                 dfu_write(
                     vendor_id,
                     product_id,
                     bus_num,
                     port_num,
                     name,
-                    img_reader,
+                    ReaderWithProgress::new(img_reader, size, Some(tx)),
                     size.try_into().unwrap(),
                 )
-            })
-            .await
-            .unwrap(),
+            }),
+            None => dfu_write(
+                vendor_id,
+                product_id,
+                bus_num,
+                port_num,
+                name,
+                img_reader,
+                size.try_into().unwrap(),
+            ),
         };
 
         // For some reason tiboot3 does not exit properly. So need to ignore errors.

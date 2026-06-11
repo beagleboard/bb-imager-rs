@@ -264,10 +264,28 @@ async fn flash_internal(
                 })
                 .collect();
 
-            bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
-                .unwrap()
-                .flash(chan)
-                .await
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        // Safeguard for initial rewinds
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
+                    .unwrap()
+                    .flash(tx)
+            })
+            .await
+            .unwrap()
         }
         #[cfg(all(
             any(feature = "zepto_uart", feature = "zepto_i2c"),
