@@ -202,7 +202,7 @@ fn write_sd(
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
 pub async fn flash<R: Read + Send + 'static, B, C>(
-    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send + 'static,
     bmap: Option<B>,
     dst: crate::Destination,
     chan: Option<mpsc::SyncSender<f32>>,
@@ -236,7 +236,7 @@ where
 }
 
 async fn flash_internal<R, B, Sd, C>(
-    img: impl Future<Output = std::io::Result<(R, u64)>>,
+    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send + 'static,
     bmap: Option<B>,
     mut sd: Sd,
     mut chan: Option<mpsc::SyncSender<f32>>,
@@ -248,16 +248,15 @@ where
     C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
     B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
 {
-    tracing::info!("Resolving Image");
-    let (img, img_size) = img.await?;
-
     tokio::task::spawn_blocking(move || {
+        tracing::info!("Resolving Image");
         let bmap = match bmap {
             Some(x) => {
                 Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
             }
             None => None,
         };
+        let (img, img_size) = img()?;
 
         chan_send(chan.as_mut(), 0.0);
 

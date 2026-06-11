@@ -9,7 +9,6 @@ use raw::*;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::io::Read;
 use tokio::sync::mpsc;
 
 use crate::{BBFlasher, BBFlasherTarget};
@@ -69,29 +68,28 @@ impl<I> Flasher<I> {
 
 impl<I> BBFlasher for Flasher<I>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
     async fn flash(
         self,
         chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
-        let bin = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            tokio::task::spawn_blocking(move || {
-                let mut data = String::new();
-                img.read_to_string(&mut data)?;
-                data.parse().map_err(|_| {
+        let img = self.img;
+        let bin = tokio::task::spawn_blocking(move || {
+            let img = crate::common::resolve_img(img)?;
+            let img = String::from_utf8(img).map_err(|_| {
+                crate::common::FlasherError::ImageResolvingError {
+                    source: std::io::Error::other("Expected utf8"),
+                }
+            })?;
+            img.parse()
+                .map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
                 })
-            })
-            .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        }?;
+                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
+        })
+        .await
+        .unwrap()?;
 
         flash(bin, chan, self.persist_eeprom)
             .await

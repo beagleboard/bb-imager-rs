@@ -45,7 +45,7 @@ use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
-pub use img::{OsImage, OsArchive};
+pub use img::{OsArchive, OsImage};
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
@@ -66,17 +66,19 @@ impl LocalImage {
         self.0.file_name().unwrap()
     }
 
-    pub async fn into_image_future(self) -> std::io::Result<(OsImage, u64)> {
-        let p = self.0.clone();
-        let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
-            .await
-            .unwrap()?;
-        let size = img.size();
+    pub fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(OsImage, u64)> {
+        move || {
+            let img = OsImage::from_path(&self.0)?;
+            let size = img.size();
 
-        Ok((img, size))
+            Ok((img, size))
+        }
     }
 
-    pub fn into_archive_fn(self, tx: Option<std::sync::mpsc::SyncSender<f32>>) -> impl FnOnce() -> std::io::Result<OsArchive> {
+    pub fn into_archive_fn(
+        self,
+        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+    ) -> impl FnOnce() -> std::io::Result<OsArchive> {
         move || OsArchive::from_path(&self.0, tx)
     }
 }

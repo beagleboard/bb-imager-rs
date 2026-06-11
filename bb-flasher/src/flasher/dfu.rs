@@ -117,7 +117,7 @@ impl<R> Flasher<R> {
 
 impl<R> BBFlasher for Flasher<R>
 where
-    R: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
+    R: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let c = if let Some(c) = chan {

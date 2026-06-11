@@ -84,7 +84,7 @@ pub async fn flash<R, I>(
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()>
 where
-    R: Future<Output = std::io::Result<(I, u64)>>,
+    R: FnOnce() -> std::io::Result<(I, u64)> + Send + 'static,
     I: io::Read + Send + 'static,
 {
     let imgs_count = imgs.len();
@@ -93,9 +93,10 @@ where
         check_token(cancel.as_ref())?;
 
         let name = img.0.clone();
-        let (img_reader, size) = img
-            .1
+        let i = img.1;
+        let (img_reader, size) = tokio::task::spawn_blocking(move || i())
             .await
+            .unwrap()
             .map_err(|e| Error::ImgResolveFail { source: e })?;
 
         let res = match chan.clone() {
