@@ -201,15 +201,16 @@ fn write_sd(
 /// [`Arc`]: std::sync::Arc
 /// [`Weak`]: std::sync::Weak
 /// [BeagleBoard.org]: https://www.beagleboard.org/
-pub async fn flash<R: Read + Send + 'static, C>(
+pub async fn flash<R: Read + Send + 'static, B, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
-    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
+    bmap: Option<B>,
     dst: crate::Destination,
     chan: Option<mpsc::SyncSender<f32>>,
     customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
 ) -> Result<()>
 where
     C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
 {
     tracing::info!("Opening Destination");
 
@@ -234,9 +235,9 @@ where
     }
 }
 
-async fn flash_internal<R, Sd, C>(
+async fn flash_internal<R, B, Sd, C>(
     img: impl Future<Output = std::io::Result<(R, u64)>>,
-    bmap: Option<impl Future<Output = std::io::Result<Box<str>>>>,
+    bmap: Option<B>,
     mut sd: Sd,
     mut chan: Option<mpsc::SyncSender<f32>>,
     customizations: impl Iterator<Item = Customization<C>> + Send + 'static,
@@ -245,17 +246,19 @@ where
     R: Read + Send + 'static,
     Sd: Read + Write + Seek + Eject + std::fmt::Debug + Send + 'static,
     C: Iterator<Item = (Box<str>, crate::ContentType<'static>)> + Send + 'static,
+    B: FnOnce() -> std::io::Result<Box<str>> + Send + 'static,
 {
     tracing::info!("Resolving Image");
-    let bmap = match bmap {
-        Some(x) => {
-            Some(bb_bmap_parser::Bmap::from_xml(&x.await?).map_err(|_| crate::Error::InvalidBmap)?)
-        }
-        None => None,
-    };
     let (img, img_size) = img.await?;
 
     tokio::task::spawn_blocking(move || {
+        let bmap = match bmap {
+            Some(x) => {
+                Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
+            }
+            None => None,
+        };
+
         chan_send(chan.as_mut(), 0.0);
 
         tracing::info!("Writing to SD Card");
