@@ -583,11 +583,10 @@ dependencies = [
 name = "bb-flasher-dfu"
 version = "1.0.8"
 dependencies = [
+ "bb-helper",
  "dfu-libusb",
  "rusb",
  "thiserror 2.0.18",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]
