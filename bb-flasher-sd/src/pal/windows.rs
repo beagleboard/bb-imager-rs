@@ -5,7 +5,6 @@ use std::os::windows::io::AsRawHandle;
 use std::path::Path;
 use std::process::Stdio;
 
-use tokio::io::AsyncWriteExt;
 use windows::Win32::{
     Foundation::HANDLE,
     System::IO::DeviceIoControl,
@@ -147,32 +146,32 @@ fn diskpart_clean(path: &Path) -> Result<()> {
     }
 }
 
-async fn diskpart_format(path: &Path) -> io::Result<()> {
+fn diskpart_format(path: &Path) -> io::Result<()> {
     let disk_num = path
         .to_str()
         .unwrap()
         .strip_prefix("\\\\.\\PhysicalDrive")
         .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?;
 
-    let mut cmd = tokio::process::Command::new("diskpart")
+    let mut cmd = std::process::Command::new("diskpart")
         .stderr(Stdio::null())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .spawn()?;
 
     let mut stdin = cmd.stdin.take().expect("Failed to get stdin");
-    stdin.write_all(b"select disk ").await?;
-    stdin.write_all(disk_num.as_bytes()).await?;
-    stdin.write_all(b"\n").await?;
-    stdin.write_all(b"clean\n").await?;
-    stdin.write_all(b"create partition primary\n").await?;
-    stdin.write_all(b"format quick fs=fat32\n").await?;
-    stdin.write_all(b"assign\n").await?;
-    stdin.write_all(b"exit\n").await?;
+    stdin.write_all(b"select disk ")?;
+    stdin.write_all(disk_num.as_bytes())?;
+    stdin.write_all(b"\n")?;
+    stdin.write_all(b"clean\n")?;
+    stdin.write_all(b"create partition primary\n")?;
+    stdin.write_all(b"format quick fs=fat32\n")?;
+    stdin.write_all(b"assign\n")?;
+    stdin.write_all(b"exit\n")?;
 
     drop(stdin);
 
-    let status = cmd.wait().await?;
+    let status = cmd.wait()?;
     if status.success() {
         Ok(())
     } else {
@@ -210,10 +209,8 @@ impl crate::helpers::Eject for WinDrive {
     }
 }
 
-pub(crate) async fn format(dst: &Path) -> Result<()> {
-    diskpart_format(dst)
-        .await
-        .map_err(|source| Error::FailedToFormat { source })
+pub(crate) fn format(dst: &Path) -> Result<()> {
+    diskpart_format(dst).map_err(|source| Error::FailedToFormat { source })
 }
 
 pub(crate) fn open(dst: &Path) -> Result<WinDrive> {

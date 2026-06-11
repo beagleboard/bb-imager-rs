@@ -10,7 +10,7 @@ use std::{
 };
 
 #[cfg(feature = "udev")]
-pub(crate) async fn format(dst: &Path) -> Result<()> {
+pub(crate) fn format(dst: &Path) -> Result<()> {
     async fn format_inner(dst: &Path) -> io::Result<()> {
         let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
@@ -47,9 +47,11 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 
         Ok(())
     }
-
-    format_inner(dst)
-        .await
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()
+        .unwrap();
+    rt.block_on(async move { format_inner(dst).await })
         .map_err(|source| Error::FailedToFormat { source })
 }
 
@@ -115,19 +117,14 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) async fn format(dst: &Path) -> Result<()> {
-    let sd = tokio::fs::OpenOptions::new()
+pub(crate) fn format(dst: &Path) -> Result<()> {
+    let sd = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
-        .open(dst)
-        .await?
-        .into_std()
-        .await;
+        .open(dst)?;
 
-    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
-        .await
-        .unwrap()
+    fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default())
         .map_err(|source| Error::FailedToFormat { source })
 }
 

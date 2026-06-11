@@ -58,11 +58,9 @@ impl crate::helpers::Eject for MacOSFile {
     }
 }
 
-pub(crate) async fn format(dst: &Path) -> Result<()> {
+pub(crate) fn format(dst: &Path) -> Result<()> {
     let sd = open(dst)?;
-    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
-        .await
-        .unwrap()
+    fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default())
         .map_err(|source| Error::FailedToFormat { source })
 }
 
@@ -170,7 +168,6 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
     let p = dst.to_owned();
     let _ = unmount_disk(dst.to_str().unwrap());
-    // TODO: Make this into a real async function
     let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
 
     Ok(MacOSFile {

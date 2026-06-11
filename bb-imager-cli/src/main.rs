@@ -373,7 +373,9 @@ async fn format(dst: PathBuf, quite: bool) {
     let term = console::Term::stdout();
 
     let config = bb_flasher::sd::FormatFlasher::new(dst.try_into().unwrap());
-    config.flash(None).await.unwrap();
+    tokio::task::spawn_blocking(move || config.flash().unwrap())
+        .await
+        .unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();
