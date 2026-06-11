@@ -10,29 +10,35 @@ fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
     std::io::Cursor::new(data.into())
 }
 
-#[tokio::test]
-async fn sd_write() {
+#[test]
+fn sd_write() {
     const FILE_LEN: usize = 12 * 1024;
 
     let dummy_file = test_file(FILE_LEN);
-    let sd = std::io::Cursor::new(Vec::<u8>::new());
+    let mut sd = std::io::Cursor::new(Vec::<u8>::new());
 
-    let sd = write_sd(dummy_file.clone(), FILE_LEN as u64, None, sd, None)
-        .await
-        .unwrap();
+    write_sd(
+        dummy_file.clone(),
+        FILE_LEN as u64,
+        None,
+        &mut sd,
+        None,
+        None,
+    )
+    .unwrap();
 
     assert_eq!(sd.get_ref().as_slice(), dummy_file.get_ref().as_ref());
 }
 
-#[tokio::test]
-async fn sd_write_bmap() {
+#[test]
+fn sd_write_bmap() {
     const BLOCK_LEN: u64 = BUFFER_SIZE as u64;
     const FILE_LEN: usize = 32 * BUFFER_SIZE;
     const BLOCKS: u64 = (FILE_LEN as u64) / BLOCK_LEN;
     const MAPPED_BLOCKS: &[u64] = &[0, 2, BLOCKS - 1];
 
     let dummy_file = test_file(FILE_LEN);
-    let sd = std::io::Cursor::new(vec![0u8; FILE_LEN]);
+    let mut sd = std::io::Cursor::new(vec![0u8; FILE_LEN]);
 
     let mut bmap = bb_bmap_parser::Bmap::builder();
     bmap.image_size(FILE_LEN as u64)
@@ -51,14 +57,14 @@ async fn sd_write_bmap() {
 
     let bmap = bmap.build().unwrap();
 
-    let sd = write_sd(
+    write_sd(
         dummy_file.clone(),
         FILE_LEN as u64,
         Some(bmap.clone()),
-        sd,
+        &mut sd,
+        None,
         None,
     )
-    .await
     .unwrap();
 
     for i in 0..(BLOCKS as usize) {
@@ -78,8 +84,8 @@ async fn sd_write_bmap() {
     }
 }
 
-#[tokio::test]
-async fn aligned_read() {
+#[test]
+fn aligned_read() {
     const FILE_LEN: usize = 12 * 1024;
 
     let mut dummy_file = test_file(FILE_LEN);
@@ -87,7 +93,7 @@ async fn aligned_read() {
     let mut pos = 0;
 
     loop {
-        let count = read_aligned(&mut dummy_file, &mut buf).await.unwrap();
+        let count = read_aligned(&mut dummy_file, &mut buf).unwrap();
         if count == 0 {
             break;
         }
@@ -99,4 +105,3 @@ async fn aligned_read() {
 
     assert_eq!(pos, FILE_LEN);
 }
-
