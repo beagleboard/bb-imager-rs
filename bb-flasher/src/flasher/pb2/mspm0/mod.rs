@@ -9,9 +9,9 @@ use raw::*;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget};
+use crate::BBFlasherTarget;
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -66,33 +66,26 @@ impl<I> Flasher<I> {
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let img = self.img;
-        let bin = tokio::task::spawn_blocking(move || {
-            let img = crate::common::resolve_img(img)?;
-            let img = String::from_utf8(img).map_err(|_| {
-                crate::common::FlasherError::ImageResolvingError {
-                    source: std::io::Error::other("Expected utf8"),
-                }
-            })?;
-            img.parse()
-                .map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
-                })
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        })
-        .await
-        .unwrap()?;
+        let img = crate::common::resolve_img(img)?;
+        let img = String::from_utf8(img).map_err(|_| {
+            crate::common::FlasherError::ImageResolvingError {
+                source: std::io::Error::other("Expected utf8"),
+            }
+        })?;
+        let bin = img
+            .parse()
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware"))
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-        flash(bin, chan, self.persist_eeprom)
-            .await
-            .map_err(Into::into)
+        flash(bin, chan, self.persist_eeprom).map_err(Into::into)
     }
 }
