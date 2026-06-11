@@ -569,13 +569,12 @@ dependencies = [
 name = "bb-flasher-bcf"
 version = "1.0.2"
 dependencies = [
+ "bb-helper",
  "bin_file",
  "crc-fast",
  "hidapi",
  "serialport",
  "thiserror 2.0.18",
- "tokio",
- "tokio-util",
  "tracing",
 ]
 

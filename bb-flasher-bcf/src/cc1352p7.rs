@@ -9,9 +9,10 @@
 
 use std::{io, time::Duration};
 
+use bb_helper::cancel::CancellationToken;
 use serialport::SerialPort;
+use std::sync::mpsc;
 use thiserror::Error;
-use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -267,7 +268,7 @@ const fn progress(off: usize) -> f32 {
     (off as f32) / (FIRMWARE_SIZE as f32)
 }
 
-fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
+fn check_token(cancel: Option<&CancellationToken>) -> Result<()> {
     match cancel {
         Some(x) if x.is_cancelled() => Err(Error::Aborted),
         _ => Ok(()),
@@ -306,18 +307,18 @@ pub fn flash(
     firmware: &[u8],
     port: &str,
     verify: bool,
-    mut chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
 ) -> Result<()> {
     let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidImage)?;
 
-    chan_send(chan.as_mut(), Status::Preparing);
+    chan_send(chan.as_ref(), Status::Preparing);
 
     let mut bcf = open_bcf(port)?;
     info!("BeagleConnectFreedom Connected");
 
     check_token(cancel.as_ref())?;
-    chan_send(chan.as_mut(), Status::Flashing(0.0));
+    chan_send(chan.as_ref(), Status::Flashing(0.0));
 
     let img_crc32: u32 = crc_fast::checksum(
         CRC_ALGO,
@@ -350,7 +351,7 @@ pub fn flash(
             offset += bcf.send_data(&data[offset..])?;
 
             chan_send(
-                chan.as_mut(),
+                chan.as_ref(),
                 Status::Flashing(progress(start_address + offset)),
             );
             check_token(cancel.as_ref())?;
@@ -358,7 +359,7 @@ pub fn flash(
     }
 
     if verify {
-        chan_send(chan.as_mut(), Status::Verifying);
+        chan_send(chan.as_ref(), Status::Verifying);
         // small delay to ensure flash operations are fully complete
         std::thread::sleep(Duration::from_millis(100));
         if bcf.verify(img_crc32)? {

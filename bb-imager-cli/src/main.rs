@@ -1,7 +1,7 @@
 mod cli;
 mod helpers;
 
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
+use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus, LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use helpers::LocalStringFile;
@@ -227,20 +227,57 @@ async fn flash_internal(
             dst,
             no_verify,
         } => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(
-                LocalImage::new(img).into_image_fn(),
-                dst.into(),
-                !no_verify,
-                None,
-            )
-            .flash(chan)
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::bcf::cc1352p7::Flasher::new(
+                    LocalImage::new(img).into_image_fn(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                )
+                .flash(tx)
+            })
             .await
+            .unwrap()
         }
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {
-            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_image_fn(), dst.into())
-                .flash(chan)
-                .await
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::bcf::msp430::Flasher::new(
+                    LocalImage::new(img).into_image_fn(),
+                    dst.into(),
+                )
+                .flash(tx)
+            })
+            .await
+            .unwrap()
         }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {

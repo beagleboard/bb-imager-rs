@@ -3,10 +3,12 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [CC1352P7]: https://www.ti.com/product/CC1352P7
 
+use std::sync::mpsc;
 use std::{borrow::Cow, fmt::Display};
-use tokio::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget};
+use bb_helper::cancel::CancellationToken;
+
+use crate::BBFlasherTarget;
 
 /// BeagleConnect Freedom target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -59,16 +61,11 @@ pub struct Flasher<I> {
     img: I,
     port: String,
     verify: bool,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
 }
 
 impl<I> Flasher<I> {
-    pub fn new(
-        img: I,
-        port: Target,
-        verify: bool,
-        cancel: Option<tokio_util::sync::CancellationToken>,
-    ) -> Self {
+    pub fn new(img: I, port: Target, verify: bool, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
             port: port.0,
@@ -78,40 +75,32 @@ impl<I> Flasher<I> {
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
-        let img = self.img;
-        let img = tokio::task::spawn_blocking(move || crate::common::resolve_img(img))
-            .await
-            .unwrap()?;
+        let img = crate::common::resolve_img(self.img)?;
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-            let flasher_task = tokio::task::spawn_blocking(move || {
+        if let Some(chan) = chan {
+            std::thread::scope(|s| {
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_bcf::Status>(2);
+                s.spawn(move || {
+                    while let Ok(x) = rx.recv() {
+                        let _ = chan.try_send(x.into());
+                    }
+                });
+
                 bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, Some(tx), self.cancel)
-            });
-
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(x.into());
-            }
-
-            flasher_task
-        } else {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, None, self.cancel)
             })
-        };
-
-        flasher_task.await.unwrap().map_err(Into::into)
+        } else {
+            bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, None, self.cancel)
+        }
+        .map_err(Into::into)
     }
 }

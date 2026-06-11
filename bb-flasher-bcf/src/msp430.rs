@@ -12,8 +12,8 @@
 
 use std::{ffi::CString, time::Duration};
 
+use std::sync::mpsc;
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 use crate::{
     Status,
@@ -222,17 +222,17 @@ fn load_bsl(dst: &std::ffi::CStr) -> Result<()> {
 pub fn flash(
     firmware: &[u8],
     dst: &std::ffi::CStr,
-    mut chan: Option<mpsc::Sender<Status>>,
+    chan: Option<mpsc::SyncSender<Status>>,
 ) -> Result<()> {
     let firmware_bin = parse_bin(firmware).map_err(|_| Error::InvalidFirmware)?;
 
-    chan_send(chan.as_mut(), Status::Preparing);
+    chan_send(chan.as_ref(), Status::Preparing);
 
     load_bsl(dst)?;
 
     std::thread::sleep(Duration::from_secs(1));
 
-    chan_send(chan.as_mut(), Status::Flashing(0.5));
+    chan_send(chan.as_ref(), Status::Flashing(0.5));
 
     let msp430 = MSP430(open_hidraw(dst)?);
 

@@ -4,7 +4,7 @@ use std::{
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
+use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use iced::widget;
 use tokio::sync::mpsc;
 use url::Url;
@@ -541,20 +541,39 @@ pub(crate) async fn flash(
             FlashingCustomization::Bcf(customization),
             Destination::BeagleConnectFreedom(t),
         ) => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(
-                img.into_image_fn(),
-                t,
-                customization.verify,
-                Some(cancel),
-            )
-            .flash(Some(chan))
+            let (tx, rx) = std::sync::mpsc::sync_channel(4);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(msg);
+                }
+            });
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::bcf::cc1352p7::Flasher::new(
+                    img.into_image_fn(),
+                    t,
+                    customization.verify,
+                    Some(cancel_sync),
+                )
+                .flash(Some(tx))
+            })
             .await
+            .unwrap()
         }
         #[cfg(feature = "bcf_msp430")]
         (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t)
-                .flash(Some(chan))
-                .await
+            let (tx, rx) = std::sync::mpsc::sync_channel(4);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(msg);
+                }
+            });
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(tx))
+            })
+            .await
+            .unwrap()
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         (
