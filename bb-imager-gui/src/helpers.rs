@@ -562,14 +562,24 @@ pub(crate) async fn flash(
             FlashingCustomization::Zepto(customization),
             Destination::Mspm0(t),
         ) => {
-            bb_flasher::mspm0::Flasher::no_prep(
-                img.into_image_fn(),
-                t,
-                customization.verify,
-                Some(cancel),
-            )
-            .flash(Some(chan))
+            let (tx, rx) = std::sync::mpsc::sync_channel(4);
+            tokio::task::spawn_blocking(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.blocking_send(msg);
+                }
+            });
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::mspm0::Flasher::no_prep(
+                    img.into_image_fn(),
+                    t,
+                    customization.verify,
+                    Some(cancel_sync),
+                )
+                .flash(Some(tx))
+            })
             .await
+            .unwrap()
         }
         _ => unimplemented!(),
     }

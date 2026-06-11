@@ -1,6 +1,7 @@
-use tokio::sync::mpsc;
-
+use std::sync::mpsc;
 use std::time::Duration;
+
+use bb_helper::cancel::CancellationToken;
 
 use crate::{Error, Result, Status, helpers};
 
@@ -13,8 +14,8 @@ pub fn flash(
     firmware: &[u8],
     port: &str,
     verify: bool,
-    chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
     prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     helpers::flash(

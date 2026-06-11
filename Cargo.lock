@@ -593,6 +593,7 @@ dependencies = [
 name = "bb-flasher-mspm0"
 version = "1.0.8"
 dependencies = [
+ "bb-helper",
  "bin_file",
  "crc-fast",
  "gpiocdev",
@@ -600,8 +601,6 @@ dependencies = [
  "nix 0.31.3",
  "serialport",
  "thiserror 2.0.18",
- "tokio",
- "tokio-util",
  "tracing",
  "zerocopy",
 ]

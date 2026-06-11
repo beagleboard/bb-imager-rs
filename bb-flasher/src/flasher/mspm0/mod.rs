@@ -1,9 +1,11 @@
 #[cfg(feature = "mspm0_i2c")]
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::{borrow::Cow, fmt::Display};
-use tokio::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget};
+use bb_helper::cancel::CancellationToken;
+
+use crate::BBFlasherTarget;
 
 /// MSPM0 UART target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -98,7 +100,7 @@ pub struct Flasher<I, P> {
     img: I,
     port: Target,
     verify: bool,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
     prep_hook: P,
 }
 
@@ -107,7 +109,7 @@ impl<I, P> Flasher<I, P> {
         img: I,
         port: Target,
         verify: bool,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
         prep_hook: P,
     ) -> Self {
         Self {
@@ -121,12 +123,7 @@ impl<I, P> Flasher<I, P> {
 }
 
 impl<I> Flasher<I, fn() -> Result<(), bb_flasher_mspm0::Error>> {
-    pub fn no_prep(
-        img: I,
-        port: Target,
-        verify: bool,
-        cancel: Option<tokio_util::sync::CancellationToken>,
-    ) -> Self {
+    pub fn no_prep(img: I, port: Target, verify: bool, cancel: Option<CancellationToken>) -> Self {
         Self::new(img, port, verify, cancel, || Ok(()))
     }
 }
@@ -137,7 +134,7 @@ impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
         img: I,
         port: Target,
         verify: bool,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
         reset: String,
         bsl: String,
     ) -> Self {
@@ -151,21 +148,19 @@ impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
     }
 }
 
-impl<I, P> BBFlasher for Flasher<I, P>
+impl<I, P> Flasher<I, P>
 where
     I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
     P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
         let img = self.img;
-        let img = tokio::task::spawn_blocking(move || crate::common::resolve_img(img))
-            .await
-            .unwrap()?;
+        let img = crate::common::resolve_img(img)?;
 
         let curry = move |chan| match port {
             #[cfg(feature = "mspm0_uart")]
@@ -182,23 +177,21 @@ where
             Target::I2c(_) => Err(anyhow::anyhow!("Unsupported Os")),
         };
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_mspm0::Status>(20);
+        std::thread::scope(|s| {
+            if let Some(chan) = chan {
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_mspm0::Status>(2);
 
-            let flasher_task = tokio::task::spawn_blocking(move || curry(Some(tx)));
+                s.spawn(move || {
+                    while let Ok(x) = rx.recv() {
+                        let _ = chan.try_send(x.into());
+                    }
+                });
 
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(x.into());
+                curry(Some(tx))
+            } else {
+                curry(None)
             }
-
-            flasher_task
-        } else {
-            tokio::task::spawn_blocking(move || curry(None))
-        };
-
-        flasher_task.await.unwrap()
+        })
     }
 }
 
@@ -221,6 +214,6 @@ fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
 }
 
 #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
-fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+fn is_i2c_dev(_: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
     Ok(false)
 }

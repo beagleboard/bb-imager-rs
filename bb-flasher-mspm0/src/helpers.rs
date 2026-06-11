@@ -1,4 +1,6 @@
-use tokio::sync::mpsc;
+use std::sync::mpsc;
+
+use bb_helper::cancel::CancellationToken;
 
 use crate::Status;
 
@@ -65,7 +67,7 @@ impl Firmware {
 }
 
 pub(crate) fn check_token(
-    cancel: Option<&tokio_util::sync::CancellationToken>,
+    cancel: Option<&CancellationToken>,
 ) -> crate::Result<()> {
     match cancel {
         Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),
@@ -73,7 +75,7 @@ pub(crate) fn check_token(
     }
 }
 
-pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<Status>>, msg: Status) {
+pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<Status>>, msg: Status) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
     }
@@ -83,8 +85,8 @@ pub fn flash<P, D, B>(
     firmware: &[u8],
     port_open: P,
     verify: bool,
-    mut chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    mut chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
     prep_hook: B,
 ) -> crate::Result<()>
 where

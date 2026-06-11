@@ -316,14 +316,32 @@ async fn flash_internal(
             dst,
             no_verify,
         } => {
-            bb_flasher::mspm0::Flasher::no_prep(
-                LocalImage::new(img).into_image_fn(),
-                dst.into(),
-                !no_verify,
-                None,
-            )
-            .flash(chan)
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        // Safeguard for initial rewinds
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::mspm0::Flasher::no_prep(
+                    LocalImage::new(img).into_image_fn(),
+                    dst.into(),
+                    !no_verify,
+                    None,
+                )
+                .flash(tx)
+            })
             .await
+            .unwrap()
         }
         #[cfg(all(
             any(feature = "zepto_uart", feature = "zepto_i2c"),
@@ -335,31 +353,50 @@ async fn flash_internal(
             no_verify,
             reset_gpio,
             bsl_gpio,
-        } => match (reset_gpio, bsl_gpio) {
-            (Some(reset), Some(bsl)) => {
-                bb_flasher::mspm0::Flasher::gpio_by_name(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                    reset,
-                    bsl,
-                )
-                .flash(chan)
+        } => {
+            let tx = if let Some(chan) = chan {
+                let (tx, rx) = std::sync::mpsc::sync_channel(4);
+                tokio::task::spawn_blocking(move || {
+                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                    while let Ok(msg) = rx.recv() {
+                        // Safeguard for initial rewinds
+                        let _ = chan.try_send(msg);
+                    }
+                });
+
+                Some(tx)
+            } else {
+                None
+            };
+
+            match (reset_gpio, bsl_gpio) {
+                (Some(reset), Some(bsl)) => tokio::task::spawn_blocking(move || {
+                    bb_flasher::mspm0::Flasher::gpio_by_name(
+                        LocalImage::new(img).into_image_fn(),
+                        dst.into(),
+                        !no_verify,
+                        None,
+                        reset,
+                        bsl,
+                    )
+                    .flash(tx)
+                })
                 .await
-            }
-            (None, None) => {
-                bb_flasher::mspm0::Flasher::no_prep(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                )
-                .flash(chan)
+                .unwrap(),
+                (None, None) => tokio::task::spawn_blocking(move || {
+                    bb_flasher::mspm0::Flasher::no_prep(
+                        LocalImage::new(img).into_image_fn(),
+                        dst.into(),
+                        !no_verify,
+                        None,
+                    )
+                    .flash(tx)
+                })
                 .await
+                .unwrap(),
+                _ => panic!("Invalid arguments"),
             }
-            _ => panic!("Invalid arguments"),
-        },
+        }
     }
 }
 
