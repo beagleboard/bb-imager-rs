@@ -121,12 +121,12 @@ where
 {
     async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
         let c = if let Some(c) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+            let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
-            tokio::spawn(async move {
+            std::thread::spawn(move || {
                 // Should run until tx is dropped, i.e. flasher task is done.
                 // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                while let Some(x) = rx.recv().await {
+                while let Ok(x) = rx.recv() {
                     let _ = c.try_send(DownloadFlashingStatus::FlashingProgress(x));
                 }
             });

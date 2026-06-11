@@ -1,9 +1,8 @@
 mod flashing;
 mod helpers;
 
-use std::{collections::HashSet, io};
+use std::{collections::HashSet, io, sync::mpsc};
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 use flashing::dfu_write;
 use helpers::{check_token, is_dfu_device};
@@ -80,7 +79,7 @@ pub async fn flash<R, I>(
     product_id: u16,
     bus_num: u8,
     port_num: u8,
-    chan: Option<mpsc::Sender<f32>>,
+    chan: Option<mpsc::SyncSender<f32>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()>
 where
@@ -94,7 +93,7 @@ where
 
         let name = img.0.clone();
         let i = img.1;
-        let (img_reader, size) = tokio::task::spawn_blocking(move || i())
+        let (img_reader, size) = tokio::task::spawn_blocking(i)
             .await
             .unwrap()
             .map_err(|e| Error::ImgResolveFail { source: e })?;
