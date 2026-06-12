@@ -209,7 +209,8 @@ async fn file_stream_uncompressed_image_reads_contents() {
 
     tokio::task::spawn_blocking(move || {
         let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, data.len() as u64).unwrap();
+        let mut img =
+            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), data.len() as u64).unwrap();
 
         assert_eq!(img.size(), data.len() as u64);
 
@@ -251,7 +252,9 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
 
     tokio::task::spawn_blocking(move || {
         let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, original.len() as u64).unwrap();
+        let mut img =
+            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64)
+                .unwrap();
 
         assert_eq!(img.size(), original.len() as u64);
 
@@ -297,7 +300,9 @@ async fn file_stream_zip_image_reads_first_entry_contents() {
 
     tokio::task::spawn_blocking(move || {
         let abort = tokio::spawn(async { Ok(()) });
-        let mut img = OsImage::from_piped(reader, abort, original.len() as u64).unwrap();
+        let mut img =
+            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64)
+                .unwrap();
 
         assert_eq!(img.size(), original.len() as u64);
 
