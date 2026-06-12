@@ -9,8 +9,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let opt = Opt::parse();
 
     if opt.verbose {
@@ -26,101 +25,101 @@ async fn main() {
     }
 
     match opt.command {
-        Commands::Flash { target, quiet } => flash(*target, quiet).await,
-        Commands::Format { dst, quiet } => format(dst, quiet).await,
+        Commands::Flash { target, quiet } => flash(*target, quiet),
+        Commands::Format { dst, quiet } => format(dst, quiet),
         Commands::ListDestinations {
             target,
             no_frills,
             no_filter,
-        } => {
-            tokio::task::spawn_blocking(move || list_destinations(target, no_frills, no_filter))
-                .await
-                .unwrap();
-        }
+        } => list_destinations(target, no_frills, no_filter),
         Commands::GenerateCompletion { shell } => generate_completion(shell),
     }
 }
 
-async fn flash(target: TargetCommands, quite: bool) {
+fn flash(target: TargetCommands, quite: bool) {
     if quite {
-        flash_internal(target, None).await
+        flash_internal(target, None)
     } else {
-        let (tx, rx) = mpsc::sync_channel(2);
-        tokio::task::spawn_blocking(move || {
-            let term = console::Term::stdout();
-            let bar_style =
-                indicatif::ProgressStyle::with_template("{msg:15}  [{wide_bar}] [{percent:3} %]")
-                    .expect("Failed to create progress bar");
-            let bars = indicatif::MultiProgress::new();
+        std::thread::scope(|s| {
+            let (tx, rx) = mpsc::sync_channel(2);
 
-            let mut last_bar: Option<indicatif::ProgressBar> = None;
-            let mut last_state = DownloadFlashingStatus::Preparing;
-            let mut stage = 1;
+            s.spawn(move || {
+                let term = console::Term::stdout();
+                let bar_style = indicatif::ProgressStyle::with_template(
+                    "{msg:15}  [{wide_bar}] [{percent:3} %]",
+                )
+                .expect("Failed to create progress bar");
+                let bars = indicatif::MultiProgress::new();
 
-            // Setting initial stage as Preparing
-            term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
-                .unwrap();
+                let mut last_bar: Option<indicatif::ProgressBar> = None;
+                let mut last_state = DownloadFlashingStatus::Preparing;
+                let mut stage = 1;
 
-            while let Ok(progress) = rx.recv() {
-                // Skip if no change in stage
-                if progress == last_state {
-                    continue;
+                // Setting initial stage as Preparing
+                term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
+                    .unwrap();
+
+                while let Ok(progress) = rx.recv() {
+                    // Skip if no change in stage
+                    if progress == last_state {
+                        continue;
+                    }
+
+                    match (progress, last_state) {
+                        // Take care when just progress needs to be updated
+                        (
+                            DownloadFlashingStatus::DownloadingProgress(p),
+                            DownloadFlashingStatus::DownloadingProgress(_),
+                        )
+                        | (
+                            DownloadFlashingStatus::FlashingProgress(p),
+                            DownloadFlashingStatus::FlashingProgress(_),
+                        ) => {
+                            last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
+                        }
+                        // Create new bar when stage has changed
+                        (DownloadFlashingStatus::DownloadingProgress(p), _)
+                        | (DownloadFlashingStatus::FlashingProgress(p), _) => {
+                            if let Some(b) = last_bar.take() {
+                                b.finish();
+                            }
+
+                            stage += 1;
+
+                            let temp_bar = bars.add(indicatif::ProgressBar::new(100));
+                            temp_bar.set_style(bar_style.clone());
+                            temp_bar.set_message(stage_msg(progress, stage));
+                            temp_bar.set_position((p * 100.0) as u64);
+                            last_bar = Some(temp_bar);
+                        }
+                        // Print stage when entering a new stage without progress
+                        (DownloadFlashingStatus::Verifying, _)
+                        | (DownloadFlashingStatus::Customizing, _)
+                        | (DownloadFlashingStatus::Preparing, _) => {
+                            if let Some(b) = last_bar.take() {
+                                b.finish();
+                            }
+
+                            stage += 1;
+                            term.write_line(&stage_msg(progress, stage)).unwrap();
+                        }
+                    }
+
+                    last_state = progress;
                 }
 
-                match (progress, last_state) {
-                    // Take care when just progress needs to be updated
-                    (
-                        DownloadFlashingStatus::DownloadingProgress(p),
-                        DownloadFlashingStatus::DownloadingProgress(_),
-                    )
-                    | (
-                        DownloadFlashingStatus::FlashingProgress(p),
-                        DownloadFlashingStatus::FlashingProgress(_),
-                    ) => {
-                        last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
-                    }
-                    // Create new bar when stage has changed
-                    (DownloadFlashingStatus::DownloadingProgress(p), _)
-                    | (DownloadFlashingStatus::FlashingProgress(p), _) => {
-                        if let Some(b) = last_bar.take() {
-                            b.finish();
-                        }
-
-                        stage += 1;
-
-                        let temp_bar = bars.add(indicatif::ProgressBar::new(100));
-                        temp_bar.set_style(bar_style.clone());
-                        temp_bar.set_message(stage_msg(progress, stage));
-                        temp_bar.set_position((p * 100.0) as u64);
-                        last_bar = Some(temp_bar);
-                    }
-                    // Print stage when entering a new stage without progress
-                    (DownloadFlashingStatus::Verifying, _)
-                    | (DownloadFlashingStatus::Customizing, _)
-                    | (DownloadFlashingStatus::Preparing, _) => {
-                        if let Some(b) = last_bar.take() {
-                            b.finish();
-                        }
-
-                        stage += 1;
-                        term.write_line(&stage_msg(progress, stage)).unwrap();
-                    }
+                if let Some(b) = last_bar.take() {
+                    b.finish();
                 }
+            });
 
-                last_state = progress;
-            }
-
-            if let Some(b) = last_bar.take() {
-                b.finish();
-            }
-        });
-
-        flash_internal(target, Some(tx)).await
+            flash_internal(target, Some(tx))
+        })
     }
     .expect("Failed to flash")
 }
 
-async fn flash_internal(
+fn flash_internal(
     target: TargetCommands,
     chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
 ) -> anyhow::Result<()> {
@@ -167,37 +166,33 @@ async fn flash_internal(
                 )]);
             }
 
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::Flasher::new(
-                    LocalImage::new(img).into_image_fn(),
-                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
-                    dst.try_into().unwrap(),
-                    customization,
-                )
-                .flash(chan, None)
-            })
-            .await
-            .unwrap()
+            bb_flasher::sd::Flasher::new(
+                LocalImage::new(img).into_image_fn(),
+                bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                dst.try_into().unwrap(),
+                customization,
+            )
+            .flash(chan, None)
         }
         TargetCommands::SdBootUpdate { img, dst } => {
-            let tx = if let Some(chan) = chan {
-                let (tx, rx) = mpsc::sync_channel(4);
-                tokio::task::spawn_blocking(move || {
-                    let _ = chan.try_send(DownloadFlashingStatus::Preparing);
-                    while let Ok(msg) = rx.recv() {
-                        // Safeguard for initial rewinds
-                        if msg > 0.01 {
-                            let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+            std::thread::scope(|s| {
+                let tx = if let Some(chan) = chan {
+                    let (tx, rx) = mpsc::sync_channel(4);
+                    s.spawn(move || {
+                        let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                        while let Ok(msg) = rx.recv() {
+                            // Safeguard for initial rewinds
+                            if msg > 0.01 {
+                                let _ =
+                                    chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                            }
                         }
-                    }
-                });
+                    });
+                    Some(tx)
+                } else {
+                    None
+                };
 
-                Some(tx)
-            } else {
-                None
-            };
-
-            tokio::task::spawn_blocking(move || {
                 bb_flasher::sd::UpdateBootFlasher::with_file_dest(
                     LocalImage::new(img).into_archive_fn(tx),
                     dst,
@@ -205,39 +200,29 @@ async fn flash_internal(
                 )
                 .flash()
             })
-            .await
-            .unwrap()
         }
         #[cfg(feature = "bcf_cc1352p7")]
         TargetCommands::Bcf {
             img,
             dst,
             no_verify,
-        } => tokio::task::spawn_blocking(move || {
-            bb_flasher::bcf::cc1352p7::Flasher::new(
-                LocalImage::new(img).into_image_fn(),
-                dst.into(),
-                !no_verify,
-                None,
-            )
-            .flash(chan)
-        })
-        .await
-        .unwrap(),
+        } => bb_flasher::bcf::cc1352p7::Flasher::new(
+            LocalImage::new(img).into_image_fn(),
+            dst.into(),
+            !no_verify,
+            None,
+        )
+        .flash(chan),
         #[cfg(feature = "bcf_msp430")]
-        TargetCommands::Msp430 { img, dst } => tokio::task::spawn_blocking(move || {
+        TargetCommands::Msp430 { img, dst } => {
             bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_image_fn(), dst.into())
                 .flash(chan)
-        })
-        .await
-        .unwrap(),
+        }
         #[cfg(feature = "pb2_mspm0")]
-        TargetCommands::Pb2Mspm0 { no_eeprom, img } => tokio::task::spawn_blocking(move || {
+        TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
             bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_image_fn(), !no_eeprom)
                 .flash(chan)
-        })
-        .await
-        .unwrap(),
+        }
         #[cfg(feature = "dfu")]
         TargetCommands::Dfu { identifier, imgs } => {
             if imgs.len() % 2 == 1 {
@@ -254,13 +239,9 @@ async fn flash_internal(
                 })
                 .collect();
 
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
-                    .unwrap()
-                    .flash(chan)
-            })
-            .await
-            .unwrap()
+            bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
+                .unwrap()
+                .flash(chan)
         }
         #[cfg(all(
             any(feature = "zepto_uart", feature = "zepto_i2c"),
@@ -270,17 +251,13 @@ async fn flash_internal(
             img,
             dst,
             no_verify,
-        } => tokio::task::spawn_blocking(move || {
-            bb_flasher::mspm0::Flasher::no_prep(
-                LocalImage::new(img).into_image_fn(),
-                dst.into(),
-                !no_verify,
-                None,
-            )
-            .flash(chan)
-        })
-        .await
-        .unwrap(),
+        } => bb_flasher::mspm0::Flasher::no_prep(
+            LocalImage::new(img).into_image_fn(),
+            dst.into(),
+            !no_verify,
+            None,
+        )
+        .flash(chan),
         #[cfg(all(
             any(feature = "zepto_uart", feature = "zepto_i2c"),
             target_os = "linux"
@@ -292,30 +269,22 @@ async fn flash_internal(
             reset_gpio,
             bsl_gpio,
         } => match (reset_gpio, bsl_gpio) {
-            (Some(reset), Some(bsl)) => tokio::task::spawn_blocking(move || {
-                bb_flasher::mspm0::Flasher::gpio_by_name(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                    reset,
-                    bsl,
-                )
-                .flash(chan)
-            })
-            .await
-            .unwrap(),
-            (None, None) => tokio::task::spawn_blocking(move || {
-                bb_flasher::mspm0::Flasher::no_prep(
-                    LocalImage::new(img).into_image_fn(),
-                    dst.into(),
-                    !no_verify,
-                    None,
-                )
-                .flash(chan)
-            })
-            .await
-            .unwrap(),
+            (Some(reset), Some(bsl)) => bb_flasher::mspm0::Flasher::gpio_by_name(
+                LocalImage::new(img).into_image_fn(),
+                dst.into(),
+                !no_verify,
+                None,
+                reset,
+                bsl,
+            )
+            .flash(chan),
+            (None, None) => bb_flasher::mspm0::Flasher::no_prep(
+                LocalImage::new(img).into_image_fn(),
+                dst.into(),
+                !no_verify,
+                None,
+            )
+            .flash(chan),
             _ => panic!("Invalid arguments"),
         },
     }
@@ -365,13 +334,11 @@ fn check_macos_device_path(dst: PathBuf) -> PathBuf {
     dst
 }
 
-async fn format(dst: PathBuf, quite: bool) {
+fn format(dst: PathBuf, quite: bool) {
     let term = console::Term::stdout();
 
     let config = bb_flasher::sd::FormatFlasher::new(dst.try_into().unwrap());
-    tokio::task::spawn_blocking(move || config.flash().unwrap())
-        .await
-        .unwrap();
+    config.flash().unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();

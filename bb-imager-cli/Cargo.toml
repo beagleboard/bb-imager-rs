@@ -10,7 +10,6 @@ license.workspace = true
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 bb-flasher = { path = "../bb-flasher" }
-tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.18"
 console = "0.16"
 const-hex = "1.19"
