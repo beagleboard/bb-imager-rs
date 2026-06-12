@@ -11,15 +11,11 @@ use bb_helper::cancel::CancellationToken;
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
-    async fn destinations_internal(filter: bool) -> HashSet<Self> {
-        tokio::task::spawn_blocking(move || {
-            bb_flasher_dfu::devices(filter)
-                .into_iter()
-                .map(Self)
-                .collect()
-        })
-        .await
-        .unwrap()
+    fn destinations_internal(filter: bool) -> HashSet<Self> {
+        bb_flasher_dfu::devices(filter)
+            .into_iter()
+            .map(Self)
+            .collect()
     }
 
     pub const fn bus_number(&self) -> u8 {
@@ -48,8 +44,8 @@ impl std::fmt::Display for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &[];
 
-    async fn destinations(filter: bool) -> HashSet<Self> {
-        Self::destinations_internal(filter).await
+    fn destinations(filter: bool) -> HashSet<Self> {
+        Self::destinations_internal(filter)
     }
 
     fn identifier(&self) -> Cow<'_, str> {

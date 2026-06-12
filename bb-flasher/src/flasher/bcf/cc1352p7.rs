@@ -29,13 +29,11 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    fn destinations(filter: bool) -> impl Future<Output = std::collections::HashSet<Self>> {
-        let temp = bb_flasher_bcf::cc1352p7::ports(filter)
+    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+        bb_flasher_bcf::cc1352p7::ports(filter)
             .into_iter()
             .map(Self)
-            .collect();
-
-        std::future::ready(temp)
+            .collect()
     }
 
     fn identifier(&self) -> Cow<'_, str> {

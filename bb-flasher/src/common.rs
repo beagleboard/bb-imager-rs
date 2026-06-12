@@ -38,7 +38,7 @@ where
     const IS_DESTINATION_SELECTABLE: bool = true;
 
     /// A list of possible flasher targets
-    fn destinations(filter: bool) -> impl Future<Output = HashSet<Self>>;
+    fn destinations(filter: bool) -> HashSet<Self>;
 
     /// A sort of device ID (mostly a Path).
     fn identifier<'a>(&'a self) -> Cow<'a, str>;
