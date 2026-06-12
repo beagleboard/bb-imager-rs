@@ -28,8 +28,8 @@ impl BBFlasherTarget for Target {
     const IS_DESTINATION_SELECTABLE: bool = false;
 
     // Since only a single destination is possible, no need for filters
-    async fn destinations(_: bool) -> HashSet<Self> {
-        let temp = destinations().await;
+    fn destinations(_: bool) -> HashSet<Self> {
+        let temp = destinations();
         HashSet::from([Target {
             name: temp.0,
             path: temp.1,

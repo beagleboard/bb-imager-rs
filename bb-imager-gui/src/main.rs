@@ -239,14 +239,17 @@ impl BBImager {
                         (*flasher, *filter, search_text.clone()),
                         async move |(flasher, filter, search_text)| {
                             let mut dest: Vec<helpers::Destination> =
-                                helpers::destinations(flasher, filter)
-                                    .await
-                                    .into_iter()
-                                    .filter(|t| {
-                                        search_text.is_empty()
-                                            || t.to_string().to_lowercase().contains(&search_text)
-                                    })
-                                    .collect();
+                                tokio::task::spawn_blocking(move || {
+                                    helpers::destinations(flasher, filter)
+                                })
+                                .await
+                                .unwrap()
+                                .into_iter()
+                                .filter(|t| {
+                                    search_text.is_empty()
+                                        || t.to_string().to_lowercase().contains(&search_text)
+                                })
+                                .collect();
 
                             dest.sort_by_key(|x| x.to_string());
 

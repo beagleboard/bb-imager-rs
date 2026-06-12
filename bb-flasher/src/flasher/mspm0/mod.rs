@@ -51,20 +51,16 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    async fn destinations(_: bool) -> std::collections::HashSet<Self> {
-        tokio::task::spawn_blocking(|| {
-            let mut dsts = std::collections::HashSet::new();
+    fn destinations(_: bool) -> std::collections::HashSet<Self> {
+        let mut dsts = std::collections::HashSet::new();
 
-            #[cfg(feature = "mspm0_uart")]
-            dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
+        #[cfg(feature = "mspm0_uart")]
+        dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
 
-            #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-            dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
+        #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
+        dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
 
-            dsts
-        })
-        .await
-        .unwrap()
+        dsts
     }
 
     fn identifier(&self) -> Cow<'_, str> {

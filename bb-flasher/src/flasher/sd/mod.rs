@@ -56,7 +56,7 @@ impl TryFrom<PathBuf> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["img", "xz"];
 
-    async fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
         Self::destinations_internal(filter)
     }
 
