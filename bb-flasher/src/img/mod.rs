@@ -1,13 +1,16 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
 use bb_flasher_sd::ContentType;
-use bb_helper::{file_stream::ReaderFileStream, reader_progress::ReaderWithProgress};
+#[cfg(feature = "piped_image")]
+use bb_helper::file_stream::ReaderFileStream;
+use bb_helper::reader_progress::ReaderWithProgress;
 use rc_zip_sync::ReadZipStreaming;
 use std::{
     io::{self, Read, Seek, SeekFrom},
     path::Path,
     sync::mpsc,
 };
+#[cfg(feature = "piped_image")]
 use tokio_util::task::AbortOnDropHandle;
 
 #[cfg(test)]
@@ -34,6 +37,7 @@ impl OsArchive {
         Self::new(img, chan, len)
     }
 
+    #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,
         _background: AbortOnDropHandle<io::Result<()>>,
@@ -129,6 +133,7 @@ impl OsImage {
             OsImageCompression::Zip(x) => x.entry().uncompressed_size,
             OsImageCompression::Uncompressed(x) => match x.get_ref() {
                 OsImageSource::File(file) => file.metadata()?.len(),
+                #[cfg(feature = "piped_image")]
                 OsImageSource::FileStream { .. } => unreachable!(),
             },
         };
@@ -136,6 +141,7 @@ impl OsImage {
         Ok(Self { size, img })
     }
 
+    #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,
         _background: AbortOnDropHandle<io::Result<()>>,
@@ -201,6 +207,7 @@ impl<I: Read> Read for OsImageCompression<I> {
 
 enum OsImageSource {
     File(std::fs::File),
+    #[cfg(feature = "piped_image")]
     FileStream {
         reader: ReaderFileStream,
         _background: AbortOnDropHandle<io::Result<()>>,
@@ -217,6 +224,7 @@ impl Read for OsImageSource {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
             OsImageSource::File(x) => x.read(buf),
+            #[cfg(feature = "piped_image")]
             OsImageSource::FileStream { reader, .. } => reader.read(buf),
         }
     }
@@ -226,6 +234,7 @@ impl Seek for OsImageSource {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match self {
             OsImageSource::File(file) => file.seek(pos),
+            #[cfg(feature = "piped_image")]
             OsImageSource::FileStream { reader, .. } => reader.seek(pos),
         }
     }

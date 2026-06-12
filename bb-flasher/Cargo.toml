@@ -20,8 +20,8 @@ bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
 bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
 bin_file = { version = "0.1", optional = true }
-tokio-util = { version = "0.7", features = ["rt"] }
-bb-helper = { path = "../bb-helper", features = ["file_stream", "reader_progress", "cancel"] }
+tokio-util = { version = "0.7", optional = true, features = ["rt"] }
+bb-helper = { path = "../bb-helper", features = ["reader_progress", "cancel"] }
 rc-zip-sync = "4.4"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
@@ -49,6 +49,7 @@ static_hidraw = ["bb-flasher-bcf?/static"]
 shared_hidraw = ["bb-flasher-bcf?/shared_hidraw"]
 mspm0_uart = ["bb-flasher-mspm0/uart"]
 mspm0_i2c = ["bb-flasher-mspm0/i2c", "dep:nix"]
+piped_image = ["dep:tokio-util", "bb-helper/file_stream"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -2,6 +2,7 @@ use super::*;
 
 use std::io::{Cursor, Read, Write};
 use tempfile::NamedTempFile;
+#[cfg(feature = "piped_image")]
 use tokio::io::AsyncWriteExt;
 use zip::write::SimpleFileOptions;
 
@@ -185,6 +186,7 @@ fn rejects_truncated_xz_header() {
 }
 
 #[tokio::test]
+#[cfg(feature = "piped_image")]
 async fn file_stream_uncompressed_image_reads_contents() {
     // This test validates that `OsImage::from_piped()` behaves the same
     // as `from_path()` for plain uncompressed images.
@@ -224,6 +226,7 @@ async fn file_stream_uncompressed_image_reads_contents() {
 }
 
 #[tokio::test]
+#[cfg(feature = "piped_image")]
 async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
     // This test validates streamed XZ handling.
     //
@@ -268,6 +271,7 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
 }
 
 #[tokio::test]
+#[cfg(feature = "piped_image")]
 async fn file_stream_zip_image_reads_first_entry_contents() {
     // This test validates ZIP handling over FileStream-backed input.
     //
