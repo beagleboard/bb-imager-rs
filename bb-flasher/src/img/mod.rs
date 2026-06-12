@@ -36,13 +36,13 @@ impl OsArchive {
 
     pub fn from_piped(
         img: ReaderFileStream,
-        abort_handle: tokio::task::JoinHandle<io::Result<()>>,
+        _background: AbortOnDropHandle<io::Result<()>>,
         size: u64,
         chan: Option<mpsc::SyncSender<f32>>,
     ) -> io::Result<Self> {
         let img = OsImageSource::FileStream {
             reader: img,
-            _background: AbortOnDropHandle::new(abort_handle),
+            _background,
         };
         Self::new(img, chan, size)
     }
@@ -138,14 +138,14 @@ impl OsImage {
 
     pub fn from_piped(
         img: ReaderFileStream,
-        abort_handle: tokio::task::JoinHandle<io::Result<()>>,
+        _background: AbortOnDropHandle<io::Result<()>>,
         size: u64,
     ) -> io::Result<Self> {
         Ok(Self {
             size,
             img: OsImageCompression::new(OsImageSource::FileStream {
                 reader: img,
-                _background: AbortOnDropHandle::new(abort_handle),
+                _background,
             })?,
         })
     }

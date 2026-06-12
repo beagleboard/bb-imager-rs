@@ -7,6 +7,7 @@ use bb_config::config;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use iced::widget;
 use std::sync::mpsc;
+use tokio_util::task::AbortOnDropHandle;
 use url::Url;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -303,7 +304,7 @@ impl RemoteImage {
                 Ok(())
             });
 
-            bb_flasher::OsArchive::from_piped(rx, t, self.extract_size, tx)
+            bb_flasher::OsArchive::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size, tx)
         }
     }
 
@@ -341,7 +342,8 @@ impl RemoteImage {
                 Ok(())
             });
 
-            let img = bb_flasher::OsImage::from_piped(rx, t, self.extract_size)?;
+            let img =
+                bb_flasher::OsImage::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size)?;
             Ok((img, self.extract_size))
         }
     }

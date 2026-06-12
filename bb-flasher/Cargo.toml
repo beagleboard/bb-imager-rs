@@ -15,7 +15,6 @@ liblzma = { version = "0.4", features = ["parallel"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 yaml_serde = { version = "0.10", optional = true }
 thiserror = { version = "2.0" }
-tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "sync", "net", "time"] }
 tracing = "0.1"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
