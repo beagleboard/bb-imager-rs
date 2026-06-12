@@ -136,6 +136,7 @@ impl OsImage {
                 #[cfg(feature = "piped_image")]
                 OsImageSource::FileStream { .. } => unreachable!(),
             },
+            OsImageCompression::QCow2(x) => x.virtual_disk_size(),
         };
 
         Ok(Self { size, img })
@@ -167,14 +168,16 @@ impl Read for OsImage {
             OsImageCompression::Xz(x) => x.read(buf),
             OsImageCompression::Zip(x) => x.read(buf),
             OsImageCompression::Uncompressed(x) => x.read(buf),
+            OsImageCompression::QCow2(x) => x.read(buf),
         }
     }
 }
 
 #[allow(clippy::large_enum_variant)]
-enum OsImageCompression<I: Read> {
+enum OsImageCompression<I: Read + Seek> {
     Xz(liblzma::read::XzDecoder<I>),
     Zip(rc_zip_sync::StreamingEntryReader<I>),
+    QCow2(qcow2::Qcow2Reader<I>),
     Uncompressed(io::BufReader<I>),
 }
 
@@ -186,6 +189,12 @@ impl<I: Read + Seek> OsImageCompression<I> {
 
         match magic {
             XZ_MAGIC => Ok(Self::Xz(liblzma::read::XzDecoder::new_parallel(img))),
+            [0x51, 0x46, 0x49, _, _, _] => {
+                tracing::info!("Detected qcow2 image");
+                qcow2::Qcow2Reader::from_reader(img)
+                    .map_err(io::Error::other)
+                    .map(Self::QCow2)
+            }
             [0x50, 0x4b, 0x03, 0x04, _, _] => img
                 .stream_zip_entries_throwing_caution_to_the_wind()
                 .map(Self::Zip)
@@ -195,12 +204,13 @@ impl<I: Read + Seek> OsImageCompression<I> {
     }
 }
 
-impl<I: Read> Read for OsImageCompression<I> {
+impl<I: Read + Seek> Read for OsImageCompression<I> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
             OsImageCompression::Xz(x) => x.read(buf),
             OsImageCompression::Zip(x) => x.read(buf),
             OsImageCompression::Uncompressed(x) => x.read(buf),
+            OsImageCompression::QCow2(x) => x.read(buf),
         }
     }
 }

@@ -54,7 +54,7 @@ impl TryFrom<PathBuf> for Target {
 }
 
 impl BBFlasherTarget for Target {
-    const FILE_TYPES: &[&str] = &["img", "xz"];
+    const FILE_TYPES: &[&str] = &["img", "xz", "qcow2"];
 
     fn destinations(filter: bool) -> std::collections::HashSet<Self> {
         Self::destinations_internal(filter)
@@ -227,7 +227,16 @@ where
         cancel: Option<CancellationToken>,
     ) -> anyhow::Result<()> {
         let is_file_dest = self.is_file_dest();
-        let customization = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
+        let customization = if self.customization.0.is_empty() {
+            vec![]
+        } else {
+            let content = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
+            vec![bb_flasher_sd::Customization {
+                partition: bb_flasher_sd::ParitionType::Boot,
+                content: content,
+            }]
+        }
+        .into_iter();
 
         let tx = match chan {
             Some(chan) => {
@@ -251,19 +260,8 @@ where
             None => None,
         };
 
-        bb_flasher_sd::flash(
-            self.img,
-            self.bmap,
-            self.dst,
-            tx,
-            [bb_flasher_sd::Customization {
-                partition: bb_flasher_sd::ParitionType::Boot,
-                content: customization,
-            }]
-            .into_iter(),
-            cancel,
-        )
-        .map_err(Into::into)
+        bb_flasher_sd::flash(self.img, self.bmap, self.dst, tx, customization, cancel)
+            .map_err(Into::into)
     }
 }
 

@@ -553,6 +553,7 @@ dependencies = [
  "futures",
  "liblzma",
  "nix 0.31.3",
+ "qcow2-core",
  "rc-zip-sync",
  "serde",
  "tar",
@@ -4955,6 +4956,15 @@ name = "pxfm"
 version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
+
+[[package]]
+name = "qcow2-core"
+version = "0.3.0"
+source = "git+https://github.com/Ayush1325/qcow2-forensic.git?branch=core-reader#0a95ca91cde8b5839582d1019a63e865a6f33cd9"
+dependencies = [
+ "flate2",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "qoi"
