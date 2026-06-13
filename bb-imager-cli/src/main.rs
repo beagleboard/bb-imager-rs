@@ -139,6 +139,7 @@ fn flash_internal(
             bmap,
             sysconfig,
             cloud_init,
+            file_destination,
         } => {
             // TODO: Remove fallback in the future.
             if !sysconfig && !cloud_init {
@@ -150,28 +151,52 @@ fn flash_internal(
 
             let dst = check_macos_device_path(dst);
 
-            let mut customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
-                hostname.clone(),
-                timezone.clone(),
-                keymap.clone(),
-                user.clone(),
-                wifi.clone(),
-                ssh_key.clone(),
-                Some(usb_enable_dhcp),
-            );
+            let customization = if hostname.is_some()
+                || timezone.is_some()
+                || keymap.is_some()
+                || user.is_some()
+                || wifi.is_some()
+                || ssh_key.is_some()
+                || usb_enable_dhcp
+            {
+                let mut customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
+                    hostname.clone(),
+                    timezone.clone(),
+                    keymap.clone(),
+                    user.clone(),
+                    wifi.clone(),
+                    ssh_key.clone(),
+                    Some(usb_enable_dhcp),
+                );
 
-            if cloud_init {
-                customization.extend([bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
-                    hostname, timezone, keymap, user, wifi, ssh_key,
-                )]);
+                if cloud_init {
+                    customization.extend([bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
+                        hostname, timezone, keymap, user, wifi, ssh_key,
+                    )]);
+                }
+
+                customization
+            } else {
+                bb_flasher::sd::FlashingSdLinuxConfig::none()
+            };
+
+            tracing::info!("Customization: {:#?}", customization);
+
+            if file_destination {
+                bb_flasher::sd::Flasher::with_file_dest(
+                    LocalImage::new(img).into_image_fn(),
+                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                    dst.try_into().unwrap(),
+                    customization,
+                )
+            } else {
+                bb_flasher::sd::Flasher::new(
+                    LocalImage::new(img).into_image_fn(),
+                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                    dst.try_into().unwrap(),
+                    customization,
+                )
             }
-
-            bb_flasher::sd::Flasher::new(
-                LocalImage::new(img).into_image_fn(),
-                bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
-                dst.try_into().unwrap(),
-                customization,
-            )
             .flash(chan, None)
         }
         TargetCommands::SdBootUpdate { img, dst } => {

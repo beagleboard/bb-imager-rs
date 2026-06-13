@@ -130,6 +130,10 @@ pub enum TargetCommands {
         /// Generate sysconfig. Currently, sysconfig will be generated regardless if this flag is
         /// provides. However, this will change in future. So best to explicitly set the flag.
         sysconfig: bool,
+
+        /// The destination is a file instead of SD Card
+        #[arg(long)]
+        file_destination: bool
     },
     /// Update boot partition with contents from archive
     SdBootUpdate {
