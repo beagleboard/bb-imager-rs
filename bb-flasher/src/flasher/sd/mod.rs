@@ -233,7 +233,7 @@ where
             let content = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
             vec![bb_flasher_sd::Customization {
                 partition: bb_flasher_sd::ParitionType::Boot,
-                content: content,
+                content,
             }]
         }
         .into_iter();

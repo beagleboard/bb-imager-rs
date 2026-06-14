@@ -186,7 +186,7 @@ fn flash_internal(
                 bb_flasher::sd::Flasher::with_file_dest(
                     LocalImage::new(img).into_image_fn(),
                     bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
-                    dst.try_into().unwrap(),
+                    dst,
                     customization,
                 )
             } else {
