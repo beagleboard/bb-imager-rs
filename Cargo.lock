@@ -550,7 +550,6 @@ dependencies = [
  "bb-flasher-sd",
  "bb-helper",
  "bin_file",
- "futures",
  "liblzma",
  "nix 0.31.3",
  "qcow2-core",
