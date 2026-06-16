@@ -21,7 +21,6 @@ gpt = "4.1"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
 tokio = { version = "1.52", optional = true, default-features = false, features = ["rt", "signal"] }
 anyhow = "1.0"
-futures = "0.3"
 bb-helper = { path = "../bb-helper", features = ["cancel"] }
 
 [dev-dependencies]
