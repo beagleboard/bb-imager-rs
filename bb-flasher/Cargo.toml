@@ -20,7 +20,7 @@ tracing = "0.1"
 bb-flasher-pb2-mspm0 = { path = "../bb-flasher-pb2-mspm0", optional = true }
 bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
 bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
-bin_file = { version = "0.1", optional = true }
+bin_file = { version = "0.2", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["rt"] }
 bb-helper = { path = "../bb-helper", features = ["reader_progress", "cancel"] }
 rc-zip-sync = "4.4"

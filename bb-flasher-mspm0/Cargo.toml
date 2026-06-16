@@ -11,7 +11,7 @@ serialport = { version = "4.7", default-features = false, optional = true }
 thiserror = "2.0"
 tracing = "0.1"
 zerocopy = { version = "0.8", features = ["std", "derive"] }
-bin_file = "0.1"
+bin_file = "0.2"
 crc-fast = "1.10"
 bb-helper = { path = "../bb-helper", features = ["cancel"] }
 
