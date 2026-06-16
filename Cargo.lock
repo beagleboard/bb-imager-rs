@@ -653,7 +653,6 @@ dependencies = [
  "clap",
  "clap_complete",
  "console",
- "const-hex",
  "indicatif",
  "tracing",
  "tracing-subscriber",
