@@ -84,7 +84,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
 #[cfg(feature = "macos_authopen")]
 pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
-    fn inner(dst: PathBuf) -> anyhow::Result<File> {
+    fn inner(dst: PathBuf) -> Option<File> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
         use security_framework::authorization::{
@@ -120,7 +120,8 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
             .args(["-stdoutpipe", "-extauth", "-o", "2", dst.to_str().unwrap()])
             .stdin(Stdio::piped())
             .stdout(OwnedFd::from(pipe1))
-            .spawn()?;
+            .spawn()
+            .ok()?;
 
         // Send authorization form
         let mut stdin = cmd.stdin.take().expect("Missing stdin");
@@ -151,7 +152,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
                     if let ControlMessageOwned::ScmRights(scm_rights) = msg {
                         if let Some(fd) = scm_rights.into_iter().next() {
                             tracing::debug!("receive file descriptor");
-                            return Ok(unsafe { File::from_raw_fd(fd) });
+                            return Some(unsafe { File::from_raw_fd(fd) });
                         }
                     }
                 }
@@ -163,12 +164,12 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
         let _ = cmd.wait();
 
-        Err(anyhow::anyhow!("Authopen failed to open the SD Card"))
+        None
     }
 
     let p = dst.to_owned();
     let _ = unmount_disk(dst.to_str().unwrap());
-    let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
+    let f = inner(p).ok_or(Error::DriveNotFound)?;
 
     Ok(MacOSFile {
         inner: f,

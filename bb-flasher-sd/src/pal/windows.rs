@@ -23,13 +23,13 @@ const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
 const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
 
 impl WinDrive {
-    pub(crate) fn open(path: &Path) -> anyhow::Result<Self> {
+    pub(crate) fn open(path: &Path) -> Result<Self> {
         tracing::info!("Trying to find {}", path.display());
         let vol_path = physical_drive_to_volume(path)?;
 
         let volume = if let Some(vol_path) = vol_path {
             tracing::info!("Trying to open {vol_path}");
-            Some(open_and_lock_volume(&vol_path)?)
+            Some(open_and_lock_volume(&vol_path).ok_or(Error::DriveNotFound)?)
         } else {
             None
         };
@@ -67,8 +67,8 @@ impl Drop for WinDrive {
     }
 }
 
-fn open_and_lock_volume(path: &str) -> anyhow::Result<File> {
-    let volume = OpenOptions::new().read(true).write(true).open(path)?;
+fn open_and_lock_volume(path: &str) -> Option<File> {
+    let volume = OpenOptions::new().read(true).write(true).open(path).ok()?;
 
     unsafe {
         DeviceIoControl(
@@ -80,7 +80,8 @@ fn open_and_lock_volume(path: &str) -> anyhow::Result<File> {
             0,
             None,
             None,
-        )?;
+        )
+        .ok()?;
 
         DeviceIoControl(
             HANDLE(volume.as_raw_handle()),
@@ -91,18 +92,19 @@ fn open_and_lock_volume(path: &str) -> anyhow::Result<File> {
             0,
             None,
             None,
-        )?;
+        )
+        .ok()?;
     }
 
-    Ok(volume)
+    Some(volume)
 }
 
-fn physical_drive_to_volume(drive: &Path) -> anyhow::Result<Option<String>> {
+fn physical_drive_to_volume(drive: &Path) -> Result<Option<String>> {
     let desc = bb_drivelist::drive_list()
         .expect("Unexpected error")
         .into_iter()
         .find(|x| x.device == drive.to_str().unwrap())
-        .ok_or(anyhow::anyhow!("Drive not found"))?;
+        .ok_or(Error::DriveNotFound)?;
 
     tracing::info!("Drive desc {:#?}", desc);
 
@@ -214,5 +216,5 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
 }
 
 pub(crate) fn open(dst: &Path) -> Result<WinDrive> {
-    WinDrive::open(dst).map_err(|e| Error::FailedToOpenDestination { source: e })
+    WinDrive::open(dst).map_err(|_| Error::DriveNotFound)
 }

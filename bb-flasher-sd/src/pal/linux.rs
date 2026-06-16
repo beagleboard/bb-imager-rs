@@ -57,8 +57,8 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
 
 #[cfg(feature = "udev")]
 pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
-    async fn open_inner(dst: &Path) -> anyhow::Result<LinuxDrive> {
-        let dbus_client = udisks2::Client::new().await?;
+    async fn open_inner(dst: &Path) -> Option<LinuxDrive> {
+        let dbus_client = udisks2::Client::new().await.ok()?;
 
         let devs = dbus_client
             .manager()
@@ -66,26 +66,26 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
                 HashMap::from([("path", dst.to_str().unwrap().into())]),
                 HashMap::new(),
             )
-            .await?;
+            .await
+            .ok()?;
 
-        let block = devs
-            .first()
-            .ok_or(anyhow::anyhow!("Block device not found",))?
-            .to_owned();
+        let block = devs.first()?.to_owned();
 
         let obj = dbus_client
             .object(block)
             .expect("Unexpected error")
             .block()
-            .await?;
+            .await
+            .ok()?;
 
         let fd = obj
             .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
-            .await?;
+            .await
+            .ok()?;
         let file =
             unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
-        Ok(LinuxDrive {
+        Some(LinuxDrive {
             file,
             drive: dst.to_path_buf(),
         })
@@ -96,7 +96,7 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
         .build()
         .unwrap();
     rt.block_on(async move { open_inner(dst).await })
-        .map_err(|e| Error::FailedToOpenDestination { source: e })
+        .ok_or(Error::DriveNotFound)
 }
 
 #[cfg(not(feature = "udev"))]

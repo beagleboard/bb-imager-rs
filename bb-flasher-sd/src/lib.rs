@@ -91,15 +91,12 @@ pub enum Error {
         #[source]
         source: io::Error,
     },
-    #[error("Failed to open SD Card.")]
-    FailedToOpenDestination {
-        #[source]
-        source: anyhow::Error,
-    },
     #[error("Invalid bmap for the image.")]
     InvalidBmap,
     #[error("Writer thread has been closed.")]
     WriterClosed,
+    #[error("Drive not found")]
+    DriveNotFound,
 
     #[cfg(windows)]
     #[error("Failed to clear SD Card.")]
