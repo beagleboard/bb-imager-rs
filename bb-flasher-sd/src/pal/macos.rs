@@ -1,8 +1,6 @@
-use std::{
-    fs::File,
-    io::{self, Read, Seek, Write},
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::{self, Read, Seek, Write};
+use std::path::{Path, PathBuf};
 
 use crate::{Error, Result};
 
@@ -64,8 +62,19 @@ pub(crate) fn format(dst: &Path) -> Result<()> {
         .map_err(|source| Error::FailedToFormat { source })
 }
 
+fn check_dst(dst: &Path) -> Result<()> {
+    match std::fs::exists(dst) {
+        Ok(true) => Ok(()),
+        _ => Err(Error::FailedToOpenDestination {
+            source: anyhow::anyhow!("Drive not found"),
+        }),
+    }
+}
+
 #[cfg(not(feature = "macos_authopen"))]
 pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
+    check_dst(dst)?;
+
     let dst_str = dst.to_string_lossy();
     let _ = unmount_disk(&dst_str);
 
@@ -166,6 +175,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
         Err(anyhow::anyhow!("Authopen failed to open the SD Card"))
     }
 
+    check_dst(dst)?;
     let p = dst.to_owned();
     let _ = unmount_disk(dst.to_str().unwrap());
     let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
