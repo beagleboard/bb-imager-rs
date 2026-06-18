@@ -19,6 +19,9 @@ crc-fast = "1.10"
 [target.'cfg(target_os = "linux")'.dependencies]
 i2cdev = { version = "0.6.2", optional = true }
 
+[dev-dependencies]
+tracing-subscriber = "0.3.23"
+
 [features]
 # Since uart is cross-platform, can be enabled by default.
 default = ["uart"]

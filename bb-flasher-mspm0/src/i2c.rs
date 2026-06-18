@@ -40,11 +40,20 @@ impl std::io::Write for I2CDev {
 pub fn flash(
     firmware: &[u8],
     port: &Path,
-    verify: bool,
+    _verify: bool,
     chan: Option<mpsc::Sender<Status>>,
     cancel: Option<tokio_util::sync::CancellationToken>,
 ) -> Result<()> {
-    crate::helpers::flash(firmware, || I2CDev::new(port), verify, chan, cancel)
+    crate::helpers::flash(
+        firmware,
+        || I2CDev::new(port),
+        crate::helpers::FlashOptions {
+            preflash_crc_check: false,
+            postflash_crc_check: false,
+        },
+        chan,
+        cancel,
+    )
 }
 
 fn probe_port(port: &Path) -> bool {
