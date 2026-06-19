@@ -28,7 +28,7 @@ pub struct Config {
 pub struct Imager {
     /// A list of remote config files
     #[serde(default)]
-    pub remote_configs: HashSet<Url>,
+    pub remote_configs: Vec<Url>,
     #[serde_as(as = "VecSkipError<_>")]
     #[serde(default)]
     /// List of BeagleBoard.org boards
@@ -74,6 +74,19 @@ pub enum InitFormat {
     Sysconf,
     /// Armbian base customization
     Armbian,
+    /// Cloud Init based customization
+    CloudInit,
+}
+
+impl std::fmt::Display for InitFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InitFormat::None => f.write_str("none"),
+            InitFormat::Sysconf => f.write_str("sysconfig"),
+            InitFormat::Armbian => f.write_str("armbian"),
+            InitFormat::CloudInit => f.write_str("cloudinit"),
+        }
+    }
 }
 
 /// Os List can contain multiple types of items depending on the situation.
@@ -165,15 +178,18 @@ pub struct OsImage {
     pub bmap: Option<Url>,
     /// Special Instructions for flashing board.
     pub info_text: Option<String>,
+    /// URL to support page for image. This is where issues should be reported.
+    pub support: Option<Url>,
 }
 
 /// Types of flashers Os Image(s) support
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize, sqlx::Type)]
-#[non_exhaustive]
 pub enum Flasher {
     #[default]
     /// Image needs to be written to SD Card
     SdCard,
+    /// Archive for updated bootfs
+    SdCardBootfs,
     /// BeagleConnect Freedom CC1352P7 Firmware
     BeagleConnectFreedom,
     /// BeagleConnect Freedom Msp430 Firmware

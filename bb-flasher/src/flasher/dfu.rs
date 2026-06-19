@@ -1,24 +1,21 @@
-use crate::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus};
+use crate::{BBFlasherTarget, DownloadFlashingStatus};
 
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io;
+use std::sync::mpsc;
 
-use tokio::sync::mpsc;
+use bb_helper::cancel::CancellationToken;
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
-    async fn destinations_internal(filter: bool) -> HashSet<Self> {
-        tokio::task::spawn_blocking(move || {
-            bb_flasher_dfu::devices(filter)
-                .into_iter()
-                .map(Self)
-                .collect()
-        })
-        .await
-        .unwrap()
+    fn destinations_internal(filter: bool) -> HashSet<Self> {
+        bb_flasher_dfu::devices(filter)
+            .into_iter()
+            .map(Self)
+            .collect()
     }
 
     pub const fn bus_number(&self) -> u8 {
@@ -47,8 +44,8 @@ impl std::fmt::Display for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &[];
 
-    async fn destinations(filter: bool) -> HashSet<Self> {
-        Self::destinations_internal(filter).await
+    fn destinations(filter: bool) -> HashSet<Self> {
+        Self::destinations_internal(filter)
     }
 
     fn identifier(&self) -> Cow<'_, str> {
@@ -65,7 +62,7 @@ pub struct Flasher<R> {
     product_id: u16,
     bus_num: u8,
     port_num: u8,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
 }
 
 impl<R> Flasher<R> {
@@ -75,7 +72,7 @@ impl<R> Flasher<R> {
         port_num: u8,
         vendor_id: u16,
         product_id: u16,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
     ) -> Self {
         Self {
             imgs,
@@ -90,7 +87,7 @@ impl<R> Flasher<R> {
     pub fn from_identifier(
         imgs: Vec<(String, R)>,
         id: &str,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
     ) -> io::Result<Self> {
         let ids = id.split(":").map(|x| x.trim()).collect::<Vec<_>>();
         if ids.len() != 4 {
@@ -115,37 +112,41 @@ impl<R> Flasher<R> {
     }
 }
 
-impl<R> BBFlasher for Flasher<R>
+impl<R> Flasher<R>
 where
-    R: Future<Output = std::io::Result<(crate::OsImage, u64)>> + Send + 'static,
+    R: FnOnce() -> std::io::Result<(crate::OsImage, u64)>,
 {
-    async fn flash(self, chan: Option<mpsc::Sender<DownloadFlashingStatus>>) -> anyhow::Result<()> {
-        let c = if let Some(c) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+    pub fn flash(
+        self,
+        chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
+    ) -> anyhow::Result<()> {
+        std::thread::scope(|s| {
+            let c = if let Some(c) = chan {
+                let (tx, rx) = mpsc::sync_channel(2);
 
-            tokio::spawn(async move {
-                // Should run until tx is dropped, i.e. flasher task is done.
-                // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                while let Some(x) = rx.recv().await {
-                    let _ = c.try_send(DownloadFlashingStatus::FlashingProgress(x));
-                }
-            });
+                s.spawn(move || {
+                    // Should run until tx is dropped, i.e. flasher task is done.
+                    // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
+                    while let Ok(x) = rx.recv() {
+                        let _ = c.try_send(DownloadFlashingStatus::FlashingProgress(x));
+                    }
+                });
 
-            Some(tx)
-        } else {
-            None
-        };
+                Some(tx)
+            } else {
+                None
+            };
 
-        bb_flasher_dfu::flash(
-            self.imgs,
-            self.vendor_id,
-            self.product_id,
-            self.bus_num,
-            self.port_num,
-            c,
-            self.cancel,
-        )
-        .await
-        .map_err(Into::into)
+            bb_flasher_dfu::flash(
+                self.imgs,
+                self.vendor_id,
+                self.product_id,
+                self.bus_num,
+                self.port_num,
+                c,
+                self.cancel,
+            )
+            .map_err(Into::into)
+        })
     }
 }

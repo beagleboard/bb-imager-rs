@@ -11,13 +11,14 @@ serialport = { version = "4.7", default-features = false, optional = true }
 thiserror = "2.0"
 tracing = "0.1"
 zerocopy = { version = "0.8", features = ["std", "derive"] }
-tokio = { version = "1.51", default-features = false, features = ["sync"] }
-tokio-util = { version = "0.7" }
 bin_file = "0.1"
 crc-fast = "1.10"
+bb-helper = { path = "../bb-helper", features = ["cancel"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-i2cdev = { version = "0.6.2", optional = true }
+i2cdev = { version = "0.6", optional = true }
+gpiocdev = "0.8"
+nix = { version = "0.31", features = ["fs"], optional = true }
 
 [dev-dependencies]
 tracing-subscriber = "0.3.23"
@@ -26,4 +27,4 @@ tracing-subscriber = "0.3.23"
 # Since uart is cross-platform, can be enabled by default.
 default = ["uart"]
 uart = ["serialport"]
-i2c = ["i2cdev"]
+i2c = ["i2cdev", "nix"]

@@ -9,31 +9,31 @@ license.workspace = true
 
 [dependencies]
 iced = { version = "0.14.0", features = ["image", "svg", "tokio", "advanced", "lazy", "canvas"] }
-rfd = { version = "0.16.0", default-features = false, features = ["tokio", "file-handle-inner"] }
-bb-flasher = { path = "../bb-flasher" }
+rfd = { version = "0.17.2", features = ["file-handle-inner"] }
+bb-flasher = { path = "../bb-flasher", features = ["serde", "piped_image"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
-iced_aw = { version = "0.13.1", default-features = false, features = ["spinner"] }
+iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
 image = "0.25"
-tokio = { version = "1.51", default-features = false, features = ["macros"] }
-webbrowser = "1.1.0"
-notify-rust = { version = "4.14.0", default-features = false, features = ["z-with-tokio"] }
+tokio = { version = "1.52", default-features = false, features = ["macros"] }
+webbrowser = "1.2.1"
+notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"] }
 url = "2.5.4"
 whoami = "2.1"
 localzone = "0.3.1"
 tokio-stream = "0.1.18"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149" }
+serde_json = { version = "1.0.150" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
-bb-helper = { path = "../bb-helper", features = ["file_stream"] }
-tokio-util = { version = "0.7" }
+bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
 semver = "1.0.28"
 anyhow = "1.0"
-sqlx = { version = "0.8", features = ["runtime-tokio", "chrono"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "chrono"] }
 tempfile = "3.26"
-const-hex = { version = "1.17", features = ["serde"] }
+const-hex = { version = "1.19", features = ["serde"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 
 [build-dependencies]
 embed-resource = "3.0"
@@ -42,12 +42,11 @@ embed-resource = "3.0"
 chrono = "0.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev"] }
-rfd = { version = "0.16.0", default-features = false, features = ["xdg-portal", "tokio", "file-handle-inner"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev", "serde"] }
 ashpd = { version = "0.13", features = ["notification"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen", "serde"] }
 
 [features]
 default = ["static"]
@@ -60,6 +59,9 @@ static = ["sqlx/sqlite", "bb-flasher/static", "bb-downloader/rustls"]
 system-deps = ["sqlx/sqlite-unbundled", "bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]
+pre-release = []
+static-hidraw = ["bb-flasher/static_hidraw"]
+shared-hidraw = ["bb-flasher/shared_hidraw"]
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]

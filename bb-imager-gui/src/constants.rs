@@ -10,7 +10,7 @@ pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", 
 pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
-pub(crate) const APP_RELEASE: &str = if option_env!("PRE_RELEASE").is_some() {
+pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
     "pre-release"
 } else {
     env!("CARGO_PKG_VERSION")
@@ -21,7 +21,6 @@ pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 // Icons
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
 pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
-pub(crate) const DOWNLOADING_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/downloading.svg");
 pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");

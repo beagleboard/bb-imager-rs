@@ -10,23 +10,25 @@ license.workspace = true
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 bb-flasher = { path = "../bb-flasher" }
-tokio = { version = "1.51", features = ["macros", "rt-multi-thread"] }
 indicatif = "0.18"
 console = "0.16"
-url = "2.5.4"
-const-hex = "1.17"
 clap_complete = "4.6"
 anyhow = "1.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing = "0.1.44"
 
 [features]
-default = []
+default = ["static-hidraw"]
 pb2_mspm0 = [ "bb-flasher/pb2_mspm0" ]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 bcf_msp430 = ["bb-flasher/bcf_msp430"]
 dfu = ["bb-flasher/dfu"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]
+# Normally, I would enable shared for CLI on Linux by default, but most distros have out of date
+# version of dependency.
+static-hidraw = ["bb-flasher/static_hidraw"]
+shared-hidraw = ["bb-flasher/shared_hidraw"]
 
 [package.metadata.packager]
 category = "DeveloperTool"

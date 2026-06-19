@@ -48,12 +48,16 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
             .style(svg_icon_style)
             .into();
 
-            let row = widget::row![
-                icon,
-                text(dest.to_string()).size(18).width(iced::Length::Fill)
-            ];
+            let title: widget::Text<'_, _> = text(dest.to_string()).size(18);
+            let col: iced::Element<'_, _> = match dest.subtitle() {
+                Some(x) => widget::column![title, text(x)]
+                    .width(iced::Length::Fill)
+                    .into(),
+                None => title.width(iced::Length::Fill).into(),
+            };
             button(
-                row.spacing(12)
+                widget::row![icon, col]
+                    .spacing(12)
                     .padding(8)
                     .align_y(iced::alignment::Vertical::Center),
             )

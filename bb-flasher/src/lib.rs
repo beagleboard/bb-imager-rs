@@ -17,7 +17,7 @@
 //!     let customization =
 //!         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(None, None, None, None, None, None, None);
 //!
-//!     let flasher = bb_flasher::sd::Flasher::without_bmap(img.into_future(), target, customization, None)
+//!     let flasher = bb_flasher::sd::Flasher::without_bmap(img.into_image_future(), target, customization, None)
 //!         .flash(None)
 //!         .await
 //!         .unwrap();
@@ -45,10 +45,11 @@ use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
-pub use img::OsImage;
+pub use img::{OsArchive, OsImage};
 
 /// An Os Image present in the local filesystem
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LocalImage(Box<Path>);
 
 impl LocalImage {
@@ -64,22 +65,21 @@ impl LocalImage {
     pub fn file_name(&self) -> &std::ffi::OsStr {
         self.0.file_name().unwrap()
     }
-}
 
-impl IntoFuture for LocalImage {
-    type Output = std::io::Result<(OsImage, u64)>;
-    type IntoFuture = std::pin::Pin<Box<dyn Future<Output = Self::Output> + Send>>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move {
-            let p = self.0.clone();
-            let img = tokio::task::spawn_blocking(move || OsImage::from_path(&p))
-                .await
-                .unwrap()?;
+    pub fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(OsImage, u64)> {
+        move || {
+            let img = OsImage::from_path(&self.0)?;
             let size = img.size();
 
             Ok((img, size))
-        })
+        }
+    }
+
+    pub fn into_archive_fn(
+        self,
+        tx: Option<std::sync::mpsc::SyncSender<f32>>,
+    ) -> impl FnOnce() -> std::io::Result<OsArchive> {
+        move || OsArchive::from_path(&self.0, tx)
     }
 }
 

@@ -4,11 +4,11 @@ BeagleBoard Imaging Utility, a streamlined tool for creating, flashing, and mana
 
 # Contributing
 
-Please see [Contributing.md](CONTRIBUTING.md)
+Please see [Contributing.adoc](./docs/modules/ROOT/pages/contributing.adoc)
 
 # Packaging
 
-Please see [Packaging.md](PACKAGING.md)
+Please see [Packaging.adoc](./docs/modules/ROOT/pages/packaging.adoc)
 
 # Configuration
 
@@ -21,7 +21,7 @@ See [config.json](config.json) for example.
 ![BBImager Home Screen](./assets/screenshots/1_board_selection.webp)
 ![BBImager Image Selection Screen](./assets/screenshots/2_image_selection.webp)
 ![BBImager Destination Screen](./assets/screenshots/3_dest_selection.webp)
-![BBImager Configuration Screen](./assets/screenshots/4_custmization.webp)
+![BBImager Configuration Screen](./assets/screenshots/4_customization.webp)
 ![BBImager Review Screen](./assets/screenshots/5_review.webp)
 ![BBImager Flashing Screen](./assets/screenshots/6_flashing.webp)
 ![BBImager Flashing Finish Screen](./assets/screenshots/7_sucess.webp)

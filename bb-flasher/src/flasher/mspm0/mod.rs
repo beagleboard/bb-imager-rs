@@ -1,9 +1,11 @@
 #[cfg(feature = "mspm0_i2c")]
 use std::path::PathBuf;
-use std::{borrow::Cow, fmt::Display, io::Read};
-use tokio::sync::mpsc;
+use std::sync::mpsc;
+use std::{borrow::Cow, fmt::Display};
 
-use crate::{BBFlasher, BBFlasherTarget};
+use bb_helper::cancel::CancellationToken;
+
+use crate::BBFlasherTarget;
 
 /// MSPM0 UART target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -28,7 +30,7 @@ impl Target {
 impl From<String> for Target {
     #[cfg(all(feature = "mspm0_uart", feature = "mspm0_i2c"))]
     fn from(value: String) -> Self {
-        if value.contains("i2c-") {
+        if matches!(is_i2c_dev(&value), Ok(true)) {
             Self::I2c(value.into())
         } else {
             Self::Uart(value)
@@ -49,26 +51,22 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    async fn destinations(_: bool) -> std::collections::HashSet<Self> {
-        tokio::task::spawn_blocking(|| {
-            let mut dsts = std::collections::HashSet::new();
+    fn destinations(_: bool) -> std::collections::HashSet<Self> {
+        let mut dsts = std::collections::HashSet::new();
 
-            #[cfg(feature = "mspm0_uart")]
-            dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
+        #[cfg(feature = "mspm0_uart")]
+        dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
 
-            #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-            dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
+        #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
+        dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
 
-            dsts
-        })
-        .await
-        .unwrap()
+        dsts
     }
 
     fn identifier(&self) -> Cow<'_, str> {
         match self {
             #[cfg(feature = "mspm0_uart")]
-            Target::Uart(x) => Cow::Borrowed(&x),
+            Target::Uart(x) => Cow::Borrowed(x),
             #[cfg(feature = "mspm0_i2c")]
             Target::I2c(x) => x.to_string_lossy(),
         }
@@ -94,83 +92,102 @@ impl Display for Target {
 /// - iHex
 /// - xz: Xz compressed files for any of the above
 #[derive(Debug, Clone)]
-pub struct Flasher<I> {
+pub struct Flasher<I, P> {
     img: I,
     port: Target,
     verify: bool,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    cancel: Option<CancellationToken>,
+    prep_hook: P,
 }
 
-impl<I> Flasher<I> {
+impl<I, P> Flasher<I, P> {
     pub fn new(
         img: I,
         port: Target,
         verify: bool,
-        cancel: Option<tokio_util::sync::CancellationToken>,
+        cancel: Option<CancellationToken>,
+        prep_hook: P,
     ) -> Self {
         Self {
             img,
-            port: port,
+            port,
             verify,
             cancel,
+            prep_hook,
         }
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I, fn() -> Result<(), bb_flasher_mspm0::Error>> {
+    pub fn no_prep(img: I, port: Target, verify: bool, cancel: Option<CancellationToken>) -> Self {
+        Self::new(img, port, verify, cancel, || Ok(()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
+    pub fn gpio_by_name(
+        img: I,
+        port: Target,
+        verify: bool,
+        cancel: Option<CancellationToken>,
+        reset: String,
+        bsl: String,
+    ) -> Self {
+        Self::new(
+            img,
+            port,
+            verify,
+            cancel,
+            Box::new(bb_flasher_mspm0::bsl_gpio_cdev_by_name(reset, bsl)),
+        )
+    }
+}
+
+impl<I, P> Flasher<I, P>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
+    P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
-        let img = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
-
-            tokio::task::spawn_blocking(move || {
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)?;
-                Ok::<Vec<u8>, std::io::Error>(data)
-            })
-            .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?
-        };
+        let img = self.img;
+        let img = crate::common::resolve_img(img)?;
 
         let curry = move |chan| match port {
             #[cfg(feature = "mspm0_uart")]
-            Target::Uart(x) => bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel)
-                .map_err(Into::into),
+            Target::Uart(x) => {
+                bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel, self.prep_hook)
+                    .map_err(Into::into)
+            }
             #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-            Target::I2c(x) => bb_flasher_mspm0::i2c::flash(&img, &x, verify, chan, self.cancel)
-                .map_err(Into::into),
+            Target::I2c(x) => {
+                bb_flasher_mspm0::i2c::flash(&img, &x, verify, chan, self.cancel, self.prep_hook)
+                    .map_err(Into::into)
+            }
             #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
             Target::I2c(_) => Err(anyhow::anyhow!("Unsupported Os")),
         };
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel::<bb_flasher_mspm0::Status>(20);
+        std::thread::scope(|s| {
+            if let Some(chan) = chan {
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_mspm0::Status>(2);
 
-            let flasher_task = tokio::task::spawn_blocking(move || curry(Some(tx)));
+                s.spawn(move || {
+                    while let Ok(x) = rx.recv() {
+                        let _ = chan.try_send(x.into());
+                    }
+                });
 
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(x.into());
+                curry(Some(tx))
+            } else {
+                curry(None)
             }
-
-            flasher_task
-        } else {
-            tokio::task::spawn_blocking(move || curry(None))
-        };
-
-        flasher_task.await.unwrap()
+        })
     }
 }
 
@@ -182,4 +199,17 @@ impl From<bb_flasher_mspm0::Status> for crate::DownloadFlashingStatus {
             bb_flasher_mspm0::Status::Verifying => Self::Verifying,
         }
     }
+}
+
+#[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
+fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+    use std::os::unix::fs::MetadataExt;
+
+    let meta = std::fs::metadata(p)?;
+    Ok(nix::sys::stat::major(meta.rdev()) == 89)
+}
+
+#[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
+fn is_i2c_dev(_: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+    Ok(false)
 }

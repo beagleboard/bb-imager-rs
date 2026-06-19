@@ -18,18 +18,21 @@
 //! ```no_run
 //! use std::path::PathBuf;
 //! use std::fs::File;
+//! use bb_flasher_sd::Customization;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let dst = PathBuf::from("/tmp/dummy").into();
+//!     let dst = bb_flasher_sd::Destination::SdCard(PathBuf::from("/tmp/dummy").into());
 //!     let img = async move {
-//!         let f = tokio::fs::File::open("/tmp/image").await?.into_std().await;
-//!         let size = f.metadata().unwrap().len();
+//!         let f = tokio::fs::File::open("/tmp/image").await?;
+//!         let size = f.metadata().await.unwrap().len();
 //!         Ok((f, size))
 //!     };
 //!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
 //!
-//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), Vec::new(), None).await });
+//!     let iter = futures::stream::iter::<[Customization<Box<dyn futures::Stream<Item = (Box<str>,
+//!     bb_flasher_sd::ContentType)> + Send + Unpin>>; 0]>([]);
+//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), iter).await });
 //!
 //!     while let Some(m) = rx.recv().await {
 //!         println!("{:?}", m);
@@ -41,16 +44,20 @@
 //!
 //! [BeagleBoard Imager]: https://openbeagle.org/ayush1325/bb-imager-rs
 
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
+pub mod bootfs_update;
 pub(crate) mod customization;
 mod flashing;
 mod helpers;
 pub(crate) mod pal;
 
-pub use customization::{Customization, ParitionType};
+pub use customization::{ContentType, Customization, ParitionType};
 pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
@@ -130,6 +137,12 @@ impl Device {
 }
 
 /// Format SD card to fat32
-pub async fn format(dst: &std::path::Path) -> Result<()> {
-    crate::pal::format(dst).await
+pub fn format(dst: &std::path::Path) -> Result<()> {
+    crate::pal::format(dst)
+}
+
+#[derive(Debug, Clone)]
+pub enum Destination {
+    File(Box<Path>),
+    SdCard(Box<Path>),
 }

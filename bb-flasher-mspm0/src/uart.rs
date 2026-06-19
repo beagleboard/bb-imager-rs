@@ -1,6 +1,7 @@
-use tokio::sync::mpsc;
-
+use std::sync::mpsc;
 use std::time::Duration;
+
+use bb_helper::cancel::CancellationToken;
 
 use crate::{Error, Result, Status, helpers};
 
@@ -13,8 +14,9 @@ pub fn flash(
     firmware: &[u8],
     port: &str,
     verify: bool,
-    chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
+    prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     helpers::flash(
         firmware,
@@ -23,13 +25,15 @@ pub fn flash(
                 .parity(BSL_UART_PARITY)
                 .stop_bits(BSL_UART_STOP_BITS)
                 .data_bits(BSL_UART_DATA_BITS)
-                .timeout(Duration::from_secs(5))
+                // MSPM0 can be quite slow to respond when full length packet sent
+                .timeout(Duration::from_secs(10))
                 .open_native()
                 .map_err(|_| Error::FailedToOpenPort)
         },
         helpers::FlashOptions::new(verify),
         chan,
         cancel,
+        prep_hook,
     )
 }
 

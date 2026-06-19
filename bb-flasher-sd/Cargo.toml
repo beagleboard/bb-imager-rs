@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-sd"
-version = "2.0.1"
+version = "3.0.0"
 description = "A library to flash OS images to SD Card"
 edition.workspace = true
 authors.workspace = true
@@ -19,18 +19,19 @@ fscommon = "0.1"
 mbrman = "0.6"
 gpt = "4.1"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
-tokio = { version = "1.51", default-features = false, features = ["rt-multi-thread", "fs"] }
-tokio-util = { version = "0.7" }
+tokio = { version = "1.52", optional = true, default-features = false, features = ["rt", "signal"] }
 anyhow = "1.0"
+bb-helper = { path = "../bb-helper", features = ["cancel"] }
+
+[dev-dependencies]
+tempfile = "3.27"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
 libc = "0.2"
-tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }
-tokio = { version = "1.50", default-features = false, features = ["rt-multi-thread", "process", "io-util"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = { version = "3.7", optional = true }
@@ -38,4 +39,4 @@ nix = { version = "0.31", features = ["socket", "uio"], optional = true }
 
 [features]
 macos_authopen = ["dep:security-framework", "dep:nix"]
-udev = ["dep:udisks2"]
+udev = ["dep:udisks2", "dep:tokio"]

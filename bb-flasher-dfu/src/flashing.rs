@@ -118,11 +118,13 @@ pub(crate) fn dfu_write(
     reader: impl std::io::Read,
     size: u32,
 ) -> Result<()> {
-    let mut dev = open_dfu_dev_with_retry(vendor_id, product_id, bus_num, port_num, &name)?;
-    dev.download(reader, size)
+    let dev = open_dfu_dev_with_retry(vendor_id, product_id, bus_num, port_num, &name)?;
+    let temp = dev
+        .download(reader, size)
         .map_err(|source| crate::Error::DownloadFail { img: name, source })?;
-    let _ = dev.usb_reset();
-    let _ = dev.detach();
-
+    if let Some(dev) = temp {
+        let _ = dev.detach();
+        let _ = dev.usb_reset();
+    }
     Ok(())
 }

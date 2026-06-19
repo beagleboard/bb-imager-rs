@@ -10,7 +10,7 @@ pub struct Opt {
     pub command: Commands,
     #[arg(long)]
     /// Enable more logging.
-    pub verbose: bool
+    pub verbose: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -121,6 +121,27 @@ pub enum TargetCommands {
         /// Provide the bmap file for the image
         #[arg(long)]
         bmap: Option<Box<Path>>,
+
+        #[arg(long)]
+        /// Generate clound-init config.
+        cloud_init: bool,
+
+        #[arg(long)]
+        /// Generate sysconfig. Currently, sysconfig will be generated regardless if this flag is
+        /// provides. However, this will change in future. So best to explicitly set the flag.
+        sysconfig: bool,
+
+        /// The destination is a file instead of SD Card
+        #[arg(long)]
+        file_destination: bool
+    },
+    /// Update boot partition with contents from archive
+    SdBootUpdate {
+        /// Local path to bootfs archive.
+        img: Box<Path>,
+
+        /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
+        dst: PathBuf,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
@@ -160,6 +181,14 @@ pub enum TargetCommands {
         #[arg(long)]
         /// Disable checksum verification after flashing to speed up the process.
         no_verify: bool,
+        #[cfg(target_os = "linux")]
+        #[arg(long, requires = "bsl_gpio")]
+        /// RESET GPIO for MSPM0.
+        reset_gpio: Option<String>,
+        #[cfg(target_os = "linux")]
+        #[arg(long, requires = "reset_gpio")]
+        /// BSL GPIO for MSPM0.
+        bsl_gpio: Option<String>,
     },
 }
 

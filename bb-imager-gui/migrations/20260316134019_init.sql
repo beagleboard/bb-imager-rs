@@ -62,7 +62,7 @@ CREATE TABLE os_images(
 	name TEXT NOT NULL,
 	description TEXT NOT NULL,
 	icon TEXT NOT NULL,
-	url TEXT NOT NULL UNIQUE,
+	url TEXT NOT NULL,
 	image_download_size INTEGER,
 	image_download_sha256 BLOB NOT NULL,
 	extract_size INTEGER NOT NULL,
@@ -70,8 +70,12 @@ CREATE TABLE os_images(
 	init_format TEXT NOT NULL,
 	bmap TEXT,
 	info_text TEXT,
+        support TEXT,
+        remote_config_id INTEGER DEFAULT NULL,
 
-	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE
+	FOREIGN KEY (parent_id) REFERENCES os_sublists(id) ON DELETE CASCADE,
+        FOREIGN KEY (remote_config_id) REFERENCES remote_configs(id) ON DELETE CASCADE
+        UNIQUE(name, description, icon, url, init_format)
 ) STRICT;
 
 CREATE TABLE os_image_boards (

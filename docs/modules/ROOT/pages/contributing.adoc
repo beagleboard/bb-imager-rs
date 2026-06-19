@@ -35,13 +35,14 @@ make setup-fedora-deps
 .GUI
 [source,shell]
 ----
-make run-gui
+cargo run -p bb-imager-gui
 ----
 
 .CLI
 [source,shell]
 ----
 make run-cli
+cargo run -p bb-imager-cli
 ----
 
 == Submitting Pull Requests

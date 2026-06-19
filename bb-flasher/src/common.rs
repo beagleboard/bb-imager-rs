@@ -1,25 +1,10 @@
 //! Stuff common to all the flashers
 
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, io::Read};
 
-#[cfg(any(
-    feature = "bcf",
-    feature = "bcf_msp430",
-    feature = "pb2_mspm0",
-    feature = "mspm0_uart",
-    feature = "mspm0_i2c"
-))]
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 #[derive(Error, Debug)]
-#[cfg(any(
-    feature = "bcf",
-    feature = "bcf_msp430",
-    feature = "pb2_mspm0",
-    feature = "mspm0_uart",
-    feature = "mspm0_i2c"
-))]
 pub(crate) enum FlasherError {
     #[error("Failed to fetch image.")]
     ImageResolvingError {
@@ -40,18 +25,6 @@ pub enum DownloadFlashingStatus {
     Customizing,
 }
 
-/// A trait for modeling flashers. Also provides optional live status using channels.
-pub trait BBFlasher {
-    /// Start flashing. Generally, any image downloading should also be done as part of this
-    /// function with the help of [ImageFile]
-    ///
-    /// [ImageFile]: crate::ImageFile
-    fn flash(
-        self,
-        chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
-    ) -> impl Future<Output = anyhow::Result<()>>;
-}
-
 /// A trait for modeling flasher targets.
 ///
 /// Some flashers have a single target (for example a subprocessor in SBC).
@@ -65,8 +38,21 @@ where
     const IS_DESTINATION_SELECTABLE: bool = true;
 
     /// A list of possible flasher targets
-    fn destinations(filter: bool) -> impl Future<Output = HashSet<Self>>;
+    fn destinations(filter: bool) -> HashSet<Self>;
 
     /// A sort of device ID (mostly a Path).
     fn identifier<'a>(&'a self) -> Cow<'a, str>;
+}
+
+// Should only be used when image is expected to rather small and can fit in heap.
+pub(crate) fn resolve_img(
+    img: impl FnOnce() -> std::io::Result<(crate::OsImage, u64)>,
+) -> Result<Vec<u8>, FlasherError> {
+    let (mut img, _) = img().map_err(|source| FlasherError::ImageResolvingError { source })?;
+
+    let mut data = Vec::new();
+    img.read_to_end(&mut data)
+        .map_err(|source| FlasherError::ImageResolvingError { source })?;
+
+    Ok(data)
 }

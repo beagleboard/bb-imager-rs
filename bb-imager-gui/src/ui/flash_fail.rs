@@ -13,9 +13,14 @@ pub(crate) fn view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
     page_type1(
         info_view(state),
         progress_view(state),
-        [button("Restart")
-            .style(widget::button::danger)
-            .on_press(BBImagerMessage::Restart)],
+        [
+            button("Flash New")
+                .style(widget::button::danger)
+                .on_press(BBImagerMessage::Restart),
+            button("Retry")
+                .style(widget::button::primary)
+                .on_press(BBImagerMessage::Retry),
+        ],
     )
 }
 

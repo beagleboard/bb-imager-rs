@@ -1,16 +1,15 @@
 mod cli;
 mod helpers;
 
-use bb_flasher::{BBFlasher, BBFlasherTarget, DownloadFlashingStatus, LocalImage};
+use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus, LocalImage};
 use clap::{CommandFactory, Parser};
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use helpers::LocalStringFile;
 use std::path::PathBuf;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let opt = Opt::parse();
 
     if opt.verbose {
@@ -26,101 +25,103 @@ async fn main() {
     }
 
     match opt.command {
-        Commands::Flash { target, quiet } => flash(*target, quiet).await,
-        Commands::Format { dst, quiet } => format(dst, quiet).await,
+        Commands::Flash { target, quiet } => flash(*target, quiet),
+        Commands::Format { dst, quiet } => format(dst, quiet),
         Commands::ListDestinations {
             target,
             no_frills,
             no_filter,
-        } => {
-            list_destinations(target, no_frills, no_filter).await;
-        }
+        } => list_destinations(target, no_frills, no_filter),
         Commands::GenerateCompletion { shell } => generate_completion(shell),
     }
 }
 
-async fn flash(target: TargetCommands, quite: bool) {
+fn flash(target: TargetCommands, quite: bool) {
     if quite {
-        flash_internal(target, None).await
+        flash_internal(target, None)
     } else {
-        let (tx, mut rx) = mpsc::channel(20);
-        tokio::task::spawn(async move {
-            let term = console::Term::stdout();
-            let bar_style =
-                indicatif::ProgressStyle::with_template("{msg:15}  [{wide_bar}] [{percent:3} %]")
-                    .expect("Failed to create progress bar");
-            let bars = indicatif::MultiProgress::new();
+        std::thread::scope(|s| {
+            let (tx, rx) = mpsc::sync_channel(2);
 
-            let mut last_bar: Option<indicatif::ProgressBar> = None;
-            let mut last_state = DownloadFlashingStatus::Preparing;
-            let mut stage = 1;
+            s.spawn(move || {
+                let term = console::Term::stdout();
+                let bar_style = indicatif::ProgressStyle::with_template(
+                    "{msg:15}  [{wide_bar}] [{percent:3} %]",
+                )
+                .expect("Failed to create progress bar");
+                let bars = indicatif::MultiProgress::new();
 
-            // Setting initial stage as Preparing
-            term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
-                .unwrap();
+                let mut last_bar: Option<indicatif::ProgressBar> = None;
+                let mut last_state = DownloadFlashingStatus::Preparing;
+                let mut stage = 1;
 
-            while let Some(progress) = rx.recv().await {
-                // Skip if no change in stage
-                if progress == last_state {
-                    continue;
+                // Setting initial stage as Preparing
+                term.write_line(&stage_msg(DownloadFlashingStatus::Preparing, stage))
+                    .unwrap();
+
+                while let Ok(progress) = rx.recv() {
+                    // Skip if no change in stage
+                    if progress == last_state {
+                        continue;
+                    }
+
+                    match (progress, last_state) {
+                        // Take care when just progress needs to be updated
+                        (
+                            DownloadFlashingStatus::DownloadingProgress(p),
+                            DownloadFlashingStatus::DownloadingProgress(_),
+                        )
+                        | (
+                            DownloadFlashingStatus::FlashingProgress(p),
+                            DownloadFlashingStatus::FlashingProgress(_),
+                        ) => {
+                            last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
+                        }
+                        // Create new bar when stage has changed
+                        (DownloadFlashingStatus::DownloadingProgress(p), _)
+                        | (DownloadFlashingStatus::FlashingProgress(p), _) => {
+                            if let Some(b) = last_bar.take() {
+                                b.finish();
+                            }
+
+                            stage += 1;
+
+                            let temp_bar = bars.add(indicatif::ProgressBar::new(100));
+                            temp_bar.set_style(bar_style.clone());
+                            temp_bar.set_message(stage_msg(progress, stage));
+                            temp_bar.set_position((p * 100.0) as u64);
+                            last_bar = Some(temp_bar);
+                        }
+                        // Print stage when entering a new stage without progress
+                        (DownloadFlashingStatus::Verifying, _)
+                        | (DownloadFlashingStatus::Customizing, _)
+                        | (DownloadFlashingStatus::Preparing, _) => {
+                            if let Some(b) = last_bar.take() {
+                                b.finish();
+                            }
+
+                            stage += 1;
+                            term.write_line(&stage_msg(progress, stage)).unwrap();
+                        }
+                    }
+
+                    last_state = progress;
                 }
 
-                match (progress, last_state) {
-                    // Take care when just progress needs to be updated
-                    (
-                        DownloadFlashingStatus::DownloadingProgress(p),
-                        DownloadFlashingStatus::DownloadingProgress(_),
-                    )
-                    | (
-                        DownloadFlashingStatus::FlashingProgress(p),
-                        DownloadFlashingStatus::FlashingProgress(_),
-                    ) => {
-                        last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
-                    }
-                    // Create new bar when stage has changed
-                    (DownloadFlashingStatus::DownloadingProgress(p), _)
-                    | (DownloadFlashingStatus::FlashingProgress(p), _) => {
-                        if let Some(b) = last_bar.take() {
-                            b.finish();
-                        }
-
-                        stage += 1;
-
-                        let temp_bar = bars.add(indicatif::ProgressBar::new(100));
-                        temp_bar.set_style(bar_style.clone());
-                        temp_bar.set_message(stage_msg(progress, stage));
-                        temp_bar.set_position((p * 100.0) as u64);
-                        last_bar = Some(temp_bar);
-                    }
-                    // Print stage when entering a new stage without progress
-                    (DownloadFlashingStatus::Verifying, _)
-                    | (DownloadFlashingStatus::Customizing, _)
-                    | (DownloadFlashingStatus::Preparing, _) => {
-                        if let Some(b) = last_bar.take() {
-                            b.finish();
-                        }
-
-                        stage += 1;
-                        term.write_line(&stage_msg(progress, stage)).unwrap();
-                    }
+                if let Some(b) = last_bar.take() {
+                    b.finish();
                 }
+            });
 
-                last_state = progress;
-            }
-
-            if let Some(b) = last_bar.take() {
-                b.finish();
-            }
-        });
-
-        flash_internal(target, Some(tx)).await
+            flash_internal(target, Some(tx))
+        })
     }
     .expect("Failed to flash")
 }
 
-async fn flash_internal(
+fn flash_internal(
     target: TargetCommands,
-    chan: Option<mpsc::Sender<DownloadFlashingStatus>>,
+    chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
 ) -> anyhow::Result<()> {
     match target {
         TargetCommands::Sd {
@@ -136,58 +137,116 @@ async fn flash_internal(
             ssh_key,
             usb_enable_dhcp,
             bmap,
+            sysconfig,
+            cloud_init,
+            file_destination,
         } => {
+            // TODO: Remove fallback in the future.
+            if !sysconfig && !cloud_init {
+                tracing::warn!("No config format specified. Using sysconfig by default");
+            }
+
             let user = user_name.map(|x| (x, user_password.unwrap()));
             let wifi = wifi_ssid.map(|x| (x, wifi_password.unwrap()));
 
             let dst = check_macos_device_path(dst);
 
-            let customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
-                hostname,
-                timezone,
-                keymap,
-                user,
-                wifi,
-                ssh_key,
-                Some(usb_enable_dhcp),
-            );
+            let customization = if hostname.is_some()
+                || timezone.is_some()
+                || keymap.is_some()
+                || user.is_some()
+                || wifi.is_some()
+                || ssh_key.is_some()
+                || usb_enable_dhcp
+            {
+                let mut customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
+                    hostname.clone(),
+                    timezone.clone(),
+                    keymap.clone(),
+                    user.clone(),
+                    wifi.clone(),
+                    ssh_key.clone(),
+                    Some(usb_enable_dhcp),
+                );
 
-            bb_flasher::sd::Flasher::new(
-                LocalImage::new(img).into_future(),
-                bmap.map(LocalStringFile::new).map(IntoFuture::into_future),
-                dst.try_into().unwrap(),
-                customization,
-                None,
-            )
-            .flash(chan)
-            .await
+                if cloud_init {
+                    customization.extend([bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
+                        hostname, timezone, keymap, user, wifi, ssh_key,
+                    )]);
+                }
+
+                customization
+            } else {
+                bb_flasher::sd::FlashingSdLinuxConfig::none()
+            };
+
+            tracing::info!("Customization: {:#?}", customization);
+
+            if file_destination {
+                bb_flasher::sd::Flasher::with_file_dest(
+                    LocalImage::new(img).into_image_fn(),
+                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                    dst,
+                    customization,
+                )
+            } else {
+                bb_flasher::sd::Flasher::new(
+                    LocalImage::new(img).into_image_fn(),
+                    bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
+                    dst.try_into().unwrap(),
+                    customization,
+                )
+            }
+            .flash(chan, None)
+        }
+        TargetCommands::SdBootUpdate { img, dst } => {
+            std::thread::scope(|s| {
+                let tx = if let Some(chan) = chan {
+                    let (tx, rx) = mpsc::sync_channel(4);
+                    s.spawn(move || {
+                        let _ = chan.try_send(DownloadFlashingStatus::Preparing);
+                        while let Ok(msg) = rx.recv() {
+                            // Safeguard for initial rewinds
+                            if msg > 0.01 {
+                                let _ =
+                                    chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                            }
+                        }
+                    });
+                    Some(tx)
+                } else {
+                    None
+                };
+
+                bb_flasher::sd::UpdateBootFlasher::with_file_dest(
+                    LocalImage::new(img).into_archive_fn(tx),
+                    dst,
+                    None,
+                )
+                .flash()
+            })
         }
         #[cfg(feature = "bcf_cc1352p7")]
         TargetCommands::Bcf {
             img,
             dst,
             no_verify,
-        } => {
-            bb_flasher::bcf::cc1352p7::Flasher::new(
-                LocalImage::new(img).into_future(),
-                dst.into(),
-                !no_verify,
-                None,
-            )
-            .flash(chan)
-            .await
-        }
+        } => bb_flasher::bcf::cc1352p7::Flasher::new(
+            LocalImage::new(img).into_image_fn(),
+            dst.into(),
+            !no_verify,
+            None,
+        )
+        .flash(chan),
         #[cfg(feature = "bcf_msp430")]
         TargetCommands::Msp430 { img, dst } => {
-            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_future(), dst.into())
+            bb_flasher::bcf::msp430::Flasher::new(LocalImage::new(img).into_image_fn(), dst.into())
                 .flash(chan)
-                .await
         }
         #[cfg(feature = "pb2_mspm0")]
         TargetCommands::Pb2Mspm0 { no_eeprom, img } => {
-            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_future(), !no_eeprom)
+            bb_flasher::pb2::mspm0::Flasher::new(LocalImage::new(img).into_image_fn(), !no_eeprom)
                 .flash(chan)
-                .await
         }
         #[cfg(feature = "dfu")]
         TargetCommands::Dfu { identifier, imgs } => {
@@ -200,7 +259,7 @@ async fn flash_internal(
                 .map(|x| {
                     (
                         x[0].to_string(),
-                        LocalImage::new(PathBuf::from(&x[1]).into()).into_future(),
+                        LocalImage::new(PathBuf::from(&x[1]).into()).into_image_fn(),
                     )
                 })
                 .collect();
@@ -208,23 +267,51 @@ async fn flash_internal(
             bb_flasher::dfu::Flasher::from_identifier(img_list, &identifier, None)
                 .unwrap()
                 .flash(chan)
-                .await
         }
-        #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
+        #[cfg(all(
+            any(feature = "zepto_uart", feature = "zepto_i2c"),
+            not(target_os = "linux")
+        ))]
         TargetCommands::Zepto {
             img,
             dst,
             no_verify,
-        } => {
-            bb_flasher::mspm0::Flasher::new(
-                LocalImage::new(img).into_future(),
+        } => bb_flasher::mspm0::Flasher::no_prep(
+            LocalImage::new(img).into_image_fn(),
+            dst.into(),
+            !no_verify,
+            None,
+        )
+        .flash(chan),
+        #[cfg(all(
+            any(feature = "zepto_uart", feature = "zepto_i2c"),
+            target_os = "linux"
+        ))]
+        TargetCommands::Zepto {
+            img,
+            dst,
+            no_verify,
+            reset_gpio,
+            bsl_gpio,
+        } => match (reset_gpio, bsl_gpio) {
+            (Some(reset), Some(bsl)) => bb_flasher::mspm0::Flasher::gpio_by_name(
+                LocalImage::new(img).into_image_fn(),
+                dst.into(),
+                !no_verify,
+                None,
+                reset,
+                bsl,
+            )
+            .flash(chan),
+            (None, None) => bb_flasher::mspm0::Flasher::no_prep(
+                LocalImage::new(img).into_image_fn(),
                 dst.into(),
                 !no_verify,
                 None,
             )
-            .flash(chan)
-            .await
-        }
+            .flash(chan),
+            _ => panic!("Invalid arguments"),
+        },
     }
 }
 
@@ -272,51 +359,51 @@ fn check_macos_device_path(dst: PathBuf) -> PathBuf {
     dst
 }
 
-async fn format(dst: PathBuf, quite: bool) {
+fn format(dst: PathBuf, quite: bool) {
     let term = console::Term::stdout();
 
     let config = bb_flasher::sd::FormatFlasher::new(dst.try_into().unwrap());
-    config.flash(None).await.unwrap();
+    config.flash().unwrap();
 
     if !quite {
         term.write_line("Formatting successful").unwrap();
     }
 }
 
-async fn no_frills_list_destinations<T: BBFlasherTarget>(no_filter: bool) {
+fn no_frills_list_destinations<T: BBFlasherTarget + Send + 'static>(no_filter: bool) {
     let term = console::Term::stdout();
-    let dsts = T::destinations(!no_filter).await;
+    let dsts = T::destinations(!no_filter);
 
     for d in dsts {
         term.write_line(&d.identifier()).unwrap();
     }
 }
 
-async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: bool) {
+fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: bool) {
     if no_frills {
         match target {
             DestinationsTarget::Sd => {
-                no_frills_list_destinations::<bb_flasher::sd::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::sd::Target>(no_filter)
             }
             #[cfg(feature = "dfu")]
             DestinationsTarget::Dfu => {
-                no_frills_list_destinations::<bb_flasher::dfu::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::dfu::Target>(no_filter)
             }
             #[cfg(feature = "bcf_cc1352p7")]
             DestinationsTarget::Bcf => {
-                no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(no_filter)
             }
             #[cfg(feature = "bcf_msp430")]
             DestinationsTarget::Msp430 => {
-                no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(no_filter)
             }
             #[cfg(feature = "pb2_mspm0")]
             DestinationsTarget::Pb2Mspm0 => {
-                no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter)
             }
             #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
             DestinationsTarget::Zepto => {
-                no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
+                no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter)
             }
         }
         return;
@@ -332,7 +419,6 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             const BYTES_IN_GB: u64 = 1024 * 1024 * 1024;
 
             let dsts_str: Vec<_> = bb_flasher::sd::Target::destinations(!no_filter)
-                .await
                 .into_iter()
                 .map(|x| {
                     (
@@ -402,7 +488,6 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
             const PRODUCT_ID_HEADER: &str = "Product Id";
 
             let dsts_str: Vec<_> = bb_flasher::dfu::Target::destinations(!no_filter)
-                .await
                 .into_iter()
                 .map(|x| {
                     (
@@ -476,19 +561,19 @@ async fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filte
         }
         #[cfg(feature = "bcf_msp430")]
         DestinationsTarget::Msp430 => {
-            no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::bcf::msp430::Target>(no_filter)
         }
         #[cfg(feature = "bcf_cc1352p7")]
         DestinationsTarget::Bcf => {
-            no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::bcf::cc1352p7::Target>(no_filter)
         }
         #[cfg(feature = "pb2_mspm0")]
         DestinationsTarget::Pb2Mspm0 => {
-            no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(!no_filter).await
+            no_frills_list_destinations::<bb_flasher::pb2::mspm0::Target>(no_filter)
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         DestinationsTarget::Zepto => {
-            no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter).await
+            no_frills_list_destinations::<bb_flasher::mspm0::Target>(no_filter)
         }
     }
 }

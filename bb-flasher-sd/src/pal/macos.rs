@@ -1,8 +1,6 @@
-use std::{
-    fs::File,
-    io::{self, Read, Seek, Write},
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::{self, Read, Seek, Write};
+use std::path::{Path, PathBuf};
 
 use crate::{Error, Result};
 
@@ -53,32 +51,39 @@ impl crate::helpers::Eject for MacOSFile {
     fn eject(self) -> std::io::Result<()> {
         self.inner.sync_all()?;
         let _ = unmount_disk(&self.path.to_string_lossy());
+
         Ok(())
     }
 }
 
-pub(crate) async fn format(dst: &Path) -> Result<()> {
-    let sd = open(dst).await?;
-    tokio::task::spawn_blocking(|| fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default()))
-        .await
-        .unwrap()
+pub(crate) fn format(dst: &Path) -> Result<()> {
+    let sd = open(dst)?;
+    fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default())
         .map_err(|source| Error::FailedToFormat { source })
 }
 
+fn check_dst(dst: &Path) -> Result<()> {
+    match std::fs::exists(dst) {
+        Ok(true) => Ok(()),
+        _ => Err(Error::FailedToOpenDestination {
+            source: anyhow::anyhow!("Drive not found"),
+        }),
+    }
+}
+
 #[cfg(not(feature = "macos_authopen"))]
-pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
+pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
+    check_dst(dst)?;
+
     let dst_str = dst.to_string_lossy();
     let _ = unmount_disk(&dst_str);
 
-    let f = tokio::fs::OpenOptions::new()
+    let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .open(dst)
-        .await
-        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?
-        .into_std()
-        .await;
+        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?;
 
     Ok(MacOSFile {
         inner: f,
@@ -87,7 +92,7 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
 }
 
 #[cfg(feature = "macos_authopen")]
-pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
+pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
     fn inner(dst: PathBuf) -> anyhow::Result<File> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
@@ -119,9 +124,6 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
             .make_external_form()
             .expect("Failed to make external form");
         let (pipe0, pipe1) = UnixStream::pair().expect("Failed to create socket");
-
-        // Use helper to unmount
-        let _ = unmount_disk(dst.to_str().unwrap());
 
         let mut cmd = Command::new("/usr/libexec/authopen")
             .args(["-stdoutpipe", "-extauth", "-o", "2", dst.to_str().unwrap()])
@@ -173,12 +175,10 @@ pub(crate) async fn open(dst: &Path) -> Result<MacOSFile> {
         Err(anyhow::anyhow!("Authopen failed to open the SD Card"))
     }
 
+    check_dst(dst)?;
     let p = dst.to_owned();
-    // TODO: Make this into a real async function
-    let f = tokio::task::spawn_blocking(move || inner(p))
-        .await
-        .unwrap()
-        .map_err(|e| Error::FailedToOpenDestination { source: e })?;
+    let _ = unmount_disk(dst.to_str().unwrap());
+    let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
 
     Ok(MacOSFile {
         inner: f,

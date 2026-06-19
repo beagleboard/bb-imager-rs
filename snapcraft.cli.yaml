@@ -1,0 +1,34 @@
+name: bb-imager-cli
+title: BeagleBoard Imager CLI
+base: core24 # the base snap is the execution environment for this snap
+version: 1.0.8
+license: MIT
+contact:
+  - https://www.beagleboard.org/about
+issues:
+  - https://github.com/beagleboard/bb-imager-rs/issues
+donation:
+  - https://github.com/sponsors/beagleboard
+website:
+  - https://www.beagleboard.org/bb-imager
+source-code:
+  - https://github.com/beagleboard/bb-imager-rs
+summary: Tool for creating, flashing, and managing OS images for BeagleBoard devices.
+description: |
+  A streamlined command line tool to flash SD cards and boards such as
+  BeagleConnect Freedom, BeagleConnect Zepto, etc.
+
+grade: stable
+confinement: classic
+
+parts:
+  bb-imager-cli:
+    # See 'snapcraft plugins'
+    plugin: rust
+    source: .
+    build-packages:
+      - libudev-dev
+    build-attributes:
+      - enable-patchelf
+    override-build: |
+      make build-cli install-cli DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr

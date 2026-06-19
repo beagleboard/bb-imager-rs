@@ -103,6 +103,7 @@ pub(crate) struct OsSublistListItem {
     pub(crate) id: i64,
     pub(crate) icon: Url,
     pub(crate) name: String,
+    pub(crate) flasher: bb_config::config::Flasher,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -119,6 +120,7 @@ pub(crate) struct OsImage {
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Url>,
     pub(crate) info_text: Option<String>,
+    pub(crate) support: Option<Url>
 }
 
 impl FromRow<'_, SqliteRow> for OsImage {
@@ -138,6 +140,7 @@ impl FromRow<'_, SqliteRow> for OsImage {
             init_format: row.try_get("init_format")?,
             bmap: row.try_get("bmap")?,
             info_text: row.try_get("info_text")?,
+            support: row.try_get("support")?,
         })
     }
 }
@@ -259,21 +262,29 @@ impl Db {
         while let Some((pid, img)) = imgs.pop() {
             match img {
                 config::OsListItem::Image(os_image) => {
-                    let id = Self::insert_image(exec, os_image, pid).await?;
+                    let id = Self::insert_image(exec, os_image, pid, remote_config_id).await?;
                     if let Some(p) = pid {
                         Self::insert_sublist_boards(exec, p, id).await?
                     }
                 }
                 config::OsListItem::SubList(os_sub_list) => {
-                    let id =
-                        Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id).await?;
-                    imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
+                    if crate::helpers::flasher_supported(os_sub_list.flasher) {
+                        let id =
+                            Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id).await?;
+                        imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
+                    }
                 }
                 config::OsListItem::RemoteSubList(os_remote_sub_list) => {
-                    let id =
-                        Self::insert_remote_image(exec, os_remote_sub_list, pid, remote_config_id)
-                            .await?;
-                    Self::insert_remote_sublist_boards(exec, id).await?;
+                    if crate::helpers::flasher_supported(os_remote_sub_list.flasher) {
+                        let id = Self::insert_remote_image(
+                            exec,
+                            os_remote_sub_list,
+                            pid,
+                            remote_config_id,
+                        )
+                        .await?;
+                        Self::insert_remote_sublist_boards(exec, id).await?;
+                    }
                 }
             }
         }
@@ -438,13 +449,14 @@ impl Db {
         exec: &mut sqlx::SqliteConnection,
         img: &config::OsImage,
         parent_id: Option<i64>,
+        remote_config_id: Option<i64>,
     ) -> sqlx::Result<i64> {
         let id = sqlx::query(
             r#"
-            INSERT INTO os_images(name, parent_id, description, icon, url, 
-                image_download_size, image_download_sha256, extract_size, 
-                release_date, init_format, bmap, info_text) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            INSERT INTO os_images(name, parent_id, description, icon, url,
+                image_download_size, image_download_sha256, extract_size,
+                release_date, init_format, bmap, info_text, remote_config_id, support)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
         )
         .bind(&img.name)
@@ -459,6 +471,8 @@ impl Db {
         .bind(img.init_format)
         .bind(img.bmap.as_ref().map(|x| x.as_str()))
         .bind(&img.info_text)
+        .bind(remote_config_id)
+        .bind(img.support.as_ref().map(|x| x.as_str()))
         .execute(&mut *exec)
         .await?
         .last_insert_rowid();
@@ -562,7 +576,7 @@ impl Db {
             r#"
             SELECT id, name, description, icon, url, image_download_size,
                 image_download_sha256, extract_size, release_date, init_format,
-                bmap, info_text 
+                bmap, info_text, support
             FROM os_images WHERE id = $1"#,
         )
         .bind(id)
@@ -598,7 +612,8 @@ impl Db {
                 AND (
                         ($2 IS NULL AND oi.parent_id IS NULL) 
                         OR oi.parent_id = $2
-                )"#,
+                )
+            ORDER BY oi.remote_config_id NULLS LAST"#,
         )
         .bind(board_id)
         .bind(parent_id)
@@ -613,14 +628,15 @@ impl Db {
     ) -> sqlx::Result<Vec<OsSublistListItem>> {
         sqlx::query_as(
             r#"
-            SELECT s.id, s.name, s.icon
+            SELECT s.id, s.name, s.icon, s.flasher
             FROM os_sublists s
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
             WHERE sb.board_id = $1
               AND (
                     ($2 IS NULL AND s.parent_id IS NULL)
                  OR s.parent_id = $2
-              )"#,
+              )
+            ORDER BY s.remote_config_id NULLS LAST"#,
         )
         .bind(board_id)
         .bind(parent_id)

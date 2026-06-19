@@ -3,7 +3,7 @@
 == Task system
 
 This project uses `+make+` as the task runner. For most people,
-running `+make+` should be enough get a grasp regarding how to build and
+running `+make help+` should be enough get a grasp regarding how to build and
 run the project.
 
 The repo contains a `+Makefile+` to help create the different supported
@@ -25,19 +25,13 @@ make setup-packaging-deps
 * CLI
 
 ....
-make package-cli-linux-deb
+make package-cli-deb
 ....
 
 * GUI
 
 ....
-make package-gui-linux-deb
-....
-
-* Service
-
-....
-make package-service-linux-deb
+make package-gui-deb
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -54,7 +48,7 @@ Compilation]
 == AppImage
 
 ....
-make package-gui-linux-appimage
+make package-gui-appimage
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -75,19 +69,13 @@ be maintained out of tree.
 * GUI
 
 ....
-make package-gui-linux-targz
+make package-gui-pacman
 ....
 
 * CLI
 
 ....
-make package-cli-linux-targz
-....
-
-* Service
-
-....
-make package-service-linux-targz
+make package-cli-pacman
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -106,7 +94,7 @@ Compilation]
 * GUI
 
 ....
-make package-gui-windows-portable
+make package-gui-portable-exe
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -125,7 +113,7 @@ Compilation]
 * GUI
 
 ....
-make package-gui-windows-wix
+make package-gui-wix
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -143,7 +131,7 @@ Compilation]
 Build the package.
 
 ....
-make package-gui-macos-dmg
+make package-gui-dmg
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -151,6 +139,24 @@ variable. Defaults to host target. Currently, the following targets have
 been tested: - x86_64-apple-darwin - aarch64-apple-darwin
 
 MacOS Package cannot be built on a non-MacOS host.
+
+== Creating all packages for a target
+
+Helpers are defined to build all pakcages with sane fetures for each target.
+
+....
+make package-$(TARGET)
+....
+
+The target platform can be specified with `+TARGET+` environment
+variable. Supported values:
+
+- x86_64-unknown-linux-gnu
+- aarch64-unknown-linux-gnu
+- x86_64-apple-darwin
+- aarch64-apple-darwin
+- x86_64-pc-windows-msvc
+- aarch64-pc-windows-msvc
 
 == Cross Compilation
 

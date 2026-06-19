@@ -4,12 +4,9 @@
 //! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 //! [Linux Firmware Upload API]: https://docs.kernel.org/driver-api/firmware/fw_upload.html
 
-use std::{io, path::Path};
+use std::io::{self, Read, Write};
+use std::{fs::File, path::Path, sync::mpsc};
 use thiserror::Error;
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
-};
 
 const DEVICE: &str = "mspm0l1105";
 const PATH: &str = "/sys/class/firmware/mspm0l1105/";
@@ -56,11 +53,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// EEPROM contents.
 ///
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
-pub async fn flash(
-    firmware: &[u8],
-    chan: &tokio::sync::mpsc::Sender<Status>,
-    persist_eeprom: bool,
-) -> Result<()> {
+pub fn flash(firmware: &[u8], chan: mpsc::SyncSender<Status>, persist_eeprom: bool) -> Result<()> {
     if firmware.len() > FIRMWARE_SIZE {
         return Err(Error::InvalidFirmware);
     }
@@ -69,35 +62,28 @@ pub async fn flash(
 
     // Copy the current EEPROM contents
     if persist_eeprom {
-        let mut eeprom = File::open(EEPROM)
-            .await
-            .map_err(|source| Error::FailedToOpen {
-                source,
-                fname: "EEPROM",
-            })?;
+        let mut eeprom = File::open(EEPROM).map_err(|source| Error::FailedToOpen {
+            source,
+            fname: "EEPROM",
+        })?;
         eeprom
             .read_to_end(&mut eeprom_contents)
-            .await
             .map_err(|source| Error::FailedToRead {
                 source,
                 fname: "EEPROM",
             })?;
     }
 
-    flash_fw_api(Path::new(PATH), firmware, chan).await?;
+    flash_fw_api(Path::new(PATH), firmware, &chan)?;
 
     // Write back EEPROM contents
     if persist_eeprom {
-        let mut eeprom =
-            sysfs_w_open(Path::new(EEPROM))
-                .await
-                .map_err(|source| Error::FailedToOpen {
-                    source,
-                    fname: "EEPROM",
-                })?;
+        let mut eeprom = sysfs_w_open(Path::new(EEPROM)).map_err(|source| Error::FailedToOpen {
+            source,
+            fname: "EEPROM",
+        })?;
         eeprom
             .write_all(&eeprom_contents)
-            .await
             .map_err(|source| Error::FailedToWrite {
                 source,
                 fname: "EEPROM",
@@ -107,32 +93,29 @@ pub async fn flash(
     Ok(())
 }
 
-async fn sysfs_w_open(path: &Path) -> io::Result<File> {
-    tokio::fs::OpenOptions::new()
+fn sysfs_w_open(path: &Path) -> io::Result<File> {
+    std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .open(path)
-        .await
 }
 
 /// Check if the proper fw upload entries are present
-pub async fn check() -> Result<()> {
+pub fn check() -> Result<()> {
     const FW_ENTRIES: &[&str] = &["loading", "status", "remaining_size"];
 
     let fw_dir = Path::new(PATH);
 
     for file in FW_ENTRIES {
-        check_file(file, &fw_dir.join(file)).await?;
+        check_file(file, &fw_dir.join(file))?;
     }
 
     Ok(())
 }
 
-async fn check_file(fname: &'static str, path: &Path) -> Result<()> {
-    let temp = tokio::fs::try_exists(path)
-        .await
-        .map_err(|source| Error::FailedToOpen { source, fname })?;
+fn check_file(fname: &'static str, path: &Path) -> Result<()> {
+    let temp = std::fs::exists(path).map_err(|source| Error::FailedToOpen { source, fname })?;
 
     if temp {
         Ok(())
@@ -144,11 +127,7 @@ async fn check_file(fname: &'static str, path: &Path) -> Result<()> {
     }
 }
 
-async fn flash_fw_api(
-    base: &Path,
-    firmware: &[u8],
-    chan: &tokio::sync::mpsc::Sender<Status>,
-) -> Result<()> {
+fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -> Result<()> {
     let loading_path = base.join("loading");
     let data_path = base.join("data");
     let status_path = base.join("status");
@@ -160,37 +139,29 @@ async fn flash_fw_api(
     // Initial firmware upload
     {
         let mut loading_file =
-            sysfs_w_open(&loading_path)
-                .await
-                .map_err(|source| Error::FailedToOpen {
-                    source,
-                    fname: "loading",
-                })?;
+            sysfs_w_open(&loading_path).map_err(|source| Error::FailedToOpen {
+                source,
+                fname: "loading",
+            })?;
         loading_file
             .write_all(b"1")
-            .await
             .map_err(|source| Error::FailedToWrite {
                 source,
                 fname: "loading",
             })?;
         loading_file
             .flush()
-            .await
             .map_err(|source| Error::FailedToWrite {
                 source,
                 fname: "loading",
             })?;
 
-        let mut data_file =
-            sysfs_w_open(&data_path)
-                .await
-                .map_err(|source| Error::FailedToOpen {
-                    source,
-                    fname: "data",
-                })?;
+        let mut data_file = sysfs_w_open(&data_path).map_err(|source| Error::FailedToOpen {
+            source,
+            fname: "data",
+        })?;
         data_file
             .write_all(firmware)
-            .await
             .map_err(|source| Error::FailedToWrite {
                 source,
                 fname: "data",
@@ -198,7 +169,6 @@ async fn flash_fw_api(
 
         loading_file
             .write_all(b"0")
-            .await
             .map_err(|source| Error::FailedToWrite {
                 source,
                 fname: "loading",
@@ -208,18 +178,14 @@ async fn flash_fw_api(
     // Wait for flashing to finish
     loop {
         // sysfs entries cause weird stuff if kept open after a single read/write
-        let mut status_file =
-            File::open(&status_path)
-                .await
-                .map_err(|source| Error::FailedToOpen {
-                    source,
-                    fname: "status",
-                })?;
+        let mut status_file = File::open(&status_path).map_err(|source| Error::FailedToOpen {
+            source,
+            fname: "status",
+        })?;
 
         inp.clear();
         status_file
             .read_to_string(&mut inp)
-            .await
             .map_err(|source| Error::FailedToRead {
                 source,
                 fname: "status",
@@ -232,15 +198,13 @@ async fn flash_fw_api(
             }
             "transferring" => {
                 let mut prog = String::with_capacity(3);
-                let mut size_file = File::open(&remaining_size_path).await.map_err(|source| {
-                    Error::FailedToOpen {
+                let mut size_file =
+                    File::open(&remaining_size_path).map_err(|source| Error::FailedToOpen {
                         source,
                         fname: "remaining_size",
-                    }
-                })?;
+                    })?;
                 size_file
                     .read_to_string(&mut prog)
-                    .await
                     .map_err(|source| Error::FailedToRead {
                         source,
                         fname: "remaining_size",
@@ -261,18 +225,14 @@ async fn flash_fw_api(
 
     // Check for error
     {
-        let mut error_file =
-            File::open(&error_path)
-                .await
-                .map_err(|source| Error::FailedToOpen {
-                    source,
-                    fname: "error",
-                })?;
+        let mut error_file = File::open(&error_path).map_err(|source| Error::FailedToOpen {
+            source,
+            fname: "error",
+        })?;
 
         inp.clear();
         error_file
             .read_to_string(&mut inp)
-            .await
             .map_err(|source| Error::FailedToRead {
                 source,
                 fname: "error",
@@ -309,7 +269,6 @@ pub fn device() -> Device {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Flashing status
 pub enum Status {
     Preparing,
@@ -318,8 +277,6 @@ pub enum Status {
 }
 
 /// PocketBeagle 2 MSPM0 information.
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "zvariant", derive(zvariant::Type))]
 pub struct Device {
     pub name: String,
     pub path: String,

@@ -1,7 +1,9 @@
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 
 use i2cdev::core::I2CDevice;
-use tokio::sync::mpsc;
+use bb_helper::cancel::CancellationToken;
 
 use crate::{Error, Result, Status};
 
@@ -41,8 +43,9 @@ pub fn flash(
     firmware: &[u8],
     port: &Path,
     _verify: bool,
-    chan: Option<mpsc::Sender<Status>>,
-    cancel: Option<tokio_util::sync::CancellationToken>,
+    chan: Option<mpsc::SyncSender<Status>>,
+    cancel: Option<CancellationToken>,
+    prep_hook: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
     crate::helpers::flash(
         firmware,
@@ -53,6 +56,7 @@ pub fn flash(
         },
         chan,
         cancel,
+        prep_hook,
     )
 }
 
@@ -79,14 +83,11 @@ pub fn ports() -> std::collections::HashSet<PathBuf> {
     std::fs::read_dir("/dev")
         .unwrap()
         .filter_map(|x| x.ok())
-        // chardev is not reported as file.
-        .filter(|x| match x.file_type() {
-            Ok(y) => !y.is_dir(),
-            Err(_) => false,
-        })
-        .filter(|x| match x.file_name().to_str() {
-            Some(y) => y.contains("i2c-"),
-            None => false,
+        .filter(|x| {
+            matches!(
+                x.metadata().map(|m| nix::sys::stat::major(m.rdev()) == 89),
+                Ok(true)
+            )
         })
         .map(|x| x.path())
         .filter(|x| probe_port(x))

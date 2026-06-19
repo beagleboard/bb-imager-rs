@@ -68,10 +68,9 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                             .get(img.icon.as_ref().expect("Missing Os Image icon"))
                         {
                             Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
-                            _ => widget::svg(helpers::DOWNLOADING_ICON.clone())
+                            _ => iced_aw::Spinner::new()
                                 .height(ICON_WIDTH)
                                 .width(ICON_WIDTH)
-                                .style(svg_icon_style)
                                 .into(),
                         }
                     }
@@ -141,9 +140,7 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 crate::helpers::BoardImageIcon::Remote(url) => {
                     match state.image_handle_cache().get(url) {
                         Some(x) => x.view(iced::Length::Fill, 100),
-                        None => widget::svg(helpers::DOWNLOADING_ICON.clone())
-                            .width(iced::Length::Fill)
-                            .into(),
+                        None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
                     }
                 }
                 crate::helpers::BoardImageIcon::Local => {
@@ -187,12 +184,40 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 None => col,
             };
 
-            let col = col.extend(
+            let mut col = col.extend(
                 img.details()
                     .iter()
                     .map(|(k, v)| detail_entry(k, v))
                     .map(Into::into),
             );
+
+            let init_formats = img.supported_init_formats();
+            if init_formats.len() > 1 {
+                let init_format = img.init_format();
+                let el = widget::pick_list(
+                    init_formats,
+                    if init_format == bb_config::config::InitFormat::None {
+                        None
+                    } else {
+                        Some(init_format)
+                    },
+                    BBImagerMessage::UpdateInitFormat,
+                );
+                col = col.push(
+                    widget::row![text("Init Format: ").font(constants::FONT_BOLD), el]
+                        .align_y(iced::Alignment::Center)
+                        .padding(iced::Padding::ZERO.right(16)),
+                )
+            } else if init_formats.len() == 1 {
+                col = col.push(detail_entry("Init Format", init_formats[0].to_string()))
+            }
+
+            if let Some(x) = img.support() {
+                let row =
+                    widget::row![button("SUPPORT").on_press(BBImagerMessage::OpenUrl(x.clone()))]
+                        .spacing(16);
+                col = col.push(widget::center(row));
+            }
 
             widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
                 .id(state.common.scroll_id.clone())

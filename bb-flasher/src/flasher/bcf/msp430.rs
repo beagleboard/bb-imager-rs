@@ -4,10 +4,10 @@
 //! [BeagleConnect Freedom]: https://www.beagleboard.org/boards/beagleconnect-freedom
 //! [MSP430]: https://www.ti.com/product/MSP430F5503
 
-use std::{borrow::Cow, ffi::CString, fmt::Display, io::Read};
-use tokio::sync::mpsc;
+use std::sync::mpsc;
+use std::{borrow::Cow, ffi::CString, fmt::Display};
 
-use crate::{BBFlasher, BBFlasherTarget};
+use crate::BBFlasherTarget;
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -40,7 +40,7 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["hex", "txt", "xz"];
 
-    async fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
         bb_flasher_bcf::msp430::devices(filter)
             .into_iter()
             .map(|x| Self {
@@ -81,48 +81,31 @@ impl<I> Flasher<I> {
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let dst = self.port;
-        let img = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
+        let img = crate::common::resolve_img(self.img)?;
 
-            tokio::task::spawn_blocking(move || {
-                let mut data = Vec::new();
-                img.read_to_end(&mut data)?;
-                Ok::<Vec<u8>, std::io::Error>(data)
-            })
-            .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        }?;
+        if let Some(chan) = chan {
+            std::thread::scope(|s| {
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_bcf::Status>(2);
+                s.spawn(move || {
+                    while let Ok(x) = rx.recv() {
+                        let _ = chan.try_send(x.into());
+                    }
+                });
 
-        let flasher_task = if let Some(chan) = chan {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-            let flasher_task = tokio::task::spawn_blocking(move || {
                 bb_flasher_bcf::msp430::flash(&img, &dst, Some(tx))
-            });
-
-            // Should run until tx is dropped, i.e. flasher task is done.
-            // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-            while let Some(x) = rx.recv().await {
-                let _ = chan.try_send(x.into());
-            }
-
-            flasher_task
+            })
         } else {
-            tokio::task::spawn_blocking(move || bb_flasher_bcf::msp430::flash(&img, &dst, None))
-        };
-
-        flasher_task.await.unwrap().map_err(Into::into)
+            bb_flasher_bcf::msp430::flash(&img, &dst, None)
+        }
+        .map_err(Into::into)
     }
 }

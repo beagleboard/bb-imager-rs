@@ -1,9 +1,7 @@
 use crate::{Error, Result, helpers::Eject};
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
+use std::io;
+use std::path::{Path, PathBuf};
 
 #[cfg(feature = "udev")]
 use std::{
@@ -12,7 +10,7 @@ use std::{
 };
 
 #[cfg(feature = "udev")]
-pub(crate) async fn format(dst: &Path) -> Result<()> {
+pub(crate) fn format(dst: &Path) -> Result<()> {
     async fn format_inner(dst: &Path) -> io::Result<()> {
         let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
 
@@ -49,14 +47,16 @@ pub(crate) async fn format(dst: &Path) -> Result<()> {
 
         Ok(())
     }
-
-    format_inner(dst)
-        .await
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()
+        .unwrap();
+    rt.block_on(async move { format_inner(dst).await })
         .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[cfg(feature = "udev")]
-pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
     async fn open_inner(dst: &Path) -> anyhow::Result<LinuxDrive> {
         let dbus_client = udisks2::Client::new().await?;
 
@@ -91,22 +91,24 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
         })
     }
 
-    open_inner(dst)
-        .await
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()
+        .unwrap();
+    rt.block_on(async move { open_inner(dst).await })
         .map_err(|e| Error::FailedToOpenDestination { source: e })
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
-    let file = tokio::fs::OpenOptions::new()
+pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .custom_flags(libc::O_DIRECT)
-        .open(dst)
-        .await?
-        .into_std()
-        .await;
+        .open(dst)?;
 
     Ok(LinuxDrive {
         file,
@@ -115,22 +117,14 @@ pub(crate) async fn open(dst: &Path) -> Result<LinuxDrive> {
 }
 
 #[cfg(not(feature = "udev"))]
-pub(crate) async fn format(dst: &Path) -> Result<()> {
-    async fn format_inner(dst: &Path) -> io::Result<()> {
-        let output = tokio::process::Command::new("mkfs.vfat")
-            .arg(dst)
-            .output()
-            .await?;
+pub(crate) fn format(dst: &Path) -> Result<()> {
+    let sd = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(false)
+        .open(dst)?;
 
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(io::Error::other(format!("Status: {}", output.status)))
-        }
-    }
-
-    format_inner(dst)
-        .await
+    fatfs::format_volume(sd, fatfs::FormatVolumeOptions::default())
         .map_err(|source| Error::FailedToFormat { source })
 }
 
@@ -205,7 +199,6 @@ impl Eject for LinuxDrive {
         std::mem::drop(self);
 
         let output = std::process::Command::new("eject").arg(drive).output()?;
-
         if output.status.success() {
             Ok(())
         } else {

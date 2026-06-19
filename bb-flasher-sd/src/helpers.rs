@@ -1,10 +1,9 @@
-use std::io;
+use std::io::{self, Write};
 
-use tokio::sync::mpsc;
+use bb_helper::cancel::CancellationToken;
+use std::sync::mpsc;
 
-use crate::Result;
-
-pub(crate) fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
+pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<f32>>, msg: f32) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
     }
@@ -14,10 +13,13 @@ pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
 }
 
-pub(crate) fn check_token(cancel: Option<&tokio_util::sync::CancellationToken>) -> Result<()> {
-    match cancel {
-        Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),
-        _ => Ok(()),
+pub(crate) fn check_cancel(tkn: Option<&CancellationToken>) -> crate::Result<()> {
+    if let Some(t) = tkn
+        && t.is_cancelled()
+    {
+        Err(crate::Error::Aborted)
+    } else {
+        Ok(())
     }
 }
 
@@ -25,9 +27,17 @@ pub(crate) trait Eject {
     fn eject(self) -> io::Result<()>;
 }
 
+impl Eject for std::fs::File {
+    fn eject(mut self) -> io::Result<()> {
+        self.flush()?;
+        self.sync_all()
+    }
+}
+
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]
+/// Wrapper to perform aligned read/write operations.
 pub(crate) struct DeviceWrapper<F> {
     f: F,
     offset: u64,
@@ -50,6 +60,10 @@ impl<F> DeviceWrapper<F> {
     const fn cache_buf_hit_len(&self) -> usize {
         self.buf.len() - self.cache_buf_offset()
     }
+
+    pub(crate) fn into_inner(self) -> F {
+        self.f
+    }
 }
 
 impl<F> DeviceWrapper<F>
@@ -57,7 +71,7 @@ where
     F: io::Seek,
 {
     pub(crate) fn new(mut f: F) -> io::Result<Self> {
-        f.seek(io::SeekFrom::Start(0))?;
+        f.rewind()?;
         Ok(Self {
             f,
             offset: 0,
@@ -171,10 +185,7 @@ pub(crate) struct SdCardWrapper<W> {
     pos: u64,
 }
 
-impl<W> SdCardWrapper<W>
-where
-    W: io::Read + io::Write + io::Seek,
-{
+impl<W> SdCardWrapper<W> {
     pub(crate) fn new(inner: W) -> Self {
         Self {
             inner,
@@ -182,23 +193,18 @@ where
             pos: 0,
         }
     }
+}
 
+impl<W> SdCardWrapper<W>
+where
+    W: io::Write + io::Seek,
+{
     fn finish(&mut self) -> io::Result<()> {
         self.inner.seek(io::SeekFrom::Start(0))?;
         self.inner.write_all(self.buf.as_slice())?;
         self.pos = u64::try_from(self.buf.len()).unwrap();
 
         Ok(())
-    }
-}
-
-impl<W> Eject for SdCardWrapper<W>
-where
-    W: io::Read + io::Write + io::Seek + Eject,
-{
-    fn eject(mut self) -> io::Result<()> {
-        self.finish()?;
-        self.inner.eject()
     }
 }
 
@@ -260,6 +266,16 @@ where
     }
 }
 
+impl<W> Eject for SdCardWrapper<W>
+where
+    W: io::Write + io::Seek + Eject,
+{
+    fn eject(mut self) -> io::Result<()> {
+        self.finish()?;
+        self.inner.eject()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Seek, SeekFrom, Write};
@@ -278,12 +294,14 @@ mod tests {
         std::io::Cursor::new(data.into())
     }
 
-    fn test_file() -> super::DeviceWrapper<std::io::Cursor<Box<[u8]>>> {
-        let data: Vec<u8> = (0..FILE_LEN)
-            .map(|x| x % 255)
-            .map(|x| u8::try_from(x).unwrap())
-            .collect();
-        super::DeviceWrapper::new(std::io::Cursor::new(data.into())).unwrap()
+    fn test_file() -> super::DeviceWrapper<std::fs::File> {
+        let mut data = test_data();
+        let mut f = tempfile::tempfile().unwrap();
+
+        std::io::copy(&mut data, &mut f).unwrap();
+        f.rewind().unwrap();
+
+        super::DeviceWrapper::new(f).unwrap()
     }
 
     #[test]
@@ -330,26 +348,42 @@ mod tests {
     #[test]
     fn sd_card_wrapper() {
         let mut test_data = test_data();
-        let mut temp_buf = vec![0; FILE_LEN].into_boxed_slice();
-        let mut sd = SdCardWrapper::new(std::io::Cursor::new(temp_buf.clone()));
+        let mut temp_buf = Vec::with_capacity(FILE_LEN);
+
+        let f = tempfile::tempfile().unwrap();
+        f.set_len(FILE_LEN as u64).unwrap();
+        let mut sd = SdCardWrapper::new(f);
 
         std::io::copy(&mut test_data, &mut sd).unwrap();
+        sd.flush().unwrap();
 
+        // Read underlying file contents directly
+        sd.inner.rewind().unwrap();
+        sd.inner.read_to_end(&mut temp_buf).unwrap();
+
+        // Everything after the cached block should already be flushed
+        assert_eq!(&test_data.get_ref()[BLOCK_SIZE..], &temp_buf[BLOCK_SIZE..]);
+        // First block should still only exist in cache
         assert_eq!(
-            test_data.get_ref()[BLOCK_SIZE..],
-            sd.inner.get_ref()[BLOCK_SIZE..]
+            &test_data.get_ref()[..BLOCK_SIZE],
+            &sd.buf.as_slice()[..BLOCK_SIZE]
         );
-        assert_eq!(
-            test_data.get_ref()[..BLOCK_SIZE],
-            sd.buf.as_slice()[..BLOCK_SIZE]
-        );
-        assert!(sd.inner.get_ref()[..BLOCK_SIZE].iter().all(|x| *x == 0));
+        assert!(temp_buf[..BLOCK_SIZE].iter().all(|x| *x == 0));
 
-        sd.seek(std::io::SeekFrom::Start(0)).unwrap();
-        sd.read_exact(&mut temp_buf).unwrap();
-        assert_eq!(temp_buf, test_data.get_ref().clone());
+        temp_buf.clear();
 
+        // Logical reads should still see full data
+        sd.rewind().unwrap();
+        sd.read_to_end(&mut temp_buf).unwrap();
+        assert_eq!(temp_buf.as_slice(), test_data.get_ref().as_ref());
+
+        // finish() flushes cached block
         sd.finish().unwrap();
-        assert_eq!(test_data.get_ref(), sd.inner.get_ref());
+
+        temp_buf.clear();
+
+        sd.inner.rewind().unwrap();
+        sd.inner.read_to_end(&mut temp_buf).unwrap();
+        assert_eq!(temp_buf.as_slice(), test_data.get_ref().as_ref());
     }
 }

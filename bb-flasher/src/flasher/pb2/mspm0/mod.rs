@@ -9,10 +9,9 @@ use raw::*;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::io::Read;
-use tokio::sync::mpsc;
+use std::sync::mpsc;
 
-use crate::{BBFlasher, BBFlasherTarget};
+use crate::BBFlasherTarget;
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -29,8 +28,8 @@ impl BBFlasherTarget for Target {
     const IS_DESTINATION_SELECTABLE: bool = false;
 
     // Since only a single destination is possible, no need for filters
-    async fn destinations(_: bool) -> HashSet<Self> {
-        let temp = destinations().await;
+    fn destinations(_: bool) -> HashSet<Self> {
+        let temp = destinations();
         HashSet::from([Target {
             name: temp.0,
             path: temp.1,
@@ -67,34 +66,26 @@ impl<I> Flasher<I> {
     }
 }
 
-impl<I> BBFlasher for Flasher<I>
+impl<I> Flasher<I>
 where
-    I: Future<Output = std::io::Result<(crate::OsImage, u64)>>,
+    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
 {
-    async fn flash(
+    pub fn flash(
         self,
-        chan: Option<mpsc::Sender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
-        let bin = {
-            let (mut img, _) = self
-                .img
-                .await
-                .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
+        let img = self.img;
+        let img = crate::common::resolve_img(img)?;
+        let img = String::from_utf8(img).map_err(|_| {
+            crate::common::FlasherError::ImageResolvingError {
+                source: std::io::Error::other("Expected utf8"),
+            }
+        })?;
+        let bin = img
+            .parse()
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware"))
+            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
 
-            tokio::task::spawn_blocking(move || {
-                let mut data = String::new();
-                img.read_to_string(&mut data)?;
-                data.parse().map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware")
-                })
-            })
-            .await
-            .unwrap()
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })
-        }?;
-
-        flash(bin, chan, self.persist_eeprom)
-            .await
-            .map_err(Into::into)
+        flash(bin, chan, self.persist_eeprom).map_err(Into::into)
     }
 }

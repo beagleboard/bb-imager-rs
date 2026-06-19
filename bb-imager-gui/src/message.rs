@@ -33,6 +33,7 @@ pub(crate) enum BBImagerMessage {
     SelectLocalOs(helpers::BoardImage),
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
     GotoOsListParent,
+    UpdateInitFormat(bb_config::config::InitFormat),
 
     /// Choose Destination page
     SelectDest(helpers::Destination),
@@ -54,6 +55,8 @@ pub(crate) enum BBImagerMessage {
 
     // Reset to start from beginning.
     Restart,
+    // Retry flashing
+    Retry,
 
     /// Open URL in browser
     OpenUrl(url::Url),
@@ -171,8 +174,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 helpers::OsImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
                     return Task::batch([
-                        inner.resolve_remote_sublists(board_id, Some(id)),
-                        inner.update_pos(Some(id)),
+                        inner.resolve_remote_sublists(board_id, Some(id.0)),
+                        inner.update_pos(Some(id.0), id.1),
                     ]);
                 }
             },
@@ -395,6 +398,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         common: inner.common,
                         err,
                         logs,
+                        selected_board: inner.selected_board,
+                        selected_image: inner.selected_image,
+                        selected_dest: inner.selected_dest,
+                        customization: inner.customization,
                     })
                 }
                 BBImager::AppInfo(inner) => match inner.page {
@@ -408,6 +415,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                                 common: flashing_state.common,
                                 err,
                                 logs,
+                                selected_board: flashing_state.selected_board,
+                                selected_image: flashing_state.selected_image,
+                                selected_dest: flashing_state.selected_dest,
+                                customization: flashing_state.customization,
                             }),
                             ..inner
                         })
@@ -427,9 +438,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 OverlayData::Flashing(flashing_state) => flashing_state.progress_update(x),
                 _ => panic!("Unexpected message"),
             },
-            _ => panic!("Unexpected message"),
+            // Debug build can be slow.
+            _ => {}
         },
-        BBImagerMessage::FlashStart => {
+        BBImagerMessage::FlashStart | BBImagerMessage::Retry => {
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess => {
@@ -535,6 +547,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseDest(inner) => inner.update_search(x),
             _ => {}
         },
+        BBImagerMessage::UpdateInitFormat(f) => {
+            if let BBImager::ChooseOs(inner) = state
+                && let Some((_, img)) = &mut inner.selected_image
+            {
+                img.update_init_format(f);
+            }
+        }
         BBImagerMessage::Null => {}
     }
 

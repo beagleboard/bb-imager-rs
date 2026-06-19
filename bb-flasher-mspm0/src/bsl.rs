@@ -296,7 +296,7 @@ where
     S: std::io::Read + std::io::Write,
 {
     pub(crate) fn new(mut port: S) -> Result<Self> {
-        Self::connect(&mut port)?;
+        Self::connect(&mut port).map_err(|_| Error::ConnectionFail)?;
         let info = Self::get_device_info(&mut port)?;
 
         Ok(Self {

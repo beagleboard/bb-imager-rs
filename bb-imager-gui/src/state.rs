@@ -195,8 +195,13 @@ impl ChooseOsState {
         self.refresh_image_list()
     }
 
-    pub fn update_pos(&mut self, pos: Option<i64>) -> Task<BBImagerMessage> {
+    pub fn update_pos(
+        &mut self,
+        pos: Option<i64>,
+        flasher: config::Flasher,
+    ) -> Task<BBImagerMessage> {
         self.pos = pos;
+        self.flasher = flasher;
         self.refresh_image_list()
     }
 }
@@ -336,37 +341,15 @@ impl CustomizeState {
     pub(crate) fn modifications(&self) -> Vec<&'static str> {
         match &self.customization {
             helpers::FlashingCustomization::LinuxSdSysconfig(x) => {
-                let mut ans = Vec::new();
-
-                if x.user.is_some() {
-                    ans.push("• User account configured");
-                }
-
-                if x.wifi.is_some() {
-                    ans.push("• Wifi configured");
-                }
-
-                if x.hostname.is_some() {
-                    ans.push("• Hostname configured");
-                }
-
-                if x.keymap.is_some() {
-                    ans.push("• Keymap configured");
-                }
-
-                if x.timezone.is_some() {
-                    ans.push("• Timezone configured");
-                }
-
-                if x.ssh.is_some() {
-                    ans.push("• SSH Key configured");
-                }
-
+                let mut ans = helpers::sd_modifications_common(x);
                 if x.usb_enable_dhcp == Some(true) {
                     ans.push("• USB DHCP enabled");
                 }
 
                 ans
+            }
+            helpers::FlashingCustomization::LinuxSdCloudInit(x) => {
+                helpers::sd_modifications_common(x)
             }
             helpers::FlashingCustomization::Bcf(x) | helpers::FlashingCustomization::Zepto(x) => {
                 if !x.verify {
@@ -388,6 +371,9 @@ pub(crate) struct FlashingState {
     pub(crate) progress: bb_flasher::DownloadFlashingStatus,
     pub(crate) start_timestamp: Option<Instant>,
     pub(crate) is_download: bool,
+    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
 }
 
 impl FlashingState {
@@ -419,10 +405,10 @@ impl FlashingState {
         // Required for better time estimate.
         match u {
             bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
-            | bb_flasher::DownloadFlashingStatus::FlashingProgress(_) => {
-                if self.start_timestamp.is_none() {
-                    self.start_timestamp = Some(Instant::now())
-                }
+            | bb_flasher::DownloadFlashingStatus::FlashingProgress(_)
+                if self.start_timestamp.is_none() =>
+            {
+                self.start_timestamp = Some(Instant::now())
             }
             _ => {}
         }
@@ -458,6 +444,22 @@ pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     pub(crate) err: String,
     pub(crate) logs: widget::text_editor::Content,
+    pub(crate) selected_board: Board,
+    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
+}
+
+impl From<FlashingFailState> for CustomizeState {
+    fn from(value: FlashingFailState) -> Self {
+        Self {
+            common: value.common,
+            selected_board: value.selected_board,
+            selected_image: value.selected_image,
+            selected_dest: value.selected_dest,
+            customization: value.customization,
+        }
+    }
 }
 
 // State for Pages that can be opened from any of the normal pages but are not part of normal flow.

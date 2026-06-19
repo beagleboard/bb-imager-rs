@@ -2,6 +2,7 @@
 
 :base-download-url: https://github.com/beagleboard/bb-imager-rs/releases/download/{page-component-version}
 :gui-url-prefix: {base-download-url}/bb-imager-gui_{page-component-version}
+:macos-url-prefix: {base-download-url}/BeagleBoard.Imaging.Utility_{page-component-version}
 
 This page explains how to install the graphical version of the BeagleBoard Imaging Utility.  
 Most users should choose one of the prebuilt options listed below.
@@ -22,7 +23,7 @@ Choose the option that best matches your operating system.
 | macOS
 | Application bundle
 | Drag-and-drop install into the Applications folder.
-| {gui-url-prefix}_aarch64.dmg[aarch64], {gui-url-prefix}_x64.dmg[x86_64]
+| {macos-url-prefix}_aarch64.dmg[aarch64], {macos-url-prefix}_x64.dmg[x86_64]
 
 .2+| Linux
 | Flatpak

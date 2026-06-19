@@ -239,14 +239,17 @@ impl BBImager {
                         (*flasher, *filter, search_text.clone()),
                         async move |(flasher, filter, search_text)| {
                             let mut dest: Vec<helpers::Destination> =
-                                helpers::destinations(flasher, filter)
-                                    .await
-                                    .into_iter()
-                                    .filter(|t| {
-                                        search_text.is_empty()
-                                            || t.to_string().to_lowercase().contains(&search_text)
-                                    })
-                                    .collect();
+                                tokio::task::spawn_blocking(move || {
+                                    helpers::destinations(flasher, filter)
+                                })
+                                .await
+                                .unwrap()
+                                .into_iter()
+                                .filter(|t| {
+                                    search_text.is_empty()
+                                        || t.to_string().to_lowercase().contains(&search_text)
+                                })
+                                .collect();
 
                             dest.sort_by_key(|x| x.to_string());
 
@@ -264,13 +267,14 @@ impl BBImager {
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
         let state = match std::mem::take(self) {
             Self::Review(inner) => inner,
+            Self::FlashingFail(inner) => inner.into(),
             _ => panic!("Unexpected page"),
         };
 
         let is_download = state.is_download();
-        let customization = state.customization;
+        let customization = state.customization.clone();
         let img = state.selected_image.1.clone();
-        let dst = state.selected_dest;
+        let dst = state.selected_dest.clone();
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", state.selected_board);
@@ -278,18 +282,18 @@ impl BBImager {
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
 
-        let cancel = tokio_util::sync::CancellationToken::new();
+        let cancel = bb_helper::cancel::CancellationToken::default();
 
-        let s = iced::stream::channel(20, async move |mut chan| {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(19);
+        let s = iced::stream::channel(2, async move |mut chan| {
+            let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
-            let cancel_child = cancel.child_token();
+            let cancel_child = cancel.clone();
             let flash_task = tokio::spawn(async move {
                 helpers::flash(img, customization, dst, tx, cancel_child).await
             });
             let mut chan_clone = chan.clone();
-            let progress_task = tokio::spawn(async move {
-                while let Some(progress) = rx.recv().await {
+            let progress_task = tokio::task::spawn_blocking(move || {
+                while let Ok(progress) = rx.recv() {
                     let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(progress));
                 }
             });
@@ -323,6 +327,9 @@ impl BBImager {
             cancel_flashing: h,
             progress: bb_flasher::DownloadFlashingStatus::Preparing,
             start_timestamp: None,
+            selected_image: state.selected_image,
+            selected_dest: state.selected_dest,
+            customization: state.customization,
         });
 
         t
@@ -359,7 +366,6 @@ impl BBImager {
                 if helpers::no_customization(
                     inner.selected_image.1.flasher(),
                     &inner.selected_image.1,
-                    &inner.selected_dest,
                 )
                 .is_none()
                 {
@@ -432,7 +438,6 @@ impl BBImager {
                 if let Some(customization) = helpers::no_customization(
                     inner.selected_image.1.flasher(),
                     &inner.selected_image.1,
-                    &selected_dest,
                 ) {
                     Self::Review(state::CustomizeState {
                         common: inner.common,

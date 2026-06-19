@@ -14,8 +14,6 @@ pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
 
 pub(crate) static ARROW_BACK_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_BACK_ICON_BYTES));
-pub(crate) static DOWNLOADING_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::DOWNLOADING_ICON_BYTES));
 pub(crate) static FILE_ADD_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::FILE_ADD_ICON_BYTES));
 pub(crate) static USB_ICON: LazyLock<svg::Handle> =
@@ -262,10 +260,7 @@ pub(crate) fn board_view_pane<'a>(
     let img: Element<BBImagerMessage> = match &dev.icon {
         Some(u) => match state.img_handle_cache.get(u) {
             Some(x) => x.view(iced::Length::Fill, iced::Shrink),
-            None => svg(DOWNLOADING_ICON.clone())
-                .width(iced::Length::Fill)
-                .style(svg_icon_style)
-                .into(),
+            None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
         },
         None => svg(BOARD_ICON.clone())
             .width(iced::Length::Fill)
@@ -374,12 +369,14 @@ impl<Message> canvas::Program<Message> for CircleBar {
                     .with_color(self.color),
             );
 
+            let frac = if self.label.len() > 4 { 3.0 } else { 2.0 };
+
             frame.fill_text(canvas::Text {
                 content: self.label.to_string(),
                 position: center,
                 align_x: iced::Center.into(),
                 align_y: iced::Center.into(),
-                size: (radius / 2.0).into(),
+                size: (radius / frac).into(),
                 color: theme.palette().text,
                 font: constants::FONT_BOLD,
                 ..Default::default()
