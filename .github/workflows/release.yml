@@ -96,7 +96,6 @@ jobs:
         platform: [armhf, riscv64]
     name: Build CLI Snap - ${{matrix.platform}}
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request'
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -104,6 +103,8 @@ jobs:
         lfs: true
 
     - uses: docker/setup-qemu-action@v4
+
+    - run: cargo vendor --locked > .cargo/config.toml
 
     - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
     - uses: canonical/snapcraft-multiarch-action@v1
