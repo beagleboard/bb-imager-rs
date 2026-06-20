@@ -21,14 +21,16 @@ pub fn flash(
     helpers::flash(
         firmware,
         || {
-            serialport::new(port, BSL_UART_BAUD_RATE)
+            let p = serialport::new(port, BSL_UART_BAUD_RATE)
                 .parity(BSL_UART_PARITY)
                 .stop_bits(BSL_UART_STOP_BITS)
                 .data_bits(BSL_UART_DATA_BITS)
                 // MSPM0 can be quite slow to respond when full length packet sent
                 .timeout(Duration::from_secs(10))
                 .open_native()
-                .map_err(|_| Error::FailedToOpenPort)
+                .map_err(|_| Error::FailedToOpenPort)?;
+
+            crate::bsl::Mspm0::serial(p)
         },
         verify,
         chan,

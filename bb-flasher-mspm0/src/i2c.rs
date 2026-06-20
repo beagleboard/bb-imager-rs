@@ -2,8 +2,8 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use i2cdev::core::I2CDevice;
 use bb_helper::cancel::CancellationToken;
+use i2cdev::core::I2CDevice;
 
 use crate::{Error, Result, Status};
 
@@ -47,7 +47,10 @@ pub fn flash(
 ) -> Result<()> {
     crate::helpers::flash(
         firmware,
-        || I2CDev::new(port),
+        || {
+            let d = I2CDev::new(port)?;
+            crate::bsl::Mspm0::new(d)
+        },
         verify,
         chan,
         cancel,
