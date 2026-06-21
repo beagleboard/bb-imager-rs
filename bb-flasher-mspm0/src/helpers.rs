@@ -2,7 +2,7 @@ use std::sync::mpsc;
 
 use bb_helper::cancel::CancellationToken;
 
-use crate::Status;
+use crate::{Status, bsl::Mspm0};
 
 const ALIGNMENT: usize = 8;
 
@@ -90,7 +90,7 @@ pub fn flash<P, D, B>(
     prep_hook: B,
 ) -> crate::Result<()>
 where
-    P: FnOnce() -> crate::Result<D>,
+    P: FnOnce() -> crate::Result<Mspm0<D>>,
     D: std::io::Read + std::io::Write,
     B: FnOnce() -> crate::Result<()>,
 {
@@ -100,8 +100,7 @@ where
 
     let firmware = Firmware::parse(firmware)?;
 
-    let port = port_open()?;
-    let mut mspm0 = crate::bsl::Mspm0::new(port)?;
+    let mut mspm0 = port_open()?;
     tracing::info!("MSPM0 Connected");
 
     mspm0.unlock()?;

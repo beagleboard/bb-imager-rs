@@ -54,6 +54,9 @@ pub enum Error {
     #[error("Failed to open {0}")]
     #[cfg(target_os = "linux")]
     GpioOpenError(String),
+
+    #[error("Failed to update baud rate")]
+    ChangeBaudRate,
 }
 
 /// Flashing status

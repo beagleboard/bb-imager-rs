@@ -12,6 +12,7 @@ const COMMAND_PROGRAM_DATA: u8 = 0x20;
 const COMMAND_GET_DEVICE_INFO: u8 = 0x19;
 const COMMAND_STANDALONE_VERIFICATION: u8 = 0x26;
 const COMMAND_START_APPLICATION: u8 = 0x40;
+const COMMAND_CHANGE_BAUD_RATE: u8 = 0x52;
 
 // BSL Acknowledgment
 const BSL_ACK: u8 = 0x00;
@@ -286,9 +287,62 @@ impl BSLProgramDataReqHeadPkt {
     }
 }
 
+#[derive(IntoBytes, Immutable)]
+#[repr(C, packed)]
+struct BSLChageBaudRatePkt {
+    head: BSLPktHead,
+    rate: u8,
+    tail: BSLPktCrc32,
+}
+
+impl BSLMsg for BSLChageBaudRatePkt {}
+
+impl BSLChageBaudRatePkt {
+    fn new(rate: u8) -> Self {
+        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+
+        crc.update(&[COMMAND_CHANGE_BAUD_RATE]);
+        crc.update(&[rate]);
+
+        Self {
+            head: BSLPktHead::new_req(Self::len(), COMMAND_CHANGE_BAUD_RATE),
+            rate,
+            tail: u32::try_from(crc.finalize()).unwrap().into(),
+        }
+    }
+}
+
 pub(crate) struct Mspm0<S> {
     port: S,
     max_buffer_size: usize,
+}
+
+impl<S> Mspm0<S>
+where
+    S: serialport::SerialPort,
+{
+    pub(crate) fn serial(port: S) -> Result<Self> {
+        let mut p = Self::new(port)?;
+        p.change_baud_rate()?;
+
+        Ok(p)
+    }
+
+    fn change_baud_rate(&mut self) -> Result<()> {
+        const BSL_UPDATED_BAUD_RATE_ID: u8 = 6;
+        const BSL_UPDATED_BAUD_RATE: u32 = 115200;
+
+        tracing::info!("Switching to faster baud rate");
+
+        BSLChageBaudRatePkt::new(BSL_UPDATED_BAUD_RATE_ID).write_to_io(&mut self.port)?;
+        Self::wait_for_ack_inner(&mut self.port)?;
+
+        self.port
+            .set_baud_rate(BSL_UPDATED_BAUD_RATE)
+            .map_err(|_| Error::ChangeBaudRate)?;
+
+        Ok(())
+    }
 }
 
 impl<S> Mspm0<S>
