@@ -14,7 +14,7 @@ categories = ["development-tools", "embedded", "hardware-support"]
 crc-fast = "1.10"
 thiserror = "2.0"
 tracing = "0.1"
-bin_file = "0.1"
+bin_file = "0.2"
 serialport = { version = "4.7", optional = true, default-features = false }
 hidapi = { version = "2.6", optional = true, default-features = false }
 bb-helper = { path = "../bb-helper", features = ["cancel"] }
