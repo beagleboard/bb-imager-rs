@@ -66,6 +66,22 @@ impl Firmware {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FlashOptions {
+    pub(crate) preflash_crc_check: bool,
+    pub(crate) postflash_crc_check: bool,
+}
+
+impl FlashOptions {
+    #[cfg(feature = "uart")]
+    pub(crate) fn new(postflash_crc_check: bool) -> Self {
+        Self {
+            preflash_crc_check: true,
+            postflash_crc_check,
+        }
+    }
+}
+
 pub(crate) fn check_token(
     cancel: Option<&CancellationToken>,
 ) -> crate::Result<()> {
@@ -81,10 +97,26 @@ pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<Status>>, msg: Status
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FlashOptions {
+    pub(crate) preflash_crc_check: bool,
+    pub(crate) postflash_crc_check: bool,
+}
+
+impl FlashOptions {
+    #[cfg(feature = "uart")]
+    pub(crate) fn new(postflash_crc_check: bool) -> Self {
+        Self {
+            preflash_crc_check: true,
+            postflash_crc_check,
+        }
+    }
+}
+
 pub fn flash<P, D, B>(
     firmware: &[u8],
     port_open: P,
-    verify: bool,
+    options: FlashOptions,
     mut chan: Option<mpsc::SyncSender<Status>>,
     cancel: Option<CancellationToken>,
     prep_hook: B,
@@ -108,10 +140,14 @@ where
 
     check_token(cancel.as_ref())?;
 
-    let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
-    if cur_crc == firmware.crc() {
-        tracing::warn!("Skipping flashing same image");
-        return mspm0.start_application();
+    if options.preflash_crc_check {
+        let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
+        if cur_crc == firmware.crc() {
+            tracing::warn!("Skipping flashing same image");
+            return mspm0.start_application();
+        }
+    } else {
+        tracing::warn!("Skipping preflash CRC comparison on this transport");
     }
 
     chan_send(chan.as_mut(), Status::Flashing(0.0));
@@ -138,12 +174,14 @@ where
     chan_send(chan.as_mut(), Status::Flashing(1.0));
     chan_send(chan.as_mut(), Status::Verifying);
 
-    if verify {
+    if options.postflash_crc_check {
         let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
         if cur_crc != firmware.crc() {
             tracing::error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
             return Err(crate::Error::InvalidImage);
         }
+    } else {
+        tracing::warn!("Skipping postflash CRC verification on this transport");
     }
 
     mspm0.start_application()

@@ -317,7 +317,10 @@ where
             BSL_ERROR_PACKET_SIZE_ZERO => Err(Error::PktSizeZero),
             BSL_ERROR_PACKET_SIZE_TOO_BIG => Err(Error::PktSize2Big),
             BSL_ERROR_UNKNOWN_BAUD_RATE => Err(Error::UnknownBaudRate),
-            _ => Err(Error::Unknown),
+            _ => {
+                tracing::error!("Unexpected ACK byte: 0x{:02x}", buf[0]);
+                Err(Error::Unknown)
+            }
         }
     }
 

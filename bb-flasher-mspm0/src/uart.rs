@@ -30,7 +30,7 @@ pub fn flash(
                 .open_native()
                 .map_err(|_| Error::FailedToOpenPort)
         },
-        verify,
+        helpers::FlashOptions::new(verify),
         chan,
         cancel,
         prep_hook,
