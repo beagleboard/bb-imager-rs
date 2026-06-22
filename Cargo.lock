@@ -1582,9 +1582,9 @@ dependencies = [
 
 [[package]]
 name = "dfu-libusb"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53cdc238a42df7f1d17560db071dcdd35623c64b10035e45624556a0f0e2a41d"
+checksum = "83237f2a68033f7c4ed63d0a98e38ce54eb87f7cbf69ce4d36e216a7dc1820cc"
 dependencies = [
  "dfu-core",
  "rusb",
