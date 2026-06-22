@@ -35,8 +35,6 @@ jobs:
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-      with:
-        prefix-key: "v1"
         
     - name: Build packages
       run: make setup-debian-deps setup-packaging-deps package-host
@@ -66,6 +64,12 @@ jobs:
       uses: actions/checkout@v6
       with:
         lfs: true
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - run: |
+        mkdir .cargo
+        cargo vendor --locked > .cargo/config.toml
 
     - run: ln -sf snapcraft.${{ matrix.package }}.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
@@ -105,6 +109,8 @@ jobs:
 
     - uses: docker/setup-qemu-action@v4
 
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
     - run: |
         mkdir .cargo
         cargo vendor --locked > .cargo/config.toml
@@ -197,8 +203,6 @@ jobs:
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-      with:
-        prefix-key: "v2"
         
     # The ENV variable names are what cargo-packager requires
     - name: Setup macos signing
@@ -246,8 +250,6 @@ jobs:
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-      with:
-        prefix-key: "v1"
         
     - name: Build packages
       run: make setup-packaging-deps package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc
