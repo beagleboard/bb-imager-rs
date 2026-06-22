@@ -105,7 +105,9 @@ jobs:
 
     - uses: docker/setup-qemu-action@v4
 
-    - run: cargo vendor --locked > .cargo/config.toml
+    - run: |
+        mkdir .cargo
+        cargo vendor --locked > .cargo/config.toml
 
     - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
     - uses: canonical/snapcraft-multiarch-action@v1
