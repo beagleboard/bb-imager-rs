@@ -67,9 +67,7 @@ jobs:
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-    - run: |
-        mkdir .cargo
-        cargo vendor --locked > .cargo/config.toml
+    - run: make vendor
 
     - run: ln -sf snapcraft.${{ matrix.package }}.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
@@ -111,10 +109,8 @@ jobs:
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
-    - run: |
-        mkdir .cargo
-        cargo vendor --locked > .cargo/config.toml
 
+    - run: make vendor
     - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
     - uses: canonical/snapcraft-multiarch-action@v1
       with:

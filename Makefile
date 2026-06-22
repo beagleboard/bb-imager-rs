@@ -142,7 +142,7 @@ clean:
 	rm -rf bb-imager-cli/dist
 	rm -rf bb-imager-service/dist
 	rm -rf cargo-vendor.tar.zst
-	rm -rf vendor
+	rm -rf vendor .cargo
 	rm -f *.snap
 
 ## housekeeping: packaging-checks: Some checks to ensure good packaging
@@ -316,12 +316,13 @@ package-armv7-unknown-linux-gnueabihf: package-checks
 	$(info Building packages for armv7-unknown-linux-gnueabihf)
 	$(MAKE) package-cli-deb package-cli-pacman TARGET=armv7-unknown-linux-gnueabihf
 
-cargo-vendor.tar.zst: Cargo.lock
+vendor: Cargo.lock
 	$(info Create tarball of all deps)
-	mkdir -p dist/vendor/.cargo
-	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE} dist/vendor/vendor > dist/vendor/.cargo/config.toml
-	cd dist/vendor && tar --zstd -cvf cargo-vendor.tar.zst .cargo vendor
-	mv dist/vendor/cargo-vendor.tar.zst ./
+	mkdir -p .cargo
+	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE} > .cargo/config.toml
+
+cargo-vendor.tar.zst: vendor
+	tar --zstd -cvf cargo-vendor.tar.zst .cargo vendor
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
 .PHONY: vendor-deps
