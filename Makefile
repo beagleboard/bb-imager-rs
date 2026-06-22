@@ -320,7 +320,7 @@ cargo-vendor.tar.zst: Cargo.lock
 	$(info Create tarball of all deps)
 	mkdir -p dist/vendor/.cargo
 	$(CARGO_PATH) vendor ${_RUST_ARGS_BASE} dist/vendor/vendor > dist/vendor/.cargo/config.toml
-	pushd dist/vendor && tar --zstd -cvf cargo-vendor.tar.zst .cargo vendor
+	cd dist/vendor && tar --zstd -cvf cargo-vendor.tar.zst .cargo vendor
 	mv dist/vendor/cargo-vendor.tar.zst ./
 
 ## housekeeping: vendor-deps: Create tarball of dependencies
