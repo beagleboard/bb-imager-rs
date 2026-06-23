@@ -245,13 +245,14 @@ where
     C: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
     B: FnOnce() -> std::io::Result<Box<str>> + Send,
 {
-    tracing::info!("Resolving Image");
+    tracing::info!("Resolving Bmap");
     let bmap = match bmap {
         Some(x) => {
             Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
         }
         None => None,
     };
+    tracing::info!("Resolving Image");
     let (img, img_size) = img()?;
 
     chan_send(chan.as_mut(), 0.0);
