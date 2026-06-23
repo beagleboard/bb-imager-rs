@@ -271,9 +271,8 @@ impl RemoteImage {
         self,
         tx: Option<mpsc::SyncSender<f32>>,
     ) -> impl FnOnce() -> std::io::Result<bb_flasher::OsArchive> {
+        let rt = tokio::runtime::Handle::current();
         move || {
-            let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
-
             let downloader = self.downloader.clone();
             let cache =
                 rt.block_on(
@@ -309,9 +308,8 @@ impl RemoteImage {
     }
 
     fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(bb_flasher::OsImage, u64)> {
+        let rt = tokio::runtime::Handle::current();
         move || {
-            let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
-
             let downloader = self.downloader.clone();
             let cache =
                 rt.block_on(
@@ -364,11 +362,8 @@ pub(crate) struct Bmap {
 
 impl Bmap {
     fn into_fn(self) -> impl FnOnce() -> std::io::Result<Box<str>> {
+        let rt = tokio::runtime::Handle::current();
         move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_io()
-                .build()
-                .unwrap();
             let res =
                 rt.block_on(async move { self.downloader.download(*self.url.clone()).await })?;
             std::fs::read_to_string(res).map(Into::into)
