@@ -148,6 +148,7 @@
 					"beagleconnect-zepto"
 				],
 				"description": "TODO",
+				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/zepto.webp",
 				"flasher": "Mspm0",
 				"instructions": "1. Connect the BeagleConnect Zepto board to your computer via USB to UART Bridge.\n2. Keep BSL button presed.\n3. Press and release RESET button.\n4. Release BSL button.",
 				"specification": {
