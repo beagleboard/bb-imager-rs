@@ -68,7 +68,6 @@ pub(crate) enum BBImagerMessage {
 
     /// Add image to cache
     ResolveImage(url::Url, std::path::PathBuf),
-    ResolveImages(Vec<(url::Url, std::path::PathBuf)>),
     // Download images which have not already been downloaded
     FilterResolveImages(Vec<url::Url>),
 
@@ -215,7 +214,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::Next => return state.next(),
         BBImagerMessage::Back => return state.back(),
         BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
-        BBImagerMessage::ResolveImages(x) => state.image_cache_extend(x),
         BBImagerMessage::FilterResolveImages(x) => {
             let iter = x
                 .into_iter()
@@ -516,30 +514,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     iced::Task::batch(tasks)
                 });
 
-            let db = state.common().db.clone();
-            let downloader = state.common().downloader.clone();
-            let board_icon_cache_task = Task::perform(
-                async move {
-                    db.board_icons()
-                        .await
-                        .unwrap()
-                        .into_iter()
-                        .filter_map(|x| {
-                            let p = downloader.check_cache_from_url(x.clone())?;
-                            Some((x, p))
-                        })
-                        .collect()
-                },
-                BBImagerMessage::ResolveImages,
-            );
-
+            let board_icon_task = state.common().fetch_board_images();
             let board_refresh_task = if let BBImager::ChooseBoard(x) = state {
                 x.refresh_board_list()
             } else {
                 Task::none()
             };
 
-            return Task::batch([board_icon_cache_task, config_fetch_task, board_refresh_task]);
+            return Task::batch([board_icon_task, config_fetch_task, board_refresh_task]);
         }
         BBImagerMessage::UpdateSearchText(x) => match state {
             BBImager::ChooseBoard(inner) => return inner.update_search(x),
