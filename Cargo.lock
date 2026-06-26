@@ -639,7 +639,6 @@ name = "bb-helper"
 version = "1.0.12"
 dependencies = [
  "tempfile",
- "tokio",
 ]
 
 [[package]]

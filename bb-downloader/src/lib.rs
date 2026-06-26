@@ -42,7 +42,7 @@
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
-    io::{self, Read},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -227,7 +227,7 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
 
         {
-            let mut file = tokio::io::BufWriter::new(&mut writer);
+            let mut file = std::io::BufWriter::new(&mut writer);
 
             let response = self
                 .client
@@ -241,9 +241,9 @@ impl Downloader {
             let mut hasher = Sha256::new();
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(io::Error::other)?;
+                let data = x.map_err(io::Error::other)?;
                 hasher.update(&data);
-                file.write_all_buf(&mut data).await?;
+                tokio::task::block_in_place(|| file.write_all(&data))?;
             }
 
             let hash: [u8; 32] = hasher
@@ -263,11 +263,13 @@ impl Downloader {
                     "Invalid SHA256",
                 ));
             }
-            file.flush().await?;
+            tokio::task::block_in_place(|| file.flush())?;
         }
 
         tracing::info!("Saving donwloaded file to disk");
-        writer.persist(&file_path).await
+        tokio::task::spawn_blocking(move || writer.persist(&file_path))
+            .await
+            .unwrap()
     }
 
     fn path_from_url(&self, url: &reqwest::Url) -> PathBuf {
