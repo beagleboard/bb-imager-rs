@@ -200,10 +200,6 @@ impl BBImager {
         self.common_mut().img_handle_cache.insert(k, v)
     }
 
-    fn image_cache_extend(&mut self, iter: Vec<(url::Url, std::path::PathBuf)>) {
-        self.common_mut().img_handle_cache.extend(iter)
-    }
-
     fn restart(&mut self) -> Task<BBImagerMessage> {
         *self = match std::mem::take(self) {
             BBImager::ChooseOs(x) => BBImager::choose_board(x.common),

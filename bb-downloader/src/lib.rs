@@ -47,8 +47,7 @@ use std::{
     time::Duration,
 };
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::sync::mpsc;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::StreamExt;
 
 pub use reqwest::IntoUrl;
 
@@ -125,7 +124,7 @@ impl Downloader {
     ///
     /// [`check_cache_from_sha`](Self::check_cache_from_sha) should be prefered in cases when SHA256
     /// of the file to download is already known.
-    pub fn check_cache_from_url<U: reqwest::IntoUrl>(&self, url: U) -> Option<PathBuf> {
+    fn check_cache_from_url<U: reqwest::IntoUrl>(&self, url: U) -> Option<PathBuf> {
         // Use hash of url for file name
         let file_path = self.path_from_url(&url.into_url().ok()?);
         if file_path.exists() {
@@ -178,7 +177,7 @@ impl Downloader {
     ///
     /// This function does not check if the file is present in cache, and will ovewrite the old
     /// cached file. The file is still cached in the end.
-    pub async fn download_no_cache<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
+    async fn download_no_cache<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
         let file_path = self.path_from_url(&url);
@@ -270,90 +269,6 @@ impl Downloader {
         writer.persist(&file_path).await
     }
 
-    /// Checks if the file is present in cache. If the file is present, returns path to it. Else
-    /// downloads the file.
-    ///
-    /// Uses SHA256 to verify that the file in cache is valid.
-    ///
-    /// # Progress
-    ///
-    /// Download progress can be optionally tracked using a [`tokio::sync::mpsc`].
-    pub async fn download_with_sha<U: reqwest::IntoUrl>(
-        &self,
-        url: U,
-        sha256: [u8; 32],
-        mut chan: Option<mpsc::Sender<f32>>,
-    ) -> io::Result<PathBuf> {
-        let url = url.into_url().map_err(io::Error::other)?;
-        tracing::debug!(
-            "Download {:?} with sha256: {:?}",
-            url,
-            const_hex::encode(sha256)
-        );
-
-        if let Some(p) = self.check_cache_from_sha(sha256).await {
-            return Ok(p);
-        }
-
-        let file_path = self.path_from_sha(sha256);
-        chan_send(chan.as_mut(), 0.0);
-
-        let mut file = AsyncTempFile::new()?;
-        {
-            let mut file = tokio::io::BufWriter::new(&mut file.0);
-
-            let response = self
-                .client
-                .get(url)
-                .send()
-                .await
-                .map_err(io::Error::other)?;
-
-            let mut cur_pos = 0;
-            let response_size = response.content_length();
-
-            let mut response_stream = response.bytes_stream();
-
-            let response_size = match response_size {
-                Some(x) => x as usize,
-                None => response_stream.size_hint().0,
-            };
-
-            let mut hasher = Sha256::new();
-
-            while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(io::Error::other)?;
-                cur_pos += data.len();
-                hasher.update(&data);
-                file.write_all_buf(&mut data).await?;
-
-                chan_send(chan.as_mut(), (cur_pos as f32) / (response_size as f32));
-            }
-
-            let hash: [u8; 32] = hasher
-                .finalize()
-                .as_slice()
-                .try_into()
-                .expect("SHA-256 is 32 bytes");
-
-            if hash != sha256 {
-                tracing::error!(
-                    "Expected SHA256: {}, got {}",
-                    const_hex::encode(sha256),
-                    const_hex::encode(hash)
-                );
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Invalid SHA256",
-                ));
-            }
-            file.flush().await?;
-        }
-
-        file.persist(&file_path).await?;
-        Ok(file_path)
-    }
-
     fn path_from_url(&self, url: &reqwest::Url) -> PathBuf {
         let fext = Path::new(url.path()).extension().expect("Invalid URL");
         let file_name: [u8; 32] = Sha256::new()
@@ -393,12 +308,6 @@ async fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
         .expect("SHA-256 is 32 bytes");
 
     Ok(hash)
-}
-
-fn chan_send(chan: Option<&mut mpsc::Sender<f32>>, msg: f32) {
-    if let Some(c) = chan {
-        let _ = c.try_send(msg);
-    }
 }
 
 struct AsyncTempFile(tokio::fs::File);
