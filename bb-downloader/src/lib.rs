@@ -179,6 +179,7 @@ impl Downloader {
     /// cached file. The file is still cached in the end.
     async fn download_no_cache<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
+        tracing::debug!("Donwloading: {}", url);
 
         let file_path = self.path_from_url(&url);
 
