@@ -49,9 +49,10 @@ impl BBImagerCommon {
 
     pub(crate) fn fetch_board_images(&self) -> Task<BBImagerMessage> {
         let db = self.db.clone();
-        let downloader = self.downloader.clone();
-        Task::future(async move { db.board_icons().await.unwrap() })
-            .then(move |iter| helpers::fetch_images(&downloader, iter))
+        Task::perform(
+            async move { db.board_icons().await.unwrap() },
+            BBImagerMessage::FilterResolveImages,
+        )
     }
 }
 

@@ -215,10 +215,16 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::Back => return state.back(),
         BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
+            let common = state.common_mut();
             let iter = x
                 .into_iter()
-                .filter(|x| !state.common().img_handle_cache.contains(x));
-            return helpers::fetch_images(&state.common().downloader, iter);
+                .filter(|x| if common.img_handle_cache.contains(x) {
+                    false
+                } else {
+                    common.img_handle_cache.mark_fetching(x.clone());
+                    true
+                });
+            return helpers::fetch_images(&common.downloader, iter);
         }
         BBImagerMessage::ExtendConfig((u, c)) => {
             tracing::debug!("Update Config: {:#?}", c);

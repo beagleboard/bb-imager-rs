@@ -803,7 +803,7 @@ pub(crate) fn log_file_path() -> PathBuf {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct ImageHandleCache(HashMap<url::Url, ImageHandleCacheValue>);
+pub(crate) struct ImageHandleCache(HashMap<url::Url, Option<ImageHandleCacheValue>>);
 
 #[derive(Debug)]
 pub(crate) enum ImageHandleCacheValue {
@@ -841,29 +841,19 @@ impl ImageHandleCacheValue {
 
 impl ImageHandleCache {
     pub(crate) fn get(&self, u: &url::Url) -> Option<&ImageHandleCacheValue> {
-        self.0.get(u)
+        self.0.get(u)?.as_ref()
     }
 
     pub(crate) fn insert(&mut self, u: url::Url, path: PathBuf) {
-        self.0.insert(u, path.into());
+        self.0.insert(u, Some(path.into()));
+    }
+
+    pub(crate) fn mark_fetching(&mut self, u: url::Url) {
+        self.0.insert(u, None);
     }
 
     pub(crate) fn contains(&self, u: &url::Url) -> bool {
         self.0.contains_key(u)
-    }
-}
-
-impl Extend<(url::Url, PathBuf)> for ImageHandleCache {
-    fn extend<T: IntoIterator<Item = (url::Url, PathBuf)>>(&mut self, iter: T) {
-        self.0.extend(iter.into_iter().map(|(k, p)| (k, p.into())))
-    }
-}
-
-impl FromIterator<(url::Url, PathBuf)> for ImageHandleCache {
-    fn from_iter<T: IntoIterator<Item = (url::Url, PathBuf)>>(iter: T) -> Self {
-        Self(HashMap::from_iter(
-            iter.into_iter().map(|(k, p)| (k, p.into())),
-        ))
     }
 }
 
