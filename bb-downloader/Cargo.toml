@@ -15,11 +15,12 @@ reqwest = { version = "0.13", default-features = false, features = ["stream", "h
 sha2 = "0.10"
 tracing = "0.1"
 serde = { version = "1.0", optional = true }
-tokio = { version = "1.52", default-features = false, features = ["fs"] }
+tokio = { version = "1.52", default-features = false, features = ["rt"] }
 const-hex = "1.19"
 tempfile = "3.27"
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
 tokio-stream = "0.1.18"
+futures-util = { version = "0.3", features = ["io"] }
 
 [features]
 default = ["rustls"]

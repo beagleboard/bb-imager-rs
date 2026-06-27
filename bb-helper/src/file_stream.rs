@@ -3,12 +3,10 @@
 //! This is designed to be used for large data streams that cannot live in memory.
 
 use std::{
-    io,
+    io::{self, Seek, Write},
     path::Path,
     sync::{Arc, Condvar, Mutex},
 };
-
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 type SharedState = Arc<(Mutex<bool>, Condvar)>;
 
@@ -17,56 +15,40 @@ type SharedState = Arc<(Mutex<bool>, Condvar)>;
 /// Writes data asynchronously to a temporary file. The data can be persisted
 /// to a permanent location using [`persist`](Self::persist).
 pub struct WriterFileStream {
-    file: tokio::fs::File,
+    file: std::fs::File,
     writing: SharedState,
 }
 
 impl WriterFileStream {
-    const fn new(file: tokio::fs::File, writing: SharedState) -> Self {
+    const fn new(file: std::fs::File, writing: SharedState) -> Self {
         Self { file, writing }
     }
 
     /// Persists the written data to a permanent file location.
     ///
     /// Copies all data from the temporary file to the specified path.
-    pub async fn persist(&mut self, path: &Path) -> io::Result<()> {
-        let mut f = tokio::fs::File::create(path).await?;
-        self.file.seek(io::SeekFrom::Start(0)).await?;
+    pub fn persist(&mut self, path: &Path) -> io::Result<()> {
+        let mut f = std::fs::File::create(path)?;
+        self.file.seek(io::SeekFrom::Start(0))?;
 
-        tokio::io::copy(&mut self.file, &mut f).await?;
+        std::io::copy(&mut self.file, &mut f)?;
 
         // Causes errors if not present
-        f.flush().await?;
-
-        Ok(())
+        f.flush()
     }
 }
 
-impl tokio::io::AsyncWrite for WriterFileStream {
-    fn poll_write(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, io::Error>> {
-        let res = std::pin::Pin::new(&mut self.file).poll_write(cx, buf);
+impl std::io::Write for WriterFileStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let res = self.file.write(buf)?;
         self.writing.1.notify_all();
-        res
+        Ok(res)
     }
 
-    fn poll_flush(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), io::Error>> {
-        let res = std::pin::Pin::new(&mut self.file).poll_flush(cx);
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()?;
         self.writing.1.notify_all();
-        res
-    }
-
-    fn poll_shutdown(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), io::Error>> {
-        std::pin::Pin::new(&mut self.file).poll_shutdown(cx)
+        Ok(())
     }
 }
 
@@ -171,7 +153,7 @@ pub fn file_stream() -> io::Result<(WriterFileStream, ReaderFileStream)> {
     let flag = Arc::new((Mutex::new(true), Condvar::new()));
 
     let reader = ReaderFileStream::new(file.reopen()?, flag.clone());
-    let writer = WriterFileStream::new(file.into_file().into(), flag);
+    let writer = WriterFileStream::new(file.into_file(), flag);
 
     Ok((writer, reader))
 }
@@ -182,90 +164,70 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn seek_from_start_works() {
+    #[test]
+    fn seek_from_start_works() {
         let (mut writer, mut reader) = file_stream().unwrap();
 
-        writer.write_all(b"abcdef").await.unwrap();
-        writer.flush().await.unwrap();
+        writer.write_all(b"abcdef").unwrap();
+        writer.flush().unwrap();
 
-        tokio::task::spawn_blocking(move || {
-            reader.seek(SeekFrom::Start(2)).unwrap();
+        reader.seek(SeekFrom::Start(2)).unwrap();
 
-            let mut buf = [0u8; 2];
-            reader.read_exact(&mut buf).unwrap();
+        let mut buf = [0u8; 2];
+        reader.read_exact(&mut buf).unwrap();
 
-            assert_eq!(&buf, b"cd");
-        })
-        .await
-        .unwrap()
+        assert_eq!(&buf, b"cd");
     }
 
-    #[tokio::test]
-    async fn seek_from_current_works() {
+    #[test]
+    fn seek_from_current_works() {
         let (mut writer, mut reader) = file_stream().unwrap();
 
-        writer.write_all(b"abcdef").await.unwrap();
-        writer.flush().await.unwrap();
+        writer.write_all(b"abcdef").unwrap();
+        writer.flush().unwrap();
 
-        tokio::task::spawn_blocking(move || {
-            reader.seek(SeekFrom::Start(1)).unwrap();
-            reader.seek(SeekFrom::Current(2)).unwrap();
+        reader.seek(SeekFrom::Start(1)).unwrap();
+        reader.seek(SeekFrom::Current(2)).unwrap();
 
-            let mut buf = [0u8; 1];
-            reader.read_exact(&mut buf).unwrap();
+        let mut buf = [0u8; 1];
+        reader.read_exact(&mut buf).unwrap();
 
-            assert_eq!(&buf, b"d");
-        })
-        .await
-        .unwrap()
+        assert_eq!(&buf, b"d");
     }
 
-    #[tokio::test]
-    async fn seek_from_end_fails_while_writer_alive() {
+    #[test]
+    fn seek_from_end_fails_while_writer_alive() {
         let (_writer, mut reader) = file_stream().unwrap();
 
-        tokio::task::spawn_blocking(move || {
-            let err = reader.seek(SeekFrom::End(0)).unwrap_err();
-            assert_eq!(err.kind(), io::ErrorKind::Unsupported);
-        })
-        .await
-        .unwrap()
+        let err = reader.seek(SeekFrom::End(0)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Unsupported);
     }
 
-    #[tokio::test]
-    async fn seek_from_end_works_after_writer_drop() {
+    #[test]
+    fn seek_from_end_works_after_writer_drop() {
         let (mut writer, mut reader) = file_stream().unwrap();
 
-        writer.write_all(b"abcdef").await.unwrap();
-        writer.flush().await.unwrap();
+        writer.write_all(b"abcdef").unwrap();
+        writer.flush().unwrap();
         drop(writer);
 
-        tokio::task::spawn_blocking(move || {
-            let pos = reader.seek(SeekFrom::End(-2)).unwrap();
-            assert_eq!(pos, 4);
+        let pos = reader.seek(SeekFrom::End(-2)).unwrap();
+        assert_eq!(pos, 4);
 
-            let mut buf = [0u8; 2];
-            reader.read_exact(&mut buf).unwrap();
+        let mut buf = [0u8; 2];
+        reader.read_exact(&mut buf).unwrap();
 
-            assert_eq!(&buf, b"ef");
-        })
-        .await
-        .unwrap()
+        assert_eq!(&buf, b"ef");
     }
 
-    #[tokio::test]
-    async fn invalid_negative_seek_fails() {
+    #[test]
+    fn invalid_negative_seek_fails() {
         let (mut writer, mut reader) = file_stream().unwrap();
 
-        writer.write_all(b"abc").await.unwrap();
-        writer.flush().await.unwrap();
+        writer.write_all(b"abc").unwrap();
+        writer.flush().unwrap();
 
-        tokio::task::spawn_blocking(move || {
-            let err = reader.seek(SeekFrom::Current(-10)).unwrap_err();
-            assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-        })
-        .await
-        .unwrap()
+        let err = reader.seek(SeekFrom::Current(-10)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
     }
 }

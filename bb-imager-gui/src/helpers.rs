@@ -1038,8 +1038,8 @@ pub(crate) fn fetch_images(
             async move { downloader.download(icon_clone).await },
             move |p| match p {
                 Ok(p) => BBImagerMessage::ResolveImage(icon_clone2, p),
-                Err(_) => {
-                    tracing::warn!("Failed to fetch image {}", icon);
+                Err(e) => {
+                    tracing::warn!("Failed to fetch image {icon}: {e}");
                     BBImagerMessage::Null
                 }
             },

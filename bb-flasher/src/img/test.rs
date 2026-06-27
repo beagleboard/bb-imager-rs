@@ -2,8 +2,6 @@ use super::*;
 
 use std::io::{Cursor, Read, Write};
 use tempfile::NamedTempFile;
-#[cfg(feature = "piped_image")]
-use tokio::io::AsyncWriteExt;
 use zip::write::SimpleFileOptions;
 
 #[test]
@@ -205,24 +203,20 @@ async fn file_stream_uncompressed_image_reads_contents() {
 
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
-    writer.write_all(data).await.unwrap();
-    writer.flush().await.unwrap();
+    writer.write_all(data).unwrap();
+    writer.flush().unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img =
-            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), data.len() as u64).unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img =
+        OsImage::from_piped(reader, AbortOnDropHandle::new(abort), data.len() as u64).unwrap();
 
-        assert_eq!(img.size(), data.len() as u64);
+    assert_eq!(img.size(), data.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).unwrap();
 
-        assert_eq!(out, data);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, data);
 }
 
 #[tokio::test]
@@ -249,25 +243,20 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
 
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
-    writer.write_all(&compressed).await.unwrap();
-    writer.flush().await.unwrap();
+    writer.write_all(&compressed).unwrap();
+    writer.flush().unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img =
-            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64)
-                .unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img =
+        OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64).unwrap();
 
-        assert_eq!(img.size(), original.len() as u64);
+    assert_eq!(img.size(), original.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).unwrap();
 
-        assert_eq!(out, original);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, original);
 }
 
 #[tokio::test]
@@ -298,23 +287,18 @@ async fn file_stream_zip_image_reads_first_entry_contents() {
 
     let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
 
-    writer.write_all(zip_data.get_ref()).await.unwrap();
-    writer.flush().await.unwrap();
+    writer.write_all(zip_data.get_ref()).unwrap();
+    writer.flush().unwrap();
     drop(writer);
 
-    tokio::task::spawn_blocking(move || {
-        let abort = tokio::spawn(async { Ok(()) });
-        let mut img =
-            OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64)
-                .unwrap();
+    let abort = tokio::spawn(async { Ok(()) });
+    let mut img =
+        OsImage::from_piped(reader, AbortOnDropHandle::new(abort), original.len() as u64).unwrap();
 
-        assert_eq!(img.size(), original.len() as u64);
+    assert_eq!(img.size(), original.len() as u64);
 
-        let mut out = Vec::new();
-        img.read_to_end(&mut out).unwrap();
+    let mut out = Vec::new();
+    img.read_to_end(&mut out).unwrap();
 
-        assert_eq!(out, original);
-    })
-    .await
-    .unwrap()
+    assert_eq!(out, original);
 }

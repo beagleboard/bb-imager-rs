@@ -515,6 +515,7 @@ version = "0.2.0"
 dependencies = [
  "bb-helper",
  "const-hex",
+ "futures-util",
  "reqwest",
  "serde",
  "sha2 0.10.9",
@@ -639,7 +640,6 @@ name = "bb-helper"
 version = "1.0.12"
 dependencies = [
  "tempfile",
- "tokio",
 ]
 
 [[package]]

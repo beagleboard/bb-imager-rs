@@ -8,12 +8,8 @@ license.workspace = true
 
 [dependencies]
 tempfile = "3.27"
-tokio = { version = "1.52", default-features = false, optional = true }
-
-[dev-dependencies]
-tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 
 [features]
-file_stream = ["tokio/fs", "tokio/io-util"]
+file_stream = []
 reader_progress = []
 cancel = []
