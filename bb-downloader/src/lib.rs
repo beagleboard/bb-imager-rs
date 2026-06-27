@@ -38,15 +38,14 @@
 //! }
 //! ```
 
+use futures_util::AsyncWriteExt;
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
-    io::{self, Read, Write},
+    io::{self, Read},
     path::{Path, PathBuf},
-    time::Duration,
 };
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 
 pub use reqwest::IntoUrl;
@@ -77,6 +76,24 @@ pub struct Downloader {
 }
 
 impl Downloader {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn new_client() -> reqwest::Client {
+        reqwest::Client::builder()
+            .user_agent(env!("CARGO_PKG_NAME"))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .read_timeout(std::time::Duration::from_secs(15))
+            .build()
+            .expect("Unsupported OS")
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn new_client() -> reqwest::Client {
+        reqwest::Client::builder()
+            .user_agent(env!("CARGO_PKG_NAME"))
+            .build()
+            .expect("Unsupported OS")
+    }
+
     /// Create a new downloader that uses a directory for storing cached files.
     pub fn new<P: Into<PathBuf>>(cache_dir: P) -> io::Result<Self> {
         let cache_dir = cache_dir.into();
@@ -92,12 +109,7 @@ impl Downloader {
             ));
         }
 
-        let client = reqwest::Client::builder()
-            .user_agent(env!("CARGO_PKG_NAME"))
-            .connect_timeout(Duration::from_secs(10))
-            .read_timeout(Duration::from_secs(15))
-            .build()
-            .expect("Unsupported OS");
+        let client = Self::new_client();
 
         Ok(Self { client, cache_dir })
     }
@@ -183,10 +195,10 @@ impl Downloader {
 
         let file_path = self.path_from_url(&url);
 
-        let mut file = AsyncTempFile::new()?;
+        let mut file = tempfile::tempfile()?;
         {
-            let mut file = tokio::io::BufWriter::new(&mut file.0);
-
+            let file = std::io::BufWriter::new(&mut file);
+            let mut file = futures_util::io::AllowStdIo::new(file);
             let response = self
                 .client
                 .get(url)
@@ -196,15 +208,25 @@ impl Downloader {
             let mut response_stream = response.bytes_stream();
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(io::Error::other)?;
-                file.write_all_buf(&mut data).await?;
+                let data = x.map_err(io::Error::other)?;
+                file.write_all(&data).await?;
             }
 
             file.flush().await?
         }
 
-        file.persist(&file_path).await?;
-        Ok(file_path)
+        tokio::task::spawn_blocking(move || {
+            let mut file = std::io::BufReader::new(file);
+            let mut f = std::fs::File::create(&file_path)?;
+
+            std::io::Seek::rewind(&mut file)?;
+            std::io::copy(&mut file, &mut f)?;
+            std::io::Write::flush(&mut f)?;
+
+            Ok(file_path)
+        })
+        .await
+        .unwrap()
     }
 
     /// Downloads the file and streams the content to pipe. This allows not having to wait for the
@@ -227,7 +249,8 @@ impl Downloader {
         let file_path = self.path_from_sha(sha256);
 
         {
-            let mut file = std::io::BufWriter::new(&mut writer);
+            let file = std::io::BufWriter::new(&mut writer);
+            let mut file = futures_util::io::AllowStdIo::new(file);
 
             let response = self
                 .client
@@ -243,7 +266,7 @@ impl Downloader {
             while let Some(x) = response_stream.next().await {
                 let data = x.map_err(io::Error::other)?;
                 hasher.update(&data);
-                tokio::task::block_in_place(|| file.write_all(&data))?;
+                file.write_all(&data).await?;
             }
 
             let hash: [u8; 32] = hasher
@@ -263,7 +286,7 @@ impl Downloader {
                     "Invalid SHA256",
                 ));
             }
-            tokio::task::block_in_place(|| file.flush())?;
+            file.flush().await?;
         }
 
         tracing::info!("Saving donwloaded file to disk");
@@ -311,31 +334,4 @@ fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
         .expect("SHA-256 is 32 bytes");
 
     Ok(hash)
-}
-
-struct AsyncTempFile(tokio::fs::File);
-
-impl AsyncTempFile {
-    fn new() -> io::Result<Self> {
-        let f = tempfile::tempfile()?;
-        Ok(Self(tokio::fs::File::from_std(f)))
-    }
-
-    async fn persist(&mut self, path: &Path) -> io::Result<()> {
-        let mut f = tokio::fs::File::create(path).await?;
-        self.0.seek(io::SeekFrom::Start(0)).await?;
-
-        tokio::io::copy(&mut self.0, &mut f).await?;
-
-        // Causes errors if not present
-        f.flush().await?;
-
-        Ok(())
-    }
-}
-
-impl From<std::fs::File> for AsyncTempFile {
-    fn from(value: std::fs::File) -> Self {
-        Self(tokio::fs::File::from_std(value))
-    }
 }
