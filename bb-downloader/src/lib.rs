@@ -42,11 +42,11 @@
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
-    io,
+    io::{self, Read},
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 
 pub use reqwest::IntoUrl;
@@ -103,18 +103,18 @@ impl Downloader {
     }
 
     /// Check if a downloaded file with a particular SHA256 is already in cache.
-    pub async fn check_cache_from_sha(&self, sha256: [u8; 32]) -> Option<PathBuf> {
+    pub fn check_cache_from_sha(&self, sha256: [u8; 32]) -> Option<PathBuf> {
         let file_path = self.path_from_sha(sha256);
 
         if file_path.exists() {
-            if let Ok(hash) = sha256_from_path(&file_path).await
+            if let Ok(hash) = sha256_from_path(&file_path)
                 && hash == sha256
             {
                 return Some(file_path);
             }
 
             // Delete old file
-            let _ = tokio::fs::remove_file(&file_path).await;
+            let _ = std::fs::remove_file(&file_path);
         }
 
         None
@@ -287,14 +287,14 @@ impl Downloader {
     }
 }
 
-async fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
-    let file = tokio::fs::File::open(p).await?;
-    let mut reader = tokio::io::BufReader::new(file);
+fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
+    let file = std::fs::File::open(p)?;
+    let mut reader = std::io::BufReader::new(file);
     let mut hasher = Sha256::new();
     let mut buffer = [0; 512];
 
     loop {
-        let count = reader.read(&mut buffer).await?;
+        let count = reader.read(&mut buffer)?;
         if count == 0 {
             break;
         }

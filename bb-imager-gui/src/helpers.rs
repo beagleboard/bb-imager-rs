@@ -274,10 +274,7 @@ impl RemoteImage {
         let rt = tokio::runtime::Handle::current();
         move || {
             let downloader = self.downloader.clone();
-            let cache =
-                rt.block_on(
-                    async move { downloader.check_cache_from_sha(self.extract_sha256).await },
-                );
+            let cache = downloader.check_cache_from_sha(self.extract_sha256);
 
             if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
@@ -311,10 +308,7 @@ impl RemoteImage {
         let rt = tokio::runtime::Handle::current();
         move || {
             let downloader = self.downloader.clone();
-            let cache =
-                rt.block_on(
-                    async move { downloader.check_cache_from_sha(self.extract_sha256).await },
-                );
+            let cache = downloader.check_cache_from_sha(self.extract_sha256);
 
             if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
