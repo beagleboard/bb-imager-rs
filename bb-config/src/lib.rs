@@ -4,21 +4,6 @@
 //! applications (like BeagleBoard Imaging Utility) to get a list of latest images for each board.
 //!
 //! This crate provides abstractions to parse and generate distros.json file.
-//!
-//! # Usage
-//!
-//! ```no_run
-//! pub const DISTROS_URL: &str =
-//!     "https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json";
-//! 
-//! let config: bb_config::Config = reqwest::blocking::get(DISTROS_URL)
-//!     .unwrap()
-//!     .json()
-//!     .unwrap();
-//!
-//! // Convert back to JSON
-//! let json_config = serde_json::to_string_pretty(&config).unwrap();
-//! ```
 
 pub mod config;
 
