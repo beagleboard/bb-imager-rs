@@ -5,7 +5,7 @@ use std::{borrow::Cow, fmt::Display};
 
 use bb_helper::cancel::CancellationToken;
 
-use crate::BBFlasherTarget;
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// MSPM0 UART target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -146,12 +146,12 @@ impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
 
 impl<I, P> Flasher<I, P>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
+    I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
     P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
     pub fn flash(
         self,
-        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl From<bb_flasher_mspm0::Status> for crate::DownloadFlashingStatus {
+impl From<bb_flasher_mspm0::Status> for DownloadFlashingStatus {
     fn from(value: bb_flasher_mspm0::Status) -> Self {
         match value {
             bb_flasher_mspm0::Status::Preparing => Self::Preparing,

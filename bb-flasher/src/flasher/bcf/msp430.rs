@@ -7,7 +7,7 @@
 use std::sync::mpsc;
 use std::{borrow::Cow, ffi::CString, fmt::Display};
 
-use crate::BBFlasherTarget;
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// BeagleConnect Freedom MSP430 target
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -83,11 +83,11 @@ impl<I> Flasher<I> {
 
 impl<I> Flasher<I>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
+    I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
     pub fn flash(
         self,
-        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let dst = self.port;
         let img = crate::common::resolve_img(self.img)?;

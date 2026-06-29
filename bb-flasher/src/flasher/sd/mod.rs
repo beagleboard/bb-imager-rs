@@ -9,7 +9,7 @@ mod cloud_init;
 use bb_helper::cancel::CancellationToken;
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
-use crate::{BBFlasherTarget, DownloadFlashingStatus};
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// SD Card
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -218,7 +218,7 @@ impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
 
 impl<I, B> Flasher<I, B>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send,
+    I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send,
     B: FnOnce() -> std::io::Result<Box<str>> + Send,
 {
     pub fn flash(

@@ -1,14 +1,15 @@
 //! Module to handle extraction of compressed firmware, auto detection of type of extraction, etc
 
+#[cfg(feature = "sd")]
 use bb_flasher_sd::ContentType;
 #[cfg(feature = "piped_image")]
 use bb_helper::file_stream::ReaderFileStream;
-use bb_helper::reader_progress::ReaderWithProgress;
 use rc_zip_sync::ReadZipStreaming;
+#[cfg(feature = "sd")]
+use std::sync::mpsc;
 use std::{
     io::{self, Read, Seek, SeekFrom},
     path::Path,
-    sync::mpsc,
 };
 #[cfg(feature = "piped_image")]
 use tokio_util::task::AbortOnDropHandle;
@@ -18,13 +19,15 @@ mod test;
 
 const XZ_MAGIC: [u8; 6] = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00];
 
+#[cfg(feature = "sd")]
 pub struct OsArchive {
     inner: OsArchiveCompression,
 }
 
+#[cfg(feature = "sd")]
 impl OsArchive {
     fn new(img: OsImageSource, chan: Option<mpsc::SyncSender<f32>>, size: u64) -> io::Result<Self> {
-        let img = ReaderWithProgress::new(img, size, chan);
+        let img = bb_helper::reader_progress::ReaderWithProgress::new(img, size, chan);
         let img = OsArchiveCompression::new(img)?;
         Ok(Self { inner: img })
     }
@@ -52,6 +55,7 @@ impl OsArchive {
     }
 }
 
+#[cfg(feature = "sd")]
 impl<'a> IntoIterator for &'a mut OsArchive {
     type Item = (Box<str>, ContentType<'a>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
@@ -68,6 +72,7 @@ impl<'a> IntoIterator for &'a mut OsArchive {
     }
 }
 
+#[cfg(feature = "sd")]
 fn flat_map_with_log<'a, R: Read>(
     entry: io::Result<tar::Entry<'a, R>>,
 ) -> Option<(Box<str>, ContentType<'a>)> {
@@ -80,6 +85,7 @@ fn flat_map_with_log<'a, R: Read>(
     }
 }
 
+#[cfg(feature = "sd")]
 fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentType<'a>) {
     let p = entry.path().unwrap().to_string_lossy().to_string().into();
     let f = if entry.header().entry_type().is_dir() {
@@ -92,13 +98,16 @@ fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentTyp
     (p, f)
 }
 
-type ProgressSource = ReaderWithProgress<OsImageSource>;
+#[cfg(feature = "sd")]
+type ProgressSource = bb_helper::reader_progress::ReaderWithProgress<OsImageSource>;
 
+#[cfg(feature = "sd")]
 enum OsArchiveCompression {
     TarXz(tar::Archive<liblzma::read::XzDecoder<ProgressSource>>),
     Tar(tar::Archive<io::BufReader<ProgressSource>>),
 }
 
+#[cfg(feature = "sd")]
 impl OsArchiveCompression {
     fn new(mut img: ProgressSource) -> io::Result<Self> {
         let mut magic = [0u8; 6];

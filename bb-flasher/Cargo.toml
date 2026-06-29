@@ -35,7 +35,7 @@ tempfile = "3.27"
 zip = { version = "8.6", default-features = false }
 
 [features]
-default = ["sd"]
+default = []
 serde = ["dep:serde"]
 sd = ["bb-flasher-sd", "serde", "dep:yaml_serde"]
 sd_linux_udev = ["bb-flasher-sd/udev"]

@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::mpsc;
 
-use crate::BBFlasherTarget;
+use crate::common::{DownloadFlashingStatus, BBFlasherTarget};
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -68,11 +68,11 @@ impl<I> Flasher<I> {
 
 impl<I> Flasher<I>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
+    I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
     pub fn flash(
         self,
-        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let img = self.img;
         let img = crate::common::resolve_img(img)?;

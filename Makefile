@@ -158,7 +158,7 @@ _check_common:
 		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli --exclude xtask \
 		--exclude bb-downloader --exclude bb-config
 	$(_CARGO_CHECK) --all-targets -p bb-flasher-bcf -F msp430,static
-	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image
+	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
 	
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
