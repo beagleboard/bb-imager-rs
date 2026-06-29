@@ -75,23 +75,23 @@ impl BoardImage {
         Self::Image {
             img: RemoteImage::new(
                 image.name.into(),
-                Box::new(image.url.into()),
+                Box::new(image.url),
                 image.image_download_sha256,
                 image.extract_size as u64,
                 downloader.clone(),
             )
             .into(),
             bmap: image.bmap.map(|url| Bmap {
-                url: Box::new(url.into()),
+                url: Box::new(url),
                 downloader,
             }),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
             description: Some(image.description),
-            icon: BoardImageIcon::Remote(image.icon.into()),
+            icon: BoardImageIcon::Remote(image.icon),
             details,
-            support: image.support.map(Into::into),
+            support: image.support,
         }
     }
 
@@ -932,7 +932,7 @@ impl From<crate::db::OsImageListItem> for OsImageItem {
     fn from(value: crate::db::OsImageListItem) -> Self {
         Self {
             id: OsImageId::OsImage(value.id),
-            icon: Some(value.icon.into()),
+            icon: Some(value.icon),
             label: Cow::Owned(value.name),
         }
     }
@@ -942,7 +942,7 @@ impl From<crate::db::OsSublistListItem> for OsImageItem {
     fn from(value: crate::db::OsSublistListItem) -> Self {
         Self {
             id: OsImageId::OsSublist((value.id, value.flasher)),
-            icon: Some(value.icon.into()),
+            icon: Some(value.icon),
             label: Cow::Owned(value.name),
         }
     }
@@ -1050,11 +1050,11 @@ pub(crate) fn fetch_images(
 }
 
 pub(crate) fn fetch_remote_subitems(
-    items: impl IntoIterator<Item = (i64, crate::db::Url)>,
+    items: impl IntoIterator<Item = (i64, Url)>,
     downloader: bb_downloader::Downloader,
 ) -> iced::Task<BBImagerMessage> {
     let temp = items.into_iter().map(move |(id, url)| {
-        let url_clone = url::Url::from(url.clone());
+        let url_clone = url.clone();
         let dl = downloader.clone();
         iced::Task::perform(
             async move { dl.download_json_no_cache(url_clone).await },
@@ -1099,4 +1099,12 @@ pub(crate) fn sd_modifications_common(
     }
 
     ans
+}
+
+pub(crate) async fn blocking_future<F, T>(f: F) -> T
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(f).await.unwrap()
 }

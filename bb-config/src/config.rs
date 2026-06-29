@@ -64,7 +64,7 @@ pub struct Device {
 }
 
 /// Types of customization Initialization formats
-#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Default, sqlx::Type)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[non_exhaustive]
 #[serde(rename_all = "lowercase")]
 pub enum InitFormat {
@@ -76,6 +76,32 @@ pub enum InitFormat {
     Armbian,
     /// Cloud Init based customization
     CloudInit,
+}
+
+impl rusqlite::ToSql for InitFormat {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        let val: u8 = match self {
+            InitFormat::None => 1,
+            InitFormat::Sysconf => 2,
+            InitFormat::Armbian => 3,
+            InitFormat::CloudInit => 4,
+        };
+        Ok(rusqlite::types::ToSqlOutput::from(val))
+    }
+}
+
+impl rusqlite::types::FromSql for InitFormat {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        value.as_i64().and_then(|val| match val {
+            1 => Ok(InitFormat::None),
+            2 => Ok(InitFormat::Sysconf),
+            3 => Ok(InitFormat::Armbian),
+            4 => Ok(InitFormat::CloudInit),
+            _ => Err(rusqlite::types::FromSqlError::Other(
+                format!("Invalid InitFormat integer variant: {}", val).into(),
+            )),
+        })
+    }
 }
 
 impl std::fmt::Display for InitFormat {
@@ -183,7 +209,7 @@ pub struct OsImage {
 }
 
 /// Types of flashers Os Image(s) support
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize, sqlx::Type)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Flasher {
     #[default]
     /// Image needs to be written to SD Card
@@ -198,4 +224,35 @@ pub enum Flasher {
     Pb2Mspm0,
     /// MSPM0 flasher
     Mspm0,
+}
+
+impl rusqlite::ToSql for Flasher {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        let val: u8 = match self {
+            Flasher::SdCard => 1,
+            Flasher::SdCardBootfs => 2,
+            Flasher::BeagleConnectFreedom => 3,
+            Flasher::Msp430Usb => 4,
+            Flasher::Pb2Mspm0 => 5,
+            Flasher::Mspm0 => 6,
+        };
+
+        Ok(rusqlite::types::ToSqlOutput::from(val))
+    }
+}
+
+impl rusqlite::types::FromSql for Flasher {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        value.as_i64().and_then(|val| match val {
+            1 => Ok(Flasher::SdCard),
+            2 => Ok(Flasher::SdCardBootfs),
+            3 => Ok(Flasher::BeagleConnectFreedom),
+            4 => Ok(Flasher::Msp430Usb),
+            5 => Ok(Flasher::Pb2Mspm0),
+            6 => Ok(Flasher::Mspm0),
+            _ => Err(rusqlite::types::FromSqlError::Other(
+                format!("Invalid Flasher discriminant: {}", val).into(),
+            )),
+        })
+    }
 }

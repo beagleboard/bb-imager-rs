@@ -6,7 +6,7 @@ use iced::{Task, widget};
 use crate::{
     BBImager, constants,
     db::{self, Board},
-    helpers::{self, DestinationItem, OsImageId, OsImageItem},
+    helpers::{self, DestinationItem, OsImageId, OsImageItem, blocking_future},
     message::BBImagerMessage,
     persistance, updater,
 };
@@ -50,7 +50,7 @@ impl BBImagerCommon {
     pub(crate) fn fetch_board_images(&self) -> Task<BBImagerMessage> {
         let db = self.db.clone();
         Task::perform(
-            async move { db.board_icons().await.unwrap() },
+            blocking_future(move || db.board_icons().unwrap()),
             BBImagerMessage::FilterResolveImages,
         )
     }
@@ -78,7 +78,7 @@ impl ChooseBoardState {
         let search = self.search_text.clone();
 
         Task::perform(
-            async move { db.board_list(&search).await.unwrap() },
+            blocking_future(move || db.board_list(&search).unwrap()),
             BBImagerMessage::UpdateBoardList,
         )
     }
@@ -154,16 +154,20 @@ impl ChooseOsState {
         let db = self.common.db.clone();
         let downloader = self.common.downloader.clone();
 
-        Task::future(async move { db.os_remote_sublists(board_id, pos).await.unwrap() })
-            .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
+        Task::future(blocking_future(move || {
+            db.os_remote_sublists(board_id, pos).unwrap()
+        }))
+        .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
     }
 
     pub(crate) fn resolve_all_remote_sublists(&self, board_id: i64) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
         let downloader = self.common.downloader.clone();
 
-        Task::future(async move { db.os_remote_sublists_by_board(board_id).await.unwrap() })
-            .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
+        Task::future(blocking_future(move || {
+            db.os_remote_sublists_by_board(board_id).unwrap()
+        }))
+        .then(move |items| helpers::fetch_remote_subitems(items, downloader.clone()))
     }
 
     pub(crate) fn refresh_image_list(&self) -> Task<BBImagerMessage> {
@@ -173,19 +177,19 @@ impl ChooseOsState {
 
         if self.search_text.is_empty() {
             Task::perform(
-                async move {
-                    let imgs = db.os_image_items(board_id, pos).await.unwrap();
+                blocking_future(move || {
+                    let imgs = db.os_image_items(board_id, pos).unwrap();
                     (imgs, pos)
-                },
+                }),
                 BBImagerMessage::UpdateOsList,
             )
         } else {
             let search = self.search_text.clone();
             Task::perform(
-                async move {
-                    let imgs = db.os_images_by_name(board_id, &search).await.unwrap();
+                blocking_future(move || {
+                    let imgs = db.os_images_by_name(board_id, &search).unwrap();
                     (imgs, pos)
-                },
+                }),
                 BBImagerMessage::UpdateOsList,
             )
         }

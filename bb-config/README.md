@@ -7,7 +7,9 @@ This crate provides abstractions to parse and generate distros.json file.
 # Usage
 
 ```rust
-let config: bb_config::Config = reqwest::blocking::get(bb_config::DISTROS_URL)
+const DISTROS_URL: &str = "https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json";
+
+let config: bb_config::Config = reqwest::blocking::get(DISTROS_URL)
     .unwrap()
     .json()
     .unwrap();

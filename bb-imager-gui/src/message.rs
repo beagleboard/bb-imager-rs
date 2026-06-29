@@ -3,7 +3,8 @@
 use iced::Task;
 
 use crate::{
-    BBImager, helpers,
+    BBImager,
+    helpers::{self, blocking_future},
     state::{OverlayData, OverlayState},
 };
 
@@ -94,10 +95,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
     match message {
         BBImagerMessage::SelectBoardById(id) => {
             let db = state.common().db.clone();
-            return Task::future(async move {
-                let b = db.board_by_id(id).await.expect("Incorrect board id");
-                BBImagerMessage::SelectBoard(b)
-            });
+            return Task::perform(
+                blocking_future(move || db.board_by_id(id).expect("Incorrect board id")),
+                BBImagerMessage::SelectBoard,
+            );
         }
         BBImagerMessage::UpdateBoardList(boards) => {
             // Update board list only if still on that page
@@ -160,15 +161,16 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 helpers::OsImageId::OsImage(id) => {
                     let db = inner.common.db.clone();
                     let flasher = inner.flasher;
-                    return Task::perform(async move { db.os_image_by_id(id).await }, move |x| {
-                        match x {
+                    return Task::perform(
+                        blocking_future(move || db.os_image_by_id(id)),
+                        move |x| match x {
                             Ok(i) => BBImagerMessage::SelectRemoteOs((i, flasher)),
                             Err(e) => {
                                 tracing::error!("Failed to get os image {e}");
                                 BBImagerMessage::Null
                             }
-                        }
-                    });
+                        },
+                    );
                 }
                 helpers::OsImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
@@ -216,21 +218,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
-            let iter = x
-                .into_iter()
-                .filter(|x| if common.img_handle_cache.contains(x) {
+            let iter = x.into_iter().filter(|x| {
+                if common.img_handle_cache.contains(x) {
                     false
                 } else {
                     common.img_handle_cache.mark_fetching(x.clone());
                     true
-                });
+                }
+            });
             return helpers::fetch_images(&common.downloader, iter);
         }
         BBImagerMessage::ExtendConfig((u, c)) => {
             tracing::debug!("Update Config: {:#?}", c);
 
             let db = state.common().db.clone();
-            let db_task = Task::perform(async move { db.add_config(c, Some(u)).await }, |x| {
+            let db_task = Task::perform(blocking_future(move || db.add_config(c, Some(u))), |x| {
                 if let Err(e) = x {
                     tracing::error!("Failed to merge config {e}");
                 }
@@ -248,11 +250,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     let db = inner.common.db.clone();
                     let downloader = inner.common.downloader.clone();
 
-                    let remote_items_fetch = Task::future(async move {
-                        db.os_remote_sublists_by_remote_config(board_id, u)
-                            .await
-                            .unwrap()
-                    })
+                    let remote_items_fetch = Task::future(blocking_future(move || {
+                        db.os_remote_sublists_by_remote_config(board_id, u).unwrap()
+                    }))
                     .then(move |items| {
                         let dl = downloader.clone();
                         helpers::fetch_remote_subitems(items, dl)
@@ -278,10 +278,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => Task::none(),
             };
 
-            return Task::future(async move {
-                db.os_remote_sublist_resolve(target, &item).await.unwrap();
+            return Task::future(blocking_future(move || {
+                db.os_remote_sublist_resolve(target, &item).unwrap();
                 BBImagerMessage::Null
-            })
+            }))
             .chain(tail);
         }
         BBImagerMessage::UpdateAvailable(x) => {
@@ -293,12 +293,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 let curpos = inner.pos.unwrap();
                 let board_id = inner.selected_board.id;
                 return Task::perform(
-                    async move {
-                        let id = db.os_sublist_parent(curpos).await.unwrap();
-                        let imgs = db.os_image_items(board_id, id).await.unwrap();
-
+                    blocking_future(move || {
+                        let id = db.os_sublist_parent(curpos).unwrap();
+                        let imgs = db.os_image_items(board_id, id).unwrap();
                         (imgs, id)
-                    },
+                    }),
                     BBImagerMessage::UpdateOsList,
                 );
             }
@@ -497,28 +496,29 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::DbInitSuccess => {
             let db = state.common().db.clone();
             let downloader = state.common().downloader.clone();
-            let config_fetch_task = Task::future(async move { db.remote_configs().await.unwrap() })
-                .then(move |configs| {
-                    let dc = downloader.clone();
-                    let tasks = configs.into_iter().map(move |(i, u)| {
-                        let dc = dc.clone();
-                        Task::perform(
-                            async move {
-                                let res =
-                                    dc.clone().download_json_no_cache(url::Url::from(u)).await?;
-                                Ok((i, res))
-                            },
-                            |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
-                                Ok(y) => BBImagerMessage::ExtendConfig(y),
-                                Err(e) => {
-                                    tracing::error!("Failed to fetch config: {e}");
-                                    BBImagerMessage::Null
-                                }
-                            },
-                        )
-                    });
-                    iced::Task::batch(tasks)
-                });
+            let config_fetch_task =
+                Task::future(blocking_future(move || db.remote_configs().unwrap())).then(
+                    move |configs| {
+                        let dc = downloader.clone();
+                        let tasks = configs.into_iter().map(move |(i, u)| {
+                            let dc = dc.clone();
+                            Task::perform(
+                                async move {
+                                    let res = dc.clone().download_json_no_cache(u).await?;
+                                    Ok((i, res))
+                                },
+                                |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
+                                    Ok(y) => BBImagerMessage::ExtendConfig(y),
+                                    Err(e) => {
+                                        tracing::error!("Failed to fetch config: {e}");
+                                        BBImagerMessage::Null
+                                    }
+                                },
+                            )
+                        });
+                        iced::Task::batch(tasks)
+                    },
+                );
 
             let board_icon_task = state.common().fetch_board_images();
             let board_refresh_task = if let BBImager::ChooseBoard(x) = state {

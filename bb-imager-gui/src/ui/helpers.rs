@@ -298,7 +298,7 @@ pub(crate) fn board_view_pane<'a>(
     if let Some(x) = &dev.documentation {
         btns.push(
             widget::button(widget::text("DOCUMENTATION"))
-                .on_press(BBImagerMessage::OpenUrl(x.clone().into()))
+                .on_press(BBImagerMessage::OpenUrl(x.clone()))
                 .into(),
         );
     }
