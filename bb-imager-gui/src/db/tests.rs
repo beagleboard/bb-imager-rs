@@ -19,15 +19,14 @@ use bb_config::Config;
 /// - Prevents duplication of DEFAULT_CONFIG values in tests
 /// - Ensures JSON parsing and DB insertion stay in sync
 /// - Ensures remote_configs() correctly reflects DEFAULT_CONFIG
-#[tokio::test]
-async fn init_loads_all_default_remote_configs() {
+#[test]
+fn init_loads_all_default_remote_configs() {
     let db = Db::new().expect("Failed to create DB");
 
-    db.init().await.expect("DB initialization should succeed");
+    db.init().expect("DB initialization should succeed");
 
     let urls = db
         .remote_configs()
-        .await
         .expect("Fetching remote configs should succeed");
 
     // Parse DEFAULT_CONFIG to extract expected URLs
@@ -61,16 +60,15 @@ async fn init_loads_all_default_remote_configs() {
 /// - Ensures add_config() correctly inserts remote configs
 /// - Ensures private insert_remote_config() is exercised via public API
 /// - Ensures DB properly merges multiple config sources
-#[tokio::test]
-async fn add_config_inserts_new_remote_configs() {
+#[test]
+fn add_config_inserts_new_remote_configs() {
     let db = Db::new().expect("Failed to create DB");
 
-    db.init().await.expect("DB initialization should succeed");
+    db.init().expect("DB initialization should succeed");
 
     // Initial remote configs from DEFAULT_CONFIG
     let initial_urls = db
         .remote_configs()
-        .await
         .expect("Fetching remote configs should succeed");
 
     let initial_count = initial_urls.len();
@@ -91,12 +89,10 @@ async fn add_config_inserts_new_remote_configs() {
 
     // Add new config
     db.add_config(new_config, None)
-        .await
         .expect("add_config should succeed");
 
     let updated_urls = db
         .remote_configs()
-        .await
         .expect("Fetching remote configs should succeed");
 
     assert_eq!(
@@ -131,15 +127,14 @@ async fn add_config_inserts_new_remote_configs() {
 /// - Remote configs may appear in multiple config sources
 /// - Ensures DB does not store duplicate URLs
 /// - Ensures add_config() is safe for repeated ingestion
-#[tokio::test]
-async fn add_config_does_not_duplicate_remote_configs() {
+#[test]
+fn add_config_does_not_duplicate_remote_configs() {
     let db = Db::new().expect("Failed to create DB");
 
-    db.init().await.expect("DB initialization should succeed");
+    db.init().expect("DB initialization should succeed");
 
     let initial_urls = db
         .remote_configs()
-        .await
         .expect("Fetching remote configs should succeed");
 
     assert!(!initial_urls.is_empty());
@@ -150,7 +145,7 @@ async fn add_config_does_not_duplicate_remote_configs() {
 
     // Create config with already existing remote config
     let mut imager = bb_config::config::Imager::default();
-    imager.remote_configs.push(existing_url.into());
+    imager.remote_configs.push(existing_url);
 
     let new_config = Config {
         imager,
@@ -158,12 +153,10 @@ async fn add_config_does_not_duplicate_remote_configs() {
     };
 
     db.add_config(new_config, None)
-        .await
         .expect("add_config should succeed");
 
     let updated_urls = db
         .remote_configs()
-        .await
         .expect("Fetching remote configs should succeed");
 
     assert_eq!(
@@ -186,15 +179,14 @@ async fn add_config_does_not_duplicate_remote_configs() {
 /// - Ensures add_config() inserts device data correctly
 /// - Ensures board_list() retrieves devices from DB
 /// - Verifies basic device storage pipeline
-#[tokio::test]
-async fn add_config_inserts_device_into_board_list() {
+#[test]
+fn add_config_inserts_device_into_board_list() {
     let db = Db::new().expect("Failed to create DB");
 
-    db.init().await.expect("DB initialization should succeed");
+    db.init().expect("DB initialization should succeed");
 
     let initial_boards = db
         .board_list("")
-        .await
         .expect("Fetching board list should succeed");
 
     let initial_count = initial_boards.len();
@@ -221,12 +213,10 @@ async fn add_config_inserts_device_into_board_list() {
     };
 
     db.add_config(new_config, None)
-        .await
         .expect("add_config should succeed");
 
     let updated_boards = db
         .board_list("")
-        .await
         .expect("Fetching board list should succeed");
 
     assert_eq!(
@@ -256,11 +246,11 @@ async fn add_config_inserts_device_into_board_list() {
 /// - Prevents duplicate boards in DB
 /// - Ensures add_config() performs an upsert
 /// - Ensures board_by_id() returns updated fields
-#[tokio::test]
-async fn add_config_updates_existing_device_with_same_name() {
+#[test]
+fn add_config_updates_existing_device_with_same_name() {
     let db = Db::new().expect("Failed to create DB");
 
-    db.init().await.expect("DB initialization should succeed");
+    db.init().expect("DB initialization should succeed");
 
     // Insert initial device
     let device_v1 = bb_config::config::Device {
@@ -285,13 +275,11 @@ async fn add_config_updates_existing_device_with_same_name() {
         },
         None,
     )
-    .await
     .expect("First add_config should succeed");
 
     // Get inserted board id
     let boards = db
         .board_list("")
-        .await
         .expect("Fetching board list should succeed");
 
     let board = boards
@@ -325,13 +313,11 @@ async fn add_config_updates_existing_device_with_same_name() {
         },
         None,
     )
-    .await
     .expect("Second add_config should succeed");
 
     // Ensure board count unchanged
     let updated_boards = db
         .board_list("")
-        .await
         .expect("Fetching board list should succeed");
 
     assert_eq!(
@@ -343,7 +329,6 @@ async fn add_config_updates_existing_device_with_same_name() {
     // Fetch full board details
     let updated_board = db
         .board_by_id(board_id)
-        .await
         .expect("Fetching board by id should succeed");
 
     assert_eq!(updated_board.description, device_v2.description);
@@ -367,16 +352,16 @@ async fn add_config_updates_existing_device_with_same_name() {
 /// - insert_image() links OS images to boards via tags and os_image_boards.
 /// - os_image_items() is the main API used by the UI to retrieve OS entries.
 /// - Ensures the full pipeline works:
-///     add_config → insert_image → os_image_boards → os_image_items
+///   add_config → insert_image → os_image_boards → os_image_items
 ///
 /// Without this test:
 /// - OS images could be inserted but never appear for any board.
 /// - Tag-based linking could silently break.
 /// - UI would show empty OS list even with valid config.
-#[tokio::test]
-async fn add_config_inserts_os_image_for_board() {
+#[test]
+fn add_config_inserts_os_image_for_board() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -416,15 +401,13 @@ async fn add_config_inserts_os_image_for_board() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list("").await.unwrap();
+    let boards = db.board_list("").unwrap();
     let board_id = boards.iter().find(|b| b.name == board.name).unwrap().id;
 
     let items = db
         .os_image_items(board_id, None)
-        .await
         .expect("os_image_items should succeed");
 
     assert!(items.iter().any(|x| x.label() == image.name));
@@ -446,17 +429,17 @@ async fn add_config_inserts_os_image_for_board() {
 /// - Ensures DB serialization/deserialization works correctly.
 /// - Prevents silent data corruption or missing fields.
 /// - Verifies:
-///     add_config → insert_image → os_images → os_image_by_id
+///   add_config → insert_image → os_images → os_image_by_id
 ///
 /// Without this test:
 /// - SHA256 could be stored incorrectly.
 /// - URLs could decode incorrectly.
 /// - release_date or init_format could break silently.
 /// - UI would receive incorrect OS metadata.
-#[tokio::test]
-async fn os_image_by_id_returns_correct_data() {
+#[test]
+fn os_image_by_id_returns_correct_data() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -500,15 +483,13 @@ async fn os_image_by_id_returns_correct_data() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list("").await.unwrap();
+    let boards = db.board_list("").unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
         .os_image_items(board_id, None)
-        .await
         .expect("os_image_items should succeed");
 
     let crate::helpers::OsImageId::OsImage(image_id) =
@@ -518,7 +499,6 @@ async fn os_image_by_id_returns_correct_data() {
     };
     let stored = db
         .os_image_by_id(image_id)
-        .await
         .expect("os_image_by_id should succeed");
 
     assert_eq!(stored.name, image.name);
@@ -551,16 +531,16 @@ async fn os_image_by_id_returns_correct_data() {
 /// - insert_sub_list() and insert_sublist_boards() handle hierarchy and board linkage.
 /// - os_image_items() merges images and sublists into one list for the UI.
 /// - Ensures:
-///     add_config → insert_sub_list → os_sublist_boards → os_image_items
+///   add_config → insert_sub_list → os_sublist_boards → os_image_items
 ///
 /// Without this test:
 /// - Sublists could be inserted but never appear in UI.
 /// - Board linkage could silently break.
 /// - OS hierarchy navigation would fail.
-#[tokio::test]
-async fn add_config_inserts_os_sublist_for_board() {
+#[test]
+fn add_config_inserts_os_sublist_for_board() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -608,15 +588,13 @@ async fn add_config_inserts_os_sublist_for_board() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
-    let boards = db.board_list("").await.unwrap();
+    let boards = db.board_list("").unwrap();
     let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
 
     let items = db
         .os_image_items(board_id, None)
-        .await
         .expect("os_image_items should succeed");
 
     assert!(items.iter().any(|x| x.label() == "Test SubList"));
@@ -628,9 +606,7 @@ async fn add_config_inserts_os_sublist_for_board() {
 /// What this test checks:
 /// 1. A board with a tag is inserted.
 /// 2. A nested sublist hierarchy is created:
-///        Parent SubList
-///            └── Child SubList
-///                    └── OsImage (supports board)
+///    Parent SubList - Child SubList - OsImage (supports board)
 /// 3. Board support propagates from OsImage to Child SubList.
 /// 4. Board support propagates from Child SubList to Parent SubList.
 /// 5. os_image_items(board_id, None) returns Parent SubList.
@@ -640,16 +616,16 @@ async fn add_config_inserts_os_sublist_for_board() {
 /// - Multi-level propagation is complex and easy to break.
 /// - Ensures parent sublists appear even if only deep child images support the board.
 /// - Verifies:
-///     add_config → insert_image → insert_sublist_boards → recursive ancestors → os_image_items
+///   add_config → insert_image → insert_sublist_boards → recursive ancestors → os_image_items
 ///
 /// Without this test:
 /// - Parent sublists might not appear in UI.
 /// - Recursive propagation could silently fail.
 /// - Deep OS hierarchy navigation would break.
-#[tokio::test]
-async fn nested_os_sublists_propagate_board_support() {
+#[test]
+fn nested_os_sublists_propagate_board_support() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -705,12 +681,10 @@ async fn nested_os_sublists_propagate_board_support() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
     let board_id = db
         .board_list("")
-        .await
         .unwrap()
         .into_iter()
         .find(|b| b.name == "Test Board")
@@ -719,7 +693,6 @@ async fn nested_os_sublists_propagate_board_support() {
 
     let items = db
         .os_image_items(board_id, None)
-        .await
         .expect("os_image_items should succeed");
 
     assert!(
@@ -743,16 +716,16 @@ async fn nested_os_sublists_propagate_board_support() {
 /// - insert_remote_image() stores subitems_url and board linkage.
 /// - os_remote_sublists() is used to fetch pending remote sublists.
 /// - Ensures:
-///     add_config → insert_remote_image → os_sublist_boards → os_remote_sublists
+///   add_config → insert_remote_image → os_sublist_boards → os_remote_sublists
 ///
 /// Without this test:
 /// - Remote sublists could be inserted but never discovered.
 /// - subitems_url could be stored incorrectly.
 /// - Remote config fetching would break silently.
-#[tokio::test]
-async fn remote_os_sublist_is_returned_for_board() {
+#[test]
+fn remote_os_sublist_is_returned_for_board() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -784,12 +757,10 @@ async fn remote_os_sublist_is_returned_for_board() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
     let board_id = db
         .board_list("")
-        .await
         .unwrap()
         .into_iter()
         .find(|b| b.name == "Test Board")
@@ -798,7 +769,6 @@ async fn remote_os_sublist_is_returned_for_board() {
 
     let remote_lists = db
         .os_remote_sublists(board_id, None)
-        .await
         .expect("os_remote_sublists should succeed");
 
     assert_eq!(remote_lists.len(), 1);
@@ -826,21 +796,21 @@ async fn remote_os_sublist_is_returned_for_board() {
 /// - os_remote_sublist_resolve() updates DB state and inserts children.
 /// - Ensures remote OS lists actually become usable.
 /// - Verifies:
-///     os_remote_sublist_resolve
-///     → UPDATE subitems_url
-///     → insert_os_list_items
-///     → os_image_items
-///     → os_remote_sublists
+///   os_remote_sublist_resolve
+///   - UPDATE subitems_url
+///   - insert_os_list_items
+///   - os_image_items
+///   - os_remote_sublists
 ///
 /// Without this test:
 /// - Remote sublists might never resolve.
 /// - URLs might not be cleared.
 /// - OS images might not appear.
 /// - UI would never show fetched OS lists.
-#[tokio::test]
-async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
+#[test]
+fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -872,19 +842,17 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
     let board_id = db
         .board_list("")
-        .await
         .unwrap()
         .into_iter()
         .find(|b| b.name == "Test Board")
         .unwrap()
         .id;
 
-    let remote_lists = db.os_remote_sublists(board_id, None).await.unwrap();
+    let remote_lists = db.os_remote_sublists(board_id, None).unwrap();
 
     assert_eq!(remote_lists.len(), 1);
 
@@ -911,14 +879,13 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         sublist_id,
         &[bb_config::config::OsListItem::Image(child_image)],
     )
-    .await
     .expect("resolve should succeed");
 
-    let remote_lists_after = db.os_remote_sublists(board_id, None).await.unwrap();
+    let remote_lists_after = db.os_remote_sublists(board_id, None).unwrap();
 
     assert!(remote_lists_after.is_empty(),);
 
-    let items = db.os_image_items(board_id, Some(sublist_id)).await.unwrap();
+    let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
 
     assert!(items.iter().any(|x| x.label() == "Fetched OS"),);
 }
@@ -938,18 +905,18 @@ async fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
 /// - os_remote_sublist_resolve() may be called multiple times.
 /// - DB must behave idempotently.
 /// - Prevents:
-///     duplicate OS entries
-///     duplicate board mappings
-///     inconsistent UI behavior
+///   - duplicate OS entries
+///   - duplicate board mappings
+///   - inconsistent UI behavior
 ///
 /// Without this test:
 /// - repeated resolves could insert duplicate OS entries
 /// - UI could show duplicate OS options
 /// - DB integrity could break over time
-#[tokio::test]
-async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
+#[test]
+fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -981,19 +948,17 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
     let board_id = db
         .board_list("")
-        .await
         .unwrap()
         .into_iter()
         .find(|b| b.name == "Test Board")
         .unwrap()
         .id;
 
-    let remote_lists = db.os_remote_sublists(board_id, None).await.unwrap();
+    let remote_lists = db.os_remote_sublists(board_id, None).unwrap();
 
     assert_eq!(remote_lists.len(), 1);
 
@@ -1021,24 +986,21 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         sublist_id,
         &[bb_config::config::OsListItem::Image(child_image.clone())],
     )
-    .await
     .expect("first resolve should succeed");
 
     // Second resolve (duplicate call)
-    let second = db
-        .os_remote_sublist_resolve(
-            sublist_id,
-            &[bb_config::config::OsListItem::Image(child_image)],
-        )
-        .await;
+    let second = db.os_remote_sublist_resolve(
+        sublist_id,
+        &[bb_config::config::OsListItem::Image(child_image)],
+    );
     assert!(second.is_err());
 
-    let items = db.os_image_items(board_id, Some(sublist_id)).await.unwrap();
+    let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
     let count = items.iter().filter(|x| x.label() == "Fetched OS").count();
 
     assert_eq!(count, 1,);
 
-    let remote_lists_after = db.os_remote_sublists(board_id, None).await.unwrap();
+    let remote_lists_after = db.os_remote_sublists(board_id, None).unwrap();
 
     assert!(remote_lists_after.is_empty(),);
 }
@@ -1062,10 +1024,10 @@ async fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
 /// - Search filtering could silently break.
 /// - Case-insensitive matching might stop working.
 /// - UI board search would behave incorrectly.
-#[tokio::test]
-async fn board_list_search_filters_boards_case_insensitive() {
+#[test]
+fn board_list_search_filters_boards_case_insensitive() {
     let db = Db::new().expect("Failed to create DB");
-    db.init().await.expect("DB init should succeed");
+    db.init().expect("DB init should succeed");
 
     let board1 = bb_config::config::Device {
         name: "Test Board 1".to_string(),
@@ -1112,10 +1074,9 @@ async fn board_list_search_filters_boards_case_insensitive() {
     };
 
     db.add_config(config, None)
-        .await
         .expect("add_config should succeed");
 
-    let results = db.board_list("test").await.expect("search should succeed");
+    let results = db.board_list("test").expect("search should succeed");
 
     assert_eq!(
         results.len(),

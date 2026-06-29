@@ -30,10 +30,11 @@ bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
 semver = "1.0.28"
 anyhow = "1.0"
-sqlx = { version = "0.9", features = ["runtime-tokio", "chrono"] }
 tempfile = "3.26"
 const-hex = { version = "1.19", features = ["serde"] }
 tokio-util = { version = "0.7", features = ["rt"] }
+rusqlite = { version = "0.40", features = ["url", "chrono"] }
+chrono = "0.4"
 
 [build-dependencies]
 embed-resource = "3.0"
@@ -55,8 +56,8 @@ bcf_cc1352p7 = ["bb-flasher/bcf"]
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 # Handle application updates
 updater = []
-static = ["sqlx/sqlite", "bb-flasher/static", "bb-downloader/rustls"]
-system-deps = ["sqlx/sqlite-unbundled", "bb-downloader/native-tls"]
+static = ["rusqlite/bundled", "bb-flasher/static", "bb-downloader/rustls"]
+system-deps = ["bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]
 pre-release = []

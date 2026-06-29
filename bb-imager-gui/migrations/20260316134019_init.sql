@@ -13,7 +13,7 @@ CREATE TABLE boards
 	name TEXT NOT NULL UNIQUE,
 	description TEXT NOT NULL,
 	icon TEXT,
-	flasher TEXT NOT NULL,
+	flasher INTEGER NOT NULL,
 	instructions TEXT,
 	oshw TEXT,
 	specification BLOB,
@@ -36,7 +36,7 @@ CREATE TABLE os_sublists (
 	name TEXT NOT NULL,
 	description TEXT NOT NULL,
 	icon TEXT NOT NULL,
-	flasher TEXT NOT NULL,
+	flasher INTEGER NOT NULL,
 	
 	-- NULL = remote sublist
 	subitems_url TEXT DEFAULT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE os_images(
 	image_download_sha256 BLOB NOT NULL,
 	extract_size INTEGER NOT NULL,
 	release_date TEXT NOT NULL,
-	init_format TEXT NOT NULL,
+	init_format INTEGER NOT NULL,
 	bmap TEXT,
 	info_text TEXT,
         support TEXT,

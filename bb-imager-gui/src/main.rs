@@ -9,7 +9,7 @@ use tokio_stream::StreamExt as _;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::state::BBImagerCommon;
+use crate::{helpers::blocking_future, state::BBImagerCommon};
 
 mod constants;
 mod db;
@@ -138,10 +138,10 @@ impl BBImager {
             db: db.clone(),
         };
 
-        let db_task = Task::future(async move {
-            db.init().await.expect("Failed to initialize db");
+        let db_task = Task::future(blocking_future(move || {
+            db.init().expect("Failed to initialize db");
             BBImagerMessage::DbInitSuccess
-        });
+        }));
         let updater_task = common.updater_task();
 
         (
@@ -235,17 +235,14 @@ impl BBImager {
                         (*flasher, *filter, search_text.clone()),
                         async move |(flasher, filter, search_text)| {
                             let mut dest: Vec<helpers::Destination> =
-                                tokio::task::spawn_blocking(move || {
-                                    helpers::destinations(flasher, filter)
-                                })
-                                .await
-                                .unwrap()
-                                .into_iter()
-                                .filter(|t| {
-                                    search_text.is_empty()
-                                        || t.to_string().to_lowercase().contains(&search_text)
-                                })
-                                .collect();
+                                blocking_future(move || helpers::destinations(flasher, filter))
+                                    .await
+                                    .into_iter()
+                                    .filter(|t| {
+                                        search_text.is_empty()
+                                            || t.to_string().to_lowercase().contains(&search_text)
+                                    })
+                                    .collect();
 
                             dest.sort_by_key(|x| x.to_string());
 
@@ -334,14 +331,7 @@ impl BBImager {
     fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
         let db = self.common().db.clone();
         Task::perform(
-            async move {
-                db.os_image_icons_by_board_id(board_id)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect()
-            },
+            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
             BBImagerMessage::FilterResolveImages,
         )
     }
