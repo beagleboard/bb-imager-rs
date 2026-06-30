@@ -158,6 +158,7 @@ impl SdSysconfCustomization {
         }
     }
 
+    #[cfg(feature = "sd")]
     pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
             self.hostname.map(Into::into),
@@ -170,6 +171,7 @@ impl SdSysconfCustomization {
         )
     }
 
+    #[cfg(feature = "sd")]
     pub(crate) fn cloudinit(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
             self.hostname.map(Into::into),
