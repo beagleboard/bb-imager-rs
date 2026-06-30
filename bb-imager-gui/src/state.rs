@@ -316,12 +316,12 @@ impl CustomizeState {
 
     pub(crate) fn save_app_config(&self) -> Task<BBImagerMessage> {
         let config = self.app_config().clone();
-        Task::future(async move {
-            if let Err(e) = config.save().await {
+        Task::future(blocking_future(move || {
+            if let Err(e) = config.save() {
                 tracing::error!("Failed to save config: {e}");
             }
             BBImagerMessage::Null
-        })
+        }))
     }
 
     pub(crate) fn selected_board(&self) -> &str {

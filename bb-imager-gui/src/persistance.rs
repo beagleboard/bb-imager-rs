@@ -1,9 +1,9 @@
 //! This module contains persistance for configuration
 
-use std::{io::Read, path::PathBuf};
+use std::io::{Read, Write};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
 
 /// Configuration for GUI that should be presisted
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -27,21 +27,20 @@ impl GuiConfiguration {
         Ok(serde_json::from_slice(&data).unwrap())
     }
 
-    pub(crate) async fn save(&self) -> std::io::Result<()> {
+    pub(crate) fn save(&self) -> std::io::Result<()> {
         let data = serde_json::to_string_pretty(self).unwrap();
         let config_p = Self::config_path().unwrap();
 
         tracing::info!("Configuration Path: {:?}", config_p);
-        tokio::fs::create_dir_all(config_p.parent().unwrap()).await?;
+        std::fs::create_dir_all(config_p.parent().unwrap())?;
 
-        let mut config = tokio::fs::OpenOptions::new()
+        let mut config = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(config_p)
-            .await?;
+            .open(config_p)?;
 
-        config.write_all(data.as_bytes()).await?;
+        config.write_all(data.as_bytes())?;
 
         Ok(())
     }
