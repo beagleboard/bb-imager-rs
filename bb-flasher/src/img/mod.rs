@@ -115,9 +115,7 @@ impl OsArchiveCompression {
         img.rewind()?;
 
         match magic {
-            XZ_MAGIC => Ok(Self::TarXz(tar::Archive::new(
-                liblzma::read::XzDecoder::new_parallel(img),
-            ))),
+            XZ_MAGIC => Ok(Self::TarXz(tar::Archive::new(liblzma_new(img)))),
             _ => Ok(Self::Tar(tar::Archive::new(io::BufReader::new(img)))),
         }
     }
@@ -197,7 +195,7 @@ impl<I: Read + Seek> OsImageCompression<I> {
         img.rewind()?;
 
         match magic {
-            XZ_MAGIC => Ok(Self::Xz(liblzma::read::XzDecoder::new_parallel(img))),
+            XZ_MAGIC => Ok(Self::Xz(liblzma_new(img))),
             [0x51, 0x46, 0x49, _, _, _] => {
                 tracing::info!("Detected qcow2 image");
                 qcow2::Qcow2Reader::from_reader(img)
@@ -257,4 +255,11 @@ impl Seek for OsImageSource {
             OsImageSource::FileStream { reader, .. } => reader.seek(pos),
         }
     }
+}
+
+fn liblzma_new<R: io::Read>(r: R) -> liblzma::read::XzDecoder<R> {
+    #[cfg(target_arch = "wasm32")]
+    return liblzma::read::XzDecoder::new(r);
+    #[cfg(not(target_arch = "wasm32"))]
+    liblzma::read::XzDecoder::new_parallel(r)
 }
