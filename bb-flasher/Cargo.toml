@@ -22,7 +22,7 @@ bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
 bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
 bin_file = { version = "0.2", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["rt"] }
-bb-helper = { path = "../bb-helper", features = ["reader_progress", "cancel"] }
+bb-helper = { path = "../bb-helper", features = ["cancel"] }
 rc-zip-sync = "4.4"
 bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
@@ -37,7 +37,7 @@ zip = { version = "8.6", default-features = false }
 [features]
 default = []
 serde = ["dep:serde"]
-sd = ["bb-flasher-sd", "serde", "dep:yaml_serde"]
+sd = ["bb-flasher-sd", "serde", "dep:yaml_serde", "bb-helper/reader_progress"]
 sd_linux_udev = ["bb-flasher-sd?/udev"]
 sd_macos_authopen = ["bb-flasher-sd?/macos_authopen"]
 bcf = ["bb-flasher-bcf/cc1352p7"]
