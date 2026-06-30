@@ -39,13 +39,12 @@
 
 mod common;
 mod flasher;
-mod img;
+pub mod img;
 
 use std::path::Path;
 
 pub use common::*;
 pub use flasher::*;
-pub use img::{OsArchive, OsImage};
 
 /// An Os Image present in the local filesystem
 #[derive(Debug, Clone)]
@@ -66,20 +65,21 @@ impl LocalImage {
         self.0.file_name().unwrap()
     }
 
-    pub fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(OsImage, u64)> {
+    pub fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(img::OsImage, u64)> {
         move || {
-            let img = OsImage::from_path(&self.0)?;
+            let img = img::OsImage::from_path(&self.0)?;
             let size = img.size();
 
             Ok((img, size))
         }
     }
 
+    #[cfg(feature = "sd")]
     pub fn into_archive_fn(
         self,
         tx: Option<std::sync::mpsc::SyncSender<f32>>,
-    ) -> impl FnOnce() -> std::io::Result<OsArchive> {
-        move || OsArchive::from_path(&self.0, tx)
+    ) -> impl FnOnce() -> std::io::Result<img::OsArchive> {
+        move || img::OsArchive::from_path(&self.0, tx)
     }
 }
 

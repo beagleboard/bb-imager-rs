@@ -46,7 +46,7 @@ where
 
 // Should only be used when image is expected to rather small and can fit in heap.
 pub(crate) fn resolve_img(
-    img: impl FnOnce() -> std::io::Result<(crate::OsImage, u64)>,
+    img: impl FnOnce() -> std::io::Result<(crate::img::OsImage, u64)>,
 ) -> Result<Vec<u8>, FlasherError> {
     let (mut img, _) = img().map_err(|source| FlasherError::ImageResolvingError { source })?;
 

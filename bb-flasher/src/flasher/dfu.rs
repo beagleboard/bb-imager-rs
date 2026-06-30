@@ -1,4 +1,4 @@
-use crate::{BBFlasherTarget, DownloadFlashingStatus};
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -114,7 +114,7 @@ impl<R> Flasher<R> {
 
 impl<R> Flasher<R>
 where
-    R: FnOnce() -> std::io::Result<(crate::OsImage, u64)>,
+    R: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)>,
 {
     pub fn flash(
         self,

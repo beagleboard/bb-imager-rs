@@ -8,7 +8,7 @@ use std::{borrow::Cow, fmt::Display};
 
 use bb_helper::cancel::CancellationToken;
 
-use crate::BBFlasherTarget;
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// BeagleConnect Freedom target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -75,11 +75,11 @@ impl<I> Flasher<I> {
 
 impl<I> Flasher<I>
 where
-    I: FnOnce() -> std::io::Result<(crate::OsImage, u64)> + Send + 'static,
+    I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
     pub fn flash(
         self,
-        chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
+        chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     ) -> anyhow::Result<()> {
         let port = self.port;
         let verify = self.verify;

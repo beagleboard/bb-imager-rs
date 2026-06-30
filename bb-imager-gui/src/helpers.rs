@@ -4,7 +4,10 @@ use std::{
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
-use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
+use bb_flasher::{
+    BBFlasherTarget, DownloadFlashingStatus,
+    img::{OsArchive, OsImage},
+};
 use iced::widget;
 use std::sync::mpsc;
 use tokio_util::task::AbortOnDropHandle;
@@ -270,7 +273,7 @@ impl RemoteImage {
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
-    ) -> impl FnOnce() -> std::io::Result<bb_flasher::OsArchive> {
+    ) -> impl FnOnce() -> std::io::Result<OsArchive> {
         let rt = tokio::runtime::Handle::current();
         move || {
             let downloader = self.downloader.clone();
@@ -278,7 +281,7 @@ impl RemoteImage {
 
             if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
-                return bb_flasher::OsArchive::from_path(&path, tx);
+                return OsArchive::from_path(&path, tx);
             }
 
             tracing::info!("Remote image not found in cache. Downloading");
@@ -300,11 +303,11 @@ impl RemoteImage {
                 Ok(())
             });
 
-            bb_flasher::OsArchive::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size, tx)
+            OsArchive::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size, tx)
         }
     }
 
-    fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(bb_flasher::OsImage, u64)> {
+    fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(OsImage, u64)> {
         let rt = tokio::runtime::Handle::current();
         move || {
             let downloader = self.downloader.clone();
@@ -312,7 +315,7 @@ impl RemoteImage {
 
             if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
-                return Ok((bb_flasher::OsImage::from_path(&path)?, self.extract_size));
+                return Ok((OsImage::from_path(&path)?, self.extract_size));
             }
 
             tracing::info!("Remote image not found in cache. Downloading");
@@ -334,8 +337,7 @@ impl RemoteImage {
                 Ok(())
             });
 
-            let img =
-                bb_flasher::OsImage::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size)?;
+            let img = OsImage::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size)?;
             Ok((img, self.extract_size))
         }
     }
@@ -382,16 +384,14 @@ impl SelectedImage {
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
-    ) -> Box<dyn FnOnce() -> std::io::Result<bb_flasher::OsArchive>> {
+    ) -> Box<dyn FnOnce() -> std::io::Result<OsArchive>> {
         match self {
             SelectedImage::LocalImage(x) => Box::new(x.into_archive_fn(tx)),
             SelectedImage::RemoteImage(x) => Box::new(x.into_archive_fn(tx)),
         }
     }
 
-    fn into_image_fn(
-        self,
-    ) -> Box<dyn FnOnce() -> std::io::Result<(bb_flasher::OsImage, u64)> + Send> {
+    fn into_image_fn(self) -> Box<dyn FnOnce() -> std::io::Result<(OsImage, u64)> + Send> {
         match self {
             SelectedImage::LocalImage(x) => Box::new(x.into_image_fn()),
             SelectedImage::RemoteImage(x) => Box::new(x.into_image_fn()),

@@ -1,5 +1,7 @@
 use std::sync::mpsc;
 
+use crate::common::DownloadFlashingStatus;
+
 use bb_flasher_pb2_mspm0::Error;
 
 pub(crate) fn destinations() -> (String, String) {
@@ -9,7 +11,7 @@ pub(crate) fn destinations() -> (String, String) {
 
 pub(crate) fn flash(
     img: bin_file::BinFile,
-    chan: Option<mpsc::SyncSender<crate::DownloadFlashingStatus>>,
+    chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     persist_eeprom: bool,
 ) -> Result<(), Error> {
     std::thread::scope(|s| {
@@ -29,7 +31,7 @@ pub(crate) fn flash(
     })
 }
 
-impl From<bb_flasher_pb2_mspm0::Status> for crate::DownloadFlashingStatus {
+impl From<bb_flasher_pb2_mspm0::Status> for DownloadFlashingStatus {
     fn from(value: bb_flasher_pb2_mspm0::Status) -> Self {
         match value {
             bb_flasher_pb2_mspm0::Status::Preparing => Self::Preparing,

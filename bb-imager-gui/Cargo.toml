@@ -10,7 +10,7 @@ license.workspace = true
 [dependencies]
 iced = { version = "0.14.0", features = ["image", "svg", "tokio", "advanced", "lazy", "canvas"] }
 rfd = { version = "0.17.2", features = ["file-handle-inner"] }
-bb-flasher = { path = "../bb-flasher", features = ["serde", "piped_image"] }
+bb-flasher = { path = "../bb-flasher", features = ["serde", "piped_image", "sd"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
 iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
@@ -43,11 +43,11 @@ embed-resource = "3.0"
 chrono = "0.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-bb-flasher = { path = "../bb-flasher", features = ["sd_linux_udev", "serde"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd", "sd_linux_udev", "serde"] }
 ashpd = { version = "0.13", features = ["notification"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen", "serde"] }
+bb-flasher = { path = "../bb-flasher", features = ["sd", "sd_macos_authopen", "serde"] }
 
 [features]
 default = ["static"]
