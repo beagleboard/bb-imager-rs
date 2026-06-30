@@ -4,10 +4,10 @@ use std::{
 
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
-use bb_flasher::{
-    BBFlasherTarget, DownloadFlashingStatus,
-    img::{OsArchive, OsImage},
-};
+#[cfg(feature = "sd")]
+use bb_flasher::img::OsArchive;
+use bb_flasher::img::OsImage;
+use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use iced::widget;
 use std::sync::mpsc;
 use tokio_util::task::AbortOnDropHandle;
@@ -270,6 +270,7 @@ impl RemoteImage {
         self.url.path_segments().unwrap().next_back().unwrap()
     }
 
+    #[cfg(feature = "sd")]
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
@@ -381,6 +382,7 @@ impl SelectedImage {
         }
     }
 
+    #[cfg(feature = "sd")]
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
@@ -428,11 +430,13 @@ pub(crate) async fn flash(
     cancel_sync: bb_helper::cancel::CancellationToken,
 ) -> anyhow::Result<()> {
     match (img, customization, dst) {
+        #[cfg(feature = "sd")]
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
             tokio::task::spawn_blocking(move || bb_flasher::sd::FormatFlasher::new(t).flash())
                 .await
                 .unwrap()
         }
+        #[cfg(feature = "sd")]
         (
             BoardImage::Image {
                 img, bmap, flasher, ..
@@ -450,6 +454,7 @@ pub(crate) async fn flash(
         })
         .await
         .unwrap(),
+        #[cfg(feature = "sd")]
         (
             BoardImage::Image {
                 img, bmap, flasher, ..
@@ -467,6 +472,7 @@ pub(crate) async fn flash(
         })
         .await
         .unwrap(),
+        #[cfg(feature = "sd")]
         (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
             if flasher == config::Flasher::SdCardBootfs =>
         {
@@ -487,6 +493,7 @@ pub(crate) async fn flash(
             .await
             .unwrap()
         }
+        #[cfg(feature = "sd")]
         (BoardImage::Image { img, flasher, .. }, _, Destination::LocalFile(t))
             if flasher == config::Flasher::SdCardBootfs =>
         {
@@ -554,6 +561,7 @@ pub(crate) async fn flash(
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum Destination {
     LocalFile(PathBuf),
+    #[cfg(feature = "sd")]
     SdCard(bb_flasher::sd::Target),
     #[cfg(feature = "bcf_cc1352p7")]
     BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
@@ -567,6 +575,7 @@ impl Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Destination::LocalFile(_) => write!(f, "Save To File"),
+            #[cfg(feature = "sd")]
             Destination::SdCard(target) => target.fmt(f),
             #[cfg(feature = "bcf_cc1352p7")]
             Destination::BeagleConnectFreedom(target) => target.fmt(f),
@@ -580,11 +589,12 @@ impl Display for Destination {
 
 impl Destination {
     pub(crate) fn size(&self) -> Option<u64> {
+        #[cfg(feature = "sd")]
         if let Destination::SdCard(item) = self {
-            Some(item.size())
-        } else {
-            None
+            return Some(item.size());
         }
+
+        None
     }
 
     /// Download instead of flashing
@@ -595,6 +605,7 @@ impl Destination {
     pub(crate) fn details(&self) -> Vec<(&'static str, String)> {
         match self {
             Self::LocalFile(p) => vec![("Path", p.to_string_lossy().to_string())],
+            #[cfg(feature = "sd")]
             Self::SdCard(t) => vec![
                 ("Path", t.path().to_string_lossy().to_string()),
                 ("Size", pretty_bytes(t.size())),
@@ -611,6 +622,7 @@ impl Destination {
 
 pub(crate) fn destinations(flasher: config::Flasher, filter: bool) -> Vec<Destination> {
     match flasher {
+        #[cfg(feature = "sd")]
         config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
             bb_flasher::sd::Target::destinations(filter)
                 .into_iter()
@@ -640,6 +652,7 @@ pub(crate) fn destinations(flasher: config::Flasher, filter: bool) -> Vec<Destin
 
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
+        #[cfg(feature = "sd")]
         config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
             bb_flasher::sd::Target::FILE_TYPES
         }
@@ -655,6 +668,7 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
 
 pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
+        #[cfg(feature = "sd")]
         config::Flasher::SdCard | config::Flasher::SdCardBootfs => true,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => true,
@@ -737,6 +751,7 @@ impl FlashingCustomization {
         }
     }
 
+    #[cfg(feature = "sd")]
     fn sd_customization(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         match self {
             FlashingCustomization::LinuxSdSysconfig(c) => c.sysconfig(),

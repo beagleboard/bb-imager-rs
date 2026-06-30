@@ -6,7 +6,7 @@ _DATE = $(shell date +%F)
 _RUST_ARGS_BASE = --locked
 _RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
-_RUST_ARGS_GUI = ${_RUST_ARGS}
+_RUST_ARGS_GUI = ${_RUST_ARGS} -F sd
 _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 
@@ -168,13 +168,13 @@ check: check-cli check-gui
 .PHONY: check-cli
 check-cli: _check_common
 	$(_CARGO_CHECK) --all-targets -p xtask --all-features
-	$(_CARGO_CHECK) --all-targets -p bb-imager-cli -F pb2_mspm0,bcf_cc1352p7,bcf_msp430,dfu,zepto_uart,zepto_i2c
+	$(_CARGO_CHECK) --all-targets -p bb-imager-cli ${_RUST_ARGS_CLI} -F pb2_mspm0,zepto_i2c
 
 ## housekeeping: check-gui: Run code quality checks on GUI.
 .PHONY: check-gui
 check-gui: _check_common
 	$(_CARGO_CHECK) --all-targets -p bb-downloader -p bb-config --all-features
-	$(_CARGO_CHECK) --all-targets -p bb-imager-gui -F bcf_cc1352p7,bcf_msp430,updater,zepto_uart,zepto_i2c,pre-release
+	$(_CARGO_CHECK) --all-targets -p bb-imager-gui ${_RUST_ARGS_GUI} -F updater,zepto_i2c,pre-release
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
