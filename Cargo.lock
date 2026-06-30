@@ -4577,17 +4577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "positioned-io"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ec4b80060f033312b99b6874025d9503d2af87aef2dd4c516e253fbfcdada7"
-dependencies = [
- "byteorder",
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "potential_utf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4980,7 +4969,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caa6adff915a3efce163d0d8a06d7e72ac6fa5a9da0c76e979895eca0c6ac000"
 dependencies = [
  "oval",
- "positioned-io",
  "rc-zip",
  "tracing",
 ]
