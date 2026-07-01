@@ -19,7 +19,7 @@
   <Properties>
     <DisplayName>BeagleBoard Imager</DisplayName>
     <PublisherDisplayName>BeagleBoard.org</PublisherDisplayName>
-    <Logo>assets\icons\icon.png</Logo>
+    <Logo>assets\icons\icon.scale-50.png</Logo>
   </Properties>
 
   <Dependencies>
