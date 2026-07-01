@@ -239,16 +239,19 @@ jobs:
       with:
         lfs: true
 
+    - uses: microsoft/setup-WinAppCli@v0.1
+
     - name: Setup rust toolchain
       run: |
         rustup toolchain install stable --profile minimal
         rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+        winapp pack --help
 
     - name: Use caching
       uses: Swatinem/rust-cache@v2
         
     - name: Build packages
-      run: make setup-packaging-deps package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc
+      run: make setup-packaging-deps package-aarch64-pc-windows-msvc package-x86_64-pc-windows-msvc package-bundle-pc-windows-msvc
 
     # Do not do versioning for Pre-Release packages
     - name: Rename Pre-Release Packages
