@@ -107,7 +107,7 @@ pub enum Error {
 }
 
 /// Enumerate all SD Cards in system
-pub fn devices(filter: bool) -> std::collections::HashSet<Device> {
+pub fn devices(filter: bool) -> Vec<Device> {
     bb_drivelist::drive_list()
         .expect("Unsupported OS for Sd Card")
         .into_iter()

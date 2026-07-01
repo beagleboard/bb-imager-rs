@@ -234,7 +234,7 @@ impl BBImager {
                     iced::futures::stream::unfold(
                         (*flasher, *filter, search_text.clone()),
                         async move |(flasher, filter, search_text)| {
-                            let mut dest: Vec<helpers::Destination> =
+                            let dest: Vec<helpers::Destination> =
                                 blocking_future(move || helpers::destinations(flasher, filter))
                                     .await
                                     .into_iter()
@@ -243,8 +243,6 @@ impl BBImager {
                                             || t.to_string().to_lowercase().contains(&search_text)
                                     })
                                     .collect();
-
-                            dest.sort_by_key(|x| x.to_string());
 
                             let msg = BBImagerMessage::Destinations(dest);
                             Some((msg, (flasher, filter, search_text)))
