@@ -204,7 +204,7 @@ impl Db {
         exec: &Connection,
         remote_configs: impl Iterator<Item = &'a Url>,
     ) -> rusqlite::Result<()> {
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
                 INSERT INTO remote_configs(url) VALUES ($1) 
                 ON CONFLICT DO NOTHING
@@ -218,16 +218,16 @@ impl Db {
     }
 
     fn remote_config_fetched(exec: &Connection, id: i64) -> rusqlite::Result<()> {
-        exec.execute(
-            "UPDATE remote_configs SET fetched = TRUE WHERE id = $1",
-            [id],
-        )?;
+        let mut stmt =
+            exec.prepare_cached("UPDATE remote_configs SET fetched = TRUE WHERE id = $1")?;
+        stmt.execute([id])?;
         Ok(())
     }
 
     pub(crate) fn remote_configs(&self) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
-        let mut stmt = db.prepare("SELECT id, url FROM remote_configs WHERE fetched = FALSE")?;
+        let mut stmt =
+            db.prepare_cached("SELECT id, url FROM remote_configs WHERE fetched = FALSE")?;
         let res = stmt
             .query_map([], |r| {
                 let id: i64 = r.get("id")?;
@@ -249,10 +249,11 @@ impl Db {
         let mut db = self.db.lock().unwrap();
         let tx = db.transaction()?;
 
-        tx.execute(
-            "UPDATE os_sublists SET subitems_url = NULL WHERE id = $1",
-            [id],
-        )?;
+        {
+            let mut stmt =
+                tx.prepare_cached("UPDATE os_sublists SET subitems_url = NULL WHERE id = $1")?;
+            stmt.execute([id])?;
+        }
 
         Self::insert_os_list_items(&tx, subitems, Some(id), None)?;
 
@@ -299,7 +300,7 @@ impl Db {
     }
 
     fn insert_remote_sublist_boards(exec: &Connection, sublist_id: i64) -> rusqlite::Result<()> {
-        exec.execute(
+        let mut stmt = exec.prepare_cached(
             r#"
             WITH RECURSIVE parents(id) AS (
                 SELECT $1
@@ -316,8 +317,8 @@ impl Db {
             FROM parents p
             JOIN os_sublist_boards osb ON osb.sublist_id = $1;
             "#,
-            [sublist_id],
         )?;
+        stmt.execute([sublist_id])?;
         Ok(())
     }
 
@@ -326,7 +327,7 @@ impl Db {
         parent_id: i64,
         image_id: i64,
     ) -> rusqlite::Result<()> {
-        exec.execute(
+        let mut stmt = exec.prepare_cached(
             r#"
             WITH RECURSIVE ancestors(id) AS (
                 SELECT $1
@@ -341,8 +342,8 @@ impl Db {
             FROM ancestors
             JOIN os_image_boards ib ON ib.image_id = $2
             "#,
-            [parent_id, image_id],
         )?;
+        stmt.execute([parent_id, image_id])?;
         Ok(())
     }
 
@@ -352,7 +353,7 @@ impl Db {
         parent_id: Option<i64>,
         remote_config_id: Option<i64>,
     ) -> rusqlite::Result<i64> {
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
              INSERT INTO os_sublists(parent_id, name, description, icon, flasher, remote_config_id)
              VALUES ($1, $2, $3, $4, $5, $6)
@@ -372,7 +373,7 @@ impl Db {
         let spec = serde_json::to_vec(&board.specification).unwrap();
 
         // Insert or update board
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
         INSERT INTO boards(
             name,
@@ -420,7 +421,7 @@ impl Db {
         )?;
 
         // Insert new tags
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
             INSERT INTO board_tags(board_id, tag)
             VALUES ($1, $2)
@@ -439,7 +440,7 @@ impl Db {
         parent_id: Option<i64>,
         remote_config_id: Option<i64>,
     ) -> rusqlite::Result<i64> {
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
             INSERT INTO os_images(name, parent_id, description, icon, url,
                 image_download_size, image_download_sha256, extract_size,
@@ -464,7 +465,7 @@ impl Db {
             img.support
         ])?;
 
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
             INSERT INTO os_image_boards(image_id, board_id)
             SELECT $1, b.board_id
@@ -485,7 +486,7 @@ impl Db {
         parent_id: Option<i64>,
         remote_config_id: Option<i64>,
     ) -> rusqlite::Result<i64> {
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
             INSERT INTO os_sublists(parent_id, name, description, icon, 
                 flasher, subitems_url, remote_config_id)
@@ -502,7 +503,7 @@ impl Db {
             remote_config_id
         ])?;
 
-        let mut stmt = exec.prepare(
+        let mut stmt = exec.prepare_cached(
             r#"
             INSERT INTO os_sublist_boards(sublist_id, board_id)
             SELECT $1, b.board_id
@@ -646,7 +647,7 @@ impl Db {
         parent_id: Option<i64>,
     ) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
-        let mut stmt = db.prepare(
+        let mut stmt = db.prepare_cached(
             r#"
             SELECT s.id, s.subitems_url
             FROM os_sublists s
@@ -703,7 +704,7 @@ impl Db {
         remote_config_id: i64,
     ) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
-        let mut stmt = db.prepare(
+        let mut stmt = db.prepare_cached(
             r#"
             SELECT s.id, s.subitems_url
             FROM os_sublists s
@@ -725,7 +726,7 @@ impl Db {
         board_id: i64,
     ) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
-        let mut stmt = db.prepare(
+        let mut stmt = db.prepare_cached(
             r#"
             SELECT s.id, s.subitems_url
             FROM os_sublists s
@@ -746,7 +747,7 @@ impl Db {
         search: &str,
     ) -> rusqlite::Result<Vec<crate::helpers::OsImageItem>> {
         let db = self.db.lock().unwrap();
-        let mut stmt = db.prepare(
+        let mut stmt = db.prepare_cached(
             r#"
             SELECT oi.id, oi.name, oi.icon
             FROM os_images oi
