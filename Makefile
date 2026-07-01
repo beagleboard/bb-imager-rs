@@ -310,6 +310,18 @@ package-x86_64-pc-windows-msvc: package-checks
 package-aarch64-pc-windows-msvc: package-checks
 	$(MAKE) package-gui-portable-exe TARGET=aarch64-pc-windows-msvc UPDATER=1
 
+## package: package-bundle-pc-windows-msvc: Create aarch64 + x64 msixbundle for Windows.
+.PHONY: package-bundle-pc-windows-msvc
+package-bundle-pc-windows-msvc:
+	$(MAKE) build-gui TARGET=aarch64-pc-windows-msvc UPDATER=1
+	$(MAKE) build-gui TARGET=x86_64-pc-windows-msvc UPDATER=1
+	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
+	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
+	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
+	winapp pack --manifest bb-imager-gui/Package.appxmanifest bb-imager-gui/dist/windows-temp/aarch64/ bb-imager-gui/dist/windows-temp/x64/
+	rm -rf bb-imager-gui/dist/windows-temp
+	mv *.msixbundle bb-imager-gui/dist/
+
 ## package: package-armv7-unknown-linux-gnueabihf: Create all packages for armv7-unknown-linux-gnueabihf
 .PHONY: package-armv7-unknown-linux-gnueabihf
 package-armv7-unknown-linux-gnueabihf: package-checks
