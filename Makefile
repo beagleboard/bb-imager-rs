@@ -318,6 +318,7 @@ package-bundle-pc-windows-msvc:
 	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
 	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
 	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
+	winapp manifest update-assets bb-imager-gui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
 	winapp pack --manifest bb-imager-gui/Package.appxmanifest bb-imager-gui/dist/windows-temp/aarch64/ bb-imager-gui/dist/windows-temp/x64/
 	rm -rf bb-imager-gui/dist/windows-temp
 	mv *.msixbundle bb-imager-gui/dist/
