@@ -59,7 +59,7 @@ pub fn flash(
 }
 
 /// Returns all paths to serial ports.
-pub fn ports() -> std::collections::HashSet<PathBuf> {
+pub fn ports() -> Vec<PathBuf> {
     std::fs::read_dir("/dev")
         .unwrap()
         .filter_map(|x| x.ok())

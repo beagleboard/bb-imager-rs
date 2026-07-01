@@ -1,7 +1,7 @@
 mod flashing;
 mod helpers;
 
-use std::{collections::HashSet, io, sync::mpsc};
+use std::{io, sync::mpsc};
 use thiserror::Error;
 
 use flashing::dfu_write;
@@ -48,7 +48,7 @@ pub struct Device {
     pub name: String,
 }
 
-pub fn devices(filter: bool) -> HashSet<Device> {
+pub fn devices(filter: bool) -> Vec<Device> {
     rusb::devices()
         .expect("rusb seems to not be implemented for this platform")
         .iter()

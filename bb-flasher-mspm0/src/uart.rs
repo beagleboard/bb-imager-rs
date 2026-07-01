@@ -40,7 +40,7 @@ pub fn flash(
 }
 
 /// Returns all paths to serial ports.
-pub fn ports() -> std::collections::HashSet<String> {
+pub fn ports() -> Vec<String> {
     serialport::available_ports()
         .expect("Unsupported OS")
         .into_iter()

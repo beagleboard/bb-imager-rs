@@ -51,8 +51,8 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    fn destinations(_: bool) -> std::collections::HashSet<Self> {
-        let mut dsts = std::collections::HashSet::new();
+    fn destinations(_: bool) -> Vec<Self> {
+        let mut dsts = Vec::new();
 
         #[cfg(feature = "mspm0_uart")]
         dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));

@@ -16,7 +16,7 @@ use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 pub struct Target(bb_flasher_sd::Device);
 
 impl Target {
-    fn destinations_internal(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations_internal(filter: bool) -> Vec<Self> {
         bb_flasher_sd::devices(filter)
             .into_iter()
             .map(Self)
@@ -56,7 +56,7 @@ impl TryFrom<PathBuf> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["img", "xz", "qcow2"];
 
-    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations(filter: bool) -> Vec<Self> {
         Self::destinations_internal(filter)
     }
 

@@ -8,10 +8,9 @@ mod raw;
 use raw::*;
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::sync::mpsc;
 
-use crate::common::{DownloadFlashingStatus, BBFlasherTarget};
+use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 /// [PocketBeagle 2] [MSPM0L1105] target
 ///
@@ -28,12 +27,12 @@ impl BBFlasherTarget for Target {
     const IS_DESTINATION_SELECTABLE: bool = false;
 
     // Since only a single destination is possible, no need for filters
-    fn destinations(_: bool) -> HashSet<Self> {
+    fn destinations(_: bool) -> Vec<Self> {
         let temp = destinations();
-        HashSet::from([Target {
+        vec![Target {
             name: temp.0,
             path: temp.1,
-        }])
+        }]
     }
 
     fn identifier(&self) -> Cow<'_, str> {

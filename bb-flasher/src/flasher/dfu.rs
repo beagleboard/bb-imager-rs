@@ -1,7 +1,6 @@
 use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::io;
 use std::sync::mpsc;
 
@@ -11,7 +10,7 @@ use bb_helper::cancel::CancellationToken;
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
-    fn destinations_internal(filter: bool) -> HashSet<Self> {
+    fn destinations_internal(filter: bool) -> Vec<Self> {
         bb_flasher_dfu::devices(filter)
             .into_iter()
             .map(Self)
@@ -44,7 +43,7 @@ impl std::fmt::Display for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &[];
 
-    fn destinations(filter: bool) -> HashSet<Self> {
+    fn destinations(filter: bool) -> Vec<Self> {
         Self::destinations_internal(filter)
     }
 

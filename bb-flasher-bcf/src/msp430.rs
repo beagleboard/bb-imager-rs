@@ -245,7 +245,7 @@ pub fn flash(
 }
 
 /// Returns all paths to ports having BeagleConnect Freedom.
-pub fn devices(filter: bool) -> std::collections::HashSet<CString> {
+pub fn devices(filter: bool) -> Vec<CString> {
     hidapi::HidApi::new()
         .expect("Failed to create hidapi context")
         .device_list()
