@@ -29,6 +29,7 @@ rustls = ["reqwest/rustls"]
 
 [dev-dependencies]
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
+httpmock = "0.8"
 
 [target.'cfg(not(windows))'.dependencies]
 sha2 = { version = "0.10", features = ["asm"] }
