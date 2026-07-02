@@ -56,8 +56,7 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-24.04, ubuntu-24.04-arm]
-        package: [gui, cli]
-    name: Build Snaps - ${{ matrix.package }} ${{ matrix.platform }}
+    name: Build Snaps - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
     steps:
     - name: Checkout
@@ -69,7 +68,10 @@ jobs:
       uses: Swatinem/rust-cache@v2
     - run: make vendor
 
-    - run: ln -sf snapcraft.${{ matrix.package }}.yaml snapcraft.yaml
+    - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
+    - uses: snapcore/action-build@v1
+
+    - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
 
     - name: Move to dist folders
@@ -87,7 +89,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: artifacts-snap-${{ matrix.package }}-${{ matrix.platform }}
+        name: artifacts-snap-${{ matrix.platform }}
         path: |
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
@@ -270,8 +272,8 @@ jobs:
     needs:
       - linux-native-job
       - linux-cross-job
-      - linux-snap-job
-      - linux-snap-cross-job
+      # - linux-snap-job
+      # - linux-snap-cross-job
       - macos-job
       - windows-job
       - vendor-deps

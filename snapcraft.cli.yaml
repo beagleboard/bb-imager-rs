@@ -25,6 +25,7 @@ parts:
   bb-imager-cli:
     # See 'snapcraft plugins'
     plugin: rust
+    rust-channel: stable
     source: .
     build-packages:
       - libudev-dev
