@@ -2,17 +2,8 @@ use std::io::{Read, Seek, Write};
 
 use bb_helper::cancel::CancellationToken;
 
-use crate::{ContentType, Result, helpers::Eject};
-
-fn check_cancel(tkn: Option<&CancellationToken>) -> crate::Result<()> {
-    if let Some(t) = tkn
-        && t.is_cancelled()
-    {
-        Err(crate::Error::Aborted)
-    } else {
-        Ok(())
-    }
-}
+use crate::helpers::{Eject, check_cancel};
+use crate::{ContentType, Result};
 
 pub fn flash<F, I>(img: F, dst: crate::Destination, cancel: Option<CancellationToken>) -> Result<()>
 where
@@ -26,8 +17,6 @@ where
             let sd = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
-                .create(true)
-                .truncate(true)
                 .open(path)?;
             common(img, sd, cancel)
         }
