@@ -9,16 +9,15 @@
 //! - Uses SHA256 for verifying cached files.
 //! - Optional support to download files without caching.
 
-
 mod helpers;
 
-use helpers::AsyncTempFile;
+use helpers::{AsyncTempFile, sha256_from_path};
 
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
 use std::{
-    io::{self, Read},
+    io,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -261,28 +260,4 @@ impl Downloader {
         let file_name = const_hex::encode(sha256);
         self.cache_dir.join(file_name)
     }
-}
-
-fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
-    let file = std::fs::File::open(p)?;
-    let mut reader = std::io::BufReader::new(file);
-    let mut hasher = Sha256::new();
-    let mut buffer = [0; 512];
-
-    loop {
-        let count = reader.read(&mut buffer)?;
-        if count == 0 {
-            break;
-        }
-
-        hasher.update(&buffer[..count]);
-    }
-
-    let hash = hasher
-        .finalize()
-        .as_slice()
-        .try_into()
-        .expect("SHA-256 is 32 bytes");
-
-    Ok(hash)
 }

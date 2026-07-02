@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use sha2::{Digest, Sha256};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 pub(crate) struct AsyncTempFile(tokio::fs::File);
@@ -44,6 +45,22 @@ impl tokio::io::AsyncWrite for AsyncTempFile {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Pin::new(&mut self.0).poll_shutdown(cx)
     }
+}
+
+pub(crate) fn sha256_from_path(p: &Path) -> io::Result<[u8; 32]> {
+    let file = std::fs::File::open(p)?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut hasher = Sha256::new();
+
+    std::io::copy(&mut reader, &mut hasher)?;
+
+    let hash = hasher
+        .finalize()
+        .as_slice()
+        .try_into()
+        .expect("SHA-256 is 32 bytes");
+
+    Ok(hash)
 }
 
 #[cfg(test)]
