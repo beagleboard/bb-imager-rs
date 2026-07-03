@@ -34,6 +34,13 @@ impl Eject for std::fs::File {
     }
 }
 
+#[cfg(test)]
+impl Eject for bb_helper::mock_sd::MockSd {
+    fn eject(self) -> io::Result<()> {
+        self.as_file().sync_all()
+    }
+}
+
 const BLOCK_SIZE: usize = 4096;
 
 #[derive(Debug)]

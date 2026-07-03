@@ -25,6 +25,7 @@ bb-helper = { path = "../bb-helper", features = ["cancel"] }
 
 [dev-dependencies]
 tempfile = "3.27"
+bb-helper = { path = "../bb-helper", features = ["mock_sd"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }

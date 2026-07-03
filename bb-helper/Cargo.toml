@@ -9,6 +9,9 @@ license.workspace = true
 [dependencies]
 tempfile = "3.27"
 tokio = { version = "1.52", default-features = false, optional = true }
+fatfs = { version = "0.3", optional = true }
+fscommon = { version = "0.1", optional = true }
+mbrman = { version = "0.6", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
@@ -17,3 +20,4 @@ tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 file_stream = ["tokio/fs", "tokio/io-util"]
 reader_progress = []
 cancel = []
+mock_sd = ["cancel", "dep:fatfs", "dep:fscommon", "dep:mbrman"]
