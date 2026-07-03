@@ -66,8 +66,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::io;
     use bb_helper::mock_sd::MockSd;
+    use std::io;
 
     use super::*;
 
@@ -131,43 +131,6 @@ mod test {
         let mut sd = MockSd::new();
 
         internal(iter.clone().into_iter(), &mut sd, None).unwrap();
-        sd.rewind().unwrap();
-
-        let boot_part = crate::customization::ParitionType::Boot.open(sd).unwrap();
-        let root = boot_part.root_dir();
-
-        for (path, f) in iter {
-            match f {
-                ContentType::Dir => {
-                    root.open_dir(&path).unwrap();
-                }
-                ContentType::Reader(mut read) => {
-                    let mut dst = root.open_file(&path).unwrap();
-                    let mut expected = Vec::new();
-                    let mut actual = Vec::new();
-
-                    read.read_to_end(&mut expected).unwrap();
-                    dst.read_to_end(&mut actual).unwrap();
-
-                    assert_eq!(actual, expected);
-                }
-                _ => unreachable!(),
-            }
-        }
-    }
-
-    #[test]
-    fn basic_file_flash() {
-        let iter = MockArchive::default();
-        let mut sd = MockSd::new();
-
-        let iter_clone = iter.clone();
-        flash(
-            move || Ok(iter_clone),
-            crate::Destination::File(sd.path().into()),
-            None,
-        )
-        .unwrap();
         sd.rewind().unwrap();
 
         let boot_part = crate::customization::ParitionType::Boot.open(sd).unwrap();

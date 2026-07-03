@@ -1,6 +1,7 @@
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
-use fscommon::StreamSlice;
+use fatfs::FileSystem;
+use fscommon::{BufStream, StreamSlice};
 use mbrman::{CHS, MBR, MBRPartitionEntry};
 
 use crate::cancel::CancellationToken;
@@ -75,6 +76,22 @@ impl MockSd {
 
     pub fn path(&self) -> &std::path::Path {
         self.file.path()
+    }
+
+    pub fn open_boot(&mut self) -> fatfs::FileSystem<BufStream<StreamSlice<&mut Self>>> {
+        let (start_offset, end_offset) = {
+            let mbr = mbrman::MBRHeader::read_from(self).unwrap();
+
+            let boot_part = mbr.get(1).unwrap();
+            let start_offset: u64 = (boot_part.starting_lba * 512).into();
+            let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
+
+            (start_offset, end_offset)
+        };
+
+        let slice = StreamSlice::new(self, start_offset, end_offset).unwrap();
+        let boot_stream = BufStream::new(slice);
+        FileSystem::new(boot_stream, fatfs::FsOptions::new()).unwrap()
     }
 }
 
