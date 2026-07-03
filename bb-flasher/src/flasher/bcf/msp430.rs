@@ -40,7 +40,7 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["hex", "txt", "xz"];
 
-    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations(filter: bool) -> Vec<Self> {
         bb_flasher_bcf::msp430::devices(filter)
             .into_iter()
             .map(|x| Self {

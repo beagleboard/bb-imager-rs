@@ -29,7 +29,7 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    fn destinations(filter: bool) -> std::collections::HashSet<Self> {
+    fn destinations(filter: bool) -> Vec<Self> {
         bb_flasher_bcf::cc1352p7::ports(filter)
             .into_iter()
             .map(Self)

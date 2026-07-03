@@ -1,6 +1,6 @@
 //! Stuff common to all the flashers
 
-use std::{borrow::Cow, collections::HashSet, io::Read};
+use std::{borrow::Cow, io::Read};
 
 use thiserror::Error;
 
@@ -38,7 +38,7 @@ where
     const IS_DESTINATION_SELECTABLE: bool = true;
 
     /// A list of possible flasher targets
-    fn destinations(filter: bool) -> HashSet<Self>;
+    fn destinations(filter: bool) -> Vec<Self>;
 
     /// A sort of device ID (mostly a Path).
     fn identifier<'a>(&'a self) -> Cow<'a, str>;

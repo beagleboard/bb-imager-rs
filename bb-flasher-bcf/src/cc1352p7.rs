@@ -375,7 +375,7 @@ pub fn flash(
 }
 
 /// Returns all paths to ports having BeagleConnect Freedom.
-pub fn ports(filter: bool) -> std::collections::HashSet<String> {
+pub fn ports(filter: bool) -> Vec<String> {
     serialport::available_ports()
         .expect("Unsupported OS")
         .into_iter()
