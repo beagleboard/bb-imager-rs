@@ -9,3 +9,5 @@ pub mod file_stream;
 pub mod reader_progress;
 #[cfg(feature = "cancel")]
 pub mod cancel;
+#[cfg(feature = "mock_sd")]
+pub mod mock_sd;

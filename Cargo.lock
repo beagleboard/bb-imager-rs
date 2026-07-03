@@ -643,6 +643,9 @@ dependencies = [
 name = "bb-helper"
 version = "1.0.12"
 dependencies = [
+ "fatfs",
+ "fscommon",
+ "mbrman",
  "tempfile",
  "tokio",
 ]
