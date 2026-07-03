@@ -189,15 +189,6 @@ fn write_sd(
 /// # Progress
 ///
 /// Progress lies between 0 and 1.
-///
-/// # Aborting
-///
-/// The process can be aborted by dropping all strong references to the [`Arc`] that owns the
-/// [`Weak`] passed as `cancel`.
-///
-/// [`Arc`]: std::sync::Arc
-/// [`Weak`]: std::sync::Weak
-/// [BeagleBoard.org]: https://www.beagleboard.org/
 pub fn flash<'a, R, B, C>(
     img: impl FnOnce() -> std::io::Result<(R, u64)> + Send,
     bmap: Option<B>,

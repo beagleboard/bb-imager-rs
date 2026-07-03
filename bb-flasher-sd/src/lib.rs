@@ -13,36 +13,7 @@
 //! - `udev`: Dynamic permissions on Linux. Mostly useful for GUI and flatpaks
 //! - `macos_authopen`: Dynamic permissions on MacOS.
 //!
-//! # Usage
-//!
-//! ```no_run
-//! use std::path::PathBuf;
-//! use std::fs::File;
-//! use bb_flasher_sd::Customization;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let dst = bb_flasher_sd::Destination::SdCard(PathBuf::from("/tmp/dummy").into());
-//!     let img = async move {
-//!         let f = tokio::fs::File::open("/tmp/image").await?;
-//!         let size = f.metadata().await.unwrap().len();
-//!         Ok((f, size))
-//!     };
-//!     let (tx, mut rx) = tokio::sync::mpsc::channel(20);
-//!
-//!     let iter = futures::stream::iter::<[Customization<Box<dyn futures::Stream<Item = (Box<str>,
-//!     bb_flasher_sd::ContentType)> + Send + Unpin>>; 0]>([]);
-//!     let flash_thread = tokio::spawn(async move { bb_flasher_sd::flash(img, None::<std::future::Ready<std::io::Result<Box<str>>>>, dst, Some(tx), iter).await });
-//!
-//!     while let Some(m) = rx.recv().await {
-//!         println!("{:?}", m);
-//!     }
-//!
-//!     flash_thread.await.unwrap().unwrap()
-//! }
-//! ```
-//!
-//! [BeagleBoard Imager]: https://openbeagle.org/ayush1325/bb-imager-rs
+//! [BeagleBoard Imager]: https://github.com/beagleboard/bb-imager-rs
 
 use std::{
     io,
