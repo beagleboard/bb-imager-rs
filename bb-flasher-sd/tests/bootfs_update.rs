@@ -1,36 +1,45 @@
 use bb_flasher_sd::bootfs_update::flash;
 use bb_flasher_sd::{ContentType, Destination};
 use bb_helper::mock_sd::MockSd;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
+use std::path::Path;
+use tempfile::NamedTempFile;
 
-struct IntegrationMockArchive(Vec<(Box<str>, Option<Vec<u8>>)>);
+struct MockArchive {
+    file_path: Box<Path>,
+}
 
-impl Default for IntegrationMockArchive {
-    fn default() -> Self {
-        Self(vec![
-            ("config".into(), None),
-            ("config/cmdline.txt".into(), Some(b"console=ttyS0".to_vec())),
-        ])
+impl MockArchive {
+    const READER_CONTENTS: &'static str = "reader";
+    const APPEND_CONTENTS: &'static str = "append";
+
+    fn new(file_path: Box<Path>) -> Self {
+        Self { file_path }
     }
 }
 
-impl<'b> IntoIterator for &'b mut IntegrationMockArchive {
+impl<'b> IntoIterator for &'b mut MockArchive {
     type Item = (Box<str>, ContentType<'b>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'b>;
 
     fn into_iter(self) -> Self::IntoIter {
         Box::new(
-            self.0
-                .iter()
-                .map(|(p, f)| match f {
-                    Some(x) => (
-                        p.clone(),
-                        ContentType::Reader(Box::new(io::Cursor::new(x.clone()))),
-                    ),
-                    None => (p.clone(), ContentType::Dir),
-                })
-                .collect::<Vec<Self::Item>>()
-                .into_iter(),
+            vec![
+                ("config_dir".into(), ContentType::Dir),
+                (
+                    "config_dir/reader.txt".into(),
+                    ContentType::Reader(Box::new(io::Cursor::new(MockArchive::READER_CONTENTS))),
+                ),
+                (
+                    "config_dir/file.txt".into(),
+                    ContentType::File(self.file_path.clone()),
+                ),
+                (
+                    "config_dir/reader.txt".into(),
+                    ContentType::DataAppend(MockArchive::APPEND_CONTENTS.as_bytes().into()),
+                ),
+            ]
+            .into_iter(),
         )
     }
 }
@@ -40,8 +49,13 @@ fn test_flash_workflow_with_helper_inspection() {
     // 1. Initialize the public mock storage block device
     let mut mock_sd = MockSd::new();
 
+    let temp_file_data = "Hello World";
+    let mut temp_file = NamedTempFile::new().unwrap();
+    temp_file.write_all(temp_file_data.as_bytes()).unwrap();
+
     // 2. Setup archive and closure
-    let img_closure = || Ok(IntegrationMockArchive::default());
+    let archive = MockArchive::new(temp_file.path().into());
+    let img_closure = move || Ok(archive);
 
     // 3. Execute the public API over the MockSD's path
     let destination = Destination::File(mock_sd.path().into());
@@ -59,16 +73,28 @@ fn test_flash_workflow_with_helper_inspection() {
 
     // 5. Assert the changes are present
     assert!(
-        root_dir.open_dir("config").is_ok(),
+        root_dir.open_dir("config_dir").is_ok(),
         "config directory missing"
     );
 
     let mut actual_contents = String::new();
     root_dir
-        .open_file("config/cmdline.txt")
-        .expect("cmdline.txt missing")
+        .open_file("config_dir/reader.txt")
+        .unwrap()
         .read_to_string(&mut actual_contents)
-        .expect("Failed to read file contents");
+        .unwrap();
 
-    assert_eq!(actual_contents, "console=ttyS0");
+    assert_eq!(
+        actual_contents,
+        [MockArchive::READER_CONTENTS, MockArchive::APPEND_CONTENTS].join("")
+    );
+
+    actual_contents.clear();
+    root_dir
+        .open_file("config_dir/file.txt")
+        .unwrap()
+        .read_to_string(&mut actual_contents)
+        .unwrap();
+
+    assert_eq!(actual_contents, temp_file_data);
 }
