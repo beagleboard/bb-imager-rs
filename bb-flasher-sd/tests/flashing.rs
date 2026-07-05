@@ -72,3 +72,9 @@ fn test_public_flash_with_temp_file() {
     assert!(!progress_updates.is_empty());
     assert_eq!(*progress_updates.last().unwrap(), 1.0);
 }
+
+#[test]
+fn destinations() {
+    let temp = bb_flasher_sd::devices(false);
+    assert!(temp.len() > 0);
+}
