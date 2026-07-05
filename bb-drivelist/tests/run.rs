@@ -1,4 +1,5 @@
 #[test]
 fn basic() {
-    bb_drivelist::drive_list().unwrap();
+    let temp = bb_drivelist::drive_list().unwrap();
+    assert!(temp.len() > 0);
 }
