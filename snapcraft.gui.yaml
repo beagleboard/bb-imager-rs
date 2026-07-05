@@ -23,7 +23,7 @@ parts:
     parse-info:
       - usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml
     override-build: |
-      make build-gui _install_gui DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr SYSTEM_DEPS=1 GUI_NAME=org.beagleboard.imagingutility
+      make build-gui _install_gui DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr SYSTEM_DEPS=1 GUI_NAME=org.beagleboard.imagingutility ZEPTO_I2C=0 BCF_MSP430=0
 
 apps:
   bb-imager:
@@ -40,8 +40,4 @@ apps:
       - udisks2
       # BCF and Zepto UART
       - serial-port
-      # Zepto I2C
-      - i2c
-      # BCF MSP430
-      - hidraw
     extensions: [gnome]

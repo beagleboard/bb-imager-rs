@@ -4,7 +4,7 @@ _HOST_TARGET = $(shell rustc --print host-tuple)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
 _RUST_ARGS_BASE = --locked
-_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,bcf_msp430,zepto_uart
+_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,zepto_uart
 _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
 _RUST_ARGS_GUI = ${_RUST_ARGS} -F sd
 _PACKAGER_ARGS = -r -vvv --verbose
@@ -58,6 +58,8 @@ TARGET ?= $(_HOST_TARGET)
 PB2_MSPM0 ?= 0
 ## variable: ZEPTO_I2C: Enable zepto_i2c feature. Only supported in GUI.
 ZEPTO_I2C ?= $(if $(findstring linux,$(TARGET)),1)
+## variable: BCF_MSP430: Enable bcf_msp430 feature. Only disabled in snap package.
+BCF_MSP430 ?= 1
 ## variable: SYSTEM_DEPS: Use system dependencies. Mainly for linux.
 SYSTEM_DEPS ?= 0
 ## variable: SHARED_HIDRAW: Use system hidraw. Requires rather recent version of hidraw.
@@ -80,6 +82,11 @@ endif
 # Add zepto_i2c feature
 ifeq ($(ZEPTO_I2C),1)
 	_RUST_ARGS += -F zepto_i2c
+endif
+
+# Add bcf_msp430 feature
+ifeq ($(BCF_MSP430),1)
+	_RUST_ARGS += -F bcf_msp430
 endif
 
 # Add system-deps feature
