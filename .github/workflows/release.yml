@@ -272,8 +272,8 @@ jobs:
     needs:
       - linux-native-job
       - linux-cross-job
-      # - linux-snap-job
-      # - linux-snap-cross-job
+      - linux-snap-job
+      - linux-snap-cross-job
       - macos-job
       - windows-job
       - vendor-deps
