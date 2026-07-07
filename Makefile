@@ -66,6 +66,8 @@ SYSTEM_DEPS ?= 0
 SHARED_HIDRAW ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
 UPDATER ?= 0
+## variable: NOTIFY_RUST: Use notify-rust for notification. Not needed when using xdg-portal on linux.
+NOTIFY_RUST ?= 1
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -120,6 +122,11 @@ endif
 # Add pre-relase feature
 ifeq ($(PRE_RELEASE),1)
 	_RUST_ARGS_GUI += -F pre-release
+endif
+
+# Add NOTIFY_RUST feature
+ifeq ($(NOTIFY_RUST),1)
+	_RUST_ARGS_GUI += -F notify-rust
 endif
 
 ## build: build: Build both CLI and GUI
@@ -430,7 +437,7 @@ _fetch-gui-deps:
 ## package: package-gui-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
 .PHONY: package-gui-flatpak
 package-gui-flatpak:
-	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1
+	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui

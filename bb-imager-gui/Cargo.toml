@@ -17,7 +17,7 @@ iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"]
 image = "0.25"
 tokio = { version = "1.52", default-features = false, features = ["macros"] }
 webbrowser = "1.2.1"
-notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"] }
+notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"], optional = true }
 url = "2.5.4"
 whoami = "2.1"
 localzone = "0.3.1"
@@ -61,6 +61,7 @@ zepto_i2c = ["bb-flasher/mspm0_i2c"]
 pre-release = []
 static-hidraw = ["bb-flasher/static_hidraw"]
 shared-hidraw = ["bb-flasher/shared_hidraw"]
+notify-rust = ["dep:notify-rust"]
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]

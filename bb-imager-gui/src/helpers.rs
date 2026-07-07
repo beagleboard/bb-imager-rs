@@ -777,13 +777,14 @@ async fn show_notification_xdg_portal(body: &str) -> ashpd::Result<()> {
         .await
 }
 
-pub(crate) async fn show_notification(body: String) -> notify_rust::error::Result<()> {
+pub(crate) async fn show_notification(body: String) -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     if show_notification_xdg_portal(&body).await.is_ok() {
         return Ok(());
     }
 
-    tokio::task::spawn_blocking(move || {
+    #[cfg(feature = "notify-rust")]
+    if tokio::task::spawn_blocking(move || {
         notify_rust::Notification::new()
             .appname("BeagleBoard Imager")
             .body(&body)
@@ -792,7 +793,12 @@ pub(crate) async fn show_notification(body: String) -> notify_rust::error::Resul
     })
     .await
     .unwrap()
-    .map(|_| ())
+    .is_ok()
+    {
+        return Ok(());
+    };
+
+    Err(anyhow::anyhow!("Failed to send notification"))
 }
 
 pub(crate) fn project_dirs() -> Option<directories::ProjectDirs> {
