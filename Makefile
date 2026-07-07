@@ -243,6 +243,8 @@ endif
 \t\t<release version="$(VERSION)" date="$(_DATE)">\
 \t\t\t<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/$(VERSION)</url>\
 \t\t</release>' bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml
+	sed -i -E "s/^[[:space:]]*Version=\"[^\"]+\"/    Version=\"${VERSION}.0\"/" bb-imager-gui/Package.appxmanifest
+	sed -i -E "s/(<assemblyIdentity[[:space:]]+version=\")[^\"]*(\")/\1${VERSION}.0\2/" bb-imager-gui/assets/packages/windows/gui.exe.manifest
 	cargo build
 	$(info Showing Diff)
 	git diff
