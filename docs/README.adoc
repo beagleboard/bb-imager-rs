@@ -1,0 +1,26 @@
+= BeagleBoard Imaging Utility docs
+
+Documentation for BeagleBoard Imaging Utility.
+
+== How to build docs
+
+The docs can be built using docker image.
+
+[source,text]
+----
+docker run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
+----
+
+Alternately, you can use podman:
+
+[source,text]
+----
+podman run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
+----
+
+Then test by serving the built docs:
+
+[source,text]
+----
+python -m http.server --directory build/site
+----
