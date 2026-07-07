@@ -225,7 +225,7 @@ mod test {
 
             // We wrap the iterator on the MAIN thread. No Send bounds broken!
             let mut step = 0;
-            let triggering_iter = (&mut archive).into_iter().map(move |item| {
+            let triggering_iter = (&mut archive).into_iter().inspect(move |_| {
                 if step == 1 {
                     // Signal the background thread to kill the drive
                     let _ = signal_tx.send(());
@@ -233,7 +233,6 @@ mod test {
                     let _ = ack_rx.recv();
                 }
                 step += 1;
-                item
             });
 
             let result = internal(triggering_iter, &mut sd, None);

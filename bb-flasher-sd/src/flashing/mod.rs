@@ -13,7 +13,7 @@ mod tests;
 
 // Stack overflow occurs during debug since box moves data from stack to heap in debug builds
 #[cfg(not(debug_assertions))]
-const BUFFER_SIZE: usize = 1 * 1024 * 1024;
+const BUFFER_SIZE: usize = 1024 * 1024;
 #[cfg(debug_assertions)]
 const BUFFER_SIZE: usize = 8 * 1024;
 
