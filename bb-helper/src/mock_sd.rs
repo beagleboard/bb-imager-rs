@@ -16,6 +16,12 @@ pub struct MockSd {
     fail: crate::cancel::CancellationToken,
 }
 
+impl Default for MockSd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockSd {
     pub fn new() -> Self {
         let mut img = tempfile::NamedTempFile::new().unwrap();

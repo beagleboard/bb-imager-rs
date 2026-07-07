@@ -76,5 +76,5 @@ fn test_public_flash_with_temp_file() {
 #[test]
 fn destinations() {
     let temp = bb_flasher_sd::devices(false);
-    assert!(temp.len() > 0);
+    assert!(!temp.is_empty());
 }
