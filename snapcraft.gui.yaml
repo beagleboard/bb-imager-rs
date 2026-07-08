@@ -38,7 +38,8 @@ parts:
     override-build: |
       # Ensure cargo/rustc from rust-deps are on PATH
       export PATH="$HOME/.cargo/bin:$PATH"
-      make build-gui _install_gui DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr SYSTEM_DEPS=1 GUI_NAME=org.beagleboard.imagingutility ZEPTO_I2C=0 BCF_MSP430=0 NOTIFY_RUST=0
+      source .envrc
+      make build-gui _install_gui DESTDIR=${CRAFT_PART_INSTALL} PREFIX=/usr SYSTEM_DEPS=1 GUI_NAME=org.beagleboard.imagingutility ZEPTO_I2C=0 BCF_MSP430=0 NOTIFY_RUST=0 PRE_RELEASE=$PRE_RELEASE
 
 apps:
   bb-imager:
