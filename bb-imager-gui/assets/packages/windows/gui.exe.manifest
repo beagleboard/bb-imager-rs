@@ -8,7 +8,7 @@
 			</requestedPrivileges>
 		</security>
 	</trustInfo>
-        <assemblyIdentity version="1.0.12.0" name="BeagleBoard.org.BBImager"/>
+        <assemblyIdentity version="1.0.13.0" name="BeagleBoard.org.BBImager"/>
         <application xmlns="urn:schemas-microsoft-com:asm.v3">
                 <windowsSettings>
                         <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/PM</dpiAware>
