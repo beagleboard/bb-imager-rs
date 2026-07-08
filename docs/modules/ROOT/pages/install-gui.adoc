@@ -25,10 +25,14 @@ Choose the option that best matches your operating system.
 | Drag-and-drop install into the Applications folder.
 | {macos-url-prefix}_aarch64.dmg[aarch64], {macos-url-prefix}_x64.dmg[x86_64]
 
-.2+| Linux
+.3+| Linux
 | Flatpak
 | Recommended for most Linux users. Sandboxed, automatic updates.
 | https://flathub.org/en/apps/org.beagleboard.imagingutility[Flathub]
+
+| Snap
+| Recommended for distros that do not support Flatpak. Sandboxed, automatic updates.
+| https://snapcraft.io/bb-imager[Snap]
 
 | AppImage
 | Portable single-file download. No installation required.
@@ -57,7 +61,8 @@ On Windows:
 * You may be prompted by User Account Control (UAC) to allow elevated permissions.
 * Some antivirus or endpoint security software may temporarily flag disk-writing tools.
 
-These prompts are expected and required for the imaging process. Always ensure you downloaded the installer from an official BeagleBoard source.
+These prompts are expected and required for the imaging process. Always ensure you downloaded the
+installer from an official BeagleBoard source.
 ====
 
 === macOS
@@ -68,10 +73,13 @@ These prompts are expected and required for the imaging process. Always ensure y
 
 [NOTE]
 ====
-macOS may ask for permission to access removable volumes the first time you run the application. Granting this access is required to write images to SD cards.
+macOS may ask for permission to access removable volumes the first time you run the application.
+Granting this access is required to write images to SD cards.
 ====
 
-=== Linux (Flatpak – Recommended)
+=== Linux
+
+==== Flatpak (Recommended)
 
 Flatpak provides a sandboxed installation and automatic updates via Flathub.
 
@@ -81,29 +89,42 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 flatpak install flathub org.beagleboard.imagingutility
 ----
 
-To run the application:
+==== Snap
+
+The Snap package is ideal for the Ubuntu family of Linux distributions.
 
 [source,shell]
 ----
-flatpak run org.beagleboard.imagingutility
+snap install bb-imager
 ----
 
-==== Flatpak Permissions and Security Notes
-
-[IMPORTANT]
+[NOTE]
 ====
-Writing disk images requires access to removable storage devices.
+Out of the box, this installation only supports flashing SD cards. Steps to enable serial flashing
+are provided below. 
 
-When installed via Flatpak, the BeagleBoard Imaging Utility requests permissions to:
-
-* Access removable drives
-* Perform raw device writes
-
-Your desktop environment may prompt you to approve these permissions the first time you run the application.  
-These permissions are required to flash SD cards and USB storage devices and are limited to what the application needs to function.
+*I2C* (BeagleConnect Zepto) and *hidraw* (MSP430) based flashing is not supported due to limitations
+of snap format.
 ====
 
-=== Linux (AppImage)
+===== Enable Serial Flashing (e.g. BeagleConnect Freedom)
+
+If you need to flash firmware to boards over a serial connection, you will need to enable 
+experimental hotplug support and connect the serial port interface. Run the following commands:
+
+[source,shell]
+----
+# Enable hotplug support
+snap set system experimental.hotplug=true
+
+# Restart the Snap daemon to apply changes
+systemctl restart snapd
+
+# Connect the serial port interface
+snap connect bb-imager:serial-port
+----
+
+==== AppImage
 
 AppImage is useful if you prefer a portable, self-contained executable.
 
@@ -113,7 +134,32 @@ chmod +x bb-imager-*.AppImage
 ./bb-imager-*.AppImage
 ----
 
-[NOTE]
-====
-On some Linux distributions, you may need to run the AppImage from a desktop session that allows access to removable media.
-====
+==== Enable Serial Flashing Support (Optional)
+
+If you are using Linux and need to flash firmware to boards over a serial connection (such as the
+BeagleConnect Freedom), your system will require a custom `udev` rule to access the serial interface
+without root privileges. 
+
+This step is **not** required if you are only flashing SD cards or USB storage.
+
+. Create a new `udev` rules file:
++
+[source,shell]
+----
+sudo nano /etc/udev/rules.d/99-beagleboard-imager.rules
+----
+
+. Add the following lines to grant user-level access to serial devices:
++
+[source,text]
+----
+include::example$10-beagle.rules[]
+----
+
+. Reload the rules to apply the changes immediately:
++
+[source,shell]
+----
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+----
