@@ -362,7 +362,7 @@ vendor-deps: cargo-vendor.tar.zst
 .PHONY: coverage
 coverage:
 	$(info Check test coverage)
-	$(CARGO_PATH) tarpaulin
+	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} llvm-cov"
 
 ## housekeeping: bloat: Check dependency contribution to bin size.
 .PHONY: bloat
