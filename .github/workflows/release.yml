@@ -68,6 +68,8 @@ jobs:
       uses: Swatinem/rust-cache@v2
     - run: make vendor
 
+    - run: echo PRE_RELEASE=$PRE_RELEASE > .envrc
+
     - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
 
