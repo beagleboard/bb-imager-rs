@@ -173,6 +173,14 @@ _check_common:
 		--exclude bb-downloader --exclude bb-config
 	$(_CARGO_CHECK) --all-targets -p bb-flasher-bcf -F msp430,static
 	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
+
+_check_cli:
+	$(_CARGO_CHECK) --all-targets -p xtask --all-features
+	$(_CARGO_CHECK) --all-targets -p bb-imager-cli ${_RUST_ARGS_CLI} -F pb2_mspm0,zepto_i2c
+
+_check_gui:
+	$(_CARGO_CHECK) --all-targets -p bb-downloader -p bb-config --all-features
+	$(_CARGO_CHECK) --all-targets -p bb-imager-gui ${_RUST_ARGS_GUI} -F updater,zepto_i2c,pre-release
 	
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
@@ -180,15 +188,11 @@ check: check-cli check-gui
 
 ## housekeeping: check-cli: Run code quality checks on CLI.
 .PHONY: check-cli
-check-cli: _check_common
-	$(_CARGO_CHECK) --all-targets -p xtask --all-features
-	$(_CARGO_CHECK) --all-targets -p bb-imager-cli ${_RUST_ARGS_CLI} -F pb2_mspm0,zepto_i2c
+check-cli: _check_common _check_cli
 
 ## housekeeping: check-gui: Run code quality checks on GUI.
 .PHONY: check-gui
-check-gui: _check_common
-	$(_CARGO_CHECK) --all-targets -p bb-downloader -p bb-config --all-features
-	$(_CARGO_CHECK) --all-targets -p bb-imager-gui ${_RUST_ARGS_GUI} -F updater,zepto_i2c,pre-release
+check-gui: _check_common _check_gui
 
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
@@ -362,7 +366,7 @@ vendor-deps: cargo-vendor.tar.zst
 .PHONY: coverage
 coverage:
 	$(info Check test coverage)
-	$(CARGO_PATH) tarpaulin
+	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} llvm-cov"
 
 ## housekeeping: bloat: Check dependency contribution to bin size.
 .PHONY: bloat

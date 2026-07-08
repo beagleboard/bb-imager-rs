@@ -64,3 +64,29 @@ jobs:
         with:
           # Upload public folder
           path: './build/site'
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install required deps
+        run: make setup-debian-deps
+      - name: Use caching
+        uses: Swatinem/rust-cache@v2
+      - name: Generate code coverage
+        run: |
+          make _check_common _CARGO_CHECK="cargo llvm-cov --codecov --output-path codecov-common.json"
+          make _check_cli _CARGO_CHECK="cargo llvm-cov --codecov --output-path codecov-cli.json"
+          make _check_gui _CARGO_CHECK="cargo llvm-cov --codecov --output-path codecov-gui.json"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: codecov-*.json
+          fail_ci_if_error: false
