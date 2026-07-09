@@ -6,6 +6,7 @@ mod helpers;
 pub mod i2c;
 #[cfg(feature = "uart")]
 pub mod uart;
+pub mod mock_bsl;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 

@@ -66,9 +66,7 @@ impl Firmware {
     }
 }
 
-pub(crate) fn check_token(
-    cancel: Option<&CancellationToken>,
-) -> crate::Result<()> {
+pub(crate) fn check_token(cancel: Option<&CancellationToken>) -> crate::Result<()> {
     match cancel {
         Some(x) if x.is_cancelled() => Err(crate::Error::Aborted),
         _ => Ok(()),
@@ -107,10 +105,12 @@ where
 
     check_token(cancel.as_ref())?;
 
-    let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
-    if cur_crc == firmware.crc() {
-        tracing::warn!("Skipping flashing same image");
-        return mspm0.start_application();
+    if verify {
+        let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
+        if cur_crc == firmware.crc() {
+            tracing::warn!("Skipping flashing same image");
+            return mspm0.start_application();
+        }
     }
 
     chan_send(chan.as_mut(), Status::Flashing(0.0));
@@ -150,6 +150,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::mock_bsl::MockBsl;
+
     use super::*;
 
     const ALIGNMENT: usize = 8;
@@ -219,5 +221,18 @@ mod tests {
 
         assert_eq!(bytes, data);
         assert_eq!(crate::bsl::crc(&bytes), bin.crc());
+    }
+
+    #[test]
+    fn basic_flash() {
+        flash(
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            || Mspm0::new(MockBsl::default()),
+            true,
+            None,
+            None,
+            || Ok(()),
+        )
+        .unwrap();
     }
 }
