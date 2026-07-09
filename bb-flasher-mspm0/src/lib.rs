@@ -61,6 +61,7 @@ pub enum Error {
 }
 
 /// Flashing status
+#[derive(Debug, PartialEq)]
 pub enum Status {
     Preparing,
     Flashing(f32),

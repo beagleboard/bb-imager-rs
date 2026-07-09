@@ -135,9 +135,9 @@ where
     }
 
     chan_send(chan.as_mut(), Status::Flashing(1.0));
-    chan_send(chan.as_mut(), Status::Verifying);
 
     if verify {
+        chan_send(chan.as_mut(), Status::Verifying);
         let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
         if cur_crc != firmware.crc() {
             tracing::error!("Invalid CRC32 in Flash. The flashed image might be corrupted");
@@ -234,5 +234,139 @@ mod tests {
             || Ok(()),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_flash_success_without_verify() {
+        let (tx, rx) = mpsc::sync_channel(10);
+
+        std::thread::spawn(move || {
+            flash(
+                &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                || Mspm0::new(MockBsl::default()),
+                false,
+                Some(tx),
+                None,
+                || Ok(()),
+            )
+            .unwrap()
+        });
+
+        let status: Vec<_> = rx.into_iter().collect();
+
+        // Should prepare, flash at 0.0, progress through chunks, and hit 1.0 (no verification status)
+        assert!(status.contains(&Status::Preparing));
+        assert!(status.contains(&Status::Flashing(0.0)));
+        assert!(status.contains(&Status::Flashing(1.0)));
+        assert!(!status.contains(&Status::Verifying));
+    }
+
+    #[test]
+    fn test_flash_skips_when_crc_matches() {
+        const FIRMWARE: &[u8] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+        let (tx, rx) = mpsc::sync_channel(10);
+
+        // Setup mock so that standalone_verification returns the matching firmware CRC immediately
+        let mock_bsl = MockBsl::with_start_crc(Firmware::parse(FIRMWARE).unwrap().crc().into());
+        // e.g., mock_bsl.expect_standalone_verification().return_const(EXPECTED_CRC);
+
+        std::thread::spawn(move || {
+            flash(
+                FIRMWARE,
+                || Mspm0::new(mock_bsl),
+                true,
+                Some(tx),
+                None,
+                || Ok(()),
+            )
+            .unwrap()
+        });
+
+        let status: Vec<_> = rx.into_iter().collect();
+
+        assert!(status.contains(&Status::Preparing));
+        // It should NOT contain flashing statuses because it returns early
+        assert!(!status.iter().any(|s| matches!(s, Status::Flashing(_))));
+    }
+
+    #[test]
+    fn test_flash_prep_hook_fails() {
+        let result = flash(
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            || Mspm0::new(MockBsl::default()),
+            true,
+            None,
+            None,
+            || Err(crate::Error::Aborted), // Mock prep hook failure
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_flash_cancelled_early() {
+        let cancel_token = CancellationToken::default();
+        drop(cancel_token.drop_guard()); // Cancel immediately
+
+        let result = flash(
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            || Mspm0::new(MockBsl::default()),
+            true,
+            None,
+            Some(cancel_token),
+            || Ok(()),
+        );
+
+        // Should fail due to early cancellation check
+        assert!(matches!(result, Err(crate::Error::Aborted)));
+    }
+
+    #[test]
+    fn test_flash_large_firmware_chunks() {
+        let (tx, rx) = mpsc::sync_channel(20);
+
+        // Create a larger fake firmware buffer (e.g., 256 bytes)
+        // Ensure your MockBsl/Firmware setup parses this size correctly
+        let large_firmware = vec![5u8; 256];
+
+        std::thread::spawn(move || {
+            flash(
+                &large_firmware,
+                || Mspm0::new(MockBsl::default()),
+                false, // Keep verify false to isolate chunking logic
+                Some(tx),
+                None,
+                || Ok(()),
+            )
+            .unwrap()
+        });
+
+        // Collect and inspect the order of statuses
+        let status: Vec<_> = rx.into_iter().collect();
+
+        // Ensure it started with preparing
+        assert_eq!(status[0], Status::Preparing);
+
+        // Filter out just the Flashing progress values to verify graduation
+        let progress_updates: Vec<f32> = status
+            .iter()
+            .filter_map(|s| match s {
+                Status::Flashing(p) => Some(*p),
+                _ => None,
+            })
+            .collect();
+
+        // The first progress update should be exactly 0.0
+        assert_eq!(progress_updates[0], 0.0);
+
+        // The final progress update inside the loop/end should be 1.0
+        assert_eq!(*progress_updates.last().unwrap(), 1.0);
+
+        // Ensure multiple chunks were actually processed
+        assert!(
+            progress_updates.len() > 2,
+            "Firmware didn't chunk! Check program_data_max_len mock value."
+        );
     }
 }
