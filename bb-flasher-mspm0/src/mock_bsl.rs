@@ -24,7 +24,7 @@ enum State {
     WaitingForCrc(crc_fast::Digest),
 }
 
-pub struct MockBsl {
+pub(crate) struct MockBsl {
     state: State,
     tx_data: VecDeque<u8>,
     is_uart: bool,
@@ -33,16 +33,6 @@ pub struct MockBsl {
 }
 
 impl MockBsl {
-    pub const fn uart() -> Self {
-        Self {
-            state: State::Waiting,
-            tx_data: VecDeque::new(),
-            is_uart: true,
-            flash: Vec::new(),
-            start_crc: 0,
-        }
-    }
-
     pub const fn with_start_crc(start_crc: u32) -> Self {
         Self {
             state: State::Waiting,
