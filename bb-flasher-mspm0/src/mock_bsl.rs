@@ -29,6 +29,7 @@ pub struct MockBsl {
     tx_data: VecDeque<u8>,
     is_uart: bool,
     flash: Vec<u8>,
+    start_crc: u32,
 }
 
 impl MockBsl {
@@ -38,6 +39,17 @@ impl MockBsl {
             tx_data: VecDeque::new(),
             is_uart: true,
             flash: Vec::new(),
+            start_crc: 0,
+        }
+    }
+
+    pub const fn with_start_crc(start_crc: u32) -> Self {
+        Self {
+            state: State::Waiting,
+            tx_data: VecDeque::new(),
+            is_uart: false,
+            flash: Vec::new(),
+            start_crc,
         }
     }
 }
@@ -49,6 +61,7 @@ impl Default for MockBsl {
             tx_data: VecDeque::new(),
             is_uart: false,
             flash: Vec::new(),
+            start_crc: 0,
         }
     }
 }
@@ -88,11 +101,16 @@ impl std::io::Write for MockBsl {
             {
                 self.tx_data.push_back(0)
             }
+            // Standalone Verification.
             ([0x80, 0x09, 0, 0x26, ..], State::Unlocked) => {
                 let flash_crc = {
-                    let mut crc = crc_fast::Digest::new(CRC_ALGO);
-                    crc.update(&self.flash);
-                    u32::try_from(crc.finalize()).unwrap()
+                    if self.flash.is_empty() {
+                        self.start_crc
+                    } else {
+                        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+                        crc.update(&self.flash);
+                        u32::try_from(crc.finalize()).unwrap()
+                    }
                 };
 
                 self.tx_data.write_all(&[0, 0x08, 0x05, 0, 0x32]).unwrap();
