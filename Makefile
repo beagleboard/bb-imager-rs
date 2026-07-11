@@ -72,6 +72,8 @@ SHARED_HIDRAW ?= 0
 UPDATER ?= 0
 ## variable: NOTIFY_RUST: Use notify-rust for notification. Not needed when using xdg-portal on linux.
 NOTIFY_RUST ?= 1
+## variable: APPIMAGE_ARCH: Target arch for Appimage
+APPIMAGE_ARCH ?= $(_ARCH)
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -227,6 +229,12 @@ setup-fedora-deps:
 .PHONY: setup-packaging-deps
 setup-packaging-deps:
 	$(info "Installing dependencies required for packaging")
+ifneq ($(findstring linux,$(TARGET)),)
+	mkdir -p ~/.local/bin
+	wget -O ~/.local/bin/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(APPIMAGE_ARCH).AppImage
+	chmod +x ~/.local/bin/appimagetool
+	appimagetool --version
+endif
 	$(CARGO_PATH) install cargo-packager --locked --git https://github.com/crabnebula-dev/cargo-packager.git
 
 ## housekeeping: package-rename: Replace package version with `_alpha_`. Intended for use in CI.
@@ -235,7 +243,11 @@ package-rename:
 	for pkg in gui cli service; do \
 		if [ -d bb-imager-$$pkg/dist ]; then \
 			for file in bb-imager-$$pkg/dist/*; do \
-				mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
+				if [ "$${file##*.}" = "AppImage" ]; then \
+					mv "$$file" "$$(echo "$$file" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+-/-alpha-/')"; \
+				else \
+					mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
+				fi; \
 			done \
 		fi \
 	done
@@ -288,7 +300,14 @@ package-gui-pacman: build-gui
 	rm -rf bb-imager-gui/dist/bb-imager-gui
 
 package-gui-appimage: build-gui
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f appimage
+	mkdir -p bb-imager-gui/dist
+	$(MAKE) _install_gui PREFIX=/usr DESTDIR=bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir GUI_NAME=org.beagleboard.imagingutility
+	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/bin/bb-imager-gui bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/AppRun
+	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/applications/org.beagleboard.imagingutility.desktop bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.desktop
+	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/icons/hicolor/128x128/apps/org.beagleboard.imagingutility.png bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.png
+	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.appdata.xml
+	appimagetool bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir bb-imager-gui/dist/BeagleBoard_Imager-$(VERSION)-$(APPIMAGE_ARCH).AppImage
+	rm -rf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir
 
 package-gui-dmg: build-gui
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f dmg
