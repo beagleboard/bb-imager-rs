@@ -28,7 +28,7 @@ jobs:
           make _check_cli _CARGO_CHECK="cargo llvm-cov --codecov --output-path codecov-cli.json"
           make _check_gui _CARGO_CHECK="cargo llvm-cov --codecov --output-path codecov-gui.json"
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: codecov-*.json
           fail_ci_if_error: false
