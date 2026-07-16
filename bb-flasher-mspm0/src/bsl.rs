@@ -5,13 +5,9 @@ use crate::{Error, Result};
 const CRC_ALGO: crc_fast::CrcAlgorithm = crc_fast::CrcAlgorithm::Crc32Jamcrc;
 
 // Bootloader Core Commands
-const COMMAND_CONNECTION: u8 = 0x12;
 const COMMAND_UNLOCK_BOOTLOADER: u8 = 0x21;
-const COMMAND_MASS_ERASE: u8 = 0x15;
 const COMMAND_PROGRAM_DATA: u8 = 0x20;
-const COMMAND_GET_DEVICE_INFO: u8 = 0x19;
 const COMMAND_STANDALONE_VERIFICATION: u8 = 0x26;
-const COMMAND_START_APPLICATION: u8 = 0x40;
 const COMMAND_CHANGE_BAUD_RATE: u8 = 0x52;
 
 // BSL Acknowledgment
@@ -79,32 +75,6 @@ impl BSLPktHead {
 
 type BSLPktCrc32 = little_endian::U32;
 
-#[derive(IntoBytes, Immutable)]
-#[repr(C, packed)]
-struct BSLNoDataReqPkt {
-    head: BSLPktHead,
-    tail: BSLPktCrc32,
-}
-
-impl BSLMsg for BSLNoDataReqPkt {}
-
-impl BSLNoDataReqPkt {
-    fn new(cmd: u8) -> Self {
-        Self {
-            head: BSLPktHead::new_req(Self::len(), cmd),
-            tail: crc(&[cmd]),
-        }
-    }
-
-    fn connection_req() -> Self {
-        Self::new(COMMAND_CONNECTION)
-    }
-
-    fn get_device_info_req() -> Self {
-        Self::new(COMMAND_GET_DEVICE_INFO)
-    }
-}
-
 #[derive(FromBytes, IntoBytes, Immutable, Debug)]
 #[repr(C, packed)]
 struct BSLDeviceInfoRespPkt {
@@ -127,7 +97,8 @@ trait Crc32 {
 // Empty trait to show that it is a MSPM0 BSL message
 trait BSLMsg: Sized {
     fn len() -> u16 {
-        (size_of::<Self>() - size_of::<BSLNoDataReqPkt>() + size_of::<u8>()) as u16
+        (size_of::<Self>() - size_of::<BSLPktHead>() - size_of::<BSLPktCrc32>() + size_of::<u8>())
+            as u16
     }
 }
 
@@ -382,14 +353,14 @@ where
     fn connect(port: &mut S) -> Result<()> {
         tracing::info!("Establishing connection");
 
-        BSLNoDataReqPkt::connection_req().write_to_io(&mut *port)?;
+        port.write_all(&[0x80, 0x01, 0, 0x12, 0x3A, 0x61, 0x44, 0xDE])?;
         Self::wait_for_ack_inner(port)
     }
 
     fn get_device_info(port: &mut S) -> Result<BSLDeviceInfoRespPkt> {
         tracing::info!("Getting Device Info");
 
-        BSLNoDataReqPkt::get_device_info_req().write_to_io(&mut *port)?;
+        port.write_all(&[0x80, 0x01, 0, 0x19, 0xB2, 0xB8, 0x96, 0x49])?;
         Self::wait_for_ack_inner(&mut *port)?;
 
         let resp = BSLDeviceInfoRespPkt::read_from_io(port)?;
@@ -423,14 +394,16 @@ where
     pub(crate) fn start_application(&mut self) -> Result<()> {
         tracing::info!("Launch application");
 
-        BSLNoDataReqPkt::new(COMMAND_START_APPLICATION).write_to_io(&mut self.port)?;
+        self.port
+            .write_all(&[0x80, 0x01, 0, 0x40, 0xE2, 0x51, 0x21, 0x5B])?;
         self.wait_for_ack()
     }
 
     pub(crate) fn mass_erase(&mut self) -> Result<()> {
         tracing::info!("Perform mass erase");
 
-        BSLNoDataReqPkt::new(COMMAND_MASS_ERASE).write_to_io(&mut self.port)?;
+        self.port
+            .write_all(&[0x80, 0x01, 0, 0x15, 0x99, 0xF4, 0x20, 0x40])?;
         self.wait_for_ack()?;
 
         let resp = BSLCoreResp::read_from_io(&mut self.port)?;
@@ -472,24 +445,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn connection_req_test() {
-        let cmd = BSLNoDataReqPkt::connection_req();
-        assert_eq!(
-            cmd.as_bytes(),
-            &[0x80, 0x01, 0x00, 0x12, 0x3A, 0x61, 0x44, 0xDE]
-        );
-    }
-
-    #[test]
-    fn get_info_req_test() {
-        let cmd = BSLNoDataReqPkt::get_device_info_req();
-        assert_eq!(
-            cmd.as_bytes(),
-            &[0x80, 0x01, 0x00, 0x19, 0xB2, 0xB8, 0x96, 0x49]
-        );
-    }
 
     #[test]
     fn unlock_req_test() {
