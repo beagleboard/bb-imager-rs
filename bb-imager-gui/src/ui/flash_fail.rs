@@ -6,13 +6,13 @@ use iced::{
 use crate::{
     BBImagerMessage, constants,
     state::FlashingFailState,
-    ui::helpers::{CircleBar, VIEW_COL_PADDING, page_type1, selectable_text},
+    ui::helpers::{VIEW_COL_PADDING, page_type1, progress_finish_view, selectable_text},
 };
 
 pub(crate) fn view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
     page_type1(
         info_view(state),
-        progress_view(state),
+        progress_finish_view("Failed", constants::DANGER, &state.err),
         [
             button("Flash New")
                 .style(widget::button::danger)
@@ -22,16 +22,6 @@ pub(crate) fn view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
                 .on_press(BBImagerMessage::Retry),
         ],
     )
-}
-
-pub(crate) fn progress_view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
-    widget::column![
-        CircleBar::new("Failed", 10.0, constants::DANGER),
-        widget::text(&state.err)
-    ]
-    .align_x(iced::Center)
-    .padding(VIEW_COL_PADDING)
-    .into()
 }
 
 pub(crate) fn info_view(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
