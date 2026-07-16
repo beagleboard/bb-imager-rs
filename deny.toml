@@ -55,7 +55,8 @@ ignore = [
     { id = "RUSTSEC-2025-0141", reason = "Need to update mbrman" },
     { id = "RUSTSEC-2026-0192", reason = "Needed by iced" },
     { id = "RUSTSEC-2026-0195", reason = "Needed by iced" },
-    { id = "RUSTSEC-2026-0194", reason = "Needed by iced" }
+    { id = "RUSTSEC-2026-0194", reason = "Needed by iced" },
+    { id = "RUSTSEC-2026-0206", reason = "Needed by iced" }
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
