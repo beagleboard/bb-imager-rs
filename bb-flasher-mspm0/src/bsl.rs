@@ -45,10 +45,10 @@ struct BSLPktHead {
 }
 
 impl BSLPktHead {
-    fn new_req(len: u16, cmd: u8) -> Self {
+    const fn new_req(len: u16, cmd: u8) -> Self {
         Self {
             header: REQUEST,
-            len: len.into(),
+            len: little_endian::U16::new(len),
             cmd,
         }
     }
@@ -243,15 +243,13 @@ struct BSLProgramDataReqHeadPkt {
     address: little_endian::U32,
 }
 
-impl BSLMsg for BSLProgramDataReqHeadPkt {}
-
 impl BSLProgramDataReqHeadPkt {
-    fn new(data_len: u16, address: u32) -> Self {
+    const fn new(data_len: u16, address: u32) -> Self {
         // Pkt len consists of header->cmd + anything before CRC32
         let len = (size_of::<u8>() + size_of::<u32>()) as u16 + data_len;
         Self {
             head: BSLPktHead::new_req(len, COMMAND_PROGRAM_DATA),
-            address: address.into(),
+            address: little_endian::U32::new(address),
         }
     }
 }
