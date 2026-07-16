@@ -6,7 +6,7 @@ use iced::{
 use crate::{
     BBImagerMessage, constants,
     state::FlashingFinishState,
-    ui::helpers::{CircleBar, VIEW_COL_PADDING, board_view_pane, page_type1},
+    ui::helpers::{board_view_pane, page_type1, progress_finish_view},
 };
 
 pub(crate) fn view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
@@ -26,13 +26,7 @@ pub(crate) fn progress_view(state: &FlashingFinishState) -> Element<'static, BBI
         "Successfully Flashed Image"
     };
 
-    widget::column![
-        CircleBar::new("100%", 10.0, constants::CHECK_MARK_GREEN),
-        msg
-    ]
-    .align_x(iced::Center)
-    .padding(VIEW_COL_PADDING)
-    .into()
+    progress_finish_view("100%", constants::CHECK_MARK_GREEN, msg)
 }
 
 pub(crate) fn info_view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {

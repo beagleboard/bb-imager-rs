@@ -468,3 +468,14 @@ pub(crate) fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMess
         ..Default::default()
     })
 }
+
+pub(crate) fn progress_finish_view<'a>(
+    label: &'static str,
+    color: iced::Color,
+    details: impl widget::text::IntoFragment<'a>,
+) -> Element<'a, BBImagerMessage> {
+    widget::column![CircleBar::new(label, 10.0f32, color), widget::text(details)]
+        .align_x(iced::Center)
+        .padding(VIEW_COL_PADDING)
+        .into()
+}

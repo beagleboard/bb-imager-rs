@@ -28,7 +28,7 @@ pub(crate) fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessag
         bb_flasher::DownloadFlashingStatus::Customizing => (0.99, "Customizing ..."),
     };
 
-    let progress = ProgressCircle::new(prog, 10.0, constants::TONGUE_ORANGE);
+    let progress = ProgressCircle::new(prog, 10.0f32, constants::TONGUE_ORANGE);
 
     let mut col = widget::column![progress, widget::text(label)];
     if let Some(x) = state.time_remaining() {
