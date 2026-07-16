@@ -96,10 +96,8 @@ trait Crc32 {
 
 // Empty trait to show that it is a MSPM0 BSL message
 trait BSLMsg: Sized {
-    fn len() -> u16 {
-        (size_of::<Self>() - size_of::<BSLPktHead>() - size_of::<BSLPktCrc32>() + size_of::<u8>())
-            as u16
-    }
+    const LEN: u16 = (size_of::<Self>() - size_of::<BSLPktHead>() - size_of::<BSLPktCrc32>()
+        + size_of::<u8>()) as u16;
 }
 
 impl<T> Crc32 for T
@@ -116,7 +114,7 @@ impl BSLMsg for BSLDeviceInfoRespPkt {}
 
 impl BSLDeviceInfoRespPkt {
     fn validate(&self) -> Result<()> {
-        self.head.validate_resp(GET_DEVICE_INFO, Self::len())?;
+        self.head.validate_resp(GET_DEVICE_INFO, Self::LEN)?;
 
         if self.crc32() != self.tail {
             return Err(Error::InvalidResponse);
@@ -138,7 +136,7 @@ impl BSLMsg for BSLCoreResp {}
 
 impl BSLCoreResp {
     fn validate(&self) -> Result<()> {
-        self.head.validate_resp(CORE_MESSAGE, Self::len())?;
+        self.head.validate_resp(CORE_MESSAGE, Self::LEN)?;
 
         if self.crc32() != self.tail {
             return Err(Error::InvalidResponse);
@@ -170,7 +168,7 @@ impl BSLUnlockBslReqPkt {
         crc.update(&password);
 
         Self {
-            head: BSLPktHead::new_req(Self::len(), COMMAND_UNLOCK_BOOTLOADER),
+            head: BSLPktHead::new_req(Self::LEN, COMMAND_UNLOCK_BOOTLOADER),
             password,
             tail: u32::try_from(crc.finalize()).unwrap().into(),
         }
@@ -203,7 +201,7 @@ impl BSLStandaloneVerificationReqPkt {
         crc.update(&size.to_le_bytes());
 
         Self {
-            head: BSLPktHead::new_req(Self::len(), COMMAND_STANDALONE_VERIFICATION),
+            head: BSLPktHead::new_req(Self::LEN, COMMAND_STANDALONE_VERIFICATION),
             address: 0.into(),
             size: size.into(),
             tail: u32::try_from(crc.finalize()).unwrap().into(),
@@ -224,7 +222,7 @@ impl BSLMsg for BSLStandaloneVerificationRespPkt {}
 impl BSLStandaloneVerificationRespPkt {
     fn validate(&self) -> Result<()> {
         self.head
-            .validate_resp(STANDALONE_VERIFICATION, Self::len())?;
+            .validate_resp(STANDALONE_VERIFICATION, Self::LEN)?;
 
         if self.crc32() != self.tail {
             return Err(Error::InvalidResponse);
@@ -276,7 +274,7 @@ impl BSLChageBaudRatePkt {
         crc.update(&[rate]);
 
         Self {
-            head: BSLPktHead::new_req(Self::len(), COMMAND_CHANGE_BAUD_RATE),
+            head: BSLPktHead::new_req(Self::LEN, COMMAND_CHANGE_BAUD_RATE),
             rate,
             tail: u32::try_from(crc.finalize()).unwrap().into(),
         }
