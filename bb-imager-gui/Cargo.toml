@@ -15,13 +15,12 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
 iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
 image = "0.25"
-tokio = { version = "1.52", default-features = false, features = ["macros"] }
+tokio = { version = "1.52", default-features = false, features = ["macros", "time"] }
 webbrowser = "1.2.1"
 notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"], optional = true }
 url = "2.5.4"
 whoami = "2.1"
 localzone = "0.3.1"
-tokio-stream = "0.1.18"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150" }
 directories = "6.0.0"

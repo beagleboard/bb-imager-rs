@@ -1,11 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::time::Duration;
-
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
-use tokio_stream::StreamExt as _;
+use tokio::time::interval;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -223,6 +221,8 @@ impl BBImager {
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
+        const INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
         match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
@@ -231,9 +231,13 @@ impl BBImager {
                     x.search_text.to_lowercase(),
                 ),
                 |(flasher, filter, search_text)| {
+                    let mut interval = interval(INTERVAL);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
                     iced::futures::stream::unfold(
-                        (*flasher, *filter, search_text.clone()),
-                        async move |(flasher, filter, search_text)| {
+                        (*flasher, *filter, search_text.clone(), interval),
+                        async move |(flasher, filter, search_text, mut interval)| {
+                            interval.tick().await;
                             let dest: Vec<helpers::Destination> =
                                 blocking_future(move || helpers::destinations(flasher, filter))
                                     .await
@@ -245,10 +249,9 @@ impl BBImager {
                                     .collect();
 
                             let msg = BBImagerMessage::Destinations(dest);
-                            Some((msg, (flasher, filter, search_text)))
+                            Some((msg, (flasher, filter, search_text, interval)))
                         },
                     )
-                    .throttle(Duration::from_secs(1))
                 },
             ),
             _ => Subscription::none(),
