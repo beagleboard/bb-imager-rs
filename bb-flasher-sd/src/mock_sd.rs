@@ -1,10 +1,9 @@
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
-use fatfs::FileSystem;
 use fscommon::{BufStream, StreamSlice};
 use mbrman::{CHS, MBR, MBRPartitionEntry};
 
-use crate::cancel::CancellationToken;
+use bb_helper::cancel::CancellationToken;
 
 const DISK_SIZE: u64 = 128 * 1024 * 1024; // 128 MiB
 const SECTOR_SIZE: u32 = 512;
@@ -13,7 +12,7 @@ const FIRST_LBA: u32 = 2048;
 #[derive(Debug)]
 pub struct MockSd {
     file: tempfile::NamedTempFile,
-    fail: crate::cancel::CancellationToken,
+    fail: CancellationToken,
 }
 
 impl Default for MockSd {
@@ -85,19 +84,7 @@ impl MockSd {
     }
 
     pub fn open_boot(&mut self) -> fatfs::FileSystem<BufStream<StreamSlice<&mut Self>>> {
-        let (start_offset, end_offset) = {
-            let mbr = mbrman::MBRHeader::read_from(self).unwrap();
-
-            let boot_part = mbr.get(1).unwrap();
-            let start_offset: u64 = (boot_part.starting_lba * 512).into();
-            let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
-
-            (start_offset, end_offset)
-        };
-
-        let slice = StreamSlice::new(self, start_offset, end_offset).unwrap();
-        let boot_stream = BufStream::new(slice);
-        FileSystem::new(boot_stream, fatfs::FsOptions::new()).unwrap()
+        crate::customization::ParitionType::Boot.open(self).unwrap()
     }
 }
 
@@ -136,5 +123,11 @@ impl Read for MockSd {
         } else {
             self.file.read(buf)
         }
+    }
+}
+
+impl crate::helpers::Eject for MockSd {
+    fn eject(self) -> io::Result<()> {
+        self.as_file().sync_all()
     }
 }

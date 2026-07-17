@@ -22,10 +22,10 @@ bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
 tokio = { version = "1.52", optional = true, default-features = false, features = ["rt", "signal"] }
 anyhow = "1.0"
 bb-helper = { path = "../bb-helper", features = ["cancel"] }
+tempfile = { version = "3.27", optional = true }
 
 [dev-dependencies]
 tempfile = "3.27"
-bb-helper = { path = "../bb-helper", features = ["mock_sd"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 udisks2 = { version = "0.3", optional = true }
@@ -41,3 +41,4 @@ nix = { version = "0.31", features = ["socket", "uio"], optional = true }
 [features]
 macos_authopen = ["dep:security-framework", "dep:nix"]
 udev = ["dep:udisks2", "dep:tokio"]
+mock_sd = ["dep:tempfile"]

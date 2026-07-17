@@ -1,6 +1,7 @@
+#![cfg(feature = "mock_sd")]
+
 use bb_flasher_sd::bootfs_update::flash;
 use bb_flasher_sd::{ContentType, Destination};
-use bb_helper::mock_sd::MockSd;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use tempfile::NamedTempFile;
@@ -47,7 +48,7 @@ impl<'b> IntoIterator for &'b mut MockArchive {
 #[test]
 fn test_flash_workflow_with_helper_inspection() {
     // 1. Initialize the public mock storage block device
-    let mut mock_sd = MockSd::new();
+    let mut mock_sd = bb_flasher_sd::mock_sd::MockSd::new();
 
     let temp_file_data = "Hello World";
     let mut temp_file = NamedTempFile::new().unwrap();
