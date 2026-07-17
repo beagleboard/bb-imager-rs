@@ -13,6 +13,7 @@ mod helpers;
 
 use helpers::{AsyncTempFile, sha256_from_path};
 
+use futures_util::{StreamExt, TryStreamExt};
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
@@ -22,7 +23,6 @@ use std::{
     time::Duration,
 };
 use tokio::io::AsyncWriteExt;
-use futures_util::StreamExt;
 
 pub use reqwest::IntoUrl;
 
@@ -168,11 +168,10 @@ impl Downloader {
                 .send()
                 .await
                 .map_err(io::Error::other)?;
-            let mut response_stream = response.bytes_stream();
+            let mut response_stream = response.bytes_stream().map_err(io::Error::other);
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(io::Error::other)?;
-                file.write_all_buf(&mut data).await?;
+                file.write_all_buf(&mut x?).await?;
             }
 
             file.flush().await?
@@ -211,12 +210,12 @@ impl Downloader {
                 .await
                 .map_err(io::Error::other)?;
 
-            let mut response_stream = response.bytes_stream();
+            let mut response_stream = response.bytes_stream().map_err(io::Error::other);
 
             let mut hasher = Sha256::new();
 
             while let Some(x) = response_stream.next().await {
-                let mut data = x.map_err(io::Error::other)?;
+                let mut data = x?;
                 hasher.update(&data);
                 file.write_all_buf(&mut data).await?;
             }
