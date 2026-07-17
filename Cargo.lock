@@ -520,13 +520,13 @@ version = "0.2.0"
 dependencies = [
  "bb-helper",
  "const-hex",
+ "futures-util",
  "httpmock",
  "reqwest",
  "serde",
  "sha2",
  "tempfile",
  "tokio",
- "tokio-stream",
  "tracing",
 ]
 

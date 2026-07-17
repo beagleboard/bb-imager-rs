@@ -22,7 +22,7 @@ use std::{
     time::Duration,
 };
 use tokio::io::AsyncWriteExt;
-use tokio_stream::StreamExt;
+use futures_util::StreamExt;
 
 pub use reqwest::IntoUrl;
 

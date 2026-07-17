@@ -19,7 +19,7 @@ tokio = { version = "1.52", default-features = false, features = ["fs"] }
 const-hex = "1.19"
 tempfile = "3.27"
 bb-helper = { path = "../bb-helper", features = ["file_stream"] }
-tokio-stream = "0.1.18"
+futures-util = "0.3"
 
 [features]
 default = ["rustls"]
