@@ -23,7 +23,7 @@ fn test_happy_path_progress() {
 }
 
 #[test]
-fn test_forward_seek_desync() {
+fn test_progress_tracks_absolute_position_after_seek() {
     let data = vec![0u8; 100];
     let (tx, rx) = mpsc::sync_channel(10);
 
@@ -35,21 +35,21 @@ fn test_forward_seek_desync() {
     assert_eq!(count, 10);
     assert_eq!(rx.try_recv().unwrap(), 0.10);
 
-    // 2. Simulate your forward seek (skipping 40 bytes)
+    // 2. Forward seek, skipping 40 bytes -> absolute position 50.
     reader.seek(SeekFrom::Current(40)).unwrap();
 
-    // 3. Read another 10 bytes.
-    // Real position is now 60 (50 skipped + 10 read), so progress should ideally be 60%.
+    // 3. Read another 10 bytes. Real position is now 60.
     let count = reader.read(&mut buf).unwrap();
     assert_eq!(count, 10);
 
     let reported_progress = rx.try_recv().unwrap();
 
-    // This assertion will FAIL on your current code because your `pos` will
-    // think it's only at 20 (10 + 10), reporting 20% instead of 60%.
+    // The Seek impl re-syncs `pos` to the reader's absolute position
+    // (`self.pos = self.reader.seek(pos)?`), so progress after a seek stays
+    // accurate: 60%, not the 20% a naive read-only byte counter would report.
     assert_eq!(
         reported_progress, 0.60,
-        "Progress desynced! Expected 0.60, but got {}",
+        "Progress should track absolute position after a seek, got {}",
         reported_progress
     );
 }
