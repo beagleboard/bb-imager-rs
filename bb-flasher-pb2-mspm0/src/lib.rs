@@ -282,3 +282,83 @@ pub struct Device {
     pub path: String,
     pub flash_size: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    /// Build a fake firmware-upload sysfs directory. `status` is seeded with
+    /// "idle" so `flash_fw_api`'s polling loop terminates after one read (any
+    /// non-terminal status would spin forever against a static file), and
+    /// `error` carries whatever terminal state we want to exercise.
+    fn fake_sysfs(error: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::write(p.join("loading"), b"").unwrap();
+        std::fs::write(p.join("data"), b"").unwrap();
+        std::fs::write(p.join("status"), b"idle").unwrap();
+        std::fs::write(p.join("error"), error.as_bytes()).unwrap();
+        dir
+    }
+
+    #[test]
+    fn flash_fw_api_writes_firmware_and_reports_success() {
+        let dir = fake_sysfs("none");
+        let (tx, _rx) = mpsc::sync_channel(4);
+        const FW: &[u8] = b"firmware-bytes";
+
+        flash_fw_api(dir.path(), FW, &tx).unwrap();
+
+        // The payload is written verbatim to the `data` entry...
+        assert_eq!(std::fs::read(dir.path().join("data")).unwrap(), FW);
+        // ...and `loading` is toggled 1 (start) then 0 (end) on one handle.
+        assert_eq!(std::fs::read(dir.path().join("loading")).unwrap(), b"10");
+    }
+
+    #[test]
+    fn flash_fw_api_empty_error_is_success() {
+        let dir = fake_sysfs("");
+        let (tx, _rx) = mpsc::sync_channel(1);
+        flash_fw_api(dir.path(), b"x", &tx).unwrap();
+    }
+
+    #[test]
+    fn flash_fw_api_firmware_invalid_is_skipped() {
+        // The driver reports this when the same image is already present; the
+        // flasher treats it as a successful skip, not a failure.
+        let dir = fake_sysfs("preparing:firmware-invalid");
+        let (tx, _rx) = mpsc::sync_channel(1);
+        flash_fw_api(dir.path(), b"x", &tx).unwrap();
+    }
+
+    #[test]
+    fn flash_fw_api_surfaces_flashing_error() {
+        let dir = fake_sysfs("write:0x1234");
+        let (tx, _rx) = mpsc::sync_channel(1);
+
+        match flash_fw_api(dir.path(), b"x", &tx).unwrap_err() {
+            Error::FlashingError { stage, code } => {
+                assert_eq!(stage, "write");
+                assert_eq!(code, "0x1234");
+            }
+            other => panic!("expected FlashingError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn flash_fw_api_missing_loading_entry_fails_to_open() {
+        // `sysfs_w_open` uses create(false); a missing `loading` entry must
+        // surface as FailedToOpen rather than silently creating the file.
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, _rx) = mpsc::sync_channel(1);
+
+        assert!(matches!(
+            flash_fw_api(dir.path(), b"x", &tx).unwrap_err(),
+            Error::FailedToOpen {
+                fname: "loading",
+                ..
+            }
+        ));
+    }
+}
