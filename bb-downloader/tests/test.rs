@@ -90,3 +90,29 @@ async fn test_download_json_no_cache() {
     let entries = std::fs::read_dir(tmp_dir.path()).unwrap().count();
     assert_eq!(entries, 0);
 }
+
+#[cfg(feature = "json")]
+#[tokio::test]
+async fn test_download_json_no_cache_rejects_malformed_json() {
+    #[derive(serde::Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct TestData {
+        status: String,
+    }
+
+    let server = MockServer::start();
+    let tmp_dir = TempDir::new().unwrap();
+    let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/api/bad");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body("{ this is not valid json ");
+    });
+
+    let result: io::Result<TestData> = downloader.download_json_no_cache(&server.url("/api/bad")).await;
+
+    assert!(result.is_err(), "malformed JSON body should surface an error");
+    mock.assert_calls(1);
+}
