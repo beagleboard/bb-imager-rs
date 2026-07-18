@@ -227,4 +227,165 @@ mod tests {
         let res: super::Devices = serde_json::from_str(data).unwrap();
         let _: Vec<DeviceDescriptor> = res.blockdevices.into_iter().map(Into::into).collect();
     }
+
+    /// Parse a `blockdevices` JSON array through the same path `lsblk()` uses
+    /// (`Devices` -> `DeviceDescriptor`), so the classification logic can be
+    /// exercised without a real `lsblk` binary or block devices.
+    fn descriptors(blockdevices: &str) -> Vec<DeviceDescriptor> {
+        let data = format!(r#"{{"blockdevices":{blockdevices}}}"#);
+        let res: super::Devices = serde_json::from_str(&data).unwrap();
+        res.blockdevices.into_iter().map(Into::into).collect()
+    }
+
+    /// A removable USB device: `rm` + a `usb`/`scsi` subsystem string. It should
+    /// be classified removable (not system), the bus type upper-cased, and the
+    /// description built from label+vendor+model with empty parts dropped.
+    #[test]
+    fn usb_removable_disk_classification() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/sda","kname":"/dev/sda",
+                "size":32000000000,"tran":"usb",
+                "subsystems":"block:scsi:usb:pci","ro":false,
+                "phy-sec":512,"log-sec":512,"rm":true,"hotplug":false,
+                "ptype":"gpt","label":"BOOT","vendor":"Kingston","model":"DataTraveler"
+            }]"#,
+        )[0];
+
+        assert_eq!(d.enumerator, "lsblk:json");
+        assert_eq!(d.device, "/dev/sda");
+        assert_eq!(d.raw, "/dev/sda");
+        assert_eq!(d.bus_type.as_deref(), Some("USB"));
+        assert!(d.is_usb);
+        assert!(d.is_scsi);
+        assert!(!d.is_virtual);
+        assert!(d.is_removable);
+        assert!(!d.is_system);
+        assert!(!d.is_readonly);
+        assert_eq!(d.size, Some(32000000000));
+        assert_eq!(d.block_size, 512);
+        assert_eq!(d.logical_block_size, 512);
+        assert_eq!(d.partition_table_type.as_deref(), Some("gpt"));
+        assert_eq!(d.description, "BOOTKingstonDataTraveler");
+    }
+
+    /// An internal NVMe disk: no `usb`, not `rm`/`hotplug`, and `block` present.
+    /// It should be a non-removable system drive, `is_scsi` via the `pci`
+    /// subsystem, description built from `model` alone.
+    #[test]
+    fn internal_disk_is_system_not_removable() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/nvme0n1","kname":"/dev/nvme0n1",
+                "size":512000000000,"tran":"nvme",
+                "subsystems":"block:nvme:pci","ro":false,
+                "phy-sec":512,"log-sec":4096,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":"Samsung SSD"
+            }]"#,
+        )[0];
+
+        assert_eq!(d.bus_type.as_deref(), Some("NVME"));
+        assert!(!d.is_usb);
+        assert!(d.is_scsi);
+        assert!(!d.is_virtual);
+        assert!(!d.is_removable);
+        assert!(d.is_system);
+        assert_eq!(d.logical_block_size, 4096);
+        assert_eq!(d.description, "Samsung SSD");
+        assert_eq!(d.partition_table_type, None);
+    }
+
+    /// A device whose `subsystems` string lacks `block` is virtual, which forces
+    /// removable=true and system=false. A missing `tran` yields the "UNKNOWN"
+    /// bus type, and `ro` propagates to `is_readonly`.
+    #[test]
+    fn virtual_device_without_block_subsystem() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/dm-0","kname":"/dev/dm-0",
+                "size":null,"tran":null,
+                "subsystems":"","ro":true,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert!(d.is_virtual);
+        assert!(d.is_removable);
+        assert!(!d.is_system);
+        assert_eq!(d.bus_type.as_deref(), Some("UNKNOWN"));
+        assert!(d.is_readonly);
+        assert!(!d.is_scsi);
+        assert!(!d.is_usb);
+        assert_eq!(d.description, "");
+    }
+
+    /// `hotplug` alone (without `rm`) must still mark the device removable.
+    #[test]
+    fn hotplug_alone_marks_removable() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/sdb","kname":"/dev/sdb",
+                "size":8000000000,"tran":"usb",
+                "subsystems":"block:usb","ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":true,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert!(d.is_removable);
+        assert!(!d.is_system);
+        assert!(d.is_usb);
+        assert!(!d.is_virtual);
+    }
+
+    /// Children map to mountpoints: `fssize`/`fsavail` accept either JSON strings
+    /// or numbers (the `FsSize` untagged enum), the mount label falls back to
+    /// `partlabel` when `label` is null, and a null `mountpoint` becomes "".
+    #[test]
+    fn children_map_to_mountpoints_with_fssize_variants() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/sdc","kname":"/dev/sdc",
+                "size":16000000000,"tran":"usb",
+                "subsystems":"block:usb","ro":false,
+                "phy-sec":512,"log-sec":512,"rm":true,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null,
+                "children":[
+                    {"mountpoint":"/boot","fssize":"1048576","fsavail":524288,"label":null,"partlabel":"BOOTFS"},
+                    {"mountpoint":null,"fssize":null,"fsavail":null,"label":"ROOT","partlabel":"rootfs"}
+                ]
+            }]"#,
+        )[0];
+
+        assert_eq!(d.mountpoints.len(), 2);
+
+        // fssize given as a JSON string, fsavail as a number.
+        assert_eq!(d.mountpoints[0].path, "/boot");
+        assert_eq!(d.mountpoints[0].total_bytes, Some(1048576));
+        assert_eq!(d.mountpoints[0].available_bytes, Some(524288));
+        // label is null -> falls back to partlabel.
+        assert_eq!(d.mountpoints[0].label.as_deref(), Some("BOOTFS"));
+
+        // null mountpoint -> empty path; label present -> used as-is.
+        assert_eq!(d.mountpoints[1].path, "");
+        assert_eq!(d.mountpoints[1].total_bytes, None);
+        assert_eq!(d.mountpoints[1].label.as_deref(), Some("ROOT"));
+    }
+
+    /// Missing `name`/`kname` fall back to the `NO_NAME` default.
+    #[test]
+    fn missing_name_uses_default() {
+        let d = &descriptors(
+            r#"[{
+                "size":null,"tran":null,
+                "subsystems":"block","ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert_eq!(d.device, "NO_NAME");
+        assert_eq!(d.raw, "NO_NAME");
+    }
 }
