@@ -169,17 +169,14 @@ endif
 
 _check_common:
 	$(_CARGO_CHECK) --all-targets --all-features --workspace --exclude bb-flasher-bcf \
-		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli --exclude xtask \
-		--exclude bb-downloader --exclude bb-config
+		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli
 	$(_CARGO_CHECK) --all-targets -p bb-flasher-bcf -F msp430,static
 	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
 
 _check_cli:
-	$(_CARGO_CHECK) --all-targets -p xtask --all-features
 	$(_CARGO_CHECK) --all-targets -p bb-imager-cli ${_RUST_ARGS_CLI} -F pb2_mspm0,zepto_i2c
 
 _check_gui:
-	$(_CARGO_CHECK) --all-targets -p bb-downloader -p bb-config --all-features
 	$(_CARGO_CHECK) --all-targets -p bb-imager-gui ${_RUST_ARGS_GUI} -F updater,zepto_i2c,pre-release
 	
 ## housekeeping: check: Run code quality checks.
