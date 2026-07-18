@@ -74,6 +74,42 @@ fn test_public_flash_with_temp_file() {
 }
 
 #[test]
+fn flash_aborts_with_cancelled_token() {
+    use bb_helper::cancel::CancellationToken;
+
+    const FILE_LEN: usize = 16 * 1024;
+    let dummy_file = test_file(FILE_LEN);
+    let img_data = dummy_file.get_ref().clone();
+
+    let temp_destination = NamedTempFile::new().expect("Failed to create temp file");
+    let dst = Destination::File(temp_destination.path().into());
+
+    let img_resolver = move || Ok((Cursor::new(img_data), FILE_LEN as u64));
+    let bmap_resolver: Option<fn() -> std::io::Result<Box<str>>> = None;
+    let customizations =
+        std::iter::empty::<Customization<std::iter::Empty<(Box<str>, ContentType)>>>();
+
+    // Cancel the token before flashing begins.
+    let token = CancellationToken::default();
+    drop(token.drop_guard());
+    assert!(token.is_cancelled());
+
+    let result = bb_flasher_sd::flash(
+        img_resolver,
+        bmap_resolver,
+        dst,
+        None,
+        customizations,
+        Some(token),
+    );
+
+    assert!(
+        matches!(result, Err(bb_flasher_sd::Error::Aborted)),
+        "expected Err(Aborted) for a pre-cancelled token, got {result:?}"
+    );
+}
+
+#[test]
 fn destinations() {
     let temp = bb_flasher_sd::devices(false);
     assert!(!temp.is_empty());
