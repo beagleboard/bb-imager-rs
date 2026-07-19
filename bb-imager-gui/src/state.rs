@@ -387,23 +387,7 @@ impl FlashingState {
     }
 
     pub(crate) fn time_remaining(&self) -> Option<Duration> {
-        const THRESHOLD: f32 = 0.02;
-
-        match self.progress {
-            bb_flasher::DownloadFlashingStatus::FlashingProgress(x)
-            | bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => {
-                if x < THRESHOLD {
-                    None
-                } else {
-                    let t = self.start_timestamp?.elapsed();
-                    let x = x.clamp(0.0, 1.0);
-                    let scale = (1.0 - x) / x;
-                    Some(t.mul_f32(scale))
-                }
-            }
-            bb_flasher::DownloadFlashingStatus::Customizing => Some(Duration::from_secs(1)),
-            _ => None,
-        }
+        time_remaining_from(self.progress, self.start_timestamp.map(|t| t.elapsed()))
     }
 
     pub(crate) fn progress_update(&mut self, u: bb_flasher::DownloadFlashingStatus) {
@@ -419,6 +403,36 @@ impl FlashingState {
         }
 
         self.progress = u;
+    }
+}
+
+/// Estimate the remaining flashing time from the current `progress` and how
+/// much time has `elapsed` since the first progress update.
+///
+/// Split out of [`FlashingState::time_remaining`] so the ETA math is testable
+/// without an `Instant` clock: a linear extrapolation `elapsed * (1 - x) / x`,
+/// suppressed until progress clears a small threshold to avoid wild early
+/// estimates.
+fn time_remaining_from(
+    progress: bb_flasher::DownloadFlashingStatus,
+    elapsed: Option<Duration>,
+) -> Option<Duration> {
+    const THRESHOLD: f32 = 0.02;
+
+    match progress {
+        bb_flasher::DownloadFlashingStatus::FlashingProgress(x)
+        | bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => {
+            if x < THRESHOLD {
+                None
+            } else {
+                let t = elapsed?;
+                let x = x.clamp(0.0, 1.0);
+                let scale = (1.0 - x) / x;
+                Some(t.mul_f32(scale))
+            }
+        }
+        bb_flasher::DownloadFlashingStatus::Customizing => Some(Duration::from_secs(1)),
+        _ => None,
     }
 }
 
@@ -577,5 +591,96 @@ impl OverlayState {
 
     pub(crate) fn common_mut(&mut self) -> &mut BBImagerCommon {
         self.page.common_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::time_remaining_from;
+    use bb_flasher::DownloadFlashingStatus;
+    use std::time::Duration;
+
+    #[test]
+    fn eta_scales_linearly_with_remaining_fraction() {
+        // At 50% after 10s, the remaining half should take another ~10s.
+        assert_eq!(
+            time_remaining_from(
+                DownloadFlashingStatus::FlashingProgress(0.5),
+                Some(Duration::from_secs(10)),
+            ),
+            Some(Duration::from_secs(10))
+        );
+        // At 25% after 10s, the remaining 75% extrapolates to 30s.
+        assert_eq!(
+            time_remaining_from(
+                DownloadFlashingStatus::FlashingProgress(0.25),
+                Some(Duration::from_secs(10)),
+            ),
+            Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn eta_uses_the_same_math_for_downloads() {
+        assert_eq!(
+            time_remaining_from(
+                DownloadFlashingStatus::DownloadingProgress(0.5),
+                Some(Duration::from_secs(4)),
+            ),
+            Some(Duration::from_secs(4))
+        );
+    }
+
+    #[test]
+    fn eta_suppressed_below_threshold() {
+        // Below 2% the estimate is too noisy, so no ETA is reported.
+        assert_eq!(
+            time_remaining_from(
+                DownloadFlashingStatus::FlashingProgress(0.01),
+                Some(Duration::from_secs(10)),
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn eta_requires_a_start_timestamp() {
+        // Past the threshold but with no elapsed time recorded yet.
+        assert_eq!(
+            time_remaining_from(DownloadFlashingStatus::FlashingProgress(0.5), None),
+            None
+        );
+    }
+
+    #[test]
+    fn eta_clamps_progress_above_one() {
+        // A progress value >1.0 clamps to 1.0, yielding a zero remainder.
+        assert_eq!(
+            time_remaining_from(
+                DownloadFlashingStatus::FlashingProgress(1.5),
+                Some(Duration::from_secs(10)),
+            ),
+            Some(Duration::ZERO)
+        );
+    }
+
+    #[test]
+    fn customizing_reports_fixed_estimate() {
+        assert_eq!(
+            time_remaining_from(DownloadFlashingStatus::Customizing, None),
+            Some(Duration::from_secs(1))
+        );
+    }
+
+    #[test]
+    fn non_progress_states_have_no_eta() {
+        assert_eq!(
+            time_remaining_from(DownloadFlashingStatus::Preparing, Some(Duration::from_secs(5))),
+            None
+        );
+        assert_eq!(
+            time_remaining_from(DownloadFlashingStatus::Verifying, Some(Duration::from_secs(5))),
+            None
+        );
     }
 }
