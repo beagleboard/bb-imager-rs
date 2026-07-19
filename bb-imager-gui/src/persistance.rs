@@ -251,3 +251,160 @@ impl Default for BcfCustomization {
         Self { verify: true }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bcf_customization_defaults_to_verify() {
+        assert!(BcfCustomization::default().verify);
+        assert!(!BcfCustomization::default().update_verify(false).verify);
+    }
+
+    #[test]
+    fn sd_user_validate_rejects_root() {
+        assert!(!SdCustomizationUser::new("root".into(), "pw".into()).validate_username());
+        assert!(SdCustomizationUser::new("beagle".into(), "pw".into()).validate_username());
+    }
+
+    #[test]
+    fn sd_user_default_has_empty_password() {
+        assert!(SdCustomizationUser::default().password.is_empty());
+    }
+
+    #[test]
+    fn sd_user_builders_set_fields() {
+        let user = SdCustomizationUser::default()
+            .update_username("alice".into())
+            .update_password("secret".into());
+        assert_eq!(user.username, "alice");
+        assert_eq!(user.password, "secret");
+    }
+
+    #[test]
+    fn sd_wifi_builders_set_fields() {
+        let wifi = SdCustomizationWifi::default()
+            .update_ssid("net".into())
+            .update_password("pw".into());
+        assert_eq!(wifi.ssid, "net");
+        assert_eq!(wifi.password, "pw");
+    }
+
+    #[test]
+    fn sysconf_validate_user_follows_inner_user() {
+        // No user configured is always valid.
+        assert!(SdSysconfCustomization::default().validate_user());
+        // A configured non-root user is valid; root is not.
+        let ok = SdSysconfCustomization::default()
+            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
+        assert!(ok.validate_user());
+        let bad = SdSysconfCustomization::default()
+            .update_user(Some(SdCustomizationUser::new("root".into(), "pw".into())));
+        assert!(!bad.validate_user());
+    }
+
+    #[test]
+    fn sysconf_builders_populate_all_fields() {
+        let cfg = SdSysconfCustomization::default()
+            .update_hostname(Some("beagle".into()))
+            .update_timezone(Some("UTC".into()))
+            .update_keymap(Some("us".into()))
+            .update_ssh(Some("ssh-key".into()))
+            .update_usb_enable_dhcp(Some(true))
+            .update_wifi(Some(SdCustomizationWifi::default().update_ssid("net".into())))
+            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
+
+        assert_eq!(cfg.hostname.as_deref(), Some("beagle"));
+        assert_eq!(cfg.timezone.as_deref(), Some("UTC"));
+        assert_eq!(cfg.keymap.as_deref(), Some("us"));
+        assert_eq!(cfg.ssh.as_deref(), Some("ssh-key"));
+        assert_eq!(cfg.usb_enable_dhcp, Some(true));
+        assert_eq!(cfg.wifi.as_ref().map(|w| w.ssid.as_str()), Some("net"));
+        assert_eq!(cfg.user.as_ref().map(|u| u.username.as_str()), Some("beagle"));
+    }
+
+    #[test]
+    fn sysconf_default_usb_dhcp_is_platform_specific() {
+        let default = SdSysconfCustomization::default();
+        if cfg!(target_os = "macos") {
+            assert_eq!(default.usb_enable_dhcp, Some(true));
+        } else {
+            assert_eq!(default.usb_enable_dhcp, None);
+        }
+    }
+
+    #[test]
+    fn sd_customization_wraps_sysconf() {
+        let mut sd = SdCustomization::default();
+        assert!(sd.sysconf_customization().is_none());
+        sd.update_sysconfig(SdSysconfCustomization::default().update_hostname(Some("bb".into())));
+        assert_eq!(
+            sd.sysconf_customization()
+                .and_then(|s| s.hostname.as_deref()),
+            Some("bb")
+        );
+    }
+
+    #[test]
+    fn gui_configuration_updates_each_slot() {
+        let mut gui = GuiConfiguration::default();
+        assert!(gui.sd_customization.is_none());
+        assert!(gui.bcf_customization.is_none());
+        assert!(gui.zepto_customization.is_none());
+
+        gui.update_sd_customization(SdCustomization::default());
+        gui.update_bcf_customization(BcfCustomization::default());
+        gui.update_zepto_customization(BcfCustomization::default().update_verify(false));
+
+        assert!(gui.sd_customization.is_some());
+        assert!(gui.bcf_customization.is_some());
+        assert_eq!(gui.zepto_customization.map(|z| z.verify), Some(false));
+    }
+
+    #[test]
+    fn empty_gui_configuration_serializes_to_empty_object() {
+        // All fields are `skip_serializing_if = "Option::is_none"`.
+        let json = serde_json::to_string(&GuiConfiguration::default()).unwrap();
+        assert_eq!(json, "{}");
+    }
+
+    #[test]
+    fn gui_configuration_round_trips_through_json() {
+        let mut gui = GuiConfiguration::default();
+        gui.update_bcf_customization(BcfCustomization { verify: false });
+        gui.update_sd_customization({
+            let mut sd = SdCustomization::default();
+            sd.update_sysconfig(
+                SdSysconfCustomization::default().update_hostname(Some("host".into())),
+            );
+            sd
+        });
+
+        let json = serde_json::to_string(&gui).unwrap();
+        let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(back.bcf_customization.map(|b| b.verify), Some(false));
+        assert_eq!(
+            back.sd_customization
+                .and_then(|s| s.sysconf_customization().and_then(|c| c.hostname.clone())),
+            Some("host".to_string())
+        );
+    }
+
+    #[cfg(feature = "sd")]
+    #[test]
+    fn sysconf_converts_to_flasher_configs_without_panicking() {
+        // Exercises the sysconfig/cloudinit bridges into bb_flasher.
+        let base = SdSysconfCustomization::default()
+            .update_hostname(Some("beagle".into()))
+            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
+            .update_wifi(Some(
+                SdCustomizationWifi::default()
+                    .update_ssid("net".into())
+                    .update_password("pw".into()),
+            ));
+        let _ = base.clone().sysconfig();
+        let _ = base.cloudinit();
+    }
+}
