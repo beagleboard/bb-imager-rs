@@ -598,3 +598,62 @@ fn generate_completion(target: clap_complete::Shell) {
 
     clap_complete::generate(target, &mut cmd, BIN_NAME, &mut std::io::stdout())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_msg_maps_each_status() {
+        assert_eq!(progress_msg(DownloadFlashingStatus::Preparing), "Preparing  ");
+        assert_eq!(
+            progress_msg(DownloadFlashingStatus::DownloadingProgress(0.5)),
+            "Downloading"
+        );
+        assert_eq!(
+            progress_msg(DownloadFlashingStatus::FlashingProgress(0.5)),
+            "Flashing"
+        );
+        assert_eq!(progress_msg(DownloadFlashingStatus::Verifying), "Verifying");
+        assert_eq!(
+            progress_msg(DownloadFlashingStatus::Customizing),
+            "Customizing"
+        );
+    }
+
+    #[test]
+    fn stage_msg_prefixes_stage_number() {
+        assert_eq!(
+            stage_msg(DownloadFlashingStatus::Preparing, 3),
+            "[3] Preparing  "
+        );
+        assert_eq!(
+            stage_msg(DownloadFlashingStatus::Verifying, 1),
+            "[1] Verifying"
+        );
+    }
+
+    #[test]
+    fn local_string_file_reads_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bmap.txt");
+        std::fs::write(&path, "bmap-contents").unwrap();
+
+        let read = LocalStringFile::new(path.into_boxed_path()).into_fn();
+        assert_eq!(&*read().unwrap(), "bmap-contents");
+    }
+
+    #[test]
+    fn local_string_file_missing_path_errors() {
+        let read =
+            LocalStringFile::new(PathBuf::from("/nonexistent/bmap.txt").into_boxed_path()).into_fn();
+        assert!(read().is_err());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn check_macos_device_path_is_identity_off_macos() {
+        let dst = PathBuf::from("/dev/disk2");
+        assert_eq!(check_macos_device_path(dst.clone()), dst);
+    }
+}
