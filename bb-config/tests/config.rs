@@ -79,7 +79,7 @@ fn full_config_round_trip() {
     assert_eq!(first.imager.devices.len(), 1);
     let device = &first.imager.devices[0];
     assert_eq!(device.flasher, Flasher::SdCard);
-    // `specification` uses tuple_vec_map, which preserves insertion order.
+    // `specification` is (de)serialized as a map via `serde_with::Map`, preserving insertion order.
     assert_eq!(
         device.specification,
         vec![

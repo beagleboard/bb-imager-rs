@@ -502,7 +502,6 @@ dependencies = [
  "const-hex",
  "rusqlite",
  "serde",
- "serde-tuple-vec-map",
  "serde_json",
  "serde_with",
  "url",
@@ -5607,15 +5606,6 @@ name = "serde-big-array"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11fc7cc2c76d73e0f27ee52abbd64eec84d46f370c88371120433196934e4b7f"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "serde-tuple-vec-map"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a04d0ebe0de77d7d445bb729a895dcb0a288854b267ca85f030ce51cdc578c82"
 dependencies = [
  "serde",
 ]

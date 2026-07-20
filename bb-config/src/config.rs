@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
-use serde_with::{VecSkipError, serde_as};
+use serde_with::{Map, VecSkipError, serde_as};
 use url::Url;
 
 /// [BeagleBoard.org] distros.json abstraction.
@@ -38,6 +38,7 @@ pub struct Imager {
 /// Structure describing [BeagleBoard.org] board
 ///
 /// [BeagleBoard.org]: https://www.beagleboard.org/
+#[serde_as]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Device {
     /// Board Name
@@ -56,7 +57,7 @@ pub struct Device {
     /// Special Instructions for flashing board.
     pub instructions: Option<String>,
     #[serde(default)]
-    #[serde(with = "tuple_vec_map")]
+    #[serde_as(as = "Map<_, _>")]
     /// Board Specification. With order preserved
     pub specification: Vec<(String, String)>,
     /// OSHW details for the device.
