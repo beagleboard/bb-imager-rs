@@ -14,6 +14,9 @@ _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
 _CLI_COMP_ZSH = bb-imager-cli/dist/.target/shell-comp/_bb-imager-cli
 _CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
+# Man pages and shell completions are emitted by bb-imager-cli's build script into its OUT_DIR.
+# Locate that directory (feature-hash is not known ahead of time; scoped to TARGET + release).
+_CLI_OUT_DIR = $(shell ls -td target/$(TARGET)/release/build/bb-imager-cli-*/out 2>/dev/null | head -1)
 
 _GUI_BIN = target/${TARGET}/release/bb-imager-gui
 _GUI_PORTABLE_EXE = bb-imager-gui/dist/bb-imager-gui_$(VERSION)_$(word 1,$(subst -, ,$(TARGET))).exe
@@ -378,18 +381,21 @@ _build-cli-bin:
 	$(RUST_BUILD) -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
 
 .PHONY: _build-cli-comp
-_build-cli-comp:
-	$(info Generate CLI shell completion)
+_build-cli-comp: _build-cli-bin
+	$(info Copy CLI shell completion)
+	@test -n "$(_CLI_OUT_DIR)" || { echo "bb-imager-cli build output not found; build the CLI first" >&2; exit 1; }
+	rm -rf bb-imager-cli/dist/.target/shell-comp
 	mkdir -p bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete bash bb-imager-cli/dist/.target/shell-comp
-	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-shell-complete zsh bb-imager-cli/dist/.target/shell-comp
+	cp $(_CLI_OUT_DIR)/shell-comp/* bb-imager-cli/dist/.target/shell-comp/
 
 .PHONY: _build-cli-man
-_build-cli-man:
-	$(info Generate CLI manpages)
+_build-cli-man: _build-cli-bin
+	$(info Copy CLI manpages)
+	@test -n "$(_CLI_OUT_DIR)" || { echo "bb-imager-cli build output not found; build the CLI first" >&2; exit 1; }
+	rm -rf bb-imager-cli/dist/.target/man
 	mkdir -p bb-imager-cli/dist/.target/man
-	$(CARGO_PATH) run -p xtask $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) cli-man bb-imager-cli/dist/.target/man/
-	gzip -f bb-imager-cli/dist/.target/man/*
+	cp $(_CLI_OUT_DIR)/man/*.1 bb-imager-cli/dist/.target/man/
+	gzip -f bb-imager-cli/dist/.target/man/*.1
 
 ## build: build-gui: Build GUI.
 .PHONY: build-gui

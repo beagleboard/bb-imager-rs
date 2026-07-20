@@ -6,7 +6,6 @@ members = [
 	"bb-imager-cli",
 	"bb-flasher-pb2-mspm0",
 	"bb-imager-gui",
-	"xtask",
 	"bb-flasher-bcf",
 	"bb-flasher-sd",
 	"bb-downloader",
