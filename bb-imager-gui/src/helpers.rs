@@ -1129,3 +1129,302 @@ where
 {
     tokio::task::spawn_blocking(f).await.unwrap()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::persistance::{
+        BcfCustomization, GuiConfiguration, SdCustomizationUser, SdCustomizationWifi,
+        SdSysconfCustomization,
+    };
+
+    #[test]
+    fn pretty_bytes_scales_units() {
+        assert_eq!(pretty_bytes(0), "0 B");
+        assert_eq!(pretty_bytes(512), "512 B");
+        assert_eq!(pretty_bytes(1024), "1.00 KiB");
+        assert_eq!(pretty_bytes(1536), "1.50 KiB");
+        assert_eq!(pretty_bytes(1024 * 1024), "1.00 MiB");
+        assert_eq!(pretty_bytes(1024 * 1024 * 1024), "1.00 GiB");
+    }
+
+    #[test]
+    fn pretty_duration_formats_minutes_and_seconds() {
+        assert_eq!(pretty_duration(Duration::from_secs(0)), "0s");
+        assert_eq!(pretty_duration(Duration::from_secs(45)), "45s");
+        assert_eq!(pretty_duration(Duration::from_secs(60)), "1:00");
+        assert_eq!(pretty_duration(Duration::from_secs(125)), "2:05");
+    }
+
+    #[test]
+    fn normalize_file_dest_strips_known_suffixes() {
+        assert_eq!(normalize_file_dest("os.zip"), "os");
+        assert_eq!(normalize_file_dest("os.img.xz"), "os.img");
+        assert_eq!(normalize_file_dest("os.img.gz"), "os.img");
+        assert_eq!(normalize_file_dest("plain.txt"), "plain.txt");
+    }
+
+    #[test]
+    fn flasher_supported_matches_enabled_features() {
+        // const fn whose arms are feature-gated; compare against cfg! so the
+        // assertion holds under any feature set the suite is compiled with.
+        assert_eq!(
+            flasher_supported(config::Flasher::SdCard),
+            cfg!(feature = "sd")
+        );
+        assert_eq!(
+            flasher_supported(config::Flasher::SdCardBootfs),
+            cfg!(feature = "sd")
+        );
+        assert_eq!(
+            flasher_supported(config::Flasher::BeagleConnectFreedom),
+            cfg!(feature = "bcf_cc1352p7")
+        );
+        assert_eq!(
+            flasher_supported(config::Flasher::Msp430Usb),
+            cfg!(feature = "bcf_msp430")
+        );
+        assert_eq!(
+            flasher_supported(config::Flasher::Mspm0),
+            cfg!(any(feature = "zepto_uart", feature = "zepto_i2c"))
+        );
+    }
+
+    #[test]
+    fn sd_modifications_common_lists_configured_fields() {
+        assert!(sd_modifications_common(&SdSysconfCustomization::default()).is_empty());
+
+        let full = SdSysconfCustomization::default()
+            .update_hostname(Some("h".into()))
+            .update_timezone(Some("UTC".into()))
+            .update_keymap(Some("us".into()))
+            .update_ssh(Some("k".into()))
+            .update_user(Some(SdCustomizationUser::new("u".into(), "p".into())))
+            .update_wifi(Some(SdCustomizationWifi::default()));
+        let mods = sd_modifications_common(&full);
+        assert_eq!(mods.len(), 6);
+        assert!(mods.contains(&"• User account configured"));
+        assert!(mods.contains(&"• Wifi configured"));
+        assert!(mods.contains(&"• SSH Key configured"));
+    }
+
+    #[test]
+    fn no_customization_covers_non_configurable_flashers() {
+        let img = BoardImage::format();
+        assert!(matches!(
+            no_customization(config::Flasher::SdCard, &img),
+            Some(FlashingCustomization::NoneSd)
+        ));
+        assert!(matches!(
+            no_customization(config::Flasher::SdCardBootfs, &img),
+            Some(FlashingCustomization::NoneSd)
+        ));
+        assert!(matches!(
+            no_customization(config::Flasher::Msp430Usb, &img),
+            Some(FlashingCustomization::Msp430)
+        ));
+        assert!(no_customization(config::Flasher::BeagleConnectFreedom, &img).is_none());
+    }
+
+    #[test]
+    fn flashing_customization_new_selects_variant_by_flasher() {
+        // A format image has init_format None, so SD falls through to NoneSd.
+        let img = BoardImage::format();
+        let cfg = GuiConfiguration::default();
+
+        assert!(matches!(
+            FlashingCustomization::new(config::Flasher::SdCard, &img, &cfg),
+            FlashingCustomization::NoneSd
+        ));
+        assert!(matches!(
+            FlashingCustomization::new(config::Flasher::BeagleConnectFreedom, &img, &cfg),
+            FlashingCustomization::Bcf(_)
+        ));
+        assert!(matches!(
+            FlashingCustomization::new(config::Flasher::Msp430Usb, &img, &cfg),
+            FlashingCustomization::Msp430
+        ));
+        assert!(matches!(
+            FlashingCustomization::new(config::Flasher::Mspm0, &img, &cfg),
+            FlashingCustomization::Zepto(_)
+        ));
+    }
+
+    #[test]
+    fn flashing_customization_validate_checks_user() {
+        assert!(FlashingCustomization::NoneSd.validate());
+        assert!(
+            FlashingCustomization::LinuxSdSysconfig(SdSysconfCustomization::default()).validate()
+        );
+        let root = SdSysconfCustomization::default()
+            .update_user(Some(SdCustomizationUser::new("root".into(), "p".into())));
+        assert!(!FlashingCustomization::LinuxSdSysconfig(root).validate());
+    }
+
+    #[test]
+    fn flashing_customization_reset_restores_defaults() {
+        let mut bcf = FlashingCustomization::Bcf(BcfCustomization { verify: false });
+        bcf.reset();
+        assert!(matches!(
+            bcf,
+            FlashingCustomization::Bcf(BcfCustomization { verify: true })
+        ));
+
+        let mut sysconf = FlashingCustomization::LinuxSdSysconfig(
+            SdSysconfCustomization::default().update_hostname(Some("h".into())),
+        );
+        sysconf.reset();
+        match sysconf {
+            FlashingCustomization::LinuxSdSysconfig(c) => assert!(c.hostname.is_none()),
+            _ => panic!("variant should be preserved"),
+        }
+
+        // Variants without inner state are left untouched.
+        let mut none = FlashingCustomization::NoneSd;
+        none.reset();
+        assert!(matches!(none, FlashingCustomization::NoneSd));
+    }
+
+    #[test]
+    fn board_image_format_accessors() {
+        let img = BoardImage::format();
+        assert_eq!(
+            img.description(),
+            Some("Format a SD Card to FAT32 for reuse.")
+        );
+        assert_eq!(img.flasher(), config::Flasher::SdCard);
+        assert_eq!(img.init_format(), config::InitFormat::None);
+        assert_eq!(img.info_text(), None);
+        assert_eq!(img.file_name(), None);
+        assert_eq!(img.details(), &[("Format", "FAT32".to_string())]);
+        assert!(img.supported_init_formats().is_empty());
+        assert!(img.support().is_none());
+        assert!(matches!(img.icon(), BoardImageIcon::Format));
+        assert_eq!(img.to_string(), "Format SD Card");
+    }
+
+    #[test]
+    fn board_image_local_reads_file_metadata() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789").unwrap();
+
+        let img = BoardImage::local(
+            file.path().to_path_buf(),
+            config::Flasher::BeagleConnectFreedom,
+        );
+        assert_eq!(img.flasher(), config::Flasher::BeagleConnectFreedom);
+        assert_eq!(img.init_format(), config::InitFormat::None);
+        assert!(matches!(img.icon(), BoardImageIcon::Local));
+        assert!(img.description().is_none());
+        assert!(img.file_name().is_some_and(|n| !n.is_empty()));
+
+        let details = img.details();
+        assert!(details.iter().any(|(k, _)| *k == "Path"));
+        assert!(details.iter().any(|(k, v)| *k == "Size" && v == "10"));
+        // Local (non-SD) images offer no init-format customization.
+        assert!(img.supported_init_formats().is_empty());
+    }
+
+    #[test]
+    fn board_image_update_init_format_on_image() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"x").unwrap();
+        let mut img = BoardImage::local(file.path().to_path_buf(), config::Flasher::SdCard);
+        img.update_init_format(config::InitFormat::Sysconf);
+        assert_eq!(img.init_format(), config::InitFormat::Sysconf);
+    }
+
+    #[test]
+    fn destination_local_file_behaviour() {
+        let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+        assert!(dst.is_download_action());
+        assert_eq!(dst.size(), None);
+        assert_eq!(dst.details(), vec![("Path", "/tmp/os.img".to_string())]);
+        assert_eq!(dst.to_string(), "Save To File");
+    }
+
+    #[test]
+    fn destination_item_save_to_file() {
+        let item = DestinationItem::SaveToFile("os.img.xz".to_string());
+        let other = Destination::LocalFile(PathBuf::from("/tmp/x"));
+
+        assert_eq!(item.to_string(), "Save To File");
+        assert!(!item.is_selected(&other));
+        assert!(item.subtitle().is_none());
+        match item.msg() {
+            BBImagerMessage::SelectFileDest(name) => assert_eq!(name, "os.img"),
+            other => panic!("expected SelectFileDest, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn destination_item_wraps_destination() {
+        let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+        let other = Destination::LocalFile(PathBuf::from("/tmp/other.img"));
+        let item = DestinationItem::Destination(&dst);
+
+        assert_eq!(item.to_string(), "Save To File");
+        assert!(item.is_selected(&dst));
+        assert!(!item.is_selected(&other));
+        // LocalFile has no size, so no subtitle.
+        assert!(item.subtitle().is_none());
+    }
+
+    #[test]
+    fn os_image_item_constructors_and_predicates() {
+        let local = OsImageItem::local(config::Flasher::SdCard);
+        assert_eq!(local.id, OsImageId::Local(config::Flasher::SdCard));
+        assert!(!local.is_sublist());
+        assert_eq!(local.label(), "Select Local Image");
+
+        let format = OsImageItem::format("Format".into());
+        assert_eq!(format.id, OsImageId::Format);
+        assert!(!format.is_sublist());
+        assert_eq!(format.label(), "Format");
+    }
+
+    #[test]
+    fn os_image_item_from_db_items() {
+        let icon = Url::parse("https://example.com/icon.png").unwrap();
+
+        let image: OsImageItem = crate::db::OsImageListItem {
+            id: 5,
+            icon: icon.clone(),
+            name: "Debian".to_string(),
+        }
+        .into();
+        assert_eq!(image.id, OsImageId::OsImage(5));
+        assert!(!image.is_sublist());
+        assert_eq!(image.label(), "Debian");
+
+        let sublist: OsImageItem = crate::db::OsSublistListItem {
+            id: 7,
+            icon,
+            name: "More".to_string(),
+            flasher: config::Flasher::SdCard,
+        }
+        .into();
+        assert_eq!(sublist.id, OsImageId::OsSublist((7, config::Flasher::SdCard)));
+        assert!(sublist.is_sublist());
+    }
+
+    #[test]
+    fn image_handle_cache_tracks_fetch_state() {
+        let url = Url::parse("https://example.com/a.png").unwrap();
+        let mut cache = ImageHandleCache::default();
+
+        assert!(!cache.contains(&url));
+        assert!(cache.get(&url).is_none());
+
+        cache.mark_fetching(url.clone());
+        assert!(cache.contains(&url));
+        // Marked-but-unresolved entries have no value yet.
+        assert!(cache.get(&url).is_none());
+    }
+
+    #[test]
+    fn system_keymap_is_never_empty() {
+        // Falls back to "us" when the locale cannot be resolved.
+        assert!(!system_keymap().is_empty());
+    }
+}
