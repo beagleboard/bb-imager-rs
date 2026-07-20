@@ -206,7 +206,8 @@ impl std::fmt::Display for BoardImage {
 }
 
 pub(crate) fn system_timezone() -> Option<&'static String> {
-    static SYSTEM_TIMEZONE: LazyLock<Option<String>> = LazyLock::new(localzone::get_local_zone);
+    static SYSTEM_TIMEZONE: LazyLock<Option<String>> =
+        LazyLock::new(|| iana_time_zone::get_timezone().ok());
     (*SYSTEM_TIMEZONE).as_ref()
 }
 
