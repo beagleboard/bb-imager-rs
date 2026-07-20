@@ -16,7 +16,6 @@ serde_with = "3.19"
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 url = { version = "2.5", default-features = false, features = ["serde"] }
 const-hex = { version = "1.19", default-features = false, features = ["serde"] }
-serde-tuple-vec-map = "1.0.1"
 rusqlite = "0.40"
 
 [dev-dependencies]
