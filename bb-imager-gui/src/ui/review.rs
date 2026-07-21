@@ -42,9 +42,9 @@ fn review_view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
             .size(HEADING_SIZE),
         widget::grid![
             text("Device"),
-            text(state.selected_board()),
+            text(state.selected_board.name.as_str()),
             text("Operating System"),
-            text(state.selected_image()),
+            text(state.selected_image.1.to_string()),
             text("Storage"),
             text(state.selected_destination())
         ]

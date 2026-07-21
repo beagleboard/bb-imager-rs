@@ -186,14 +186,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseOs(inner) => {
                 inner.selected_image = Some((
                     helpers::OsImageId::OsImage(image.id),
-                    helpers::BoardImage::remote(image, flasher, inner.downloader().clone()),
+                    helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
                 ));
             }
             BBImager::AppInfo(overlay_state) => match &mut overlay_state.page {
                 OverlayData::ChooseOs(inner) => {
                     inner.selected_image = Some((
                         helpers::OsImageId::OsImage(image.id),
-                        helpers::BoardImage::remote(image, flasher, inner.downloader().clone()),
+                        helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
                     ));
                 }
                 _ => panic!("Unexpected message"),

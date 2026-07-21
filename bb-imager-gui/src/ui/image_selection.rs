@@ -23,7 +23,7 @@ pub(crate) fn view<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BB
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
             widget::button("NEXT")
-                .on_press_maybe(state.selected_image().map(|_| BBImagerMessage::Next)),
+                .on_press_maybe(state.selected_image.as_ref().map(|_| BBImagerMessage::Next)),
         ],
     )
 }
@@ -64,7 +64,8 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                     crate::helpers::OsImageId::OsImage(_)
                     | crate::helpers::OsImageId::OsSublist(_) => {
                         match state
-                            .image_handle_cache()
+                            .common
+                            .img_handle_cache
                             .get(img.icon.as_ref().expect("Missing Os Image icon"))
                         {
                             Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
@@ -134,11 +135,11 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
 }
 
 fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBImagerMessage> {
-    match state.selected_image() {
+    match state.selected_image.as_ref() {
         Some((_, img)) => {
             let icon = match img.icon() {
                 crate::helpers::BoardImageIcon::Remote(url) => {
-                    match state.image_handle_cache().get(url) {
+                    match state.common.img_handle_cache.get(url) {
                         Some(x) => x.view(iced::Length::Fill, 100),
                         None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
                     }

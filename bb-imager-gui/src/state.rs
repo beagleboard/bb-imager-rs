@@ -65,14 +65,6 @@ pub(crate) struct ChooseBoardState {
 }
 
 impl ChooseBoardState {
-    pub(crate) fn selected_board(&self) -> Option<&Board> {
-        self.selected_board.as_ref()
-    }
-
-    pub(crate) fn image_handle_cache(&self) -> &helpers::ImageHandleCache {
-        &self.common.img_handle_cache
-    }
-
     pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
         let search = self.search_text.clone();
@@ -112,13 +104,6 @@ pub(crate) struct ChooseOsState {
 }
 
 impl ChooseOsState {
-    pub(crate) fn selected_image(&self) -> Option<(&OsImageId, &helpers::BoardImage)> {
-        match &self.selected_image {
-            Some((x, y)) => Some((x, y)),
-            None => None,
-        }
-    }
-
     pub(crate) fn update_images(&mut self, mut imgs: Vec<OsImageItem>, pos: Option<i64>) {
         match self.flasher {
             config::Flasher::SdCard => imgs.extend([
@@ -130,14 +115,6 @@ impl ChooseOsState {
 
         self.images = imgs;
         self.pos = pos;
-    }
-
-    pub(crate) fn image_handle_cache(&self) -> &helpers::ImageHandleCache {
-        &self.common.img_handle_cache
-    }
-
-    pub(crate) fn downloader(&self) -> &bb_downloader::Downloader {
-        &self.common.downloader
     }
 
     pub(crate) fn img_json(&self) -> Option<String> {
@@ -213,15 +190,7 @@ impl ChooseOsState {
 
 impl From<CustomizeState> for ChooseOsState {
     fn from(value: CustomizeState) -> Self {
-        Self {
-            common: value.common,
-            images: Vec::new(),
-            flasher: value.selected_board.flasher,
-            selected_board: value.selected_board,
-            pos: None,
-            selected_image: Some(value.selected_image),
-            search_text: String::new(),
-        }
+        ChooseDestState::from(value).into()
     }
 }
 
@@ -262,14 +231,10 @@ impl ChooseDestState {
         iter.chain(temp)
     }
 
-    pub(crate) fn selected_board(&self) -> &Board {
-        &self.selected_board
-    }
-
     pub(crate) fn instruction(&self) -> Option<&str> {
         match self.selected_image.1.info_text() {
             Some(x) => Some(x),
-            None => self.selected_board().instructions.as_deref(),
+            None => self.selected_board.instructions.as_deref(),
         }
     }
 
@@ -302,34 +267,14 @@ pub(crate) struct CustomizeState {
 }
 
 impl CustomizeState {
-    pub(crate) fn timezones(&self) -> &widget::combo_box::State<String> {
-        &self.common.timezones
-    }
-
-    pub(crate) fn keymaps(&self) -> &widget::combo_box::State<String> {
-        &self.common.keymaps
-    }
-
-    pub(crate) fn app_config(&self) -> &persistance::GuiConfiguration {
-        &self.common.app_config
-    }
-
     pub(crate) fn save_app_config(&self) -> Task<BBImagerMessage> {
-        let config = self.app_config().clone();
+        let config = self.common.app_config.clone();
         Task::future(blocking_future(move || {
             if let Err(e) = config.save() {
                 tracing::error!("Failed to save config: {e}");
             }
             BBImagerMessage::Null
         }))
-    }
-
-    pub(crate) fn selected_board(&self) -> &str {
-        self.selected_board.name.as_str()
-    }
-
-    pub(crate) fn selected_image(&self) -> String {
-        self.selected_image.1.to_string()
     }
 
     pub(crate) fn selected_destination(&self) -> String {
@@ -382,10 +327,6 @@ pub(crate) struct FlashingState {
 }
 
 impl FlashingState {
-    pub(crate) fn selected_board(&self) -> &Board {
-        &self.selected_board
-    }
-
     pub(crate) fn time_remaining(&self) -> Option<Duration> {
         time_remaining_from(self.progress, self.start_timestamp.map(|t| t.elapsed()))
     }
@@ -441,12 +382,6 @@ pub(crate) struct FlashingFinishState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
     pub(crate) is_download: bool,
-}
-
-impl FlashingFinishState {
-    pub(crate) fn selected_board(&self) -> &Board {
-        &self.selected_board
-    }
 }
 
 impl From<FlashingState> for FlashingFinishState {

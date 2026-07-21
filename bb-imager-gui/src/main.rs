@@ -35,7 +35,7 @@ fn main() -> iced::Result {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
-                .with_writer(std::fs::File::create(helpers::log_file_path()).unwrap()),
+                .with_writer(std::fs::File::create(&log_file_p).unwrap()),
         )
         .try_init()
         .expect("Failed to register tracing_subscriber");
@@ -474,7 +474,8 @@ impl BBImager {
             Self::Review(inner) => match &inner.customization {
                 helpers::FlashingCustomization::LinuxSdSysconfig(c) => {
                     let mut temp = inner
-                        .app_config()
+                        .common
+                        .app_config
                         .sd_customization
                         .clone()
                         .unwrap_or_default();

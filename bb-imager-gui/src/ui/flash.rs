@@ -42,5 +42,5 @@ pub(crate) fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessag
 }
 
 pub(crate) fn info_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
-    helpers::board_view_pane(state.selected_board(), &state.common)
+    helpers::board_view_pane(&state.selected_board, &state.common)
 }

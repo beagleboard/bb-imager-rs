@@ -36,7 +36,7 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
                 .map(|x| x.id == dev.id)
                 .unwrap_or(false);
             let img: Element<BBImagerMessage> = match &dev.icon {
-                Some(u) => match state.image_handle_cache().get(u) {
+                Some(u) => match state.common.img_handle_cache.get(u) {
                     Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
                     _ => iced_aw::Spinner::new().width(ICON_WIDTH).into(),
                 },
@@ -78,7 +78,7 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
 }
 
 fn board_view_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessage> {
-    match state.selected_board() {
+    match state.selected_board.as_ref() {
         Some(dev) => helpers::board_view_pane(dev, &state.common),
         None => widget::center(
             text("Please Select a Board")
