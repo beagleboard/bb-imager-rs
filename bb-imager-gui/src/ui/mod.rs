@@ -5,9 +5,7 @@ mod board_selection;
 mod configuration;
 mod destination_selection;
 mod flash;
-mod flash_cancel;
-mod flash_fail;
-mod flash_success;
+mod flash_finish;
 mod helpers;
 mod image_selection;
 mod review;
@@ -20,9 +18,9 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::Customize(inner) => configuration::view(inner),
         BBImager::Review(inner) => review::view(inner),
         BBImager::Flashing(inner) => flash::view(inner),
-        BBImager::FlashingCancel(inner) => flash_cancel::view(inner),
-        BBImager::FlashingFail(inner) => flash_fail::view(inner),
-        BBImager::FlashingSuccess(inner) => flash_success::view(inner),
+        BBImager::FlashingCancel(inner) => flash_finish::cancel(inner),
+        BBImager::FlashingFail(inner) => flash_finish::fail(inner),
+        BBImager::FlashingSuccess(inner) => flash_finish::success(inner),
         BBImager::AppInfo(inner) => app_info::view(inner),
         _ => panic!("Unexpected message"),
     }
