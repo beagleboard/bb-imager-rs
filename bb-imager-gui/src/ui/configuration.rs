@@ -7,7 +7,9 @@ use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
     persistance,
-    ui::helpers::{VIEW_COL_PADDING, element_with_element, element_with_label, page_type2},
+    ui::helpers::{
+        VIEW_COL_PADDING, detail_pane, element_with_element, element_with_label, page_type2,
+    },
 };
 
 const INPUT_WIDTH: u32 = 200;
@@ -277,9 +279,7 @@ fn linux_sd_card_cloudinit<'a>(
     config: &'a persistance::SdSysconfCustomization,
 ) -> Element<'a, BBImagerMessage> {
     let col = linux_sd_card_common(state, config, FlashingCustomization::LinuxSdCloudInit);
-    widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
-        .id(state.common.scroll_id.clone())
-        .into()
+    detail_pane(col, &state.common.scroll_id)
 }
 
 fn linux_sd_card_sysconfig<'a>(
@@ -300,9 +300,7 @@ fn linux_sd_card_sysconfig<'a>(
             }),
     );
 
-    widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
-        .id(state.common.scroll_id.clone())
-        .into()
+    detail_pane(col, &state.common.scroll_id)
 }
 
 fn input_with_label<'a, F>(

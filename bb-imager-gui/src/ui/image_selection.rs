@@ -6,10 +6,7 @@ use iced::{
 use crate::{
     constants,
     message::BBImagerMessage,
-    ui::helpers::{
-        self, LIST_COL_PADDING, VIEW_COL_PADDING, card_btn_style, detail_entry, page_type1,
-        svg_icon_style,
-    },
+    ui::helpers::{self, detail_entry, page_type1, svg_icon_style},
 };
 
 const ICON_WIDTH: u32 = 60;
@@ -77,60 +74,40 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                     }
                 };
 
-                let row = widget::row![icon, text(img.label()).size(18).width(iced::Length::Fill)];
-                let row = if img.is_sublist() {
-                    row.push(
+                let mut contents = vec![icon, helpers::list_label(img.label()).into()];
+                if img.is_sublist() {
+                    contents.push(
                         widget::svg(helpers::ARROW_FORWARD_IOS_ICON.clone())
                             .height(20)
                             .width(iced::Shrink)
-                            .style(svg_icon_style),
-                    )
-                } else {
-                    row
-                };
+                            .style(svg_icon_style)
+                            .into(),
+                    );
+                }
 
-                button(
-                    row.spacing(12)
-                        .padding(8)
-                        .align_y(iced::alignment::Vertical::Center),
-                )
-                .on_press(BBImagerMessage::SelectOs(img.id))
-                .style(move |theme, status| card_btn_style(theme, status, is_selected))
+                helpers::list_item(contents, is_selected, BBImagerMessage::SelectOs(img.id))
             })
             .map(Into::into);
 
-        let col = widget::column![
-            helpers::search_box(&state.search_text),
-            widget::center(widget::rule::horizontal(2)).padding(iced::Padding {
-                left: 16.0,
-                ..Default::default()
-            }),
-        ];
-
-        let col = if state.pos.is_none() {
-            col.extend(items)
+        // Nested sublists get a row to walk back up to their parent.
+        let back: Vec<Element<BBImagerMessage>> = if state.pos.is_none() {
+            Vec::new()
         } else {
             let icon = widget::svg(helpers::ARROW_BACK_ICON.clone())
                 .height(ICON_WIDTH)
                 .width(ICON_WIDTH)
                 .style(svg_icon_style);
-            let row = widget::row![icon, text("Back").size(18).width(iced::Length::Fill)]
-                .spacing(12)
-                .padding(8)
-                .align_y(iced::alignment::Vertical::Center);
-            col.extend(
-                [button(row)
-                    .on_press(BBImagerMessage::GotoOsListParent)
-                    .style(move |theme, status| card_btn_style(theme, status, false))
-                    .into()]
-                .into_iter()
-                .chain(items),
-            )
+            vec![
+                helpers::list_item(
+                    [icon.into(), helpers::list_label("Back").into()],
+                    false,
+                    BBImagerMessage::GotoOsListParent,
+                )
+                .into(),
+            ]
         };
 
-        widget::scrollable(col.padding(LIST_COL_PADDING))
-            .id(state.common.scroll_id.clone())
-            .into()
+        helpers::list_pane(&state.search_text, &state.common.scroll_id, back, items)
     }
 }
 
@@ -220,20 +197,8 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 col = col.push(widget::center(row));
             }
 
-            widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
-                .id(state.common.scroll_id.clone())
-                .into()
+            helpers::detail_pane(col, &state.common.scroll_id)
         }
-        None => {
-            let col = widget::column![
-                text("Please Select an OS")
-                    .size(28)
-                    .width(iced::Fill)
-                    .align_x(iced::Center)
-                    .font(constants::FONT_BOLD)
-            ];
-
-            widget::center(col.padding(VIEW_COL_PADDING)).into()
-        }
+        None => helpers::placeholder_pane("Please Select an OS"),
     }
 }
