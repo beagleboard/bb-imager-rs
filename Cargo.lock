@@ -648,11 +648,13 @@ version = "1.0.13"
 dependencies = [
  "anyhow",
  "bb-flasher",
+ "bb-flasher-sd",
  "clap",
  "clap_complete",
  "clap_mangen",
  "console",
  "indicatif",
+ "tar",
  "tempfile",
  "tracing",
  "tracing-subscriber",
