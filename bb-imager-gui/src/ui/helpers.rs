@@ -283,8 +283,7 @@ pub(crate) fn board_view_pane<'a>(
         widget::text(&dev.description)
             .align_x(iced::alignment::Alignment::Center)
             .width(iced::Length::Fill),
-    ]
-    .spacing(16);
+    ];
 
     let cols = cols.extend(
         dev.specification
@@ -313,11 +312,10 @@ pub(crate) fn board_view_pane<'a>(
         );
     }
 
-    let cols = cols.push(widget::center(widget::row(btns).spacing(16)));
-
-    widget::scrollable(cols.padding(VIEW_COL_PADDING))
-        .id(state.scroll_id.clone())
-        .into()
+    detail_pane(
+        cols.push(widget::center(widget::row(btns).spacing(16))),
+        &state.scroll_id,
+    )
 }
 
 #[derive(Debug)]
@@ -443,7 +441,79 @@ pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> widget::Button<'a, BBImagerMe
         .style(widget::button::secondary)
 }
 
-pub(crate) fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
+/// Horizontal separator between rows of a list pane.
+pub(crate) fn list_separator<'a>() -> Element<'a, BBImagerMessage> {
+    widget::center(widget::rule::horizontal(2))
+        .padding(iced::Padding::ZERO.left(16))
+        .into()
+}
+
+/// Scrollable pane listing selectable items: a search box, a separator, any
+/// extra `header` rows, then the `items` themselves.
+pub(crate) fn list_pane<'a>(
+    search_text: &'a str,
+    scroll_id: &widget::Id,
+    header: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
+    items: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
+) -> Element<'a, BBImagerMessage> {
+    let top = [search_box(search_text).into(), list_separator()];
+
+    widget::scrollable(
+        widget::column(top.into_iter().chain(header).chain(items)).padding(LIST_COL_PADDING),
+    )
+    .id(scroll_id.clone())
+    .into()
+}
+
+/// A selectable row of a [`list_pane`], laid out as a horizontal run of
+/// `contents` (typically a leading icon followed by a label).
+pub(crate) fn list_item<'a>(
+    contents: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
+    is_selected: bool,
+    msg: BBImagerMessage,
+) -> widget::Button<'a, BBImagerMessage> {
+    widget::button(
+        widget::row(contents)
+            .spacing(12)
+            .padding(8)
+            .align_y(iced::alignment::Vertical::Center),
+    )
+    .on_press(msg)
+    .style(move |theme, status| card_btn_style(theme, status, is_selected))
+}
+
+/// The primary label of a [`list_item`].
+pub(crate) fn list_label<'a>(label: impl widget::text::IntoFragment<'a>) -> widget::Text<'a> {
+    widget::text(label).size(18).width(iced::Length::Fill)
+}
+
+/// Scrollable pane detailing whatever is currently selected in a [`list_pane`].
+pub(crate) fn detail_pane<'a>(
+    content: widget::Column<'a, BBImagerMessage>,
+    scroll_id: &widget::Id,
+) -> Element<'a, BBImagerMessage> {
+    widget::scrollable(content.spacing(16).padding(VIEW_COL_PADDING))
+        .id(scroll_id.clone())
+        .into()
+}
+
+/// Heading of a [`detail_pane`] with nothing selected yet.
+pub(crate) fn placeholder_heading<'a>(label: &'a str) -> widget::Text<'a> {
+    widget::text(label)
+        .size(28)
+        .width(iced::Fill)
+        .align_x(iced::Center)
+        .font(constants::FONT_BOLD)
+}
+
+/// A [`detail_pane`] with nothing selected yet.
+pub(crate) fn placeholder_pane<'a>(label: &'a str) -> Element<'a, BBImagerMessage> {
+    widget::center(placeholder_heading(label))
+        .padding(VIEW_COL_PADDING)
+        .into()
+}
+
+fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
     widget::container(
         widget::row![
             widget::svg(SEARCH_ICON.clone())

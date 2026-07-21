@@ -7,7 +7,7 @@ use crate::{
     constants,
     message::BBImagerMessage,
     state::CustomizeState,
-    ui::helpers::{VIEW_COL_PADDING, page_type2},
+    ui::helpers::{detail_pane, page_type2},
 };
 
 const HEADING_SIZE: u32 = 26;
@@ -67,7 +67,5 @@ fn review_view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
         ]);
     }
 
-    widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
-        .id(state.common.scroll_id.clone())
-        .into()
+    detail_pane(col, &state.common.scroll_id)
 }

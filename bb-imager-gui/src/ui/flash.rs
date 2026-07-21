@@ -11,7 +11,7 @@ use crate::{
 
 pub(crate) fn view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
     page_type1(
-        info_view(state),
+        helpers::board_view_pane(&state.selected_board, &state.common),
         progress_view(state),
         [button("Cancel")
             .style(widget::button::danger)
@@ -19,7 +19,7 @@ pub(crate) fn view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
     )
 }
 
-pub(crate) fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
+fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
     let (prog, label) = match state.progress {
         bb_flasher::DownloadFlashingStatus::Preparing => (0.0, "Preparing ..."),
         bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => (x, "Downloading ..."),
@@ -39,8 +39,4 @@ pub(crate) fn progress_view(state: &FlashingState) -> Element<'_, BBImagerMessag
     }
 
     col.align_x(iced::Center).padding(VIEW_COL_PADDING).into()
-}
-
-pub(crate) fn info_view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
-    helpers::board_view_pane(&state.selected_board, &state.common)
 }

@@ -1,16 +1,13 @@
 use iced::{
     Element,
-    widget::{self, button, text},
+    widget::{self, text},
 };
 
 use crate::{
     BBImagerMessage, constants,
     helpers::DestinationItem,
     state::ChooseDestState,
-    ui::helpers::{
-        self, LIST_COL_PADDING, VIEW_COL_PADDING, card_btn_style, detail_entry, page_type1,
-        svg_icon_style,
-    },
+    ui::helpers::{self, detail_entry, page_type1, svg_icon_style},
 };
 
 const ICON_WIDTH: u32 = 60;
@@ -48,54 +45,30 @@ fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage
             .style(svg_icon_style)
             .into();
 
-            let title: widget::Text<'_, _> = text(dest.to_string()).size(18);
-            let col: iced::Element<'_, _> = match dest.subtitle() {
-                Some(x) => widget::column![title, text(x)]
+            let label: Element<'_, _> = match dest.subtitle() {
+                Some(x) => widget::column![text(dest.to_string()).size(18), text(x)]
                     .width(iced::Length::Fill)
                     .into(),
-                None => title.width(iced::Length::Fill).into(),
+                None => helpers::list_label(dest.to_string()).into(),
             };
-            button(
-                widget::row![icon, col]
-                    .spacing(12)
-                    .padding(8)
-                    .align_y(iced::alignment::Vertical::Center),
-            )
-            .on_press(dest.msg())
-            .style(move |theme, status| card_btn_style(theme, status, is_selected))
+
+            helpers::list_item([icon, label], is_selected, dest.msg())
         })
         .map(Into::into);
 
-    let hrule_pad = iced::Padding {
-        left: 16.0,
-        ..Default::default()
-    };
-
-    widget::scrollable(
-        widget::column(
-            [
-                helpers::search_box(&state.search_text).into(),
-                widget::center(widget::rule::horizontal(2))
-                    .padding(hrule_pad)
-                    .into(),
-                widget::container(
-                    widget::toggler(!state.filter_destination)
-                        .label("Show all destinations")
-                        .on_toggle(|x| BBImagerMessage::DestinationFilter(!x)),
-                )
-                .padding(16)
-                .into(),
-                widget::center(widget::rule::horizontal(2))
-                    .padding(hrule_pad)
-                    .into(),
-            ]
-            .into_iter()
-            .chain(items),
-        )
-        .padding(LIST_COL_PADDING),
+    let filter_toggle = widget::container(
+        widget::toggler(!state.filter_destination)
+            .label("Show all destinations")
+            .on_toggle(|x| BBImagerMessage::DestinationFilter(!x)),
     )
-    .id(state.common.scroll_id.clone())
-    .into()
+    .padding(16);
+
+    helpers::list_pane(
+        &state.search_text,
+        &state.common.scroll_id,
+        [filter_toggle.into(), helpers::list_separator()],
+        items,
+    )
 }
 
 fn dest_view_pane<'a>(state: &'a crate::state::ChooseDestState) -> Element<'a, BBImagerMessage> {
@@ -122,18 +95,10 @@ fn dest_view_pane<'a>(state: &'a crate::state::ChooseDestState) -> Element<'a, B
                     .map(Into::into),
             );
 
-            widget::scrollable(col.spacing(16).padding(VIEW_COL_PADDING))
-                .id(state.common.scroll_id.clone())
-                .into()
+            helpers::detail_pane(col, &state.common.scroll_id)
         }
         None => {
-            let col = widget::column![
-                text("Please Select a Destination")
-                    .size(28)
-                    .width(iced::Fill)
-                    .align_x(iced::Center)
-                    .font(constants::FONT_BOLD)
-            ];
+            let col = widget::column![helpers::placeholder_heading("Please Select a Destination")];
 
             let col = match state.instruction() {
                 Some(x) => col.extend([
@@ -147,11 +112,7 @@ fn dest_view_pane<'a>(state: &'a crate::state::ChooseDestState) -> Element<'a, B
                 None => col,
             };
 
-            widget::center(
-                widget::scrollable(col.padding(VIEW_COL_PADDING).spacing(16))
-                    .id(state.common.scroll_id.clone()),
-            )
-            .into()
+            widget::center(helpers::detail_pane(col, &state.common.scroll_id)).into()
         }
     }
 }

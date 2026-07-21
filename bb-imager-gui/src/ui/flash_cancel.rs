@@ -11,7 +11,7 @@ use crate::{
 
 pub(crate) fn view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
     page_type1(
-        info_view(state),
+        board_view_pane(&state.selected_board, &state.common),
         progress_finish_view(
             "Cancelled",
             constants::DANGER,
@@ -21,8 +21,4 @@ pub(crate) fn view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> 
             .style(widget::button::danger)
             .on_press(BBImagerMessage::Restart)],
     )
-}
-
-pub(crate) fn info_view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
-    board_view_pane(&state.selected_board, &state.common)
 }
