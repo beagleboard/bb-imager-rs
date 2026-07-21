@@ -30,5 +30,5 @@ pub(crate) fn progress_view(state: &FlashingFinishState) -> Element<'static, BBI
 }
 
 pub(crate) fn info_view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
-    board_view_pane(state.selected_board(), &state.common)
+    board_view_pane(&state.selected_board, &state.common)
 }

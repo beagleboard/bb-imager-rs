@@ -177,7 +177,7 @@ fn linux_sd_card_common<'a>(
             col.push(element_with_element(
                 toggle.into(),
                 widget::combo_box(
-                    state.timezones(),
+                    &state.common.timezones,
                     "Timezone",
                     Some(&tz.to_owned()),
                     move |t| {
@@ -237,7 +237,7 @@ fn linux_sd_card_common<'a>(
             col.push(element_with_element(
                 toggle.into(),
                 widget::combo_box(
-                    state.keymaps(),
+                    &state.common.keymaps,
                     "Keymap",
                     Some(&keymap.to_owned()),
                     move |t| {

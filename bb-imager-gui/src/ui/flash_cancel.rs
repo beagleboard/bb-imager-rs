@@ -24,5 +24,5 @@ pub(crate) fn view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> 
 }
 
 pub(crate) fn info_view(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
-    board_view_pane(state.selected_board(), &state.common)
+    board_view_pane(&state.selected_board, &state.common)
 }
