@@ -2,7 +2,7 @@ pub mod cli;
 mod helpers;
 
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus, LocalImage};
-use clap::{CommandFactory};
+use clap::CommandFactory;
 use cli::{Commands, DestinationsTarget, Opt, TargetCommands};
 use helpers::LocalStringFile;
 use std::path::PathBuf;

@@ -133,7 +133,7 @@ pub enum TargetCommands {
 
         /// The destination is a file instead of SD Card
         #[arg(long)]
-        file_destination: bool
+        file_destination: bool,
     },
     /// Update boot partition with contents from archive
     SdBootUpdate {
@@ -364,9 +364,14 @@ mod tests {
 
     #[test]
     fn format_and_verbose_parse() {
-        let opt =
-            Opt::try_parse_from(["bb-imager-cli", "--verbose", "format", "/dev/sdX", "--quiet"])
-                .expect("valid format invocation");
+        let opt = Opt::try_parse_from([
+            "bb-imager-cli",
+            "--verbose",
+            "format",
+            "/dev/sdX",
+            "--quiet",
+        ])
+        .expect("valid format invocation");
         assert!(opt.verbose);
         match opt.command {
             Commands::Format { dst, quiet } => {
@@ -396,9 +401,14 @@ mod tests {
 
     #[test]
     fn sd_boot_update_parses() {
-        let opt =
-            Opt::try_parse_from(["bb-imager-cli", "flash", "sd-boot-update", "boot.tar", "/dev/sdX"])
-                .expect("valid sd-boot-update");
+        let opt = Opt::try_parse_from([
+            "bb-imager-cli",
+            "flash",
+            "sd-boot-update",
+            "boot.tar",
+            "/dev/sdX",
+        ])
+        .expect("valid sd-boot-update");
         match opt.command {
             Commands::Flash { target, .. } => match *target {
                 TargetCommands::SdBootUpdate { img, dst } => {

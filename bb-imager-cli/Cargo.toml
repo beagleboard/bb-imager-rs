@@ -14,6 +14,10 @@ clap_mangen = "0.3"
 
 [dev-dependencies]
 tempfile = "3.27"
+# `mock_sd` provides a real MBR + FAT32 image, which lets the integration tests
+# drive `flash sd` end-to-end against a file destination.
+bb-flasher-sd = { path = "../bb-flasher-sd", features = ["mock_sd"] }
+tar = "0.4"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
