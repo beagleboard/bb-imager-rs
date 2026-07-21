@@ -1,3 +1,4 @@
+use std::io;
 use std::{
     borrow::Cow, collections::HashMap, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration,
 };
@@ -8,6 +9,7 @@ use bb_config::config;
 use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
+use bb_helper::file_stream::ReaderFileStream;
 use iced::widget;
 use std::sync::mpsc;
 use tokio_util::task::AbortOnDropHandle;
@@ -271,77 +273,65 @@ impl RemoteImage {
         self.url.path_segments().unwrap().next_back().unwrap()
     }
 
+    fn open<C, P, R>(self, f_cache: C, f_pipe: P) -> impl FnOnce() -> io::Result<R>
+    where
+        C: FnOnce(&std::path::Path) -> io::Result<R>,
+        P: FnOnce(ReaderFileStream, AbortOnDropHandle<io::Result<()>>, u64) -> io::Result<R>,
+    {
+        let rt = tokio::runtime::Handle::current();
+        move || {
+            let downloader = self.downloader.clone();
+            let cache = downloader.check_cache_from_sha(self.extract_sha256);
+
+            if let Some(path) = cache {
+                tracing::info!("Found the remote image in cache");
+                return f_cache(&path);
+            }
+
+            tracing::info!("Remote image not found in cache. Downloading");
+            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
+            let downloader = self.downloader.clone();
+            let url = self.url.clone();
+            let sha = self.extract_sha256;
+
+            let t: tokio::task::JoinHandle<io::Result<()>> = rt.spawn(async move {
+                downloader
+                    .download_to_stream(*url, sha, tx_stream)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error while downloading Os Image: {e}");
+                        tracing::error!("{}", &msg);
+                        io::Error::other(msg)
+                    })?;
+                tracing::info!("Image download finished");
+                Ok(())
+            });
+
+            f_pipe(rx, AbortOnDropHandle::new(t), self.extract_size)
+        }
+    }
+
     #[cfg(feature = "sd")]
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
-    ) -> impl FnOnce() -> std::io::Result<OsArchive> {
-        let rt = tokio::runtime::Handle::current();
-        move || {
-            let downloader = self.downloader.clone();
-            let cache = downloader.check_cache_from_sha(self.extract_sha256);
-
-            if let Some(path) = cache {
-                tracing::info!("Found the remote image in cache");
-                return OsArchive::from_path(&path, tx);
-            }
-
-            tracing::info!("Remote image not found in cache. Downloading");
-            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
-            let downloader = self.downloader.clone();
-            let url = self.url.clone();
-            let sha = self.extract_sha256;
-
-            let t: tokio::task::JoinHandle<std::io::Result<()>> = rt.spawn(async move {
-                downloader
-                    .download_to_stream(*url, sha, tx_stream)
-                    .await
-                    .map_err(|e| {
-                        let msg = format!("Error while downloading Os Image: {e}");
-                        tracing::error!("{}", &msg);
-                        std::io::Error::other(msg)
-                    })?;
-                tracing::info!("Image download finished");
-                Ok(())
-            });
-
-            OsArchive::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size, tx)
-        }
+    ) -> impl FnOnce() -> io::Result<OsArchive> {
+        let tx_clone = tx.clone();
+        self.open(
+            move |p| OsArchive::from_path(p, tx_clone),
+            move |rx, abort, es| OsArchive::from_piped(rx, abort, es, tx),
+        )
     }
 
-    fn into_image_fn(self) -> impl FnOnce() -> std::io::Result<(OsImage, u64)> {
-        let rt = tokio::runtime::Handle::current();
-        move || {
-            let downloader = self.downloader.clone();
-            let cache = downloader.check_cache_from_sha(self.extract_sha256);
-
-            if let Some(path) = cache {
-                tracing::info!("Found the remote image in cache");
-                return Ok((OsImage::from_path(&path)?, self.extract_size));
-            }
-
-            tracing::info!("Remote image not found in cache. Downloading");
-            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
-            let downloader = self.downloader.clone();
-            let url = self.url.clone();
-            let sha = self.extract_sha256;
-
-            let t: tokio::task::JoinHandle<std::io::Result<()>> = rt.spawn(async move {
-                downloader
-                    .download_to_stream(*url, sha, tx_stream)
-                    .await
-                    .map_err(|e| {
-                        let msg = format!("Error while downloading Os Image: {e}");
-                        tracing::error!("{}", &msg);
-                        std::io::Error::other(msg)
-                    })?;
-                tracing::info!("Image download finished");
-                Ok(())
-            });
-
-            let img = OsImage::from_piped(rx, AbortOnDropHandle::new(t), self.extract_size)?;
-            Ok((img, self.extract_size))
-        }
+    fn into_image_fn(self) -> impl FnOnce() -> io::Result<(OsImage, u64)> {
+        let extract_size = self.extract_size;
+        self.open(
+            move |p| Ok((OsImage::from_path(p)?, extract_size)),
+            move |rx, abort, es| {
+                let img = OsImage::from_piped(rx, abort, es)?;
+                Ok((img, es))
+            },
+        )
     }
 }
 
@@ -359,7 +349,7 @@ pub(crate) struct Bmap {
 }
 
 impl Bmap {
-    fn into_fn(self) -> impl FnOnce() -> std::io::Result<Box<str>> {
+    fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
         let rt = tokio::runtime::Handle::current();
         move || {
             let res =
@@ -387,14 +377,14 @@ impl SelectedImage {
     fn into_archive_fn(
         self,
         tx: Option<mpsc::SyncSender<f32>>,
-    ) -> Box<dyn FnOnce() -> std::io::Result<OsArchive>> {
+    ) -> Box<dyn FnOnce() -> io::Result<OsArchive>> {
         match self {
             SelectedImage::LocalImage(x) => Box::new(x.into_archive_fn(tx)),
             SelectedImage::RemoteImage(x) => Box::new(x.into_archive_fn(tx)),
         }
     }
 
-    fn into_image_fn(self) -> Box<dyn FnOnce() -> std::io::Result<(OsImage, u64)> + Send> {
+    fn into_image_fn(self) -> Box<dyn FnOnce() -> io::Result<(OsImage, u64)> + Send> {
         match self {
             SelectedImage::LocalImage(x) => Box::new(x.into_image_fn()),
             SelectedImage::RemoteImage(x) => Box::new(x.into_image_fn()),
@@ -1405,7 +1395,10 @@ mod tests {
             flasher: config::Flasher::SdCard,
         }
         .into();
-        assert_eq!(sublist.id, OsImageId::OsSublist((7, config::Flasher::SdCard)));
+        assert_eq!(
+            sublist.id,
+            OsImageId::OsSublist((7, config::Flasher::SdCard))
+        );
         assert!(sublist.is_sublist());
     }
 
