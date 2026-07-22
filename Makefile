@@ -9,6 +9,7 @@ _RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
 _RUST_ARGS_GUI = ${_RUST_ARGS} -F sd
 _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
+_ARCH = $(firstword $(subst -, ,$(TARGET)))
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -48,7 +49,7 @@ BASH_COMPLETIONDIR ?= $(PREFIX)/share/bash-completion/completions
 ## variable: ZSH_COMPLETIONDIR: Directory to install zsh completions
 ZSH_COMPLETIONDIR ?= $(PREFIX)/share/zsh/site-functions
 ## variable: UDEV_RULESDIR: Directory to install udev rules to
-UDEV_RULESDIR ?= /etc/udev/rules.d/
+UDEV_RULESDIR ?= /etc/udev/rules.d
 ## variable: ICONS_DIR: Directory to install icons to.
 ICONS_DIR ?= $(PREFIX)/share/icons
 ## variable: DESKTOP_DIR: Directory to install desktop entry to
@@ -214,13 +215,13 @@ test-gui:
 setup-debian-deps:
 	$(info "Installing Debian dependencies")
 	sudo apt-get update -y
-	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev
+	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev desktop-file-utils
 
 ## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon hidapi-devel
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon hidapi-devel desktop-file-utils
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
@@ -272,15 +273,19 @@ package-cli-deb: build-cli
 	$(CARGO_PATH) packager -p bb-imager-cli --target $(TARGET) $(_PACKAGER_ARGS) -f deb
 
 package-cli-pacman: build-cli
-	$(CARGO_PATH) packager -p bb-imager-cli --target $(TARGET) $(_PACKAGER_ARGS) -f pacman
-	rm bb-imager-cli/dist/PKGBUILD
+	mkdir -p bb-imager-cli/dist/bb-imager-cli
+	$(MAKE) install-cli DESTDIR=bb-imager-cli/dist/bb-imager-cli  PREFIX=/usr
+	cd bb-imager-cli/dist && tar --zstd -cvf bb-imager-cli_${VERSION}_${_ARCH}.tar.zst bb-imager-cli
+	rm -rf bb-imager-cli/dist/bb-imager-cli
 
 package-gui-deb: build-gui
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f deb
 
 package-gui-pacman: build-gui
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f pacman
-	rm bb-imager-gui/dist/PKGBUILD
+	mkdir -p bb-imager-gui/dist/bb-imager-gui
+	$(MAKE) install-gui DESTDIR=bb-imager-gui/dist/bb-imager-gui  PREFIX=/usr
+	cd bb-imager-gui/dist && tar --zstd -cvf bb-imager-gui_${VERSION}_${_ARCH}.tar.zst bb-imager-gui
+	rm -rf bb-imager-gui/dist/bb-imager-gui
 
 package-gui-appimage: build-gui
 	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f appimage
