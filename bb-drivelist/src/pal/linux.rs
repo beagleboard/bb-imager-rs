@@ -16,7 +16,8 @@ struct Device {
     #[serde(default = "Device::name_default")]
     name: String,
     tran: Option<String>,
-    subsystems: String,
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    subsystems: Option<String>,
     ro: bool,
     #[serde(rename = "phy-sec")]
     phy_sec: u32,
@@ -38,11 +39,13 @@ impl Device {
     }
 
     fn is_scsi(&self) -> bool {
-        self.subsystems.contains("sata")
-            || self.subsystems.contains("scsi")
-            || self.subsystems.contains("ata")
-            || self.subsystems.contains("ide")
-            || self.subsystems.contains("pci")
+        self.subsystems.as_ref().is_some_and(|x| {
+            x.contains("sata")
+                || x.contains("scsi")
+                || x.contains("ata")
+                || x.contains("ide")
+                || x.contains("pci")
+        })
     }
 
     fn description(&self) -> String {
@@ -60,7 +63,9 @@ impl Device {
     }
 
     fn is_virtual(&self) -> bool {
-        !self.subsystems.contains("block")
+        self.subsystems
+            .as_ref()
+            .is_some_and(|x| !x.contains("block"))
     }
 
     fn is_removable(&self) -> bool {
@@ -87,7 +92,7 @@ impl From<Device> for DeviceDescriptor {
             raw: value.kname,
             is_virtual,
             is_scsi,
-            is_usb: value.subsystems.contains("usb"),
+            is_usb: value.subsystems.is_some_and(|x| x.contains("usb")),
             is_readonly: value.ro,
             description,
             size: value.size,
@@ -156,6 +161,13 @@ pub(crate) fn lsblk() -> crate::Result<Vec<DeviceDescriptor>> {
     let res: Devices = serde_json::from_slice(&output.stdout).unwrap();
 
     Ok(res.blockdevices.into_iter().map(Into::into).collect())
+}
+
+fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.filter(|s| !s.is_empty()))
 }
 
 #[cfg(test)]
@@ -304,7 +316,8 @@ mod tests {
             r#"[{
                 "name":"/dev/dm-0","kname":"/dev/dm-0",
                 "size":null,"tran":null,
-                "subsystems":"","ro":true,
+                "subsystems":"nvme:pci",
+                "ro":true,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
                 "ptype":null,"label":null,"vendor":null,"model":null
             }]"#,
@@ -315,7 +328,6 @@ mod tests {
         assert!(!d.is_system);
         assert_eq!(d.bus_type.as_deref(), Some("UNKNOWN"));
         assert!(d.is_readonly);
-        assert!(!d.is_scsi);
         assert!(!d.is_usb);
         assert_eq!(d.description, "");
     }
@@ -387,5 +399,93 @@ mod tests {
 
         assert_eq!(d.device, "NO_NAME");
         assert_eq!(d.raw, "NO_NAME");
+    }
+
+    /// `subsystems` can be null in `lsblk` output. The device must still parse
+    /// (it used to fail deserialization when the field was a required `String`),
+    /// and every subsystems-derived flag falls to false: `is_scsi`, `is_usb`,
+    /// and `is_virtual`. Note `is_usb` is derived from `subsystems`, not `tran`,
+    /// so it stays false even though `tran` is "usb" and the bus type is "USB".
+    /// With no `rm`/`hotplug` and not virtual, the device is a non-removable
+    /// system disk.
+    #[test]
+    fn null_subsystems_parses_and_classifies() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/sdd","kname":"/dev/sdd",
+                "size":64000000000,"tran":"usb",
+                "subsystems":null,"ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":"Generic"
+            }]"#,
+        )[0];
+
+        assert!(!d.is_scsi);
+        assert!(!d.is_usb);
+        assert!(!d.is_virtual);
+        assert!(!d.is_removable);
+        assert!(d.is_system);
+        // Non-subsystems fields are unaffected: bus type still comes from `tran`.
+        assert_eq!(d.bus_type.as_deref(), Some("USB"));
+        assert_eq!(d.description, "Generic");
+    }
+
+    /// The `subsystems` key omitted entirely (not just null) must also parse via
+    /// serde's `Option` default, yielding the same all-false classification.
+    #[test]
+    fn omitted_subsystems_key_parses() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/sde","kname":"/dev/sde",
+                "size":null,"tran":null,"ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert!(!d.is_scsi);
+        assert!(!d.is_usb);
+        assert!(!d.is_virtual);
+        assert_eq!(d.bus_type.as_deref(), Some("UNKNOWN"));
+    }
+
+    /// Guard against a regression where a virtual device is detected by the
+    /// *absence* of "block" in `subsystems`: a null `subsystems` is NOT the same
+    /// as a subsystems string missing "block". `is_some_and` returns false for
+    /// None, so a null-subsystems device is non-virtual (contrast with the
+    /// existing empty-string case, which is virtual).
+    #[test]
+    fn null_subsystems_is_not_virtual() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/dm-1","kname":"/dev/dm-1",
+                "size":null,"tran":null,"subsystems":null,"ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert!(!d.is_virtual);
+        assert!(!d.is_removable);
+        assert!(d.is_system);
+    }
+
+    /// An empty `subsystems` string is normalized to `None`, so it classifies
+    /// identically to null/missing: not virtual (contrast the old behavior where
+    /// `""` was treated as virtual because it lacks "block").
+    #[test]
+    fn empty_subsystems_normalized_to_none() {
+        let d = &descriptors(
+            r#"[{
+                "name":"/dev/dm-2","kname":"/dev/dm-2",
+                "size":null,"tran":null,"subsystems":"","ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "ptype":null,"label":null,"vendor":null,"model":null
+            }]"#,
+        )[0];
+
+        assert!(!d.is_virtual);
+        assert!(!d.is_scsi);
+        assert!(!d.is_usb);
     }
 }
