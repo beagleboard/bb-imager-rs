@@ -11,6 +11,7 @@ _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
 _APPIMAGETOOL_ARGS =
+_DEST_VERSION = $(VERSION)
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -131,6 +132,7 @@ endif
 # Add pre-relase feature
 ifeq ($(PRE_RELEASE),1)
 	_RUST_ARGS_GUI += -F pre-release
+	_DEST_VERSION = alpha
 endif
 
 # Add NOTIFY_RUST feature
@@ -250,9 +252,7 @@ package-rename:
 	for pkg in gui cli service; do \
 		if [ -d bb-imager-$$pkg/dist ]; then \
 			for file in bb-imager-$$pkg/dist/*; do \
-				if [ "$${file##*.}" = "AppImage" ]; then \
-					mv "$$file" "$$(echo "$$file" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+-/-alpha-/')"; \
-				elif [ "$${file##*.}" = "msixbundle" ]; then \
+				if [ "$${file##*.}" = "msixbundle" ]; then \
 					mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
 				else \
 					mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
@@ -315,7 +315,7 @@ package-gui-appimage: build-gui
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/applications/org.beagleboard.imagingutility.desktop bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.desktop
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/icons/hicolor/128x128/apps/org.beagleboard.imagingutility.png bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.png
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.appdata.xml
-	cd bb-imager-gui/dist && appimagetool $(_APPIMAGETOOL_ARGS) org.beagleboard.imagingutility.AppDir BeagleBoard_Imager-$(VERSION)-$(APPIMAGE_ARCH).AppImage
+	cd bb-imager-gui/dist && appimagetool $(_APPIMAGETOOL_ARGS) org.beagleboard.imagingutility.AppDir BeagleBoard_Imager-$(_DEST_VERSION)-$(APPIMAGE_ARCH).AppImage
 	rm -rf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir
 
 package-gui-dmg: build-gui
