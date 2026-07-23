@@ -245,6 +245,8 @@ package-rename:
 			for file in bb-imager-$$pkg/dist/*; do \
 				if [ "$${file##*.}" = "AppImage" ]; then \
 					mv "$$file" "$$(echo "$$file" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+-/-alpha-/')"; \
+				elif [ "$${file##*.}" = "msixbundle" ]; then \
+					mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
 				else \
 					mv "$$file" "$$(echo "$$file" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+_/_alpha_/')"; \
 				fi; \
