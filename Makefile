@@ -10,6 +10,7 @@ _RUST_ARGS_GUI = ${_RUST_ARGS} -F sd
 _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
+_APPIMAGETOOL_ARGS =
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -74,6 +75,8 @@ UPDATER ?= 0
 NOTIFY_RUST ?= 1
 ## variable: APPIMAGE_ARCH: Target arch for Appimage
 APPIMAGE_ARCH ?= $(_ARCH)
+## variable: APPIMAGE_RELEASE_TAG: Release tag for update info
+APPIMAGE_RELEASE_TAG ?=
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -133,6 +136,10 @@ endif
 # Add NOTIFY_RUST feature
 ifeq ($(NOTIFY_RUST),1)
 	_RUST_ARGS_GUI += -F notify-rust
+endif
+
+ifneq ($(APPIMAGE_RELEASE_TAG),)
+	_APPIMAGETOOL_ARGS += -u "gh-releases-zsync|beagleboard|bb-imager-rs|${APPIMAGE_RELEASE_TAG}|BeagleBoard_Imager-*-${APPIMAGE_ARCH}.AppImage.zsync"
 endif
 
 ## build: build: Build both CLI and GUI
@@ -308,7 +315,7 @@ package-gui-appimage: build-gui
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/applications/org.beagleboard.imagingutility.desktop bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.desktop
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/icons/hicolor/128x128/apps/org.beagleboard.imagingutility.png bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.png
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.appdata.xml
-	appimagetool bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir bb-imager-gui/dist/BeagleBoard_Imager-$(VERSION)-$(APPIMAGE_ARCH).AppImage
+	cd bb-imager-gui/dist && appimagetool $(_APPIMAGETOOL_ARGS) org.beagleboard.imagingutility.AppDir BeagleBoard_Imager-$(VERSION)-$(APPIMAGE_ARCH).AppImage
 	rm -rf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir
 
 package-gui-dmg: build-gui
