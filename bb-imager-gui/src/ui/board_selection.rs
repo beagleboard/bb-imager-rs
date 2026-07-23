@@ -1,15 +1,11 @@
 use iced::{Element, widget};
 
-use crate::{
-    BBImagerMessage,
-    state::ChooseBoardState,
-    ui::helpers::{self, page_type1, svg_icon_style},
-};
+use crate::{BBImagerMessage, state::ChooseBoardState, ui::helpers};
 
 const ICON_WIDTH: u32 = 100;
 
 pub(crate) fn view<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessage> {
-    page_type1(
+    helpers::page_type1(
         board_list_pane(state),
         board_view_pane(state),
         [widget::button("NEXT")
@@ -22,23 +18,18 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
         .boards
         .iter()
         .map(|dev| {
-            // TODO: Make selected_board proper id
             let is_selected = state
                 .selected_board
                 .as_ref()
                 .map(|x| x.id == dev.id)
                 .unwrap_or(false);
-            let img: Element<BBImagerMessage> = match &dev.icon {
-                Some(u) => state
-                    .common
-                    .img_handle_cache
-                    .view(u, ICON_WIDTH, iced::Shrink),
-                None => widget::svg(helpers::BOARD_ICON.clone())
-                    .width(ICON_WIDTH)
-                    .style(svg_icon_style)
-                    .into(),
-            };
-            // TODO: Make selected_board proper id
+            let img = helpers::network_image_or_default(
+                &state.common.img_handle_cache,
+                dev.icon.as_ref(),
+                helpers::BOARD_ICON.clone(),
+                ICON_WIDTH,
+                iced::Shrink,
+            );
             helpers::list_item(
                 [img, helpers::list_label(&dev.name).into()],
                 is_selected,

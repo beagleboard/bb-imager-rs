@@ -257,15 +257,13 @@ pub(crate) fn board_view_pane<'a>(
     dev: &'a crate::db::Board,
     state: &'a crate::BBImagerCommon,
 ) -> Element<'a, BBImagerMessage> {
-    let img: Element<BBImagerMessage> = match &dev.icon {
-        Some(u) => state
-            .img_handle_cache
-            .view(u, iced::Length::Fill, iced::Shrink),
-        None => svg(BOARD_ICON.clone())
-            .width(iced::Length::Fill)
-            .style(svg_icon_style)
-            .into(),
-    };
+    let img = network_image_or_default(
+        &state.img_handle_cache,
+        dev.icon.as_ref(),
+        BOARD_ICON.clone(),
+        iced::Fill,
+        iced::Shrink,
+    );
 
     let copy_btn = copy_btn(COPY_ICON.clone()).on_press_with(|| {
         let json = serde_json::to_string_pretty(dev).expect("Invalid image");
@@ -547,4 +545,21 @@ pub(crate) fn progress_finish_view<'a>(
         .align_x(iced::Center)
         .padding(VIEW_COL_PADDING)
         .into()
+}
+
+pub(crate) fn network_image_or_default<'a>(
+    cache: &'a crate::helpers::ImageHandleCache,
+    img: Option<&url::Url>,
+    def: svg::Handle,
+    width: impl Into<iced::Length>,
+    height: impl Into<iced::Length>,
+) -> Element<'a, BBImagerMessage> {
+    match img {
+        Some(u) => cache.view(u, width, height),
+        None => widget::svg(def)
+            .width(width)
+            .height(height)
+            .style(svg_icon_style)
+            .into(),
+    }
 }
