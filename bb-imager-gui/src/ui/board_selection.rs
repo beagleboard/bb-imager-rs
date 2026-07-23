@@ -29,10 +29,10 @@ fn board_list_pane<'a>(state: &'a ChooseBoardState) -> Element<'a, BBImagerMessa
                 .map(|x| x.id == dev.id)
                 .unwrap_or(false);
             let img: Element<BBImagerMessage> = match &dev.icon {
-                Some(u) => match state.common.img_handle_cache.get(u) {
-                    Some(handle) => handle.view(ICON_WIDTH, iced::Shrink),
-                    _ => iced_aw::Spinner::new().width(ICON_WIDTH).into(),
-                },
+                Some(u) => state
+                    .common
+                    .img_handle_cache
+                    .view(u, ICON_WIDTH, iced::Shrink),
                 None => widget::svg(helpers::BOARD_ICON.clone())
                     .width(ICON_WIDTH)
                     .style(svg_icon_style)

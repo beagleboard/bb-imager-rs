@@ -258,10 +258,9 @@ pub(crate) fn board_view_pane<'a>(
     state: &'a crate::BBImagerCommon,
 ) -> Element<'a, BBImagerMessage> {
     let img: Element<BBImagerMessage> = match &dev.icon {
-        Some(u) => match state.img_handle_cache.get(u) {
-            Some(x) => x.view(iced::Length::Fill, iced::Shrink),
-            None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
-        },
+        Some(u) => state
+            .img_handle_cache
+            .view(u, iced::Length::Fill, iced::Shrink),
         None => svg(BOARD_ICON.clone())
             .width(iced::Length::Fill)
             .style(svg_icon_style)

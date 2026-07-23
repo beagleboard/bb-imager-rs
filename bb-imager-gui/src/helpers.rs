@@ -861,6 +861,18 @@ impl ImageHandleCache {
     pub(crate) fn contains(&self, u: &url::Url) -> bool {
         self.0.contains_key(u)
     }
+
+    pub(crate) fn view(
+        &self,
+        u: &url::Url,
+        width: impl Into<iced::Length>,
+        height: impl Into<iced::Length>,
+    ) -> iced::Element<'_, BBImagerMessage> {
+        match self.get(u) {
+            Some(handle) => handle.view(width, height),
+            None => iced_aw::Spinner::new().width(width).height(height).into(),
+        }
+    }
 }
 
 pub(crate) fn pretty_bytes(bytes: u64) -> String {

@@ -60,17 +60,11 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                     }
                     crate::helpers::OsImageId::OsImage(_)
                     | crate::helpers::OsImageId::OsSublist(_) => {
-                        match state
-                            .common
-                            .img_handle_cache
-                            .get(img.icon.as_ref().expect("Missing Os Image icon"))
-                        {
-                            Some(handle) => handle.view(ICON_WIDTH, ICON_WIDTH),
-                            _ => iced_aw::Spinner::new()
-                                .height(ICON_WIDTH)
-                                .width(ICON_WIDTH)
-                                .into(),
-                        }
+                        state.common.img_handle_cache.view(
+                            img.icon.as_ref().expect("Missing Os Image icon"),
+                            ICON_WIDTH,
+                            ICON_WIDTH,
+                        )
                     }
                 };
 
@@ -116,10 +110,10 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
         Some((_, img)) => {
             let icon = match img.icon() {
                 crate::helpers::BoardImageIcon::Remote(url) => {
-                    match state.common.img_handle_cache.get(url) {
-                        Some(x) => x.view(iced::Length::Fill, 100),
-                        None => iced_aw::Spinner::new().width(iced::Length::Fill).into(),
-                    }
+                    state
+                        .common
+                        .img_handle_cache
+                        .view(url, iced::Length::Fill, 100)
                 }
                 crate::helpers::BoardImageIcon::Local => {
                     widget::svg(helpers::FILE_ADD_ICON.clone())
