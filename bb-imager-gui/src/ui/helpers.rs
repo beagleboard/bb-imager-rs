@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use iced::{
-    Element, Radians, Rectangle, Renderer, Theme,
+    Element, Rectangle, Renderer, Theme,
     advanced::text::highlighter::PlainText,
     mouse,
     widget::{self, canvas, svg},
@@ -162,95 +162,6 @@ pub(crate) fn page_type3<'a>(
         .padding(24)
         .spacing(24)
         .into()
-}
-
-#[derive(Debug)]
-pub(crate) struct ProgressCircle {
-    progress: f32,
-    thickness: f32,
-    color: iced::Color,
-    cache: canvas::Cache,
-}
-
-impl ProgressCircle {
-    pub(crate) fn new(
-        progress: f32,
-        thickness: impl Into<f32>,
-        color: iced::Color,
-    ) -> widget::Canvas<Self, BBImagerMessage> {
-        widget::canvas(Self {
-            progress,
-            cache: canvas::Cache::new(),
-            thickness: thickness.into(),
-            color,
-        })
-        .width(iced::Fill)
-        .height(iced::Fill)
-    }
-}
-
-// Then, we implement the `Program` trait
-impl<Message> canvas::Program<Message> for ProgressCircle {
-    // No internal state
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &(),
-        renderer: &Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let geometry = self.cache.draw(renderer, bounds.size(), |frame| {
-            let center = iced::Point::new(bounds.width / 2.0, bounds.height / 2.0);
-            let radius = bounds.width.min(bounds.height) / 2.0 - self.thickness;
-
-            // Background ring
-            let bg = canvas::Path::circle(center, radius);
-            frame.stroke(
-                &bg,
-                canvas::Stroke::default()
-                    .with_width(self.thickness)
-                    .with_color(theme.palette().background),
-            );
-
-            // Foreground arc
-            let angle = self.progress.clamp(0.0, 1.0) * 2.0 * Radians::PI;
-
-            let arc = canvas::path::Arc {
-                center,
-                radius,
-                start_angle: iced::Radians::PI / 2.0,
-                end_angle: iced::Radians::PI / 2.0 + angle,
-            };
-            let arc = canvas::Path::new(|b| b.arc(arc));
-
-            frame.stroke(
-                &arc,
-                canvas::Stroke::default()
-                    .with_line_cap(canvas::LineCap::Round)
-                    .with_width(self.thickness)
-                    .with_color(self.color),
-            );
-
-            // Progress Report
-            let prog = (self.progress.clamp(0.0, 1.0) * 100.0).floor();
-            let prog_pretty = format!("{}%", prog);
-            frame.fill_text(canvas::Text {
-                content: prog_pretty,
-                position: center,
-                align_x: iced::Center.into(),
-                align_y: iced::Center.into(),
-                size: (radius / 2.0).into(),
-                color: theme.palette().text,
-                font: constants::FONT_BOLD,
-                ..Default::default()
-            });
-        });
-
-        vec![geometry]
-    }
 }
 
 pub(crate) fn board_view_pane<'a>(

@@ -643,6 +643,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-iced-widgets"
+version = "1.0.13"
+dependencies = [
+ "iced",
+]
+
+[[package]]
 name = "bb-imager-cli"
 version = "1.0.13"
 dependencies = [
@@ -670,6 +677,7 @@ dependencies = [
  "bb-downloader",
  "bb-flasher",
  "bb-helper",
+ "bb-iced-widgets",
  "chrono",
  "const-hex",
  "directories",
