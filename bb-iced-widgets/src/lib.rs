@@ -1,4 +1,5 @@
 pub mod circle_bar;
+pub mod icon;
 pub mod progress_circle;
 
 pub fn progress_circle<T>(
@@ -17,4 +18,8 @@ pub fn circle_bar<T>(
     font: iced::Font,
 ) -> iced::widget::Canvas<circle_bar::CircleBar, T> {
     circle_bar::CircleBar::new(label, thickness, color, font)
+}
+
+pub fn icon<'a>(handle: impl Into<icon::IconHandle>) -> icon::Icon<'a> {
+    icon::Icon::new(handle)
 }
