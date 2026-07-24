@@ -1,11 +1,9 @@
 use std::sync::LazyLock;
 
-use iced::{
-    Element, Rectangle, Renderer, Theme,
-    advanced::text::highlighter::PlainText,
-    mouse,
-    widget::{self, canvas, svg},
-};
+use bb_iced_widgets::circle_bar;
+use iced::Element;
+use iced::advanced::text::highlighter::PlainText;
+use iced::widget::{self, svg};
 
 use crate::{constants, message::BBImagerMessage};
 
@@ -226,73 +224,6 @@ pub(crate) fn board_view_pane<'a>(
     )
 }
 
-#[derive(Debug)]
-pub(crate) struct CircleBar {
-    label: &'static str,
-    thickness: f32,
-    color: iced::Color,
-    cache: canvas::Cache,
-}
-
-impl CircleBar {
-    pub(crate) fn new(
-        label: &'static str,
-        thickness: impl Into<f32>,
-        color: iced::Color,
-    ) -> widget::Canvas<Self, BBImagerMessage> {
-        widget::canvas(Self {
-            label,
-            cache: canvas::Cache::new(),
-            thickness: thickness.into(),
-            color,
-        })
-        .width(iced::Fill)
-        .height(iced::Fill)
-    }
-}
-
-impl<Message> canvas::Program<Message> for CircleBar {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &(),
-        renderer: &Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let geometry = self.cache.draw(renderer, bounds.size(), |frame| {
-            let center = iced::Point::new(bounds.width / 2.0, bounds.height / 2.0);
-            let radius = bounds.width.min(bounds.height) / 2.0 - self.thickness;
-
-            // Background ring
-            let bg = canvas::Path::circle(center, radius);
-            frame.stroke(
-                &bg,
-                canvas::Stroke::default()
-                    .with_width(self.thickness)
-                    .with_color(self.color),
-            );
-
-            let frac = if self.label.len() > 4 { 3.0 } else { 2.0 };
-
-            frame.fill_text(canvas::Text {
-                content: self.label.to_string(),
-                position: center,
-                align_x: iced::Center.into(),
-                align_y: iced::Center.into(),
-                size: (radius / frac).into(),
-                color: theme.palette().text,
-                font: constants::FONT_BOLD,
-                ..Default::default()
-            });
-        });
-
-        vec![geometry]
-    }
-}
-
 pub(crate) fn detail_entry<'a>(
     key: &'a str,
     val: impl widget::text::IntoFragment<'a>,
@@ -452,10 +383,13 @@ pub(crate) fn progress_finish_view<'a>(
     color: iced::Color,
     details: impl widget::text::IntoFragment<'a>,
 ) -> Element<'a, BBImagerMessage> {
-    widget::column![CircleBar::new(label, 10.0f32, color), widget::text(details)]
-        .align_x(iced::Center)
-        .padding(VIEW_COL_PADDING)
-        .into()
+    widget::column![
+        circle_bar(label, 10.0f32, color, constants::FONT_BOLD),
+        widget::text(details)
+    ]
+    .align_x(iced::Center)
+    .padding(VIEW_COL_PADDING)
+    .into()
 }
 
 pub(crate) fn network_image_or_default<'a>(
