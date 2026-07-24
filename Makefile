@@ -4,14 +4,15 @@ _HOST_TARGET = $(shell rustc --print host-tuple)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
 _RUST_ARGS_BASE = --locked
-_RUST_ARGS = ${_RUST_ARGS_BASE} -r -F bcf_cc1352p7,zepto_uart
-_RUST_ARGS_CLI = ${_RUST_ARGS} -F dfu
-_RUST_ARGS_GUI = ${_RUST_ARGS} -F sd
+_RUST_ARGS = ${_RUST_ARGS_BASE} --features bcf_cc1352p7,zepto_uart
+_RUST_ARGS_CLI = ${_RUST_ARGS} --features dfu
+_RUST_ARGS_GUI = ${_RUST_ARGS} --features sd
 _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
 _APPIMAGETOOL_ARGS =
 _DEST_VERSION = $(VERSION)
+_DIOXUS_CLI = $(shell which dx)
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -93,25 +94,25 @@ endif
 
 # Add zepto_i2c feature
 ifeq ($(ZEPTO_I2C),1)
-	_RUST_ARGS += -F zepto_i2c
+	_RUST_ARGS += --features zepto_i2c
 endif
 
 # Add bcf_msp430 feature
 ifeq ($(BCF_MSP430),1)
-	_RUST_ARGS += -F bcf_msp430
+	_RUST_ARGS += --features bcf_msp430
 endif
 
 # Add system-deps feature
 ifeq ($(SYSTEM_DEPS),1)
 	_RUST_ARGS += --no-default-features
-	_RUST_ARGS_GUI += -F system-deps
+	_RUST_ARGS_GUI += --features system-deps
 endif
 
 # Add shared-hidraw feature
 ifeq ($(SHARED_HIDRAW),1)
-	_RUST_ARGS += -F shared-hidraw
+	_RUST_ARGS += --features shared-hidraw
 else
-	_RUST_ARGS += -F static-hidraw
+	_RUST_ARGS += --features static-hidraw
 endif
 
 # Add offline flag is needed
@@ -121,23 +122,23 @@ endif
 
 # Add pb2_mspm0 feature
 ifeq ($(PB2_MSPM0),1)
-	_RUST_ARGS_CLI += -F pb2_mspm0
+	_RUST_ARGS_CLI += --features pb2_mspm0
 endif
 
 # Add updater feature
 ifeq ($(UPDATER),1)
-	_RUST_ARGS_GUI += -F updater
+	_RUST_ARGS_GUI += --features updater
 endif
 
 # Add pre-relase feature
 ifeq ($(PRE_RELEASE),1)
-	_RUST_ARGS_GUI += -F pre-release
+	_RUST_ARGS_GUI += --features pre-release
 	_DEST_VERSION = alpha
 endif
 
 # Add NOTIFY_RUST feature
 ifeq ($(NOTIFY_RUST),1)
-	_RUST_ARGS_GUI += -F notify-rust
+	_RUST_ARGS_GUI += --features notify-rust
 endif
 
 ifneq ($(APPIMAGE_RELEASE_TAG),)
@@ -411,7 +412,7 @@ bloat:
 .PHONY: _build-cli-bin
 _build-cli-bin:
 	$(info Build CLI for $(TARGET))
-	$(RUST_BUILD) -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
+	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
 
 .PHONY: _build-cli-comp
 _build-cli-comp: _build-cli-bin
@@ -434,7 +435,7 @@ _build-cli-man: _build-cli-bin
 .PHONY: build-gui
 build-gui:
 	$(info Build GUI for $(TARGET))
-	$(RUST_BUILD) -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
+	$(RUST_BUILD) -r -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 
 ## build: build-cli: Build CLI and complementary stuff.
 .PHONY: build-cli
@@ -516,3 +517,8 @@ package-gui-snap:
 	ln -sf snapcraft.gui.yaml snapcraft.yaml
 	snapcraft pack -v
 	unlink snapcraft.yaml
+
+## housekeeping: debug-gui: Run GUI in debug mode. Provides access to comet with F12.
+.PHONY: debug-gui
+debug-gui:
+	$(_DIOXUS_CLI) serve -p bb-imager-gui ${_RUST_ARGS_GUI} --features debug
