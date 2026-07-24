@@ -3,12 +3,12 @@ use std::{io::Read, path::PathBuf};
 use iced::{Length, widget};
 
 #[derive(Debug, Clone)]
-pub enum IconHandle {
+pub enum Handle {
     Svg(widget::svg::Handle),
     Img(widget::image::Handle),
 }
 
-impl From<PathBuf> for IconHandle {
+impl From<PathBuf> for Handle {
     fn from(value: PathBuf) -> Self {
         let mut magic = [0u8; 32];
         {
@@ -22,13 +22,13 @@ impl From<PathBuf> for IconHandle {
     }
 }
 
-impl From<widget::svg::Handle> for IconHandle {
+impl From<widget::svg::Handle> for Handle {
     fn from(value: widget::svg::Handle) -> Self {
         Self::Svg(value)
     }
 }
 
-impl From<widget::image::Handle> for IconHandle {
+impl From<widget::image::Handle> for Handle {
     fn from(value: widget::image::Handle) -> Self {
         Self::Img(value)
     }
@@ -40,10 +40,10 @@ pub enum Icon<'a> {
 }
 
 impl<'a> Icon<'a> {
-    pub fn new(handle: impl Into<IconHandle>) -> Self {
+    pub fn new(handle: impl Into<Handle>) -> Self {
         match handle.into() {
-            IconHandle::Svg(handle) => Self::Svg(widget::svg(handle)),
-            IconHandle::Img(handle) => Self::Img(widget::image(handle)),
+            Handle::Svg(handle) => Self::Svg(widget::svg(handle)),
+            Handle::Img(handle) => Self::Img(widget::image(handle)),
         }
     }
 
