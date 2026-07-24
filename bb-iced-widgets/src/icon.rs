@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::Read, path::PathBuf};
 
 use iced::{Length, widget};
 
@@ -10,10 +10,14 @@ pub enum IconHandle {
 
 impl From<PathBuf> for IconHandle {
     fn from(value: PathBuf) -> Self {
-        let img = std::fs::read(&value).expect("Failed to open image");
-        match image::guess_format(&img) {
+        let mut magic = [0u8; 32];
+        {
+            let mut f = std::fs::File::open(&value).expect("Failed to open image");
+            f.read_exact(&mut magic).unwrap();
+        };
+        match image::guess_format(&magic) {
             Ok(_) => widget::image::Handle::from_path(value).into(),
-            Err(_) => widget::svg::Handle::from_memory(img).into(),
+            Err(_) => widget::svg::Handle::from_path(value).into(),
         }
     }
 }
