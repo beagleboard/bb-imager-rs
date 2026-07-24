@@ -45,6 +45,20 @@ make run-cli
 cargo run -p bb-imager-cli
 ----
 
+=== Debugging the GUI
+
+The GUI can be run in a debug mode that exposes https://github.com/hecrj/comet[comet], Iced's inspector/debugger. Press `F12` in the running application to open it.
+
+This requires the https://dioxuslabs.com/learn/0.6/CLI/installation/[Dioxus CLI] (`dx`), since debug mode relies on its `serve` command:
+
+[source,shell]
+----
+cargo install dioxus-cli
+make debug-gui
+----
+
+*Note:* Hot-reloading is expected to work in this mode but currently does not behave reliably. With the `dx` CLI, code changes are picked up but the application resets to the start screen, so the `App` state is not preserved. `cargo-hot` does not work at all. Debugging via comet works regardless.
+
 == Submitting Pull Requests
 
 This document exists to define some conventions and standards for all pull requests. These guidelines are not rigid and may be evaluated on a case-by-case basis, but contributors are encouraged to follow them.

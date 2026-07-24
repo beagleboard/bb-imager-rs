@@ -62,6 +62,7 @@ pre-release = []
 static-hidraw = ["bb-flasher/static_hidraw"]
 shared-hidraw = ["bb-flasher/shared_hidraw"]
 notify-rust = ["dep:notify-rust"]
+debug = ["iced/hot"]
 
 [package.metadata.packager]
 icons = ["assets/icons/icon.*"]
