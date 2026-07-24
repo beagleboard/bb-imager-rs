@@ -18,7 +18,7 @@ pub(crate) struct BBImagerCommon {
     pub(crate) timezones: widget::combo_box::State<String>,
     pub(crate) keymaps: widget::combo_box::State<String>,
 
-    pub(crate) img_handle_cache: helpers::ImageHandleCache,
+    pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<url::Url>,
 
     pub(crate) scroll_id: widget::Id,
     pub(crate) db: db::Db,
@@ -610,11 +610,17 @@ mod tests {
     #[test]
     fn non_progress_states_have_no_eta() {
         assert_eq!(
-            time_remaining_from(DownloadFlashingStatus::Preparing, Some(Duration::from_secs(5))),
+            time_remaining_from(
+                DownloadFlashingStatus::Preparing,
+                Some(Duration::from_secs(5))
+            ),
             None
         );
         assert_eq!(
-            time_remaining_from(DownloadFlashingStatus::Verifying, Some(Duration::from_secs(5))),
+            time_remaining_from(
+                DownloadFlashingStatus::Verifying,
+                Some(Duration::from_secs(5))
+            ),
             None
         );
     }

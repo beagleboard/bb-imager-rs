@@ -59,13 +59,13 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                             .into()
                     }
                     crate::helpers::OsImageId::OsImage(_)
-                    | crate::helpers::OsImageId::OsSublist(_) => {
-                        state.common.img_handle_cache.view(
-                            img.icon.as_ref().expect("Missing Os Image icon"),
-                            ICON_WIDTH,
-                            ICON_WIDTH,
-                        )
-                    }
+                    | crate::helpers::OsImageId::OsSublist(_) => bb_iced_widgets::cached_icon(
+                        &state.common.img_handle_cache,
+                        img.icon.as_ref().expect("Missing Os Image icon"),
+                    )
+                    .width(ICON_WIDTH)
+                    .height(ICON_WIDTH)
+                    .into(),
                 };
 
                 let mut contents = vec![icon, helpers::list_label(img.label()).into()];
@@ -108,12 +108,12 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
 fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBImagerMessage> {
     match state.selected_image.as_ref() {
         Some((_, img)) => {
-            let icon = match img.icon() {
+            let icon: Element<'a, BBImagerMessage> = match img.icon() {
                 crate::helpers::BoardImageIcon::Remote(url) => {
-                    state
-                        .common
-                        .img_handle_cache
-                        .view(url, iced::Length::Fill, 100)
+                    bb_iced_widgets::cached_icon(&state.common.img_handle_cache, url)
+                        .width(iced::Length::Fill)
+                        .height(100)
+                        .into()
                 }
                 crate::helpers::BoardImageIcon::Local => {
                     widget::svg(helpers::FILE_ADD_ICON.clone())

@@ -9,3 +9,4 @@ license.workspace = true
 [dependencies]
 iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg"] }
 image = "0.25"
+iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }

@@ -393,14 +393,17 @@ pub(crate) fn progress_finish_view<'a>(
 }
 
 pub(crate) fn network_image_or_default<'a>(
-    cache: &'a crate::helpers::ImageHandleCache,
+    cache: &'a bb_iced_widgets::cached_icon::Cache<url::Url>,
     img: Option<&url::Url>,
     def: svg::Handle,
     width: impl Into<iced::Length>,
     height: impl Into<iced::Length>,
 ) -> Element<'a, BBImagerMessage> {
     match img {
-        Some(u) => cache.view(u, width, height),
+        Some(u) => bb_iced_widgets::cached_icon(cache, u)
+            .width(width)
+            .height(height)
+            .into(),
         None => widget::svg(def)
             .width(width)
             .height(height)
