@@ -20,6 +20,6 @@ pub fn circle_bar<T>(
     circle_bar::CircleBar::new(label, thickness, color, font)
 }
 
-pub fn icon<'a>(handle: impl Into<icon::IconHandle>) -> icon::Icon<'a> {
+pub fn icon<'a>(handle: impl Into<icon::Handle>) -> icon::Icon<'a> {
     icon::Icon::new(handle)
 }

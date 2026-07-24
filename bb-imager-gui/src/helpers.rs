@@ -808,10 +808,10 @@ pub(crate) fn log_file_path() -> PathBuf {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct ImageHandleCache(HashMap<url::Url, Option<bb_iced_widgets::icon::IconHandle>>);
+pub(crate) struct ImageHandleCache(HashMap<url::Url, Option<bb_iced_widgets::icon::Handle>>);
 
 impl ImageHandleCache {
-    pub(crate) fn get(&self, u: &url::Url) -> Option<&bb_iced_widgets::icon::IconHandle> {
+    pub(crate) fn get(&self, u: &url::Url) -> Option<&bb_iced_widgets::icon::Handle> {
         self.0.get(u)?.as_ref()
     }
 
