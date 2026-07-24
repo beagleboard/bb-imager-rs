@@ -130,7 +130,7 @@ impl BBImager {
                     .collect(),
             ),
 
-            img_handle_cache: helpers::ImageHandleCache::default(),
+            img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
 
             scroll_id: widget::Id::unique(),
             db: db.clone(),
