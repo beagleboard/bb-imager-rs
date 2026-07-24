@@ -647,6 +647,7 @@ name = "bb-iced-widgets"
 version = "1.0.13"
 dependencies = [
  "iced",
+ "image",
 ]
 
 [[package]]

@@ -10,7 +10,6 @@ use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use bb_helper::file_stream::ReaderFileStream;
-use iced::widget;
 use std::sync::mpsc;
 use tokio_util::task::AbortOnDropHandle;
 use url::Url;
@@ -809,44 +808,10 @@ pub(crate) fn log_file_path() -> PathBuf {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct ImageHandleCache(HashMap<url::Url, Option<ImageHandleCacheValue>>);
-
-#[derive(Debug)]
-pub(crate) enum ImageHandleCacheValue {
-    Svg(widget::svg::Handle),
-    Img(widget::image::Handle),
-}
-
-impl From<PathBuf> for ImageHandleCacheValue {
-    fn from(value: PathBuf) -> Self {
-        let img = std::fs::read(&value).expect("Failed to open image");
-        match image::guess_format(&img) {
-            Ok(_) => Self::Img(widget::image::Handle::from_path(value)),
-            Err(_) => Self::Svg(widget::svg::Handle::from_memory(img)),
-        }
-    }
-}
-
-impl ImageHandleCacheValue {
-    pub(crate) fn view<'a>(
-        &'a self,
-        width: impl Into<iced::Length>,
-        height: impl Into<iced::Length>,
-    ) -> iced::Element<'a, BBImagerMessage> {
-        match self {
-            ImageHandleCacheValue::Svg(handle) => widget::svg(handle.clone())
-                .width(width)
-                .height(height)
-                .into(),
-            ImageHandleCacheValue::Img(handle) => {
-                widget::image(handle).width(width).height(height).into()
-            }
-        }
-    }
-}
+pub(crate) struct ImageHandleCache(HashMap<url::Url, Option<bb_iced_widgets::icon::IconHandle>>);
 
 impl ImageHandleCache {
-    pub(crate) fn get(&self, u: &url::Url) -> Option<&ImageHandleCacheValue> {
+    pub(crate) fn get(&self, u: &url::Url) -> Option<&bb_iced_widgets::icon::IconHandle> {
         self.0.get(u)?.as_ref()
     }
 
@@ -869,7 +834,10 @@ impl ImageHandleCache {
         height: impl Into<iced::Length>,
     ) -> iced::Element<'_, BBImagerMessage> {
         match self.get(u) {
-            Some(handle) => handle.view(width, height),
+            Some(handle) => bb_iced_widgets::icon(handle.clone())
+                .width(width)
+                .height(height)
+                .into(),
             None => iced_aw::Spinner::new().width(width).height(height).into(),
         }
     }
