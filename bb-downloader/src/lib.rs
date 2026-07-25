@@ -95,20 +95,6 @@ impl Downloader {
         None
     }
 
-    /// Check if a downloaded file is already in cache.
-    ///
-    /// [`check_cache_from_sha`](Self::check_cache_from_sha) should be prefered in cases when SHA256
-    /// of the file to download is already known.
-    fn check_cache_from_url<U: reqwest::IntoUrl>(&self, url: U) -> Option<PathBuf> {
-        // Use hash of url for file name
-        let file_path = self.path_from_url(&url.into_url().ok()?);
-        if file_path.exists() {
-            Some(file_path)
-        } else {
-            None
-        }
-    }
-
     /// Download a JSON file without caching the contents. Should be used when there is no point in
     /// caching the file.
     #[cfg(feature = "json")]
@@ -135,12 +121,12 @@ impl Downloader {
     pub async fn download<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
-        // Check cache
-        if let Some(p) = self.check_cache_from_url(url.clone()) {
-            return Ok(p);
-        }
-
         let file_path = self.path_from_url(&url);
+
+        // Check cache
+        if file_path.exists() {
+            return Ok(file_path);
+        }
 
         let response = self
             .client
