@@ -11,7 +11,7 @@
 
 mod helpers;
 
-use helpers::{AsyncTempFile, sha256_from_path};
+use helpers::sha256_from_path;
 
 use futures_util::{StreamExt, TryStreamExt};
 #[cfg(feature = "json")]
@@ -140,44 +140,23 @@ impl Downloader {
             return Ok(p);
         }
 
-        self.download_no_cache(url).await
-    }
-
-    /// Downloads the file without checking cache.
-    ///
-    /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
-    /// file is known in advance.
-    ///
-    /// # Differences from [Self::download]
-    ///
-    /// This function does not check if the file is present in cache, and will ovewrite the old
-    /// cached file. The file is still cached in the end.
-    async fn download_no_cache<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
-        let url = url.into_url().map_err(io::Error::other)?;
-        tracing::debug!("Donwloading: {}", url);
-
         let file_path = self.path_from_url(&url);
 
-        let mut file = AsyncTempFile::new()?;
-        {
-            let mut file = tokio::io::BufWriter::new(&mut file);
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(io::Error::other)?
+            .bytes()
+            .await
+            .map_err(io::Error::other)?;
 
-            let response = self
-                .client
-                .get(url)
-                .send()
-                .await
-                .map_err(io::Error::other)?;
-            let mut response_stream = response.bytes_stream().map_err(io::Error::other);
+        let fp_clone = file_path.clone();
+        tokio::task::spawn_blocking(move || std::fs::write(fp_clone, response))
+            .await
+            .unwrap()?;
 
-            while let Some(x) = response_stream.next().await {
-                file.write_all_buf(&mut x?).await?;
-            }
-
-            file.flush().await?
-        }
-
-        file.persist(&file_path).await?;
         Ok(file_path)
     }
 
