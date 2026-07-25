@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
-use iced::Length;
+use iced::{Length, widget};
 
 #[derive(Debug)]
 pub struct Cache<K: Eq + Hash>(HashMap<K, Option<crate::icon::Handle>>);
@@ -29,16 +29,16 @@ impl<K: Eq + Hash> Cache<K> {
     }
 }
 
-pub enum CachedIcon<'a> {
+pub enum CachedIcon<'a, M> {
     Icon(crate::icon::Icon<'a>),
-    Spinner(iced_aw::Spinner),
+    Spinner(widget::Container<'a, M>),
 }
 
-impl<'a> CachedIcon<'a> {
+impl<'a, M> CachedIcon<'a, M> {
     pub fn new<K: Eq + Hash>(cache: &Cache<K>, key: &K) -> Self {
         match cache.get(key) {
             Some(v) => Self::Icon(crate::icon(v.clone())),
-            None => Self::Spinner(iced_aw::Spinner::new()),
+            None => Self::Spinner(widget::center(iced_aw::Spinner::new())),
         }
     }
 
@@ -57,8 +57,8 @@ impl<'a> CachedIcon<'a> {
     }
 }
 
-impl<'a, M> From<CachedIcon<'a>> for iced::Element<'a, M> {
-    fn from(value: CachedIcon<'a>) -> Self {
+impl<'a, M: 'a> From<CachedIcon<'a, M>> for iced::Element<'a, M> {
+    fn from(value: CachedIcon<'a, M>) -> Self {
         match value {
             CachedIcon::Icon(icon) => icon.into(),
             CachedIcon::Spinner(spinner) => spinner.into(),
