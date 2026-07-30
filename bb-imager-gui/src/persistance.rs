@@ -84,7 +84,7 @@ pub(crate) struct SdSysconfCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) timezone: Option<String>,
+    pub(crate) timezone: Option<chrono_tz::Tz>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) keymap: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,7 +121,7 @@ impl SdSysconfCustomization {
         self
     }
 
-    pub(crate) fn update_timezone(mut self, t: Option<String>) -> Self {
+    pub(crate) fn update_timezone(mut self, t: Option<chrono_tz::Tz>) -> Self {
         self.timezone = t;
         self
     }
@@ -162,7 +162,7 @@ impl SdSysconfCustomization {
     pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
             self.hostname.map(Into::into),
-            self.timezone.map(Into::into),
+            self.timezone.map(|x| x.to_string()).map(Into::into),
             self.keymap.map(Into::into),
             self.user.map(|x| (x.username.into(), x.password.into())),
             self.wifi.map(|x| (x.ssid.into(), x.password.into())),
@@ -175,7 +175,7 @@ impl SdSysconfCustomization {
     pub(crate) fn cloudinit(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
             self.hostname.map(Into::into),
-            self.timezone.map(Into::into),
+            self.timezone.map(|x| x.to_string()).map(Into::into),
             self.keymap.map(Into::into),
             self.user.map(|x| (x.username.into(), x.password.into())),
             self.wifi.map(|x| (x.ssid.into(), x.password.into())),
@@ -308,20 +308,25 @@ mod tests {
     fn sysconf_builders_populate_all_fields() {
         let cfg = SdSysconfCustomization::default()
             .update_hostname(Some("beagle".into()))
-            .update_timezone(Some("UTC".into()))
+            .update_timezone(Some("UTC".parse().unwrap()))
             .update_keymap(Some("us".into()))
             .update_ssh(Some("ssh-key".into()))
             .update_usb_enable_dhcp(Some(true))
-            .update_wifi(Some(SdCustomizationWifi::default().update_ssid("net".into())))
+            .update_wifi(Some(
+                SdCustomizationWifi::default().update_ssid("net".into()),
+            ))
             .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
 
         assert_eq!(cfg.hostname.as_deref(), Some("beagle"));
-        assert_eq!(cfg.timezone.as_deref(), Some("UTC"));
+        assert_eq!(cfg.timezone, Some(chrono_tz::Tz::UTC));
         assert_eq!(cfg.keymap.as_deref(), Some("us"));
         assert_eq!(cfg.ssh.as_deref(), Some("ssh-key"));
         assert_eq!(cfg.usb_enable_dhcp, Some(true));
         assert_eq!(cfg.wifi.as_ref().map(|w| w.ssid.as_str()), Some("net"));
-        assert_eq!(cfg.user.as_ref().map(|u| u.username.as_str()), Some("beagle"));
+        assert_eq!(
+            cfg.user.as_ref().map(|u| u.username.as_str()),
+            Some("beagle")
+        );
     }
 
     #[test]
