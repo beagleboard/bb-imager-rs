@@ -220,8 +220,8 @@ pub(crate) fn system_timezone() -> Option<&'static str> {
     *SYSTEM_TIMEZONE
 }
 
-pub(crate) fn system_keymap() -> String {
-    static SYSTEM_KEYMAP: LazyLock<Option<String>> = LazyLock::new(|| {
+pub(crate) fn system_keymap() -> &'static str {
+    static SYSTEM_KEYMAP: LazyLock<Option<&'static str>> = LazyLock::new(|| {
         let lang = whoami::lang_prefs().ok()?.message_langs().next()?;
         let lang_str = lang.to_string();
 
@@ -236,16 +236,13 @@ pub(crate) fn system_keymap() -> String {
                     .iter()
                     .find(|k| k.eq_ignore_ascii_case(region))
             {
-                return Some(canon.to_string());
+                return Some(canon);
             }
         }
 
         None
     });
-    (*SYSTEM_KEYMAP)
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| String::from("us"))
+    (*SYSTEM_KEYMAP).unwrap_or("us")
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

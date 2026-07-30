@@ -218,7 +218,7 @@ fn linux_sd_card_common<'a>(
         .label("Set Keymap")
         .on_toggle(move |t| {
             let keymap = if t {
-                Some(helpers::system_keymap())
+                Some(helpers::system_keymap().to_string())
             } else {
                 None
             };
@@ -227,17 +227,22 @@ fn linux_sd_card_common<'a>(
     col = match config.keymap.as_ref() {
         Some(keymap) => {
             let xc = config.clone();
+            // The current selection needs to be resolved back to one of the options,
+            // which are kept sorted (see `constants::KEYMAP_LAYOUTS`) to allow a binary
+            // search.
+            let options = state.common.keymaps.options();
+            let selection = options
+                .binary_search(&keymap.as_str())
+                .map(|x| &options[x])
+                .ok();
 
             col.push(element_with_element(
                 toggle.into(),
-                widget::combo_box(
-                    &state.common.keymaps,
-                    "Keymap",
-                    Some(&keymap.to_owned()),
-                    move |t| {
-                        BBImagerMessage::UpdateFlashConfig(wrap(xc.clone().update_keymap(Some(t))))
-                    },
-                )
+                widget::combo_box(&state.common.keymaps, "Keymap", selection, move |t| {
+                    BBImagerMessage::UpdateFlashConfig(wrap(
+                        xc.clone().update_keymap(Some(t.to_string())),
+                    ))
+                })
                 .width(INPUT_WIDTH)
                 .into(),
             ))

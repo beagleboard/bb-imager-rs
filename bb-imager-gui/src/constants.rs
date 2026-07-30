@@ -609,7 +609,7 @@ pub(crate) const TIMEZONES: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::TIMEZONES;
+    use super::{KEYMAP_LAYOUTS, TIMEZONES};
 
     /// The timezone combo box looks up its selection with `binary_search`, so new
     /// entries need to be inserted in byte order (note `_` sorts after uppercase
@@ -617,5 +617,12 @@ mod tests {
     #[test]
     fn timezones_sorted() {
         assert!(TIMEZONES.is_sorted());
+    }
+
+    /// The keymap combo box looks up its selection with `binary_search`, so new
+    /// entries need to be inserted in byte order.
+    #[test]
+    fn keymap_layouts_sorted() {
+        assert!(KEYMAP_LAYOUTS.is_sorted());
     }
 }
