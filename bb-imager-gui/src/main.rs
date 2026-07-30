@@ -121,12 +121,7 @@ impl BBImager {
             app_config,
             downloader: downloader.clone(),
             timezones: widget::combo_box::State::new(constants::TIMEZONES.to_vec()),
-            keymaps: widget::combo_box::State::new(
-                constants::KEYMAP_LAYOUTS
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect(),
-            ),
+            keymaps: widget::combo_box::State::new(constants::KEYMAP_LAYOUTS.to_vec()),
 
             img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
 

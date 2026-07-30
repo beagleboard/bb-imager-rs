@@ -16,7 +16,7 @@ pub(crate) struct BBImagerCommon {
     pub(crate) app_config: persistance::GuiConfiguration,
     pub(crate) downloader: bb_downloader::Downloader,
     pub(crate) timezones: widget::combo_box::State<&'static str>,
-    pub(crate) keymaps: widget::combo_box::State<String>,
+    pub(crate) keymaps: widget::combo_box::State<&'static str>,
 
     pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<url::Url>,
 
