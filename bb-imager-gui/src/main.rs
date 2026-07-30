@@ -120,9 +120,7 @@ impl BBImager {
         let common = BBImagerCommon {
             app_config,
             downloader: downloader.clone(),
-            timezones: widget::combo_box::State::new(
-                constants::TIMEZONES.iter().map(|x| x.to_string()).collect(),
-            ),
+            timezones: widget::combo_box::State::new(constants::TIMEZONES.to_vec()),
             keymaps: widget::combo_box::State::new(
                 constants::KEYMAP_LAYOUTS
                     .iter()
