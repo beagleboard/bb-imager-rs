@@ -204,19 +204,9 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
-pub(crate) fn system_timezone() -> Option<&'static str> {
-    static SYSTEM_TIMEZONE: LazyLock<Option<&'static str>> = LazyLock::new(|| {
-        let tz = iana_time_zone::get_timezone().ok()?;
-        let find = |name: &str| {
-            crate::constants::TIMEZONES
-                .iter()
-                .copied()
-                .find(|x| x.eq_ignore_ascii_case(name))
-        };
-
-        // Zones like `UTC` and `GMT` are only listed under `Etc/`.
-        find(&tz).or_else(|| find(&format!("Etc/{tz}")))
-    });
+pub(crate) fn system_timezone() -> Option<chrono_tz::Tz> {
+    static SYSTEM_TIMEZONE: LazyLock<Option<chrono_tz::Tz>> =
+        LazyLock::new(|| iana_time_zone::get_timezone().ok()?.parse().ok());
     *SYSTEM_TIMEZONE
 }
 
@@ -1136,7 +1126,7 @@ mod tests {
 
         let full = SdSysconfCustomization::default()
             .update_hostname(Some("h".into()))
-            .update_timezone(Some("UTC".into()))
+            .update_timezone(Some("UTC".parse().unwrap()))
             .update_keymap(Some("us".into()))
             .update_ssh(Some("k".into()))
             .update_user(Some(SdCustomizationUser::new("u".into(), "p".into())))

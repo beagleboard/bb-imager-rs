@@ -34,6 +34,7 @@ const-hex = { version = "1.19", features = ["serde"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 rusqlite = { version = "0.40", features = ["url", "chrono"] }
 chrono = "0.4"
+chrono-tz = { version = "0.10", features = ["serde"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 
 [build-dependencies]
