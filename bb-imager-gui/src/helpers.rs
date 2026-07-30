@@ -204,10 +204,20 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
-pub(crate) fn system_timezone() -> Option<&'static String> {
-    static SYSTEM_TIMEZONE: LazyLock<Option<String>> =
-        LazyLock::new(|| iana_time_zone::get_timezone().ok());
-    (*SYSTEM_TIMEZONE).as_ref()
+pub(crate) fn system_timezone() -> Option<&'static str> {
+    static SYSTEM_TIMEZONE: LazyLock<Option<&'static str>> = LazyLock::new(|| {
+        let tz = iana_time_zone::get_timezone().ok()?;
+        let find = |name: &str| {
+            crate::constants::TIMEZONES
+                .iter()
+                .copied()
+                .find(|x| x.eq_ignore_ascii_case(name))
+        };
+
+        // Zones like `UTC` and `GMT` are only listed under `Etc/`.
+        find(&tz).or_else(|| find(&format!("Etc/{tz}")))
+    });
+    *SYSTEM_TIMEZONE
 }
 
 pub(crate) fn system_keymap() -> String {

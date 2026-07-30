@@ -158,23 +158,28 @@ fn linux_sd_card_common<'a>(
         .label("Set Timezone")
         .on_toggle(move |t| {
             let tz = if t { helpers::system_timezone() } else { None };
-            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_timezone(tz.cloned())))
+            BBImagerMessage::UpdateFlashConfig(wrap(
+                config.clone().update_timezone(tz.map(str::to_string)),
+            ))
         });
     col = match config.timezone.as_ref() {
         Some(tz) => {
             let xc = config.clone();
+            // The current selection needs to be resolved back to one of the options,
+            // which are kept sorted (see `constants::TIMEZONES`) to allow a binary search.
+            let options = state.common.timezones.options();
+            let selection = options
+                .binary_search(&tz.as_str())
+                .map(|x| &options[x])
+                .ok();
+
             col.push(element_with_element(
                 toggle.into(),
-                widget::combo_box(
-                    &state.common.timezones,
-                    "Timezone",
-                    Some(&tz.to_owned()),
-                    move |t| {
-                        BBImagerMessage::UpdateFlashConfig(wrap(
-                            xc.clone().update_timezone(Some(t)),
-                        ))
-                    },
-                )
+                widget::combo_box(&state.common.timezones, "Timezone", selection, move |t| {
+                    BBImagerMessage::UpdateFlashConfig(wrap(
+                        xc.clone().update_timezone(Some(t.to_string())),
+                    ))
+                })
                 .width(INPUT_WIDTH)
                 .into(),
             ))
