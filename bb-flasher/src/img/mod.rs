@@ -184,11 +184,11 @@ impl Read for OsImage {
 enum OsImageCompression<I: Read + Seek> {
     Xz(liblzma::read::XzDecoder<I>),
     Zip(rc_zip_sync::StreamingEntryReader<I>),
-    QCow2(qcow2::Qcow2Reader<I>),
+    QCow2(qcow2::Qcow2Reader),
     Uncompressed(io::BufReader<I>),
 }
 
-impl<I: Read + Seek> OsImageCompression<I> {
+impl<I: Read + Seek + Sync + Send + 'static> OsImageCompression<I> {
     fn new(mut img: I) -> io::Result<Self> {
         let mut magic = [0u8; 6];
         img.read_exact(&mut magic)?;
@@ -198,7 +198,7 @@ impl<I: Read + Seek> OsImageCompression<I> {
             XZ_MAGIC => Ok(Self::Xz(liblzma_new(img))),
             [0x51, 0x46, 0x49, _, _, _] => {
                 tracing::info!("Detected qcow2 image");
-                qcow2::Qcow2Reader::from_reader(img)
+                qcow2::Qcow2Reader::open_reader(Box::new(img))
                     .map_err(io::Error::other)
                     .map(Self::QCow2)
             }
