@@ -4851,8 +4851,9 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qcow2-core"
-version = "0.3.0"
-source = "git+https://github.com/Ayush1325/qcow2-forensic.git?branch=core-reader#0a95ca91cde8b5839582d1019a63e865a6f33cd9"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b074b1f76bdfe7f5ac0d52d91d666c4ddb17d7c35797594c2e388c2f673e3a9a"
 dependencies = [
  "flate2",
  "thiserror 2.0.18",
