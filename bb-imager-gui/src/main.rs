@@ -59,6 +59,7 @@ fn main() -> iced::Result {
     let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
+        icon,
         ..Default::default()
     };
 
