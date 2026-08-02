@@ -579,7 +579,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-dfu"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "bb-helper",
  "dfu-libusb",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-mspm0"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "bb-helper",
  "bin_file",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "bb-helper"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "tempfile",
  "tokio",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "bb-iced-widgets"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "iced",
  "iced_aw",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "anyhow",
  "bb-flasher",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "anyhow",
  "ashpd",
