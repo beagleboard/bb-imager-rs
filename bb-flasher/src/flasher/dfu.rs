@@ -10,11 +10,10 @@ use bb_helper::cancel::CancellationToken;
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
-    fn destinations_internal(filter: bool) -> Vec<Self> {
+    fn destinations_internal(filter: bool) -> impl Iterator<Item = Self> {
         bb_flasher_dfu::devices(filter)
             .into_iter()
             .map(Self)
-            .collect()
     }
 
     pub const fn bus_number(&self) -> u8 {
@@ -43,7 +42,7 @@ impl std::fmt::Display for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &[];
 
-    fn destinations(filter: bool) -> Vec<Self> {
+    fn destinations(filter: bool) -> impl Iterator<Item = Self> {
         Self::destinations_internal(filter)
     }
 

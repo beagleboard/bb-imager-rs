@@ -40,14 +40,13 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["hex", "txt", "xz"];
 
-    fn destinations(filter: bool) -> Vec<Self> {
+    fn destinations(filter: bool) -> impl Iterator<Item = Self> {
         bb_flasher_bcf::msp430::devices(filter)
             .into_iter()
             .map(|x| Self {
                 display_path: x.to_string_lossy().to_string(),
                 raw_path: x,
             })
-            .collect()
     }
 
     fn identifier(&self) -> Cow<'_, str> {

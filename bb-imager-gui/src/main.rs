@@ -232,15 +232,11 @@ impl BBImager {
                         (*flasher, *filter, search_text.clone(), interval),
                         async move |(flasher, filter, search_text, mut interval)| {
                             interval.tick().await;
-                            let dest: Vec<helpers::Destination> =
-                                blocking_future(move || helpers::destinations(flasher, filter))
-                                    .await
-                                    .into_iter()
-                                    .filter(|t| {
-                                        search_text.is_empty()
-                                            || t.to_string().to_lowercase().contains(&search_text)
-                                    })
-                                    .collect();
+                            let search = search_text.clone();
+                            let dest = blocking_future(move || {
+                                helpers::destinations(flasher, filter, search)
+                            })
+                            .await;
 
                             let msg = BBImagerMessage::Destinations(dest);
                             Some((msg, (flasher, filter, search_text, interval)))

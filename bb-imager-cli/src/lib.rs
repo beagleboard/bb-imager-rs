@@ -404,7 +404,6 @@ fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: boo
             const BYTES_IN_GB: u64 = 1024 * 1024 * 1024;
 
             let dsts_str: Vec<_> = bb_flasher::sd::Target::destinations(!no_filter)
-                .into_iter()
                 .map(|x| {
                     (
                         x.to_string().trim().to_string(),
@@ -473,7 +472,6 @@ fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: boo
             const PRODUCT_ID_HEADER: &str = "Product Id";
 
             let dsts_str: Vec<_> = bb_flasher::dfu::Target::destinations(!no_filter)
-                .into_iter()
                 .map(|x| {
                     (
                         x.to_string().trim().to_string(),

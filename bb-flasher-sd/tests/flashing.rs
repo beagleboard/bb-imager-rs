@@ -112,5 +112,5 @@ fn flash_aborts_with_cancelled_token() {
 #[test]
 fn destinations() {
     let temp = bb_flasher_sd::devices(false);
-    assert!(!temp.is_empty());
+    assert!(temp.count() > 0);
 }

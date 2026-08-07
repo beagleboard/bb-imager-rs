@@ -106,5 +106,5 @@ fn flash_cancel() {
 #[test]
 fn destinations() {
     let temp = bb_flasher::sd::Target::destinations(false);
-    assert!(!temp.is_empty());
+    assert!(!temp.count() > 0);
 }

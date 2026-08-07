@@ -59,7 +59,7 @@ pub fn flash(
 }
 
 /// Returns all paths to serial ports.
-pub fn ports() -> Vec<PathBuf> {
+pub fn ports() -> impl Iterator<Item = PathBuf> {
     std::fs::read_dir("/dev")
         .unwrap()
         .filter_map(|x| x.ok())
@@ -70,5 +70,4 @@ pub fn ports() -> Vec<PathBuf> {
             )
         })
         .map(|x| x.path())
-        .collect()
 }

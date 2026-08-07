@@ -29,11 +29,8 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    fn destinations(filter: bool) -> Vec<Self> {
-        bb_flasher_bcf::cc1352p7::ports(filter)
-            .into_iter()
-            .map(Self)
-            .collect()
+    fn destinations(filter: bool) -> impl Iterator<Item = Self> {
+        bb_flasher_bcf::cc1352p7::ports(filter).map(Self)
     }
 
     fn identifier(&self) -> Cow<'_, str> {

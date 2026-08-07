@@ -27,12 +27,12 @@ impl BBFlasherTarget for Target {
     const IS_DESTINATION_SELECTABLE: bool = false;
 
     // Since only a single destination is possible, no need for filters
-    fn destinations(_: bool) -> Vec<Self> {
+    fn destinations(_: bool) -> impl Iterator<Item = Self> {
         let temp = destinations();
-        vec![Target {
+        std::iter::once(Target {
             name: temp.0,
             path: temp.1,
-        }]
+        })
     }
 
     fn identifier(&self) -> Cow<'_, str> {

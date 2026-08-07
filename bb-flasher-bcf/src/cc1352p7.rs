@@ -375,11 +375,11 @@ pub fn flash(
 }
 
 /// Returns all paths to ports having BeagleConnect Freedom.
-pub fn ports(filter: bool) -> Vec<String> {
+pub fn ports(filter: bool) -> impl Iterator<Item = String> {
     serialport::available_ports()
         .expect("Unsupported OS")
         .into_iter()
-        .filter(|x| {
+        .filter(move |x| {
             if filter && cfg!(target_os = "linux") {
                 return match &x.port_type {
                     serialport::SerialPortType::UsbPort(y) => {
@@ -393,5 +393,4 @@ pub fn ports(filter: bool) -> Vec<String> {
             true
         })
         .map(|x| x.port_name)
-        .collect()
 }
