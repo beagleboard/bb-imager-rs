@@ -48,7 +48,7 @@ pub use reqwest::IntoUrl;
 #[derive(Debug, Clone)]
 pub struct Downloader {
     client: reqwest::Client,
-    cache_dir: PathBuf,
+    cache_dir: std::sync::Arc<std::path::Path>,
 }
 
 impl Downloader {
@@ -74,7 +74,10 @@ impl Downloader {
             .build()
             .expect("Unsupported OS");
 
-        Ok(Self { client, cache_dir })
+        Ok(Self {
+            client,
+            cache_dir: cache_dir.into(),
+        })
     }
 
     /// Check if a downloaded file with a particular SHA256 is already in cache.
