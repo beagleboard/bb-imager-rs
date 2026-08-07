@@ -274,8 +274,7 @@ impl RemoteImage {
     {
         let rt = tokio::runtime::Handle::current();
         move || {
-            let downloader = self.downloader.clone();
-            let cache = downloader.check_cache_from_sha(self.extract_sha256);
+            let cache = self.downloader.check_cache_from_sha(self.extract_sha256);
 
             if let Some(path) = cache {
                 tracing::info!("Found the remote image in cache");
@@ -284,13 +283,11 @@ impl RemoteImage {
 
             tracing::info!("Remote image not found in cache. Downloading");
             let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
-            let downloader = self.downloader.clone();
-            let url = self.url.clone();
             let sha = self.extract_sha256;
 
             let t: tokio::task::JoinHandle<io::Result<()>> = rt.spawn(async move {
-                downloader
-                    .download_to_stream(*url, sha, tx_stream)
+                self.downloader
+                    .download_to_stream(*self.url, sha, tx_stream)
                     .await
                     .map_err(|e| {
                         let msg = format!("Error while downloading Os Image: {e}");
@@ -346,8 +343,7 @@ impl Bmap {
     fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
         let rt = tokio::runtime::Handle::current();
         move || {
-            let res =
-                rt.block_on(async move { self.downloader.download(*self.url.clone()).await })?;
+            let res = rt.block_on(async move { self.downloader.download(*self.url).await })?;
             std::fs::read_to_string(res).map(Into::into)
         }
     }

@@ -193,7 +193,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 OverlayData::ChooseOs(inner) => {
                     inner.selected_image = Some((
                         helpers::OsImageId::OsImage(image.id),
-                        helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
+                        helpers::BoardImage::remote(
+                            image,
+                            flasher,
+                            inner.common.downloader.clone(),
+                        ),
                     ));
                 }
                 _ => panic!("Unexpected message"),
@@ -496,29 +500,28 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::DbInitSuccess => {
             let db = state.common().db.clone();
             let downloader = state.common().downloader.clone();
-            let config_fetch_task =
-                Task::future(blocking_future(move || db.remote_configs().unwrap())).then(
-                    move |configs| {
-                        let dc = downloader.clone();
-                        let tasks = configs.into_iter().map(move |(i, u)| {
-                            let dc = dc.clone();
-                            Task::perform(
-                                async move {
-                                    let res = dc.clone().download_json_no_cache(u).await?;
-                                    Ok((i, res))
-                                },
-                                |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
-                                    Ok(y) => BBImagerMessage::ExtendConfig(y),
-                                    Err(e) => {
-                                        tracing::error!("Failed to fetch config: {e}");
-                                        BBImagerMessage::Null
-                                    }
-                                },
-                            )
-                        });
-                        iced::Task::batch(tasks)
-                    },
-                );
+
+            let config_fetch_task = Task::future(blocking_future(move || {
+                let configs = db.remote_configs().unwrap();
+                let tasks = configs.into_iter().map(move |(i, u)| {
+                    let dc = downloader.clone();
+                    Task::perform(
+                        async move {
+                            let res = dc.download_json_no_cache(u).await?;
+                            Ok((i, res))
+                        },
+                        |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
+                            Ok(y) => BBImagerMessage::ExtendConfig(y),
+                            Err(e) => {
+                                tracing::error!("Failed to fetch config: {e}");
+                                BBImagerMessage::Null
+                            }
+                        },
+                    )
+                });
+                iced::Task::batch(tasks)
+            }))
+            .then(std::convert::identity);
 
             let board_icon_task = state.common().fetch_board_images();
             let board_refresh_task = if let BBImager::ChooseBoard(x) = state {
