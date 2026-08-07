@@ -51,16 +51,16 @@ impl From<String> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
-    fn destinations(_: bool) -> Vec<Self> {
+    fn destinations(_: bool) -> impl Iterator<Item = Self> {
         let mut dsts = Vec::new();
 
         #[cfg(feature = "mspm0_uart")]
-        dsts.extend(bb_flasher_mspm0::uart::ports().into_iter().map(Self::Uart));
+        dsts.extend(bb_flasher_mspm0::uart::ports().map(Self::Uart));
 
         #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-        dsts.extend(bb_flasher_mspm0::i2c::ports().into_iter().map(Self::I2c));
+        dsts.extend(bb_flasher_mspm0::i2c::ports().map(Self::I2c));
 
-        dsts
+        dsts.into_iter()
     }
 
     fn identifier(&self) -> Cow<'_, str> {

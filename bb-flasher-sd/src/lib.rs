@@ -80,11 +80,11 @@ pub enum Error {
 }
 
 /// Enumerate all SD Cards in system
-pub fn devices(filter: bool) -> Vec<Device> {
+pub fn devices(filter: bool) -> impl Iterator<Item = Device> {
     bb_drivelist::drive_list()
         .expect("Unsupported OS for Sd Card")
         .into_iter()
-        .filter(|x| {
+        .filter(move |x| {
             if filter {
                 x.is_removable && !x.is_virtual
             } else {
@@ -92,7 +92,6 @@ pub fn devices(filter: bool) -> Vec<Device> {
             }
         })
         .map(|x| Device::new(x.description, x.raw.into(), x.size.unwrap_or_default()))
-        .collect()
 }
 
 #[derive(Hash, Debug, PartialEq, Eq, Clone)]

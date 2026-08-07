@@ -40,10 +40,9 @@ pub fn flash(
 }
 
 /// Returns all paths to serial ports.
-pub fn ports() -> Vec<String> {
+pub fn ports() -> impl Iterator<Item = String> {
     serialport::available_ports()
         .expect("Unsupported OS")
         .into_iter()
         .map(|x| x.port_name)
-        .collect()
 }

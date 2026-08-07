@@ -16,11 +16,8 @@ use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 pub struct Target(bb_flasher_sd::Device);
 
 impl Target {
-    fn destinations_internal(filter: bool) -> Vec<Self> {
-        bb_flasher_sd::devices(filter)
-            .into_iter()
-            .map(Self)
-            .collect()
+    fn destinations_internal(filter: bool) -> impl Iterator<Item = Self> {
+        bb_flasher_sd::devices(filter).map(Self)
     }
 
     /// SD Card size in bytes
@@ -44,7 +41,6 @@ impl TryFrom<PathBuf> for Target {
 
     fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
         Self::destinations_internal(false)
-            .into_iter()
             .find(|x| x.0.path == value)
             .ok_or(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -56,7 +52,7 @@ impl TryFrom<PathBuf> for Target {
 impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["img", "xz", "qcow2"];
 
-    fn destinations(filter: bool) -> Vec<Self> {
+    fn destinations(filter: bool) -> impl Iterator<Item = Self> {
         Self::destinations_internal(filter)
     }
 
