@@ -50,39 +50,58 @@ fn builder_happy_path() {
 #[test]
 fn builder_missing_field_matrix() {
     // (label, configure-all-but-one, expected error)
-    let cases: Vec<(&str, Box<dyn Fn(&mut bb_bmap_parser::BmapBuilder)>, BmapBuilderError)> = vec![
+    let cases: Vec<(
+        &str,
+        Box<dyn Fn(&mut bb_bmap_parser::BmapBuilder)>,
+        BmapBuilderError,
+    )> = vec![
         (
             "image_size",
             Box::new(|b| {
-                b.block_size(4096).blocks(1).mapped_blocks(1).checksum_type(HashType::Sha256);
+                b.block_size(4096)
+                    .blocks(1)
+                    .mapped_blocks(1)
+                    .checksum_type(HashType::Sha256);
             }),
             BmapBuilderError::MissingImageSize,
         ),
         (
             "block_size",
             Box::new(|b| {
-                b.image_size(4096).blocks(1).mapped_blocks(1).checksum_type(HashType::Sha256);
+                b.image_size(4096)
+                    .blocks(1)
+                    .mapped_blocks(1)
+                    .checksum_type(HashType::Sha256);
             }),
             BmapBuilderError::MissingBlockSize,
         ),
         (
             "blocks",
             Box::new(|b| {
-                b.image_size(4096).block_size(4096).mapped_blocks(1).checksum_type(HashType::Sha256);
+                b.image_size(4096)
+                    .block_size(4096)
+                    .mapped_blocks(1)
+                    .checksum_type(HashType::Sha256);
             }),
             BmapBuilderError::MissingBlocks,
         ),
         (
             "mapped_blocks",
             Box::new(|b| {
-                b.image_size(4096).block_size(4096).blocks(1).checksum_type(HashType::Sha256);
+                b.image_size(4096)
+                    .block_size(4096)
+                    .blocks(1)
+                    .checksum_type(HashType::Sha256);
             }),
             BmapBuilderError::MissingMappedBlocks,
         ),
         (
             "checksum_type",
             Box::new(|b| {
-                b.image_size(4096).block_size(4096).blocks(1).mapped_blocks(1);
+                b.image_size(4096)
+                    .block_size(4096)
+                    .blocks(1)
+                    .mapped_blocks(1);
             }),
             BmapBuilderError::MissingChecksumType,
         ),
