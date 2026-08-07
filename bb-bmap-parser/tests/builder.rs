@@ -49,12 +49,13 @@ fn builder_happy_path() {
 /// mapped_blocks, checksum_type), so omitting one reliably surfaces its error.
 #[test]
 fn builder_missing_field_matrix() {
-    // (label, configure-all-but-one, expected error)
-    let cases: Vec<(
-        &str,
+    type Case = (
+        &'static str,
         Box<dyn Fn(&mut bb_bmap_parser::BmapBuilder)>,
         BmapBuilderError,
-    )> = vec![
+    );
+    // (label, configure-all-but-one, expected error)
+    let cases: Vec<Case> = vec![
         (
             "image_size",
             Box::new(|b| {
