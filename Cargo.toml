@@ -22,6 +22,10 @@ members = [
 lto = true
 codegen-units = 1
 
+[profile.profiling]
+inherits = "release"
+debug = 1
+
 [workspace.package]
 version = "1.0.14"
 edition = "2024"
