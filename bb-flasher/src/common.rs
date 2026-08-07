@@ -48,9 +48,11 @@ where
 pub(crate) fn resolve_img(
     img: impl FnOnce() -> std::io::Result<(crate::img::OsImage, u64)>,
 ) -> Result<Vec<u8>, FlasherError> {
-    let (mut img, _) = img().map_err(|source| FlasherError::ImageResolvingError { source })?;
+    let (mut img, size) = img().map_err(|source| FlasherError::ImageResolvingError { source })?;
 
-    let mut data = Vec::new();
+    // If size > usize::MAX, this function should never have been called in the first place. So
+    // panic is fine
+    let mut data = Vec::with_capacity(usize::try_from(size).expect("Image size too big"));
     img.read_to_end(&mut data)
         .map_err(|source| FlasherError::ImageResolvingError { source })?;
 
