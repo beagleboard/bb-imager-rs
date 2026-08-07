@@ -1,7 +1,5 @@
 //! Abstractions to parse and generate distros.json file.
 
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 use serde_with::{Map, VecSkipError, serde_as};
 use url::Url;
@@ -44,7 +42,7 @@ pub struct Device {
     /// Board Name
     pub name: String,
     /// Board tags are used to match OS images with boards
-    pub tags: HashSet<String>,
+    pub tags: Box<[Box<str>]>,
     /// Board image URL
     pub icon: Option<Url>,
     /// Board description
@@ -168,7 +166,7 @@ pub struct OsRemoteSubList {
     #[serde(default)]
     pub flasher: Flasher,
     /// Union of devices the OsImages in the SubList can be used with
-    pub devices: HashSet<String>,
+    pub devices: Box<[Box<str>]>,
     /// Url to the Remote list
     pub subitems_url: Url,
 }
@@ -194,10 +192,7 @@ pub struct OsImage {
     /// Os Image release date
     pub release_date: chrono::NaiveDate,
     /// Devices the Os Image can be used with
-    pub devices: HashSet<String>,
-    /// Os Image tags
-    #[serde(default)]
-    pub tags: HashSet<String>,
+    pub devices: Box<[Box<str>]>,
     /// Initialization Format. Currently only used by SD Card Images
     #[serde(default)]
     pub init_format: InitFormat,

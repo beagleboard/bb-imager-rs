@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::constants::DEFAULT_CONFIG;
 
 use super::*;
@@ -194,7 +192,7 @@ fn add_config_inserts_device_into_board_list() {
     // Create minimal device
     let device = bb_config::config::Device {
         name: "Test Board".to_string(),
-        tags: std::collections::HashSet::from(["test-board".to_string()]),
+        tags: Box::new(["test-board".into()]),
         icon: None,
         description: "Test device".to_string(),
         flasher: bb_config::config::Flasher::SdCard,
@@ -255,7 +253,7 @@ fn add_config_updates_existing_device_with_same_name() {
     // Insert initial device
     let device_v1 = bb_config::config::Device {
         name: "Test Board".to_string(),
-        tags: std::collections::HashSet::from(["test-board".to_string()]),
+        tags: Box::new(["test-board".into()]),
         icon: None,
         description: "Old description".to_string(),
         flasher: bb_config::config::Flasher::SdCard,
@@ -293,7 +291,7 @@ fn add_config_updates_existing_device_with_same_name() {
     // Insert updated device with same name
     let device_v2 = bb_config::config::Device {
         name: "Test Board".to_string(),
-        tags: std::collections::HashSet::from(["updated-tag".to_string()]),
+        tags: Box::new(["updated-tag".into()]),
         icon: None,
         description: "Updated description".to_string(),
         flasher: bb_config::config::Flasher::SdCard,
@@ -372,7 +370,7 @@ fn add_config_inserts_os_image_for_board() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let image = bb_config::config::OsImage {
@@ -384,8 +382,7 @@ fn add_config_inserts_os_image_for_board() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
@@ -450,7 +447,7 @@ fn os_image_by_id_returns_correct_data() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let image = bb_config::config::OsImage {
@@ -462,8 +459,7 @@ fn os_image_by_id_returns_correct_data() {
         image_download_sha256: [7; 32],
         extract_size: 4096,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
         info_text: Some("Test info".to_string()),
@@ -551,7 +547,7 @@ fn add_config_inserts_os_sublist_for_board() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let image = bb_config::config::OsImage {
@@ -563,8 +559,7 @@ fn add_config_inserts_os_sublist_for_board() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
@@ -636,7 +631,7 @@ fn nested_os_sublists_propagate_board_support() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let image = bb_config::config::OsImage {
@@ -648,8 +643,7 @@ fn nested_os_sublists_propagate_board_support() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
@@ -736,7 +730,7 @@ fn remote_os_sublist_is_returned_for_board() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -745,7 +739,7 @@ fn remote_os_sublist_is_returned_for_board() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
+        devices: Box::new(["test_board".into()]),
     };
 
     let config = Config {
@@ -821,7 +815,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -830,7 +824,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
+        devices: Box::new(["test_board".into()]),
     };
 
     let config = Config {
@@ -867,8 +861,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
@@ -927,7 +920,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["test_board".to_string()]),
+        tags: Box::new(["test_board".into()]),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -936,7 +929,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
+        devices: Box::new(["test_board".into()]),
     };
 
     let config = Config {
@@ -973,8 +966,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: HashSet::from(["test_board".to_string()]),
-        tags: HashSet::new(),
+        devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         info_text: None,
@@ -1038,7 +1030,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["bbb".to_string()]),
+        tags: Box::new(["bbb".into()]),
     };
 
     let board2 = bb_config::config::Device {
@@ -1050,7 +1042,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["beagleplay".to_string()]),
+        tags: Box::new(["beagleplay".into()]),
     };
 
     let board3 = bb_config::config::Device {
@@ -1062,7 +1054,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         oshw: None,
         specification: vec![],
         documentation: None,
-        tags: HashSet::from(["rpi".to_string()]),
+        tags: Box::new(["rpi".into()]),
     };
 
     let config = Config {

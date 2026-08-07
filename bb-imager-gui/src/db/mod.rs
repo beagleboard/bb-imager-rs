@@ -423,7 +423,7 @@ impl Db {
         // Insert new tags
         let mut stmt = exec.prepare_cached(
             r#"
-            INSERT INTO board_tags(board_id, tag)
+            INSERT OR IGNORE INTO board_tags(board_id, tag)
             VALUES ($1, $2)
             "#,
         )?;
@@ -467,7 +467,7 @@ impl Db {
 
         let mut stmt = exec.prepare_cached(
             r#"
-            INSERT INTO os_image_boards(image_id, board_id)
+            INSERT OR IGNORE INTO os_image_boards(image_id, board_id)
             SELECT $1, b.board_id
             FROM board_tags b
             WHERE b.tag = $2
@@ -505,7 +505,7 @@ impl Db {
 
         let mut stmt = exec.prepare_cached(
             r#"
-            INSERT INTO os_sublist_boards(sublist_id, board_id)
+            INSERT OR IGNORE INTO os_sublist_boards(sublist_id, board_id)
             SELECT $1, b.board_id
             FROM board_tags b
             WHERE b.tag = $2
