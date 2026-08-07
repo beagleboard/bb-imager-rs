@@ -224,11 +224,12 @@ impl Db {
         Ok(())
     }
 
+    // Not cached: runs exactly once per process, from the `DbInitSuccess` handler.
     pub(crate) fn remote_configs(&self) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
-        let mut stmt =
-            db.prepare_cached("SELECT id, url FROM remote_configs WHERE fetched = FALSE")?;
-        let res = stmt
+
+        let res = db
+            .prepare("SELECT id, url FROM remote_configs WHERE fetched = FALSE")?
             .query_map([], |r| {
                 let id: i64 = r.get("id")?;
                 let u: Url = r.get("url")?;
