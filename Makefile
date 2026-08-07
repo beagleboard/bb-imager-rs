@@ -174,6 +174,7 @@ clean:
 	rm -rf cargo-vendor.tar.zst
 	rm -rf vendor .cargo
 	rm -f *.snap
+	rm -f *.zst
 
 ## housekeeping: packaging-checks: Some checks to ensure good packaging
 .PHONY: package-checks
@@ -522,3 +523,9 @@ package-gui-snap:
 .PHONY: debug-gui
 debug-gui:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui ${_RUST_ARGS_GUI} --features debug
+
+## housekeeping: profile-gui: Use heaptrace to profile GUI.
+.PHONY: profile-gui
+profile-gui:
+	$(RUST_BUILD) --profile profiling -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
+	heaptrack target/${TARGET}/profiling/bb-imager-gui
