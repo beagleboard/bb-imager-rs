@@ -52,15 +52,17 @@ impl BBFlasherTarget for Target {
     const FILE_TYPES: &[&str] = &["bin", "hex", "txt", "xz"];
 
     fn destinations(_: bool) -> impl Iterator<Item = Self> {
-        let mut dsts = Vec::new();
-
         #[cfg(feature = "mspm0_uart")]
-        dsts.extend(bb_flasher_mspm0::uart::ports().map(Self::Uart));
+        let uart = bb_flasher_mspm0::uart::ports().map(Self::Uart);
+        #[cfg(not(feature = "mspm0_uart"))]
+        let uart = std::iter::empty::<Self>();
 
         #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-        dsts.extend(bb_flasher_mspm0::i2c::ports().map(Self::I2c));
+        let i2c = bb_flasher_mspm0::i2c::ports().map(Self::I2c);
+        #[cfg(not(all(feature = "mspm0_i2c", target_os = "linux")))]
+        let i2c = std::iter::empty::<Self>();
 
-        dsts.into_iter()
+        uart.chain(i2c)
     }
 
     fn identifier(&self) -> Cow<'_, str> {
