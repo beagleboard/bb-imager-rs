@@ -1,0 +1,37 @@
+[package]
+name = "bb-destination-watcher"
+description = "Notifies when the set of attached storage destinations may have changed."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+futures-core = "0.3"
+thiserror = "2.0"
+tracing = "0.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+udisks2 = "0.3"
+zbus = "5"
+futures-util = "0.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-disk-arbitration = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", features = ["CFRunLoop"] }
+futures-channel = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+	"Win32_Devices_DeviceAndDriverInstallation",
+	"Win32_System_Ioctl",
+	"Win32_Foundation",
+] }
+futures-channel = "0.3"
+
+[dev-dependencies]
+futures-util = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1.52", features = ["macros", "rt", "rt-multi-thread", "time"] }

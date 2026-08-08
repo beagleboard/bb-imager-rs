@@ -36,6 +36,10 @@ rusqlite = { version = "0.40", features = ["url", "chrono"] }
 chrono = "0.4"
 chrono-tz = { version = "0.10", features = ["serde"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
+bb-destination-watcher = { path = "../bb-destination-watcher" }
+
+[dev-dependencies]
+tokio = { version = "1.52", features = ["macros", "rt", "time", "test-util"] }
 
 [build-dependencies]
 embed-resource = "3.0"

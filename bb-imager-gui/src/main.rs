@@ -1,9 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::time::Duration;
+
+use bb_config::config;
 use constants::PACKAGE_QUALIFIER;
+use iced::futures::{FutureExt, StreamExt};
 use iced::{Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
-use tokio::time::interval;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -215,8 +218,6 @@ impl BBImager {
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
-        const INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
-
         match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
@@ -225,23 +226,7 @@ impl BBImager {
                     x.search_text.to_lowercase(),
                 ),
                 |(flasher, filter, search_text)| {
-                    let mut interval = interval(INTERVAL);
-                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-                    iced::futures::stream::unfold(
-                        (*flasher, *filter, search_text.clone(), interval),
-                        async move |(flasher, filter, search_text, mut interval)| {
-                            interval.tick().await;
-                            let search = search_text.clone();
-                            let dest = blocking_future(move || {
-                                helpers::destinations(flasher, filter, search)
-                            })
-                            .await;
-
-                            let msg = BBImagerMessage::Destinations(dest);
-                            Some((msg, (flasher, filter, search_text, interval)))
-                        },
-                    )
+                    destination_stream(*flasher, *filter, search_text.clone())
                 },
             ),
             _ => Subscription::none(),
@@ -489,5 +474,173 @@ impl BBImager {
             },
             _ => self.scroll_reset(),
         }
+    }
+}
+
+/// Settle time after a device change before re-enumerating. A card reader emits
+/// several events while it comes up; this collapses them into one refresh.
+const DEBOUNCE: Duration = Duration::from_millis(250);
+
+/// Safety net for changes the OS never reported — a missed event, resume from
+/// suspend, a dropped D-Bus connection. Only used while a watcher is active.
+const FALLBACK_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Refresh rate when no watcher is available. Matches the old behaviour.
+const POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Destination list for the currently selected flasher.
+///
+/// Enumeration is driven by OS hotplug notifications where they are available,
+/// because on Linux each pass forks `lsblk` — milliseconds and thousands of
+/// syscalls that used to be paid every second for as long as this page was open.
+/// Anything that prevents watching (unsupported platform, a flasher whose
+/// devices are not watched, a backend that failed to start) falls back to the
+/// original poll, so this is never worse than before.
+fn destination_stream(
+    flasher: config::Flasher,
+    filter: bool,
+    search: String,
+) -> impl iced::futures::Stream<Item = BBImagerMessage> {
+    iced::stream::channel(1, async move |mut out| {
+        // The page should not sit empty while the watcher starts up.
+        emit_destinations(&mut out, flasher, filter, &search).await;
+
+        let mut watcher = if helpers::is_watchable(flasher) {
+            match bb_destination_watcher::Watcher::new().await {
+                Ok(w) => Some(w),
+                Err(e) => {
+                    tracing::info!("No destination watcher ({e}); polling instead");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        loop {
+            wait_for_refresh(&mut watcher).await;
+            emit_destinations(&mut out, flasher, filter, &search).await;
+        }
+    })
+}
+
+/// Blocks until the destination list should be re-enumerated.
+///
+/// Takes `watcher` by `&mut Option<_>` so that a backend which stops producing
+/// can be dropped here, degrading this and every later call to a plain poll
+/// rather than going silent for the rest of the session.
+async fn wait_for_refresh<S>(watcher: &mut Option<S>)
+where
+    S: iced::futures::Stream<Item = ()> + Unpin,
+{
+    let Some(w) = watcher.as_mut() else {
+        tokio::time::sleep(POLL_INTERVAL).await;
+        return;
+    };
+
+    match tokio::time::timeout(FALLBACK_INTERVAL, w.next()).await {
+        // A change: let the burst settle, then drop whatever queued up behind
+        // it so the whole burst costs one enumeration.
+        Ok(Some(())) => {
+            tokio::time::sleep(DEBOUNCE).await;
+            while w.next().now_or_never().flatten().is_some() {}
+        }
+        Ok(None) => {
+            tracing::warn!("Destination watcher ended; falling back to polling");
+            *watcher = None;
+        }
+        // Fallback deadline with no events; re-enumerate anyway in case one was
+        // missed.
+        Err(_) => {}
+    }
+}
+
+async fn emit_destinations(
+    out: &mut iced::futures::channel::mpsc::Sender<BBImagerMessage>,
+    flasher: config::Flasher,
+    filter: bool,
+    search: &str,
+) {
+    let search = search.to_owned();
+    let dest = blocking_future(move || helpers::destinations(flasher, filter, search)).await;
+    let _ = out.send(BBImagerMessage::Destinations(dest)).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iced::futures::channel::mpsc;
+
+    /// Number of refreshes `wait_for_refresh` completes within `budget`.
+    ///
+    /// Time is paused, so this measures logical scheduling rather than
+    /// wall-clock and runs instantly.
+    async fn refreshes_within<S>(watcher: &mut Option<S>, budget: Duration) -> usize
+    where
+        S: iced::futures::Stream<Item = ()> + Unpin,
+    {
+        let deadline = tokio::time::Instant::now() + budget;
+        let mut count = 0;
+        while tokio::time::timeout_at(deadline, wait_for_refresh(watcher))
+            .await
+            .is_ok()
+        {
+            count += 1;
+        }
+        count
+    }
+
+    /// A burst while a reader settles must cost one enumeration, not one each.
+    #[tokio::test(start_paused = true)]
+    async fn burst_of_hints_debounces_to_one_refresh() {
+        let (tx, rx) = mpsc::unbounded::<()>();
+        for _ in 0..5 {
+            tx.unbounded_send(()).unwrap();
+        }
+        let mut watcher = Some(rx);
+
+        // Long enough to debounce, far short of the fallback deadline.
+        let count = refreshes_within(&mut watcher, DEBOUNCE * 3).await;
+
+        assert_eq!(count, 1, "a burst should collapse into a single refresh");
+        assert!(watcher.is_some(), "watcher should still be live");
+    }
+
+    /// With a live but silent watcher, the fallback still forces a refresh so a
+    /// missed event cannot leave the list stale forever.
+    #[tokio::test(start_paused = true)]
+    async fn silent_watcher_still_refreshes_on_fallback() {
+        let (_tx, rx) = mpsc::unbounded::<()>();
+        let mut watcher = Some(rx);
+
+        let count = refreshes_within(&mut watcher, FALLBACK_INTERVAL * 2 + DEBOUNCE).await;
+
+        assert_eq!(count, 2, "fallback should fire once per interval");
+    }
+
+    /// A backend that ends must degrade to polling, not go silent.
+    #[tokio::test(start_paused = true)]
+    async fn ended_watcher_degrades_to_polling() {
+        let (tx, rx) = mpsc::unbounded::<()>();
+        drop(tx);
+        let mut watcher = Some(rx);
+
+        wait_for_refresh(&mut watcher).await;
+        assert!(watcher.is_none(), "a dead watcher should be dropped");
+
+        // And the poll cadence takes over.
+        let count = refreshes_within(&mut watcher, POLL_INTERVAL * 3 + POLL_INTERVAL / 2).await;
+        assert_eq!(count, 3);
+    }
+
+    /// No watcher at all (unsupported platform, or a flasher we do not watch)
+    /// keeps the original poll behaviour.
+    #[tokio::test(start_paused = true)]
+    async fn no_watcher_polls_at_the_old_interval() {
+        let mut watcher: Option<mpsc::UnboundedReceiver<()>> = None;
+
+        let count = refreshes_within(&mut watcher, POLL_INTERVAL * 3 + POLL_INTERVAL / 2).await;
+
+        assert_eq!(count, 3);
     }
 }

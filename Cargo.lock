@@ -508,6 +508,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-destination-watcher"
+version = "1.0.14"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-util",
+ "objc2-core-foundation",
+ "objc2-disk-arbitration",
+ "thiserror 2.0.19",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "udisks2",
+ "windows 0.62.2",
+ "zbus",
+]
+
+[[package]]
 name = "bb-downloader"
 version = "0.2.0"
 dependencies = [
@@ -676,6 +694,7 @@ dependencies = [
  "anyhow",
  "ashpd",
  "bb-config",
+ "bb-destination-watcher",
  "bb-downloader",
  "bb-flasher",
  "bb-helper",
