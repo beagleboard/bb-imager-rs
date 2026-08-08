@@ -148,9 +148,23 @@ impl From<Child> for MountPoint {
     }
 }
 
+/// Exactly the columns [`Device`] and [`Child`] deserialize.
+///
+/// `--output-all` asks for every column lsblk knows (~70 per device and per
+/// partition), and serde then walks and discards the ones with no matching
+/// field. Naming the columns cuts the JSON to roughly a quarter, which is worth
+/// it because the GUI re-runs this once a second while the destination page is
+/// open.
+///
+/// Keep in sync with the two structs: an absent column leaves an `Option` field
+/// as `None`, but the non-optional ones (`ro`, `rm`, `hotplug`, `phy-sec`,
+/// `log-sec`) would fail to deserialize.
+const COLUMNS: &str = "NAME,KNAME,SIZE,TRAN,SUBSYSTEMS,RO,RM,HOTPLUG,PHY-SEC,LOG-SEC,\
+                       PTTYPE,LABEL,VENDOR,MODEL,MOUNTPOINT,FSSIZE,FSAVAIL,PARTLABEL";
+
 pub(crate) fn lsblk() -> crate::Result<Vec<DeviceDescriptor>> {
     let output = Command::new("lsblk")
-        .args(["--bytes", "--all", "--json", "--paths", "--output-all"])
+        .args(["--bytes", "--all", "--json", "--paths", "--output", COLUMNS])
         .output()
         .map_err(|e| crate::Error::LsblkExecuteError { source: Some(e) })?;
 
