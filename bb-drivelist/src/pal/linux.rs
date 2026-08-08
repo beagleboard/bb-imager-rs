@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{borrow::Cow, process::Command};
 
 use crate::device::{DeviceDescriptor, MountPoint};
 use serde::Deserialize;
@@ -86,7 +86,7 @@ impl From<Device> for DeviceDescriptor {
         let is_system = value.is_system();
 
         Self {
-            enumerator: "lsblk:json".to_string(),
+            enumerator: Cow::Borrowed("lsblk:json"),
             bus_type: Some(value.tran.as_deref().unwrap_or("UNKNOWN").to_uppercase()),
             device: value.name,
             raw: value.kname,
