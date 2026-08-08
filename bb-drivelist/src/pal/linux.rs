@@ -24,7 +24,7 @@ struct Device {
     #[serde(rename = "log-sec")]
     log_sec: u32,
     rm: bool,
-    ptype: Option<String>,
+    pttype: Option<String>,
     #[serde(default)]
     children: Vec<Child>,
     label: Option<String>,
@@ -100,7 +100,7 @@ impl From<Device> for DeviceDescriptor {
             logical_block_size: value.log_sec,
             is_removable,
             is_system,
-            partition_table_type: value.ptype,
+            partition_table_type: value.pttype,
             mountpoints: value.children.into_iter().map(Into::into).collect(),
             ..Default::default()
         }
@@ -260,7 +260,7 @@ mod tests {
                 "size":32000000000,"tran":"usb",
                 "subsystems":"block:scsi:usb:pci","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":true,"hotplug":false,
-                "ptype":"gpt","label":"BOOT","vendor":"Kingston","model":"DataTraveler"
+                "pttype":"gpt","label":"BOOT","vendor":"Kingston","model":"DataTraveler"
             }]"#,
         )[0];
 
@@ -292,7 +292,7 @@ mod tests {
                 "size":512000000000,"tran":"nvme",
                 "subsystems":"block:nvme:pci","ro":false,
                 "phy-sec":512,"log-sec":4096,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":"Samsung SSD"
+                "pttype":null,"label":null,"vendor":null,"model":"Samsung SSD"
             }]"#,
         )[0];
 
@@ -319,7 +319,7 @@ mod tests {
                 "subsystems":"nvme:pci",
                 "ro":true,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
@@ -341,7 +341,7 @@ mod tests {
                 "size":8000000000,"tran":"usb",
                 "subsystems":"block:usb","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":true,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
@@ -362,7 +362,7 @@ mod tests {
                 "size":16000000000,"tran":"usb",
                 "subsystems":"block:usb","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":true,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null,
+                "pttype":null,"label":null,"vendor":null,"model":null,
                 "children":[
                     {"mountpoint":"/boot","fssize":"1048576","fsavail":524288,"label":null,"partlabel":"BOOTFS"},
                     {"mountpoint":null,"fssize":null,"fsavail":null,"label":"ROOT","partlabel":"rootfs"}
@@ -393,7 +393,7 @@ mod tests {
                 "size":null,"tran":null,
                 "subsystems":"block","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
@@ -416,7 +416,7 @@ mod tests {
                 "size":64000000000,"tran":"usb",
                 "subsystems":null,"ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":"Generic"
+                "pttype":null,"label":null,"vendor":null,"model":"Generic"
             }]"#,
         )[0];
 
@@ -439,7 +439,7 @@ mod tests {
                 "name":"/dev/sde","kname":"/dev/sde",
                 "size":null,"tran":null,"ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
@@ -461,7 +461,7 @@ mod tests {
                 "name":"/dev/dm-1","kname":"/dev/dm-1",
                 "size":null,"tran":null,"subsystems":null,"ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
@@ -480,7 +480,7 @@ mod tests {
                 "name":"/dev/dm-2","kname":"/dev/dm-2",
                 "size":null,"tran":null,"subsystems":"","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
-                "ptype":null,"label":null,"vendor":null,"model":null
+                "pttype":null,"label":null,"vendor":null,"model":null
             }]"#,
         )[0];
 
