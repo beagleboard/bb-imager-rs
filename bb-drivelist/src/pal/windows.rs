@@ -66,7 +66,7 @@ pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
 
             let mut item = DeviceDescriptor {
                 description: friendly_name.clone(),
-                enumerator: enumerator_name.clone(),
+                enumerator: enumerator_name.clone().into(),
                 is_usb: is_usb_drive(&enumerator_name),
                 is_removable: is_removable(h_device_info, &mut device_info_data),
                 ..Default::default()

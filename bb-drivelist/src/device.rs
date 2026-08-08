@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 #[derive(Debug, Default, Clone)]
 /// Mountpoints of a drive
 pub struct MountPoint {
@@ -21,7 +23,7 @@ impl MountPoint {
 #[derive(Debug, Clone)]
 /// Device Description
 pub struct DeviceDescriptor {
-    pub enumerator: String,
+    pub enumerator: Cow<'static, str>,
     pub bus_type: Option<String>,
     pub bus_version: Option<String>,
     pub device: String,

@@ -1,7 +1,7 @@
-use core::ffi::c_void;
 use std::collections::HashMap;
-use std::ffi::{CStr, c_char};
+use std::ffi::{CStr, c_char, c_void};
 use std::ptr::NonNull;
+use std::borrow::Cow;
 
 use crate::MountPoint;
 use crate::device::DeviceDescriptor;
@@ -274,7 +274,7 @@ impl DeviceDescriptorFromDiskDescription for DeviceDescriptor {
             }
         }
 
-        device.enumerator = "DiskArbitration".to_string();
+        device.enumerator = Cow::Borrowed("DiskArbitration");
         device.bus_type = device_protocol.as_ref().map(|s| s.to_string());
         device.bus_version = None;
         device.device = format!("/dev/{}", disk_bsd_name);
