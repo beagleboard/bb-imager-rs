@@ -638,6 +638,20 @@ pub(crate) fn destinations(
     }
 }
 
+/// Whether changes to this flasher's destinations arrive as OS notifications.
+///
+/// Only storage devices are watched. The other backends enumerate in-process
+/// (`serialport` walks `/sys/class/tty`, `hidapi` walks `hidraw`, mspm0-i2c
+/// reads `/dev`) at a fraction of the cost of forking `lsblk`, so polling them
+/// is not worth a watcher.
+pub(crate) const fn is_watchable(flasher: config::Flasher) -> bool {
+    match flasher {
+        #[cfg(feature = "sd")]
+        config::Flasher::SdCard | config::Flasher::SdCardBootfs => true,
+        _ => false,
+    }
+}
+
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
         #[cfg(feature = "sd")]
