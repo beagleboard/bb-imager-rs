@@ -363,7 +363,7 @@ fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
                     temp.background = iced::Background::Color(iced::Color::TRANSPARENT);
                     temp
                 })
-                .on_input(BBImagerMessage::UpdateSearchText),
+                .on_input(|x| BBImagerMessage::UpdateSearchText(x.into())),
         ]
         .align_y(iced::Alignment::Center),
     )
@@ -390,8 +390,8 @@ pub(crate) fn progress_finish_view<'a>(
 }
 
 pub(crate) fn network_image_or_default<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<url::Url>,
-    img: Option<&url::Url>,
+    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
+    img: Option<&std::sync::Arc<url::Url>>,
     def: svg::Handle,
     width: impl Into<iced::Length>,
     height: impl Into<iced::Length>,

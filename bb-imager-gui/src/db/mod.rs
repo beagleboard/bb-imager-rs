@@ -18,7 +18,7 @@ pub(crate) struct Db {
 #[derive(Debug, Clone)]
 pub(crate) struct BoardListItem {
     pub(crate) id: i64,
-    pub(crate) icon: Option<Url>,
+    pub(crate) icon: Option<Arc<Url>>,
     pub(crate) name: String,
 }
 
@@ -26,7 +26,7 @@ impl BoardListItem {
     fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: value.get("id")?,
-            icon: value.get("icon")?,
+            icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
             name: value.get("name")?,
         })
     }
@@ -36,7 +36,7 @@ impl BoardListItem {
 pub(crate) struct Board {
     pub(crate) id: i64,
     pub(crate) name: String,
-    pub(crate) icon: Option<Url>,
+    pub(crate) icon: Option<Arc<Url>>,
     pub(crate) description: String,
     pub(crate) documentation: Option<Url>,
     pub(crate) specification: Vec<(String, String)>,
@@ -52,7 +52,7 @@ impl Board {
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: value.get("icon")?,
+            icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
             description: value.get("description")?,
             documentation: value.get("documentation")?,
             specification: serde_json::from_slice(&spec).unwrap(),
@@ -66,7 +66,7 @@ impl Board {
 #[derive(Debug, Clone)]
 pub(crate) struct OsImageListItem {
     pub(crate) id: i64,
-    pub(crate) icon: Url,
+    pub(crate) icon: Arc<Url>,
     pub(crate) name: String,
 }
 
@@ -75,7 +75,7 @@ impl OsImageListItem {
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: value.get("icon")?,
+            icon: Arc::new(value.get("icon")?),
         })
     }
 }
@@ -83,7 +83,7 @@ impl OsImageListItem {
 #[derive(Debug, Clone)]
 pub(crate) struct OsSublistListItem {
     pub(crate) id: i64,
-    pub(crate) icon: Url,
+    pub(crate) icon: Arc<Url>,
     pub(crate) name: String,
     pub(crate) flasher: bb_config::config::Flasher,
 }
@@ -93,7 +93,7 @@ impl OsSublistListItem {
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: value.get("icon")?,
+            icon: Arc::new(value.get("icon")?),
             flasher: value.get("flasher")?,
         })
     }
@@ -104,7 +104,7 @@ pub(crate) struct OsImage {
     pub(crate) id: i64,
     pub(crate) name: String,
     pub(crate) description: String,
-    pub(crate) icon: Url,
+    pub(crate) icon: Arc<Url>,
     pub(crate) url: Url,
     pub(crate) image_download_size: Option<i64>,
     pub(crate) image_download_sha256: [u8; 32],
@@ -121,7 +121,7 @@ impl OsImage {
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: value.get("icon")?,
+            icon: Arc::new(value.get("icon")?),
             description: value.get("description")?,
             url: value.get("url")?,
             image_download_size: value.get("image_download_size")?,
@@ -520,20 +520,20 @@ impl Db {
     }
 
     /// Get all board icons.
-    pub(crate) fn board_icons(&self) -> rusqlite::Result<Vec<url::Url>> {
+    pub(crate) fn board_icons(&self) -> rusqlite::Result<Vec<Arc<Url>>> {
         let db = self.db.lock().unwrap();
         let mut stmt =
             db.prepare_cached("SELECT DISTINCT icon FROM boards WHERE icon IS NOT NULL")?;
         let res = stmt
             .query_map([], |r| r.get(0))?
-            .map(|x| x.unwrap())
+            .map(|x| Arc::new(x.unwrap()))
             .collect();
 
         Ok(res)
     }
 
     /// Get board list data. (ID, Icon, Name)
-    pub(crate) fn board_list(&self, search: &str) -> rusqlite::Result<Vec<BoardListItem>> {
+    pub(crate) fn board_list(&self, search: &str) -> rusqlite::Result<Box<[BoardListItem]>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             "SELECT id, icon, name FROM boards WHERE name LIKE $1 COLLATE NOCASE",
@@ -676,7 +676,10 @@ impl Db {
         stmt.query_row([sublist_id], |r| r.get(0))
     }
 
-    pub(crate) fn os_image_icons_by_board_id(&self, board_id: i64) -> rusqlite::Result<Vec<Url>> {
+    pub(crate) fn os_image_icons_by_board_id(
+        &self,
+        board_id: i64,
+    ) -> rusqlite::Result<Vec<Arc<Url>>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -693,7 +696,7 @@ impl Db {
         )?;
         let res = stmt
             .query_map([board_id], |r| r.get(0))?
-            .map(|x| x.unwrap())
+            .map(|x| Arc::new(x.unwrap()))
             .collect();
 
         Ok(res)

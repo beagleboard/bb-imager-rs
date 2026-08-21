@@ -1,5 +1,7 @@
 //! Global GUI Messages
 
+use std::sync::Arc;
+
 use iced::Task;
 
 use crate::{
@@ -16,7 +18,7 @@ pub(crate) enum BBImagerMessage {
     /// Config related options
     ExtendConfig((i64, bb_config::Config)),
     ResolveRemoteSubitemItem {
-        item: Vec<bb_config::config::OsListItem>,
+        item: Box<[bb_config::config::OsListItem]>,
         target: i64,
     },
 
@@ -24,7 +26,7 @@ pub(crate) enum BBImagerMessage {
     UpdateAvailable(semver::Version),
 
     /// Select a board by index. Can only be used in Board selection page.
-    UpdateBoardList(Vec<crate::db::BoardListItem>),
+    UpdateBoardList(Box<[crate::db::BoardListItem]>),
     SelectBoardById(i64),
     SelectBoard(crate::db::Board),
 
@@ -68,12 +70,12 @@ pub(crate) enum BBImagerMessage {
     Back,
 
     /// Add image to cache
-    ResolveImage(url::Url, std::path::PathBuf),
+    ResolveImage(Arc<url::Url>, std::path::PathBuf),
     // Download images which have not already been downloaded
-    FilterResolveImages(Vec<url::Url>),
+    FilterResolveImages(Vec<Arc<url::Url>>),
 
     /// Update destinations
-    Destinations(Vec<helpers::Destination>),
+    Destinations(Box<[helpers::Destination]>),
 
     /// Read-only editor
     EditorEvent(iced::widget::text_editor::Action),
@@ -92,7 +94,7 @@ pub(crate) enum BBImagerMessage {
     DbInitSuccess,
 
     /// Search
-    UpdateSearchText(String),
+    UpdateSearchText(Arc<str>),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
