@@ -301,13 +301,6 @@ impl CustomizeState {
             helpers::FlashingCustomization::LinuxSdCloudInit(x) => {
                 helpers::sd_modifications_common(x)
             }
-            helpers::FlashingCustomization::Bcf(x) | helpers::FlashingCustomization::Zepto(x) => {
-                if !x.verify {
-                    vec!["• Skip Verification"]
-                } else {
-                    Vec::new()
-                }
-            }
             _ => Vec::new(),
         }
     }

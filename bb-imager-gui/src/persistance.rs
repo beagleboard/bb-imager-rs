@@ -10,10 +10,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct GuiConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) sd_customization: Option<SdCustomization>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) bcf_customization: Option<BcfCustomization>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) zepto_customization: Option<BcfCustomization>,
 }
 
 impl GuiConfiguration {
@@ -52,14 +48,6 @@ impl GuiConfiguration {
 
     pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
         self.sd_customization = Some(t);
-    }
-
-    pub(crate) fn update_bcf_customization(&mut self, t: BcfCustomization) {
-        self.bcf_customization = Some(t)
-    }
-
-    pub(crate) fn update_zepto_customization(&mut self, t: BcfCustomization) {
-        self.zepto_customization = Some(t)
     }
 }
 
@@ -234,33 +222,9 @@ impl SdCustomizationWifi {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BcfCustomization {
-    pub(crate) verify: bool,
-}
-
-impl BcfCustomization {
-    pub(crate) fn update_verify(mut self, t: bool) -> Self {
-        self.verify = t;
-        self
-    }
-}
-
-impl Default for BcfCustomization {
-    fn default() -> Self {
-        Self { verify: true }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn bcf_customization_defaults_to_verify() {
-        assert!(BcfCustomization::default().verify);
-        assert!(!BcfCustomization::default().update_verify(false).verify);
-    }
 
     #[test]
     fn sd_user_validate_rejects_root() {
@@ -352,19 +316,13 @@ mod tests {
     }
 
     #[test]
-    fn gui_configuration_updates_each_slot() {
+    fn gui_configuration_updates_sd_slot() {
         let mut gui = GuiConfiguration::default();
         assert!(gui.sd_customization.is_none());
-        assert!(gui.bcf_customization.is_none());
-        assert!(gui.zepto_customization.is_none());
 
         gui.update_sd_customization(SdCustomization::default());
-        gui.update_bcf_customization(BcfCustomization::default());
-        gui.update_zepto_customization(BcfCustomization::default().update_verify(false));
 
         assert!(gui.sd_customization.is_some());
-        assert!(gui.bcf_customization.is_some());
-        assert_eq!(gui.zepto_customization.map(|z| z.verify), Some(false));
     }
 
     #[test]
@@ -377,7 +335,6 @@ mod tests {
     #[test]
     fn gui_configuration_round_trips_through_json() {
         let mut gui = GuiConfiguration::default();
-        gui.update_bcf_customization(BcfCustomization { verify: false });
         gui.update_sd_customization({
             let mut sd = SdCustomization::default();
             sd.update_sysconfig(
@@ -389,7 +346,6 @@ mod tests {
         let json = serde_json::to_string(&gui).unwrap();
         let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(back.bcf_customization.map(|b| b.verify), Some(false));
         assert_eq!(
             back.sd_customization
                 .and_then(|s| s.sysconf_customization().and_then(|c| c.hostname.clone())),

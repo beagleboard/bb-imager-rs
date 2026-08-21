@@ -498,16 +498,11 @@ pub(crate) async fn flash(
         #[cfg(feature = "bcf_cc1352p7")]
         (
             BoardImage::Image { img, .. },
-            FlashingCustomization::Bcf(customization),
+            FlashingCustomization::Bcf,
             Destination::BeagleConnectFreedom(t),
         ) => tokio::task::spawn_blocking(move || {
-            bb_flasher::bcf::cc1352p7::Flasher::new(
-                img.into_image_fn(),
-                t,
-                customization.verify,
-                Some(cancel_sync),
-            )
-            .flash(Some(chan))
+            bb_flasher::bcf::cc1352p7::Flasher::new(img.into_image_fn(), t, true, Some(cancel_sync))
+                .flash(Some(chan))
         })
         .await
         .unwrap(),
@@ -520,21 +515,14 @@ pub(crate) async fn flash(
             .unwrap()
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-        (
-            BoardImage::Image { img, .. },
-            FlashingCustomization::Zepto(customization),
-            Destination::Mspm0(t),
-        ) => tokio::task::spawn_blocking(move || {
-            bb_flasher::mspm0::Flasher::no_prep(
-                img.into_image_fn(),
-                t,
-                customization.verify,
-                Some(cancel_sync),
-            )
-            .flash(Some(chan))
-        })
-        .await
-        .unwrap(),
+        (BoardImage::Image { img, .. }, FlashingCustomization::Zepto, Destination::Mspm0(t)) => {
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::mspm0::Flasher::no_prep(img.into_image_fn(), t, true, Some(cancel_sync))
+                    .flash(Some(chan))
+            })
+            .await
+            .unwrap()
+        }
         _ => unimplemented!(),
     }
 }
@@ -673,9 +661,9 @@ pub(crate) enum FlashingCustomization {
     NoneSd,
     LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
     LinuxSdCloudInit(crate::persistance::SdSysconfCustomization),
-    Bcf(crate::persistance::BcfCustomization),
+    Bcf,
     Msp430,
-    Zepto(crate::persistance::BcfCustomization),
+    Zepto,
 }
 
 impl FlashingCustomization {
@@ -704,30 +692,17 @@ impl FlashingCustomization {
                 )
             }
             config::Flasher::SdCard | config::Flasher::SdCardBootfs => Self::NoneSd,
-            config::Flasher::BeagleConnectFreedom => {
-                Self::Bcf(app_config.bcf_customization.clone().unwrap_or_default())
-            }
+            config::Flasher::BeagleConnectFreedom => Self::Bcf,
             config::Flasher::Msp430Usb => Self::Msp430,
-            config::Flasher::Mspm0 => {
-                Self::Zepto(app_config.zepto_customization.clone().unwrap_or_default())
-            }
+            config::Flasher::Mspm0 => Self::Zepto,
             _ => unimplemented!(),
         }
     }
 
     pub(crate) fn reset(&mut self) {
-        match self {
-            Self::LinuxSdSysconfig(_) => {
-                *self = Self::LinuxSdSysconfig(Default::default());
-            }
-            Self::Bcf(_) => {
-                *self = Self::Bcf(Default::default());
-            }
-            Self::Zepto(_) => {
-                *self = Self::Zepto(Default::default());
-            }
-            _ => {}
-        };
+        if let Self::LinuxSdSysconfig(_) = self {
+            *self = Self::LinuxSdSysconfig(Default::default());
+        }
     }
 
     pub(crate) fn validate(&self) -> bool {
@@ -745,9 +720,9 @@ impl FlashingCustomization {
             FlashingCustomization::LinuxSdSysconfig(c) => c.sysconfig(),
             FlashingCustomization::LinuxSdCloudInit(c) => c.cloudinit(),
             FlashingCustomization::NoneSd => bb_flasher::sd::FlashingSdLinuxConfig::none(),
-            FlashingCustomization::Bcf(_)
+            FlashingCustomization::Bcf
             | FlashingCustomization::Msp430
-            | FlashingCustomization::Zepto(_) => unreachable!(),
+            | FlashingCustomization::Zepto => unreachable!(),
         }
     }
 }
@@ -843,6 +818,8 @@ pub(crate) fn no_customization(
             Some(FlashingCustomization::NoneSd)
         }
         config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
+        config::Flasher::BeagleConnectFreedom => Some(FlashingCustomization::Bcf),
+        config::Flasher::Mspm0 => Some(FlashingCustomization::Zepto),
         _ => None,
     }
 }
@@ -1067,8 +1044,7 @@ where
 mod tests {
     use super::*;
     use crate::persistance::{
-        BcfCustomization, GuiConfiguration, SdCustomizationUser, SdCustomizationWifi,
-        SdSysconfCustomization,
+        GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
     };
 
     #[test]
@@ -1156,7 +1132,15 @@ mod tests {
             no_customization(config::Flasher::Msp430Usb, &img),
             Some(FlashingCustomization::Msp430)
         ));
-        assert!(no_customization(config::Flasher::BeagleConnectFreedom, &img).is_none());
+        // BCF and MSPM0 have no customization of their own, so they skip the page.
+        assert!(matches!(
+            no_customization(config::Flasher::BeagleConnectFreedom, &img),
+            Some(FlashingCustomization::Bcf)
+        ));
+        assert!(matches!(
+            no_customization(config::Flasher::Mspm0, &img),
+            Some(FlashingCustomization::Zepto)
+        ));
     }
 
     #[test]
@@ -1171,7 +1155,7 @@ mod tests {
         ));
         assert!(matches!(
             FlashingCustomization::new(config::Flasher::BeagleConnectFreedom, &img, &cfg),
-            FlashingCustomization::Bcf(_)
+            FlashingCustomization::Bcf
         ));
         assert!(matches!(
             FlashingCustomization::new(config::Flasher::Msp430Usb, &img, &cfg),
@@ -1179,7 +1163,7 @@ mod tests {
         ));
         assert!(matches!(
             FlashingCustomization::new(config::Flasher::Mspm0, &img, &cfg),
-            FlashingCustomization::Zepto(_)
+            FlashingCustomization::Zepto
         ));
     }
 
@@ -1196,13 +1180,6 @@ mod tests {
 
     #[test]
     fn flashing_customization_reset_restores_defaults() {
-        let mut bcf = FlashingCustomization::Bcf(BcfCustomization { verify: false });
-        bcf.reset();
-        assert!(matches!(
-            bcf,
-            FlashingCustomization::Bcf(BcfCustomization { verify: true })
-        ));
-
         let mut sysconf = FlashingCustomization::LinuxSdSysconfig(
             SdSysconfCustomization::default().update_hostname(Some("h".into())),
         );
@@ -1216,6 +1193,10 @@ mod tests {
         let mut none = FlashingCustomization::NoneSd;
         none.reset();
         assert!(matches!(none, FlashingCustomization::NoneSd));
+
+        let mut bcf = FlashingCustomization::Bcf;
+        bcf.reset();
+        assert!(matches!(bcf, FlashingCustomization::Bcf));
     }
 
     #[test]
