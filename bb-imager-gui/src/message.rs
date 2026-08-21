@@ -83,6 +83,10 @@ pub(crate) enum BBImagerMessage {
 
     /// Copy text to clipboard.
     CopyToClipboard(String),
+    /// Copy a board's config entry, looked up by id, to the clipboard.
+    CopyBoardConfig(i64),
+    /// Copy an OS image's config entry, looked up by id, to the clipboard.
+    CopyImageConfig(i64),
 
     /// DB Ops
     DbInitSuccess,
@@ -497,6 +501,36 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
+        }
+        BBImagerMessage::CopyBoardConfig(id) => {
+            let db = state.common().db.clone();
+            return Task::perform(
+                blocking_future(move || db.os_board_json_by_id(id)),
+                |x| match x {
+                    Ok(b) => BBImagerMessage::CopyToClipboard(
+                        serde_json::to_string_pretty(&b).expect("Device is always serializable"),
+                    ),
+                    Err(e) => {
+                        tracing::error!("Failed to get board config: {e}");
+                        BBImagerMessage::Null
+                    }
+                },
+            );
+        }
+        BBImagerMessage::CopyImageConfig(id) => {
+            let db = state.common().db.clone();
+            return Task::perform(
+                blocking_future(move || db.os_image_json_by_id(id)),
+                |x| match x {
+                    Ok(i) => BBImagerMessage::CopyToClipboard(
+                        serde_json::to_string_pretty(&i).expect("OsImage is always serializable"),
+                    ),
+                    Err(e) => {
+                        tracing::error!("Failed to get image config: {e}");
+                        BBImagerMessage::Null
+                    }
+                },
+            );
         }
         BBImagerMessage::DbInitSuccess => {
             let db = state.common().db.clone();

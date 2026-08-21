@@ -682,7 +682,6 @@ dependencies = [
  "bb-iced-widgets",
  "chrono",
  "chrono-tz",
- "const-hex",
  "directories",
  "embed-resource",
  "iana-time-zone",

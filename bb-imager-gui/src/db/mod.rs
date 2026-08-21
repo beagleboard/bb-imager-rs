@@ -32,7 +32,7 @@ impl BoardListItem {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct Board {
     pub(crate) id: i64,
     pub(crate) name: String,
@@ -99,7 +99,7 @@ impl OsSublistListItem {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct OsImage {
     pub(crate) id: i64,
     pub(crate) name: String,
@@ -765,5 +765,89 @@ impl Db {
             .collect();
 
         Ok(res)
+    }
+
+    /// Reconstruct the [`config::Device`] entry for a board, as it was inserted from the config.
+    ///
+    /// Statements here are not cached: this only runs when the user copies a board to the
+    /// clipboard, so a cache slot would be wasted on it.
+    pub(crate) fn os_board_json_by_id(&self, id: i64) -> rusqlite::Result<config::Device> {
+        let db = self.db.lock().unwrap();
+
+        let mut stmt = db.prepare("SELECT tag FROM board_tags WHERE board_id = $1")?;
+        let tags = stmt
+            .query_map([id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+
+        let mut stmt = db.prepare(
+            r#"
+            SELECT name, description, icon, flasher, instructions, oshw, specification, documentation
+            FROM boards WHERE id = $1"#)?;
+
+        stmt.query_one([id], |value| {
+            let spec: Vec<u8> = value.get("specification")?;
+
+            Ok(config::Device {
+                name: value.get("name")?,
+                description: value.get("description")?,
+                icon: value.get("icon")?,
+                flasher: value.get("flasher")?,
+                instructions: value.get("instructions")?,
+                specification: serde_json::from_slice(&spec).unwrap(),
+                documentation: value.get("documentation")?,
+                oshw: value.get("oshw")?,
+                tags,
+            })
+        })
+    }
+
+    /// Reconstruct the [`config::OsImage`] entry for an image, as it was inserted from the config.
+    ///
+    /// Image tags are not stored, and `devices` is recovered from the boards the image ended up
+    /// linked to, so it can contain more tags than the original config entry listed.
+    ///
+    /// Statements here are not cached, for the same reason as
+    /// [`Self::os_board_json_by_id`].
+    pub(crate) fn os_image_json_by_id(&self, id: i64) -> rusqlite::Result<config::OsImage> {
+        let db = self.db.lock().unwrap();
+
+        let mut stmt = db.prepare(
+            r#"
+            SELECT DISTINCT bt.tag
+            FROM os_image_boards oib
+            JOIN board_tags bt ON bt.board_id = oib.board_id
+            WHERE oib.image_id = $1"#,
+        )?;
+        let devices = stmt
+            .query_map([id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+
+        let mut stmt = db.prepare(
+            r#"
+            SELECT name, description, icon, url, image_download_size, image_download_sha256,
+                extract_size, release_date, init_format, bmap, info_text, support
+            FROM os_images WHERE id = $1"#,
+        )?;
+
+        stmt.query_one([id], |value| {
+            let image_download_size: Option<i64> = value.get("image_download_size")?;
+            let extract_size: i64 = value.get("extract_size")?;
+
+            Ok(config::OsImage {
+                name: value.get("name")?,
+                description: value.get("description")?,
+                icon: value.get("icon")?,
+                url: value.get("url")?,
+                image_download_size: image_download_size.map(|x| x as u64),
+                image_download_sha256: value.get("image_download_sha256")?,
+                extract_size: extract_size as u64,
+                release_date: value.get("release_date")?,
+                init_format: value.get("init_format")?,
+                bmap: value.get("bmap")?,
+                info_text: value.get("info_text")?,
+                support: value.get("support")?,
+                devices,
+            })
+        })
     }
 }

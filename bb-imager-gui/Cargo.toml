@@ -10,7 +10,7 @@ license.workspace = true
 [dependencies]
 iced = { version = "0.14.0", features = ["image", "svg", "tokio", "advanced"] }
 rfd = { version = "0.17.2", features = ["file-handle-inner"] }
-bb-flasher = { path = "../bb-flasher", features = ["serde", "piped_image"] }
+bb-flasher = { path = "../bb-flasher", features = ["piped_image"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
 iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
@@ -30,7 +30,6 @@ bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
 semver = "1.0.28"
 anyhow = "1.0"
 tempfile = "3.26"
-const-hex = { version = "1.19", features = ["serde"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 rusqlite = { version = "0.40", features = ["url", "chrono"] }
 chrono = "0.4"

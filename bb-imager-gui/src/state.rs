@@ -117,10 +117,15 @@ impl ChooseOsState {
         self.pos = pos;
     }
 
-    pub(crate) fn img_json(&self) -> Option<String> {
-        self.selected_image
-            .as_ref()
-            .map(|(_, b)| serde_json::to_string_pretty(&b).unwrap())
+    /// Id of the selected image's config entry, if it has one.
+    ///
+    /// Local images and the SD format action are not in the config, so there is
+    /// nothing to copy for them.
+    pub(crate) fn selected_image_config_id(&self) -> Option<i64> {
+        match self.selected_image.as_ref()?.0 {
+            helpers::OsImageId::OsImage(id) => Some(id),
+            _ => None,
+        }
     }
 
     pub(crate) fn resolve_remote_sublists(

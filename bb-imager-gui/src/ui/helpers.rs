@@ -174,10 +174,7 @@ pub(crate) fn board_view_pane<'a>(
         iced::Shrink,
     );
 
-    let copy_btn = copy_btn(COPY_ICON.clone()).on_press_with(|| {
-        let json = serde_json::to_string_pretty(dev).expect("Invalid image");
-        BBImagerMessage::CopyToClipboard(json)
-    });
+    let copy_btn = copy_btn(COPY_ICON.clone()).on_press(BBImagerMessage::CopyBoardConfig(dev.id));
 
     let cols = widget::column![
         img,
