@@ -106,22 +106,24 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImager::ChooseBoard(x) => {
                     x.boards = boards;
                 }
-                BBImager::AppInfo(overlay_state) => match &mut overlay_state.page {
-                    OverlayData::ChooseBoard(x) => x.boards = boards,
-                    _ => panic!("Unexpected message"),
-                },
-                _ => panic!("Unexpected message"),
+                BBImager::AppInfo(overlay_state) => {
+                    if let OverlayData::ChooseBoard(x) = &mut overlay_state.page {
+                        x.boards = boards
+                    }
+                }
+                _ => {}
             }
         }
         BBImagerMessage::SelectBoard(b) => match state {
             BBImager::ChooseBoard(inner) => {
                 inner.selected_board = Some(b);
             }
-            BBImager::AppInfo(overlay_state) => match &mut overlay_state.page {
-                OverlayData::ChooseBoard(inner) => inner.selected_board = Some(b),
-                _ => panic!("Unexpected message"),
-            },
-            _ => panic!("Unexpected message"),
+            BBImager::AppInfo(overlay_state) => {
+                if let OverlayData::ChooseBoard(inner) = &mut overlay_state.page {
+                    inner.selected_board = Some(b)
+                }
+            }
+            _ => {}
         },
         BBImagerMessage::UpdateOsList((imgs, pos)) => {
             match state {
@@ -189,8 +191,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
                 ));
             }
-            BBImager::AppInfo(overlay_state) => match &mut overlay_state.page {
-                OverlayData::ChooseOs(inner) => {
+            BBImager::AppInfo(overlay_state) => {
+                if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
                     inner.selected_image = Some((
                         helpers::OsImageId::OsImage(image.id),
                         helpers::BoardImage::remote(
@@ -200,9 +202,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         ),
                     ));
                 }
-                _ => panic!("Unexpected message"),
-            },
-            _ => panic!("Unexpected message"),
+            }
+            _ => {}
         },
         BBImagerMessage::SelectLocalOs(image) => match state {
             BBImager::ChooseOs(inner) => {
