@@ -462,7 +462,10 @@ impl BBImager {
                 ])
             }
             Self::Review(inner) => match &inner.customization {
-                helpers::FlashingCustomization::LinuxSdSysconfig(c) => {
+                // Both variants are backed by the same `sysconf` slot, matching how
+                // `FlashingCustomization::new` loads them.
+                helpers::FlashingCustomization::LinuxSdSysconfig(c)
+                | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
                     let mut temp = inner
                         .common
                         .app_config
