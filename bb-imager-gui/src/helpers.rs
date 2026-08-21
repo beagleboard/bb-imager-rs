@@ -12,14 +12,14 @@ use std::sync::mpsc;
 use tokio_util::task::AbortOnDropHandle;
 use url::Url;
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) enum BoardImageIcon {
     Remote(url::Url),
     Local,
     Format,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
     SdFormat {
@@ -235,14 +235,12 @@ pub(crate) fn system_keymap() -> &'static str {
     (*SYSTEM_KEYMAP).unwrap_or("us")
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
     name: Box<str>,
     url: Box<url::Url>,
-    #[serde(with = "const_hex")]
     extract_sha256: [u8; 32],
     extract_size: u64,
-    #[serde(skip)]
     downloader: bb_downloader::Downloader,
 }
 
@@ -332,10 +330,9 @@ impl std::fmt::Display for RemoteImage {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct Bmap {
     url: Box<Url>,
-    #[serde(skip)]
     downloader: bb_downloader::Downloader,
 }
 
@@ -349,7 +346,7 @@ impl Bmap {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub(crate) enum SelectedImage {
     LocalImage(bb_flasher::LocalImage),
     RemoteImage(RemoteImage),

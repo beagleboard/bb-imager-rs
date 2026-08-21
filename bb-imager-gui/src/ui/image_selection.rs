@@ -130,10 +130,10 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
             let mut col = widget::column![icon];
 
             // Add button to copy image info when it makes sense.
-            if let Some(json) = state.img_json() {
+            if let Some(id) = state.selected_image_config_id() {
                 col = col.push(widget::center(
                     helpers::copy_btn(helpers::COPY_ICON.clone())
-                        .on_press(BBImagerMessage::CopyToClipboard(json)),
+                        .on_press(BBImagerMessage::CopyImageConfig(id)),
                 ));
             }
 

@@ -1080,3 +1080,422 @@ fn board_list_search_filters_boards_case_insensitive() {
     assert!(results.iter().any(|b| b.name == "Test Board 2"));
     assert!(results.iter().any(|b| b.name == "Test Board 3"));
 }
+
+/// Insert a single board and return its id.
+fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
+    let name = board.name.clone();
+
+    db.add_config(
+        Config {
+            imager: bb_config::config::Imager {
+                remote_configs: Default::default(),
+                devices: vec![board],
+            },
+            os_list: vec![],
+        },
+        None,
+    )
+    .expect("add_config should succeed");
+
+    db.board_list("")
+        .expect("Fetching board list should succeed")
+        .iter()
+        .find(|b| b.name == name)
+        .expect("Inserted board should exist")
+        .id
+}
+
+/// This test verifies that os_board_json_by_id() reconstructs the exact
+/// [`bb_config::config::Device`] that was inserted through add_config().
+///
+/// What this test checks:
+/// 1. A device with every field populated is inserted.
+/// 2. os_board_json_by_id() returns a Device equal to the original.
+/// 3. Multi-entry tags and ordered specification pairs survive the round trip.
+///
+/// Why this matters:
+/// - The device is stored across two tables (boards + board_tags) and the
+///   specification is stored as a serialized blob, so a round trip is the only
+///   way to catch a column being dropped or serialized in the wrong shape.
+/// - The reconstructed Device is handed back to the flashing code, so any
+///   missing field would silently change flashing behaviour.
+#[test]
+fn os_board_json_by_id_round_trips_device() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "Test description".to_string(),
+        icon: Some("https://example.com/icon.png".try_into().unwrap()),
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: Some("Hold the boot button".to_string()),
+        oshw: Some("us000000".to_string()),
+        specification: vec![
+            ("CPU".to_string(), "Test CPU".to_string()),
+            ("RAM".to_string(), "1GB".to_string()),
+        ],
+        documentation: Some("https://example.com/docs".try_into().unwrap()),
+        tags: ["test-board".into(), "test-board-alt".into()].into(),
+    };
+
+    let id = insert_board_helper(&db, board.clone());
+
+    let res = db
+        .os_board_json_by_id(id)
+        .expect("Fetching board json should succeed");
+
+    assert_eq!(res, board);
+}
+
+/// This test verifies that os_board_json_by_id() works for a board with no
+/// optional fields, no tags and an empty specification.
+///
+/// What this test checks:
+/// 1. A device with all optional columns NULL is inserted.
+/// 2. os_board_json_by_id() returns it without error.
+/// 3. Tags and specification come back empty instead of failing.
+///
+/// Why this matters:
+/// - icon, instructions, oshw and documentation are nullable columns; reading
+///   them into non-Option types would panic only for such minimal boards.
+/// - A board without tags produces zero rows in board_tags, which must not be
+///   treated as a missing board.
+#[test]
+fn os_board_json_by_id_handles_board_without_optional_fields() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = bb_config::config::Device {
+        name: "Minimal Board".to_string(),
+        description: "Minimal".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: Box::default(),
+    };
+
+    let id = insert_board_helper(&db, board.clone());
+
+    let res = db
+        .os_board_json_by_id(id)
+        .expect("Fetching board json should succeed");
+
+    assert_eq!(res, board);
+}
+
+/// This test verifies that os_board_json_by_id() reflects an updated board
+/// instead of mixing old and new data.
+///
+/// What this test checks:
+/// 1. A board is inserted and then re-inserted with the same name.
+/// 2. os_board_json_by_id() returns the updated fields.
+/// 3. Tags from the first insertion are gone, not merged with the new ones.
+///
+/// Why this matters:
+/// - insert_board() upserts on name and deletes the old tags; a regression
+///   there would leave stale tags attached to the board.
+/// - Stale tags would also link the board to OS images it no longer supports.
+#[test]
+fn os_board_json_by_id_reflects_updated_board() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board_v1 = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "Old description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: ["old-tag".into()].into(),
+    };
+
+    let id = insert_board_helper(&db, board_v1);
+
+    let board_v2 = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "New description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: Some("New instructions".to_string()),
+        oshw: Some("us000000".to_string()),
+        specification: vec![("CPU".to_string(), "Test CPU".to_string())],
+        documentation: None,
+        tags: ["new-tag".into()].into(),
+    };
+
+    assert_eq!(
+        insert_board_helper(&db, board_v2.clone()),
+        id,
+        "Re-inserting the same board name should update the same row"
+    );
+
+    let res = db
+        .os_board_json_by_id(id)
+        .expect("Fetching board json should succeed");
+
+    assert_eq!(res, board_v2);
+}
+
+/// Insert a board along with an OS image and return the id of the inserted image.
+fn insert_image_helper(
+    db: &Db,
+    board: bb_config::config::Device,
+    image: bb_config::config::OsImage,
+) -> i64 {
+    let name = image.name.clone();
+
+    db.add_config(
+        Config {
+            imager: bb_config::config::Imager {
+                remote_configs: Default::default(),
+                devices: vec![board.clone()],
+            },
+            os_list: vec![bb_config::config::OsListItem::Image(image)],
+        },
+        None,
+    )
+    .expect("add_config should succeed");
+
+    let board_id = db
+        .board_list("")
+        .expect("Fetching board list should succeed")
+        .iter()
+        .find(|b| b.name == board.name)
+        .expect("Inserted board should exist")
+        .id;
+
+    let items = db
+        .os_image_items(board_id, None)
+        .expect("os_image_items should succeed");
+
+    let crate::helpers::OsImageId::OsImage(image_id) = items
+        .iter()
+        .find(|x| x.label.as_ref() == name.as_str())
+        .expect("Inserted image should exist")
+        .id
+    else {
+        panic!("Incorrect ID");
+    };
+
+    image_id
+}
+
+/// This test verifies that os_image_json_by_id() reconstructs the exact
+/// [`bb_config::config::OsImage`] that was inserted through add_config().
+///
+/// What this test checks:
+/// 1. An image with every field populated is inserted for a board with one tag.
+/// 2. os_image_json_by_id() returns an OsImage equal to the original.
+/// 3. sha256, sizes, release date, urls and devices survive the round trip.
+///
+/// Why this matters:
+/// - Sizes are stored as signed integers and the sha256 as a blob, so a wrong
+///   cast or column would only show up on a full round trip.
+/// - The reconstructed OsImage describes what is actually being flashed, so a
+///   missing field would misreport the flashing job.
+#[test]
+fn os_image_json_by_id_round_trips_image() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "Test Board description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: ["test_board".into()].into(),
+    };
+
+    let image = bb_config::config::OsImage {
+        name: "Test OS".to_string(),
+        description: "Test OS description".to_string(),
+        icon: "https://example.com/icon.png".try_into().unwrap(),
+        url: "https://example.com/os.img.xz".try_into().unwrap(),
+        image_download_size: Some(1024),
+        image_download_sha256: [7; 32],
+        extract_size: 4096,
+        release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
+        devices: ["test_board".into()].into(),
+        init_format: bb_config::config::InitFormat::Sysconf,
+        bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
+        info_text: Some("Test info".to_string()),
+        support: Some(
+            "https://github.com/beagleboard/bb-imager-rs"
+                .try_into()
+                .unwrap(),
+        ),
+    };
+
+    let id = insert_image_helper(&db, board, image.clone());
+
+    let res = db
+        .os_image_json_by_id(id)
+        .expect("Fetching image json should succeed");
+
+    assert_eq!(res, image);
+}
+
+/// This test verifies that os_image_json_by_id() works for an image with none
+/// of the optional fields set.
+///
+/// What this test checks:
+/// 1. An image without download size, bmap, info text and support url is inserted.
+/// 2. os_image_json_by_id() returns it without error.
+///
+/// Why this matters:
+/// - Those columns are nullable; reading them into non-Option types would only
+///   fail for images that omit them.
+#[test]
+fn os_image_json_by_id_handles_image_without_optional_fields() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "Test Board description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: ["test_board".into()].into(),
+    };
+
+    let image = bb_config::config::OsImage {
+        name: "Minimal OS".to_string(),
+        description: "Minimal OS description".to_string(),
+        icon: "https://example.com/icon.png".try_into().unwrap(),
+        url: "https://example.com/os.img.xz".try_into().unwrap(),
+        image_download_size: None,
+        image_download_sha256: [0; 32],
+        extract_size: 1,
+        release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
+        devices: ["test_board".into()].into(),
+        init_format: bb_config::config::InitFormat::None,
+        bmap: None,
+        info_text: None,
+        support: None,
+    };
+
+    let id = insert_image_helper(&db, board, image.clone());
+
+    let res = db
+        .os_image_json_by_id(id)
+        .expect("Fetching image json should succeed");
+
+    assert_eq!(res, image);
+}
+
+/// This test pins the known lossiness of os_image_json_by_id(): the returned
+/// `devices` comes from the boards the image is linked to, not from the config.
+///
+/// What this test checks:
+/// 1. A board carrying two tags is inserted.
+/// 2. An image referencing only one of those tags is inserted.
+/// 3. os_image_json_by_id() reports both tags in `devices`.
+///
+/// Why this matters:
+/// - The original device list is not stored; only the board links are. Callers
+///   must treat `devices` as "tags of the boards this image matched", and this
+///   test documents that instead of leaving it to be discovered later.
+#[test]
+fn os_image_json_by_id_devices_come_from_linked_boards() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = bb_config::config::Device {
+        name: "Test Board".to_string(),
+        description: "Test Board description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        specification: vec![],
+        documentation: None,
+        tags: ["test_board".into(), "test_board_alt".into()].into(),
+    };
+
+    let image = bb_config::config::OsImage {
+        name: "Test OS".to_string(),
+        description: "Test OS description".to_string(),
+        icon: "https://example.com/icon.png".try_into().unwrap(),
+        url: "https://example.com/os.img.xz".try_into().unwrap(),
+        image_download_size: None,
+        image_download_sha256: [1; 32],
+        extract_size: 1,
+        release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
+        devices: ["test_board".into()].into(),
+        init_format: bb_config::config::InitFormat::None,
+        bmap: None,
+        info_text: None,
+        support: None,
+    };
+
+    let id = insert_image_helper(&db, board, image);
+
+    let res = db
+        .os_image_json_by_id(id)
+        .expect("Fetching image json should succeed");
+
+    // `devices` is now an ordered slice, but the query has no ORDER BY, so
+    // compare without depending on the row order.
+    let mut devices: Vec<&str> = res.devices.iter().map(AsRef::as_ref).collect();
+    devices.sort_unstable();
+    assert_eq!(devices, ["test_board", "test_board_alt"]);
+}
+
+/// This test verifies that os_image_json_by_id() fails for an unknown image id.
+///
+/// What this test checks:
+/// 1. An id that does not exist is queried.
+/// 2. The call returns QueryReturnedNoRows instead of a default image.
+///
+/// Why this matters:
+/// - Returning a bogus image instead of an error would report the wrong image
+///   for a flashing job.
+#[test]
+fn os_image_json_by_id_unknown_id_returns_no_rows() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let res = db.os_image_json_by_id(i64::MAX);
+
+    assert!(
+        matches!(res, Err(rusqlite::Error::QueryReturnedNoRows)),
+        "Unknown image id should return QueryReturnedNoRows, got {res:?}"
+    );
+}
+
+/// This test verifies that os_board_json_by_id() fails for an unknown board id.
+///
+/// What this test checks:
+/// 1. An id that does not exist is queried.
+/// 2. The call returns QueryReturnedNoRows instead of a default board.
+///
+/// Why this matters:
+/// - Callers pass board ids kept in UI state; returning a bogus board instead
+///   of an error would flash a device with the wrong configuration.
+#[test]
+fn os_board_json_by_id_unknown_id_returns_no_rows() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let res = db.os_board_json_by_id(i64::MAX);
+
+    assert!(
+        matches!(res, Err(rusqlite::Error::QueryReturnedNoRows)),
+        "Unknown board id should return QueryReturnedNoRows, got {res:?}"
+    );
+}
