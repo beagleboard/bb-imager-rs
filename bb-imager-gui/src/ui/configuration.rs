@@ -7,9 +7,7 @@ use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
     persistance,
-    ui::helpers::{
-        VIEW_COL_PADDING, detail_pane, element_with_element, element_with_label, page_type2,
-    },
+    ui::helpers::{detail_pane, element_with_element, element_with_label, page_type2},
 };
 
 const INPUT_WIDTH: u32 = 200;
@@ -37,25 +35,8 @@ fn customization_pane<'a>(state: &'a crate::state::CustomizeState) -> Element<'a
     match &state.customization {
         FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card_sysconfig(state, inner),
         FlashingCustomization::LinuxSdCloudInit(inner) => linux_sd_card_cloudinit(state, inner),
-        FlashingCustomization::Bcf(inner) => verify_toggle(inner, FlashingCustomization::Bcf),
-        FlashingCustomization::Zepto(inner) => verify_toggle(inner, FlashingCustomization::Zepto),
         _ => panic!("No customization"),
     }
-}
-
-fn verify_toggle<'a>(
-    state: &'a persistance::BcfCustomization,
-    cb: impl Fn(persistance::BcfCustomization) -> FlashingCustomization + 'a,
-) -> Element<'a, BBImagerMessage> {
-    widget::container(
-        widget::toggler(!state.verify)
-            .label("Skip Verification")
-            .on_toggle(move |x| {
-                BBImagerMessage::UpdateFlashConfig(cb(state.clone().update_verify(!x)))
-            }),
-    )
-    .padding(VIEW_COL_PADDING)
-    .into()
 }
 
 fn linux_sd_card_common<'a>(

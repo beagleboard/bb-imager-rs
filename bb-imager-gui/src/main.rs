@@ -474,17 +474,6 @@ impl BBImager {
 
                     Task::batch([inner.save_app_config(), self.scroll_reset()])
                 }
-                helpers::FlashingCustomization::Bcf(c) => {
-                    inner.common.app_config.update_bcf_customization(c.clone());
-                    Task::batch([inner.save_app_config(), self.scroll_reset()])
-                }
-                helpers::FlashingCustomization::Zepto(c) => {
-                    inner
-                        .common
-                        .app_config
-                        .update_zepto_customization(c.clone());
-                    Task::batch([inner.save_app_config(), self.scroll_reset()])
-                }
                 _ => self.scroll_reset(),
             },
             _ => self.scroll_reset(),
