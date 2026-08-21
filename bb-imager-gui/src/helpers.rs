@@ -29,6 +29,9 @@ pub(crate) enum BoardImage {
         flasher: config::Flasher,
         init_format: config::InitFormat,
         img: SelectedImage,
+        // Only the SD flasher consumes a bmap; without that backend the field,
+        // `Bmap` and its downloader are dead weight.
+        #[cfg(feature = "sd")]
         bmap: Option<Bmap>,
         info_text: Option<String>,
         description: Option<String>,
@@ -48,6 +51,7 @@ impl BoardImage {
 
         Self::Image {
             img: bb_flasher::LocalImage::new(path.into()).into(),
+            #[cfg(feature = "sd")]
             bmap: None,
             flasher,
             // Do not try to apply customization for local images
@@ -83,6 +87,7 @@ impl BoardImage {
                 downloader.clone(),
             )
             .into(),
+            #[cfg(feature = "sd")]
             bmap: image.bmap.map(|url| Bmap {
                 url: Box::new(url),
                 downloader,
@@ -344,12 +349,14 @@ impl std::fmt::Display for RemoteImage {
     }
 }
 
+#[cfg(feature = "sd")]
 #[derive(Debug, Clone)]
 pub(crate) struct Bmap {
     url: Box<Url>,
     downloader: bb_downloader::Downloader,
 }
 
+#[cfg(feature = "sd")]
 impl Bmap {
     fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
         let rt = tokio::runtime::Handle::current();
