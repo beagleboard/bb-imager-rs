@@ -200,7 +200,7 @@ impl SdCustomizationUser {
 
 impl Default for SdCustomizationUser {
     fn default() -> Self {
-        Self::new(whoami::username().unwrap_or_default(), String::new())
+        Self::new(crate::helpers::default_user().to_owned(), String::new())
     }
 }
 
