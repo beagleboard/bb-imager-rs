@@ -198,22 +198,23 @@ fn linux_sd_card_common<'a>(
     col = match config.keymap.as_ref() {
         Some(keymap) => {
             let xc = config.clone();
-            // The current selection needs to be resolved back to one of the options,
-            // which are kept sorted (see `constants::KEYMAP_LAYOUTS`) to allow a binary
-            // search.
-            let options = state.common.keymaps.options();
-            let selection = options
-                .binary_search(&keymap.as_str())
-                .map(|x| &options[x])
-                .ok();
+            // The stored keymap is a `String`; the combo box options are the
+            // `&'static str`s from `KEYMAP_LAYOUTS`, so the selection has to be
+            // resolved back through the table.
+            let selection = crate::constants::keymap_layout(keymap);
 
             col.push(element_with_element(
                 toggle.into(),
-                widget::combo_box(&state.common.keymaps, "Keymap", selection, move |t| {
-                    BBImagerMessage::UpdateFlashConfig(wrap(
-                        xc.clone().update_keymap(Some(t.to_string())),
-                    ))
-                })
+                widget::combo_box(
+                    &state.common.keymaps,
+                    "Keymap",
+                    selection.as_ref(),
+                    move |t| {
+                        BBImagerMessage::UpdateFlashConfig(wrap(
+                            xc.clone().update_keymap(Some(t.to_string())),
+                        ))
+                    },
+                )
                 .width(INPUT_WIDTH)
                 .into(),
             ))

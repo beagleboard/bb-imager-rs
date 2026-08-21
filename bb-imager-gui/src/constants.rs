@@ -63,14 +63,50 @@ pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "ua", "us", "uz", "vn", "za",
 ];
 
+/// Resolve a keymap name to its entry in [`KEYMAP_LAYOUTS`].
+///
+/// Customization carries keymaps as `&'static str` borrowed from this table,
+/// while the persisted config stores a plain `String`. Loading a saved keymap
+/// back into the UI therefore has to come back through the table, or the field
+/// silently reads as unset.
+///
+/// Returns `None` for a name not in the table, which is what a hand-edited
+/// config file can contain.
+pub(crate) fn keymap_layout(name: &str) -> Option<&'static str> {
+    KEYMAP_LAYOUTS
+        .binary_search(&name)
+        .ok()
+        .map(|i| KEYMAP_LAYOUTS[i])
+}
+
 #[cfg(test)]
 mod tests {
-    use super::KEYMAP_LAYOUTS;
+    use super::{KEYMAP_LAYOUTS, keymap_layout};
 
-    /// The keymap combo box looks up its selection with `binary_search`, so new
-    /// entries need to be inserted in byte order.
+    /// [`keymap_layout`] looks entries up with `binary_search`, so new entries
+    /// need to be inserted in byte order.
     #[test]
     fn keymap_layouts_sorted() {
         assert!(KEYMAP_LAYOUTS.is_sorted());
+    }
+
+    #[test]
+    fn keymap_layout_resolves_known_names() {
+        assert_eq!(keymap_layout("us"), Some("us"));
+        assert_eq!(keymap_layout("de"), Some("de"));
+        // First and last entries, to pin the search bounds.
+        assert_eq!(keymap_layout(KEYMAP_LAYOUTS[0]), Some(KEYMAP_LAYOUTS[0]));
+        let last = KEYMAP_LAYOUTS[KEYMAP_LAYOUTS.len() - 1];
+        assert_eq!(keymap_layout(last), Some(last));
+    }
+
+    /// A hand-edited config can name a layout that does not exist; it should
+    /// read as unset rather than be forced into the picker.
+    #[test]
+    fn keymap_layout_rejects_unknown_names() {
+        assert_eq!(keymap_layout("not-a-layout"), None);
+        assert_eq!(keymap_layout(""), None);
+        // Matching is exact: the table is lowercase, locale regions are not.
+        assert_eq!(keymap_layout("US"), None);
     }
 }
