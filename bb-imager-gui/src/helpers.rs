@@ -8,13 +8,13 @@ use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
 use bb_helper::file_stream::ReaderFileStream;
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 use tokio_util::task::AbortOnDropHandle;
 use url::Url;
 
 #[derive(Debug, Clone)]
 pub(crate) enum BoardImageIcon {
-    Remote(url::Url),
+    Remote(Arc<url::Url>),
     Local,
     Format,
 }
@@ -610,10 +610,11 @@ impl Destination {
 pub(crate) fn destinations(
     flasher: config::Flasher,
     filter: bool,
-    search: String,
-) -> Vec<Destination> {
-    let filter_func =
-        move |t: &Destination| search.is_empty() || t.to_string().to_lowercase().contains(&search);
+    search: Arc<str>,
+) -> Box<[Destination]> {
+    let filter_func = move |t: &Destination| {
+        search.is_empty() || t.to_string().to_lowercase().contains(search.as_ref())
+    };
 
     match flasher {
         #[cfg(feature = "sd")]
@@ -873,7 +874,7 @@ pub(crate) enum OsImageId {
 #[derive(Debug, Clone)]
 pub(crate) struct OsImageItem {
     pub(crate) id: OsImageId,
-    pub(crate) icon: Option<url::Url>,
+    pub(crate) icon: Option<Arc<url::Url>>,
     pub(crate) label: Cow<'static, str>,
 }
 
@@ -977,16 +978,18 @@ impl<'a> DestinationItem<'a> {
 
 pub(crate) fn fetch_images(
     downloader: &bb_downloader::Downloader,
-    iter: impl IntoIterator<Item = url::Url>,
+    iter: impl IntoIterator<Item = Arc<url::Url>>,
 ) -> iced::Task<BBImagerMessage> {
     let tasks = iter.into_iter().map(|icon| {
         let downloader = downloader.clone();
-        let icon_clone = icon.clone();
-        let icon_clone2 = icon.clone();
+        let key = icon.clone();
+        // The downloader takes an owned `Url` (reqwest's `IntoUrl`), so this one
+        // clone stays; the cache key is shared rather than cloned.
+        let target = url::Url::clone(&icon);
         iced::Task::perform(
-            async move { downloader.download(icon_clone).await },
+            async move { downloader.download(target).await },
             move |p| match p {
-                Ok(p) => BBImagerMessage::ResolveImage(icon_clone2, p),
+                Ok(p) => BBImagerMessage::ResolveImage(key, p),
                 Err(_) => {
                     tracing::warn!("Failed to fetch image {}", icon);
                     BBImagerMessage::Null
@@ -1317,7 +1320,7 @@ mod tests {
 
     #[test]
     fn os_image_item_from_db_items() {
-        let icon = Url::parse("https://example.com/icon.png").unwrap();
+        let icon = std::sync::Arc::new(Url::parse("https://example.com/icon.png").unwrap());
 
         let image: OsImageItem = crate::db::OsImageListItem {
             id: 5,

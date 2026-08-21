@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bb_config::config;
@@ -18,7 +19,7 @@ pub(crate) struct BBImagerCommon {
     pub(crate) timezones: widget::combo_box::State<chrono_tz::Tz>,
     pub(crate) keymaps: widget::combo_box::State<&'static str>,
 
-    pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<url::Url>,
+    pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
 
     pub(crate) scroll_id: widget::Id,
     pub(crate) db: db::Db,
@@ -59,9 +60,9 @@ impl BBImagerCommon {
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) boards: Vec<db::BoardListItem>,
+    pub(crate) boards: Box<[db::BoardListItem]>,
     pub(crate) selected_board: Option<Board>,
-    pub(crate) search_text: String,
+    pub(crate) search_text: Arc<str>,
 }
 
 impl ChooseBoardState {
@@ -75,7 +76,7 @@ impl ChooseBoardState {
         )
     }
 
-    pub(crate) fn update_search(&mut self, search: String) -> Task<BBImagerMessage> {
+    pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
         self.search_text = search;
         self.refresh_board_list()
     }
@@ -85,9 +86,9 @@ impl From<ChooseOsState> for ChooseBoardState {
     fn from(value: ChooseOsState) -> Self {
         Self {
             common: value.common,
-            boards: Vec::new(),
+            boards: Box::default(),
             selected_board: Some(value.selected_board),
-            search_text: String::new(),
+            search_text: "".into(),
         }
     }
 }
@@ -100,7 +101,7 @@ pub(crate) struct ChooseOsState {
     pub(crate) pos: Option<i64>,
     pub(crate) flasher: config::Flasher,
     pub(crate) selected_image: Option<(OsImageId, helpers::BoardImage)>,
-    pub(crate) search_text: String,
+    pub(crate) search_text: Arc<str>,
 }
 
 impl ChooseOsState {
@@ -177,7 +178,7 @@ impl ChooseOsState {
         }
     }
 
-    pub(crate) fn update_search(&mut self, search: String) -> Task<BBImagerMessage> {
+    pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
         self.search_text = search;
         self.refresh_image_list()
     }
@@ -208,7 +209,7 @@ impl From<ChooseDestState> for ChooseOsState {
             selected_board: value.selected_board,
             pos: None,
             selected_image: Some(value.selected_image),
-            search_text: String::new(),
+            search_text: "".into(),
         }
     }
 }
@@ -219,9 +220,9 @@ pub(crate) struct ChooseDestState {
     pub(crate) selected_board: Board,
     pub(crate) selected_image: (OsImageId, helpers::BoardImage),
     pub(crate) selected_dest: Option<helpers::Destination>,
-    pub(crate) destinations: Vec<helpers::Destination>,
+    pub(crate) destinations: Box<[helpers::Destination]>,
     pub(crate) filter_destination: bool,
-    pub(crate) search_text: String,
+    pub(crate) search_text: Arc<str>,
 }
 
 impl ChooseDestState {
@@ -243,7 +244,7 @@ impl ChooseDestState {
         }
     }
 
-    pub(crate) fn update_search(&mut self, search: String) {
+    pub(crate) fn update_search(&mut self, search: Arc<str>) {
         self.search_text = search;
     }
 }
@@ -255,9 +256,9 @@ impl From<CustomizeState> for ChooseDestState {
             selected_board: value.selected_board,
             selected_image: value.selected_image,
             selected_dest: Some(value.selected_dest),
-            destinations: Vec::new(),
+            destinations: Box::default(),
             filter_destination: true,
-            search_text: String::new(),
+            search_text: "".into(),
         }
     }
 }

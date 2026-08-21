@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Arc;
+
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
@@ -92,12 +94,12 @@ enum BBImager {
 }
 
 impl BBImager {
-    const fn choose_board(common: BBImagerCommon) -> Self {
+    fn choose_board(common: BBImagerCommon) -> Self {
         Self::ChooseBoard(state::ChooseBoardState {
             common,
-            boards: Vec::new(),
+            boards: Box::default(),
             selected_board: None,
-            search_text: String::new(),
+            search_text: "".into(),
         })
     }
 
@@ -188,7 +190,7 @@ impl BBImager {
         }
     }
 
-    fn image_cache_insert(&mut self, k: url::Url, v: std::path::PathBuf) {
+    fn image_cache_insert(&mut self, k: Arc<url::Url>, v: std::path::PathBuf) {
         self.common_mut().img_handle_cache.insert(k, v)
     }
 
@@ -222,7 +224,7 @@ impl BBImager {
                 (
                     x.selected_image.1.flasher(),
                     x.filter_destination,
-                    x.search_text.to_lowercase(),
+                    Arc::<str>::from(x.search_text.to_lowercase()),
                 ),
                 |(flasher, filter, search_text)| {
                     let mut interval = interval(INTERVAL);
@@ -389,7 +391,7 @@ impl BBImager {
                     pos: None,
                     selected_image: None,
                     images: Vec::new(),
-                    search_text: String::new(),
+                    search_text: "".into(),
                 })
             }
             Self::ChooseOs(inner) => {
@@ -402,9 +404,9 @@ impl BBImager {
                     selected_board: inner.selected_board,
                     selected_image,
                     selected_dest: None,
-                    destinations: Vec::new(),
+                    destinations: Box::default(),
                     filter_destination: true,
-                    search_text: String::new(),
+                    search_text: "".into(),
                 })
             }
             Self::ChooseDest(inner) => {
