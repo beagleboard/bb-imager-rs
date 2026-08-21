@@ -235,6 +235,20 @@ pub(crate) fn system_keymap() -> &'static str {
     (*SYSTEM_KEYMAP).unwrap_or("us")
 }
 
+/// Username to pre-fill the customization page with.
+///
+/// Falls back to "beagle" rather than an empty name: an empty username is not a
+/// valid account, and nothing downstream rejects one, so it would be written to
+/// the image as-is.
+pub(crate) fn default_user() -> &'static str {
+    static USER: LazyLock<Option<String>> = LazyLock::new(|| whoami::username().ok());
+
+    match &*USER {
+        Some(x) => x,
+        None => "beagle",
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
     name: Box<str>,
@@ -1320,6 +1334,11 @@ mod tests {
             OsImageId::OsSublist((7, config::Flasher::SdCard))
         );
         assert!(sublist.is_sublist());
+    }
+
+    #[test]
+    fn default_user_is_never_empty() {
+        assert!(!default_user().is_empty());
     }
 
     #[test]
