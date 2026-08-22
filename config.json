@@ -25,7 +25,7 @@
 					"beagleconnect-freedom"
 				],
 				"description": "BeagleConnect Freedom based on Ti CC1352P7",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/bcf.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2021/04/feature-400x975.png",
 				"flasher": "BeagleConnectFreedom",
 				"documentation": "https://docs.beagleboard.org/latest/boards/beagleconnect/freedom/index.html",
 				"oshw": "us002175",
@@ -43,7 +43,7 @@
 					"beagle-am67"
 				],
 				"description": "BeagleY-AI based on TI AM67A",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beagley.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2024/03/BeagleY-AI-angled-front-1-400x267.webp",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beagley/ai/index.html#beagley-ai-home",
 				"oshw": "us002616",
@@ -60,7 +60,7 @@
 					"beagle-am62"
 				],
 				"description": "BeaglePlay and other boards based on TI AM62",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beagleplay.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2023/03/45front-400x297.webp",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beagleplay/index.html#beagleplay-home",
 				"oshw": "us002174",
@@ -77,7 +77,7 @@
 					"beagle-tda4vm"
 				],
 				"description": "BeagleBone AI-64 based on TI TDA4VM",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/ai64.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2022/04/BeagleBone_AI_64-400x333.webp",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglebone/ai-64/index.html#bbai64-home",
 				"oshw": "us002120",
@@ -95,7 +95,7 @@
 					"beaglev-fire"
 				],
 				"description": "BeagleV-Fire based on Microchip PolarFire SoC",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/beaglevfire.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2023/10/45-degree-angled-perspective-view-Front-400x324.webp",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglev/fire/index.html#beaglev-fire-home",
 				"instructions": "1. Connect the BeagleV-Fire board to your computer via USB.\n2. While powering on the board, click the USER button on the board as soon as you power it on.\n3. BeagleV-Fire must appear as a USB device in the destination list.",
@@ -113,7 +113,7 @@
 					"beagle-am335"
 				],
 				"description": "BeagleBone Black and other boards based on TI AM335",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/bbb.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2023/07/DSC00505-400x345.webp",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/beaglebone/black/index.html#beagleboneblack-home",
 				"oshw": "us000236",
@@ -131,7 +131,7 @@
 					"pocketbeagle2-am62"
 				],
 				"description": "PocketBeagle 2 and other boards based on TI AM62",
-				"icon": "https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/heads/main/assets/boards/pocket2.png",
+				"icon": "https://www.beagleboard.org/app/uploads/2024/11/PocketBeagle2-400x225.png",
 				"flasher": "SdCard",
 				"documentation": "https://docs.beagleboard.org/boards/pocketbeagle-2/index.html",
 				"oshw": "us002717",
