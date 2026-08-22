@@ -1192,6 +1192,68 @@ mod tests {
         );
     }
 
+    /// A remote SD image with the given init format.
+    ///
+    /// Remote specifically: a local image always reports `InitFormat::None`, so
+    /// it cannot exercise format detection.
+    fn remote_sd_image(init_format: config::InitFormat) -> BoardImage {
+        let cache = tempfile::tempdir().unwrap();
+        let downloader = bb_downloader::Downloader::new(cache.path()).unwrap();
+
+        BoardImage::remote(
+            crate::db::OsImage {
+                id: 1,
+                name: "test-image".to_string(),
+                description: "test".to_string(),
+                icon: std::sync::Arc::new(url::Url::parse("https://example.com/icon.png").unwrap()),
+                url: url::Url::parse("https://example.com/os.img.xz").unwrap(),
+                image_download_size: None,
+                image_download_sha256: [0u8; 32],
+                extract_size: 0,
+                release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
+                init_format,
+                bmap: None,
+                info_text: None,
+                support: None,
+            },
+            config::Flasher::SdCard,
+            downloader,
+        )
+    }
+
+    /// Returning `Some` for a customizable image skips the Customize page and
+    /// writes an empty config, so the user silently loses hostname, user, wifi
+    /// and SSH key.
+    ///
+    /// The two formats are checked by separate guards, so it is possible to fix
+    /// or break one without touching the other.
+    #[test]
+    fn customizable_init_formats_reach_the_customization_page() {
+        for format in [config::InitFormat::Sysconf, config::InitFormat::CloudInit] {
+            let img = remote_sd_image(format);
+            assert!(
+                no_customization(config::Flasher::SdCard, &img).is_none(),
+                "{format:?} images must be customizable"
+            );
+        }
+    }
+
+    /// The counterpart: formats we cannot write skip the page rather than
+    /// showing one that would do nothing.
+    #[test]
+    fn unwritable_init_formats_skip_the_customization_page() {
+        for format in [config::InitFormat::None, config::InitFormat::Armbian] {
+            let img = remote_sd_image(format);
+            assert!(
+                matches!(
+                    no_customization(config::Flasher::SdCard, &img),
+                    Some(FlashingCustomization::NoneSd)
+                ),
+                "{format:?} images have no customization we can apply"
+            );
+        }
+    }
+
     #[test]
     fn no_customization_covers_non_configurable_flashers() {
         let img = BoardImage::format();
