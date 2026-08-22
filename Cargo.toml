@@ -15,7 +15,8 @@ members = [
         "bb-drivelist", 
         "bb-flasher-mspm0",
         "bb-bmap-parser",
-        "bb-iced-widgets"
+        "bb-iced-widgets", 
+        "bb-imager-ui"
 ]
 
 [profile.release]
