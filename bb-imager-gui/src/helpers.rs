@@ -719,14 +719,21 @@ impl FlashingCustomization {
     }
 
     pub(crate) fn reset(&mut self) {
-        if let Self::LinuxSdSysconfig(_) = self {
-            *self = Self::LinuxSdSysconfig(Default::default());
+        match self {
+            Self::LinuxSdSysconfig(_) => {
+                *self = Self::LinuxSdSysconfig(Default::default());
+            }
+            Self::LinuxSdCloudInit(_) => {
+                *self = Self::LinuxSdCloudInit(Default::default());
+            }
+            _ => {}
         }
     }
 
     pub(crate) fn validate(&self) -> bool {
         match self {
-            FlashingCustomization::LinuxSdSysconfig(sd_customization) => {
+            FlashingCustomization::LinuxSdSysconfig(sd_customization)
+            | FlashingCustomization::LinuxSdCloudInit(sd_customization) => {
                 sd_customization.validate_user()
             }
             _ => true,
@@ -1196,7 +1203,12 @@ mod tests {
         );
         let root = SdSysconfCustomization::default()
             .update_user(Some(SdCustomizationUser::new("root".into(), "p".into())));
-        assert!(!FlashingCustomization::LinuxSdSysconfig(root).validate());
+        assert!(!FlashingCustomization::LinuxSdSysconfig(root.clone()).validate());
+        // Cloud-init writes the same user account, so it needs the same check.
+        assert!(
+            FlashingCustomization::LinuxSdCloudInit(SdSysconfCustomization::default()).validate()
+        );
+        assert!(!FlashingCustomization::LinuxSdCloudInit(root).validate());
     }
 
     #[test]
@@ -1207,6 +1219,16 @@ mod tests {
         sysconf.reset();
         match sysconf {
             FlashingCustomization::LinuxSdSysconfig(c) => assert!(c.hostname.is_none()),
+            _ => panic!("variant should be preserved"),
+        }
+
+        // Cloud-init is just as resettable as sysconf.
+        let mut cloudinit = FlashingCustomization::LinuxSdCloudInit(
+            SdSysconfCustomization::default().update_hostname(Some("h".into())),
+        );
+        cloudinit.reset();
+        match cloudinit {
+            FlashingCustomization::LinuxSdCloudInit(c) => assert!(c.hostname.is_none()),
             _ => panic!("variant should be preserved"),
         }
 
