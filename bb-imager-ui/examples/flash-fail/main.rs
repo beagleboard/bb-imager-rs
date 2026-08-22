@@ -3,8 +3,9 @@ use bb_imager_ui::{Message, flash_fail};
 struct State(flash_fail::State);
 
 impl State {
-    fn new() -> (Self, iced::Task<Message>) {
+    fn new() -> (Self, iced::Task<Message<()>>) {
         let res = State(flash_fail::State {
+            has_customization: true,
             reason: "Fail Reason for Testing".into(),
             logs: iced::widget::text_editor::Content::with_text(LOGS.trim()),
         });
@@ -17,11 +18,13 @@ fn main() {
     let app = iced::application(
         State::new,
         |s: &mut State, msg| {
-            if let Message::EditorEvent(evt) = msg {
-                match evt {
+            match msg {
+                Message::EditorEvent(evt) => match evt {
                     iced::widget::text_editor::Action::Edit(_) => {}
                     _ => s.0.logs.perform(evt),
-                }
+                },
+                Message::CopyToClipboard => return iced::clipboard::write(s.0.logs.text()),
+                _ => {}
             }
             iced::Task::none()
         },
@@ -30,7 +33,7 @@ fn main() {
     bb_imager_ui::application(app).run().unwrap()
 }
 
-fn view(s: &State) -> iced::Element<'_, Message> {
+fn view(s: &State) -> iced::Element<'_, Message<()>> {
     flash_fail::view(&s.0)
 }
 

@@ -717,11 +717,12 @@ dependencies = [
  "bb-config",
  "bb-downloader",
  "bb-iced-widgets",
+ "chrono",
  "chrono-tz",
  "iced",
- "iced_aw",
  "serde_json",
  "tempfile",
+ "tokio",
  "url",
 ]
 

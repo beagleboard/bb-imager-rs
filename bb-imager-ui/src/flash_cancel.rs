@@ -1,30 +1,54 @@
-use std::sync::Arc;
+use iced::widget;
 
-use iced::{Element, widget};
+use crate::Message;
+use crate::constants::FONT_BOLD;
+use crate::helpers::page_layout;
 
-use crate::board_selection::BoardDetails;
-use crate::helpers::{board_details_pane, page_type1, progress_finish_view};
-use crate::{Message, constants};
+const HEADING_SIZE: u32 = 26;
 
-#[derive(Debug)]
+#[derive(Default)]
 pub struct State {
-    pub board: BoardDetails,
+    pub has_customization: bool,
 }
 
-pub fn view<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: widget::Id,
-) -> Element<'a, Message> {
-    page_type1(
-        board_details_pane(cache, &state.board, &scroll_id),
-        progress_finish_view(
-            "Cancelled",
-            constants::DANGER,
-            "Flashing Cancelled by the user",
+pub fn view<'a, D: Clone + 'a>(s: &'a State) -> iced::Element<'a, Message<D>> {
+    let mut sidebar = vec![
+        ("Device", false, Some(Message::GotoDevicePage)),
+        ("Software", false, Some(Message::GotoSoftwarePage)),
+        ("Destination", false, Some(Message::GotoDestinationPage)),
+    ];
+
+    if s.has_customization {
+        sidebar.push(("Customization", false, Some(Message::GotoCustomizationPage)));
+    }
+
+    sidebar.push(("Review", false, Some(Message::GotoReviewPage)));
+    sidebar.push(("Flashing", true, None));
+
+    page_layout(
+        (
+            sidebar,
+            [("App Options", false, Some(Message::GotoAppOptions))],
         ),
-        [widget::button("Restart")
-            .style(widget::button::danger)
-            .on_press(Message::Restart)],
+        widget::column![
+            widget::column![
+                widget::text("Write Cancelled")
+                    .style(widget::text::danger)
+                    .font(FONT_BOLD)
+                    .size(HEADING_SIZE),
+                widget::text("Writing cancelled by the user")
+                    .style(widget::text::danger)
+                    .font(FONT_BOLD),
+            ]
+            .height(iced::Fill)
+            .spacing(16)
+            .padding(iced::Padding::ZERO.horizontal(16)),
+            widget::rule::horizontal(2),
+            widget::right(widget::button("WRITE ANOTHER").on_press(Message::GotoDevicePage))
+                .padding(iced::Padding::ZERO.horizontal(16))
+        ]
+        .height(iced::Fill)
+        .padding(iced::Padding::ZERO.vertical(16))
+        .spacing(16),
     )
 }

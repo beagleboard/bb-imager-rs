@@ -1,93 +1,66 @@
-use std::sync::Arc;
-
-use bb_iced_widgets::cached_icon::Cache;
 use iced::{Element, widget};
 
-use crate::helpers::{
-    board_details_pane, list_item, list_label, list_pane, network_image_or_default, page_type1,
-    placeholder_pane,
-};
-use crate::{Message, constants};
-
-const ICON_WIDTH: u32 = 100;
+use crate::Message;
+use crate::constants::FONT_BOLD;
+use crate::helpers::{layout_with_search, network_image_or_default, page_layout};
 
 /// One row of the board list.
 #[derive(Default, Debug, Clone)]
 pub struct Board {
     pub id: i64,
-    pub icon: Option<Arc<url::Url>>,
+    pub icon: Option<std::sync::Arc<url::Url>>,
     pub name: Box<str>,
-}
-
-#[derive(Debug, Clone)]
-pub struct BoardDetails {
-    pub id: i64,
-    pub name: Box<str>,
-    pub icon: Option<Arc<url::Url>>,
-    pub description: Box<str>,
-    pub specification: Box<[(Box<str>, Box<str>)]>,
-    pub documentation: Option<url::Url>,
-    pub oshw: Option<url::Url>,
 }
 
 #[derive(Default, Debug)]
 pub struct State {
     pub boards: Box<[Board]>,
-    pub selected: Option<BoardDetails>,
-    pub search: Arc<str>,
+    pub search: std::sync::Arc<str>,
 }
 
-pub fn view<'a>(
-    cache: &'a Cache<Arc<url::Url>>,
-    state: &'a State,
+pub fn view<'a, D: Clone + 'a>(
+    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
+    s: &'a State,
     scroll_id: widget::Id,
-) -> Element<'a, Message> {
-    page_type1(
-        board_list_pane(cache, state, &scroll_id),
-        board_view_pane(cache, state, &scroll_id),
-        [widget::button("NEXT").on_press_maybe(state.selected.as_ref().map(|_| Message::Next))],
+) -> iced::Element<'a, Message<D>> {
+    let grid = s.boards.iter().map(|x| {
+        card(
+            network_image_or_default(cache, x.icon.as_ref()),
+            &x.name,
+            Message::SelectBoardById(x.id),
+        )
+        .height(iced::Fill)
+        .into()
+    });
+
+    page_layout(
+        (
+            [("Device", true, None)],
+            [("App Options", false, Some(Message::GotoAppOptions))],
+        ),
+        layout_with_search(
+            &s.search,
+            widget::grid(grid)
+                .height(widget::grid::aspect_ratio(4, 3))
+                .fluid(300)
+                .spacing(18),
+            scroll_id,
+        ),
     )
 }
 
-fn board_list_pane<'a>(
-    cache: &'a Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: &widget::Id,
-) -> Element<'a, Message> {
-    let items = state
-        .boards
-        .iter()
-        .map(|dev| {
-            let is_selected = state
-                .selected
-                .as_ref()
-                .map(|x| x.id == dev.id)
-                .unwrap_or(false);
-            let img = network_image_or_default(
-                cache,
-                dev.icon.as_ref(),
-                constants::BOARD_ICON.clone(),
-                ICON_WIDTH,
-                iced::Shrink,
-            );
-            list_item(
-                [img, list_label(dev.name.as_ref()).into()],
-                is_selected,
-                Message::SelectBoardById(dev.id),
-            )
-        })
-        .map(Into::into);
+fn card<'a, M: 'a>(img: Element<'a, M>, label: &'a str, cb: M) -> widget::Button<'a, M> {
+    const BORDER_WIDTH: f32 = 3.0;
 
-    list_pane(&state.search, scroll_id, [], items)
-}
-
-fn board_view_pane<'a>(
-    cache: &'a Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: &widget::Id,
-) -> Element<'a, Message> {
-    match state.selected.as_ref() {
-        Some(dev) => board_details_pane(cache, dev, scroll_id),
-        None => placeholder_pane("Please Select a Board"),
-    }
+    widget::button(widget::column![
+        widget::center(img).padding(6),
+        widget::rule::horizontal(BORDER_WIDTH),
+        widget::center(widget::text(label).font(FONT_BOLD))
+            .height(iced::Shrink)
+            .style(widget::container::transparent)
+            .padding(6)
+    ])
+    .on_press(cb)
+    .padding(BORDER_WIDTH)
+    .style(crate::helpers::card_btn_style)
 }

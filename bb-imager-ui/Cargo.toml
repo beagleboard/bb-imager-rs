@@ -7,16 +7,18 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-iced = { version = "0.14", features = ["image", "svg", "tokio"] }
+iced = { version = "0.14", features = ["tokio"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
-chrono-tz = "0.10"
 url = "2.5"
+chrono = "0.4"
 bb-config = { path = "../bb-config" }
-iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
+chrono-tz = "0.10"
 
 [dev-dependencies]
 tempfile = "3.27"
-serde_json = "1.0.150"
+bb-config = { path = "../bb-config" }
+serde_json = { version = "1.0.150" }
+tokio = { version = "1.52" }
 bb-downloader = { path = "../bb-downloader" }
 
 [features]

@@ -1,333 +1,34 @@
-use bb_iced_widgets::circle_bar;
+use bb_iced_widgets::cached_icon::Cache;
 use iced::{Element, widget};
 
-use crate::{Message, constants};
-
-pub(crate) const VIEW_COL_PADDING: u16 = 16;
-pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
-    right: 16.0,
-    ..iced::Padding::ZERO
+use crate::{
+    Message,
+    constants::{BEAGLEBOARD_LOGO, BOARD_ICON, FONT_BOLD, ISSUE_TRACKER, SEARCH_ICON},
 };
 
-/// |------|------|
-/// |      |      |
-/// |      | col2 |
-/// | col1 |      |
-/// |      |------|
-/// |      | btns |
-/// |------|------|
-pub(crate) fn page_type1<'a>(
-    col1: Element<'a, Message>,
-    col2: Element<'a, Message>,
-    btns: impl IntoIterator<Item = widget::Button<'a, Message>>,
-) -> Element<'a, Message> {
-    let row2 = widget::row(
-        [
-            info_btn(constants::INFO_ICON.clone()).into(),
-            widget::space::horizontal().into(),
-        ]
-        .into_iter()
-        .chain(btns.into_iter().map(Into::into)),
-    )
-    .align_y(iced::Center)
-    .width(iced::Length::Fill)
-    .spacing(24);
+pub(crate) fn card_btn_style(t: &iced::Theme, s: widget::button::Status) -> widget::button::Style {
+    const BORDER_RADIUS: f32 = 10.0;
+    const BORDER_WIDTH: f32 = 3.0;
 
-    let col2 = widget::column![
-        card_box(col2)
-            .height(iced::Length::Fill)
-            .width(iced::Length::Fill),
-        row2.width(iced::Length::Fill)
-    ]
-    .spacing(24)
-    .width(iced::FillPortion(1));
+    let mut style = widget::button::text(t, s);
 
-    widget::row![
-        card_box(col1)
-            .height(iced::Length::Fill)
-            .width(iced::Length::FillPortion(1)),
-        col2
-    ]
-    .padding(24)
-    .spacing(24)
-    .into()
-}
-
-/// |--------|
-/// |        |
-/// |  row1  |
-/// |        |
-/// |--------|
-/// |  btns  |
-/// |--------|
-pub(crate) fn page_type2<'a>(
-    row1: Element<'a, Message>,
-    btns: impl IntoIterator<Item = widget::Button<'a, Message>>,
-) -> Element<'a, Message> {
-    let row2 = widget::row(
-        [
-            info_btn(constants::INFO_ICON.clone()).into(),
-            widget::space::horizontal().into(),
-        ]
-        .into_iter()
-        .chain(btns.into_iter().map(Into::into)),
-    )
-    .align_y(iced::Center)
-    .width(iced::Length::Fill)
-    .spacing(24);
-
-    widget::column![card_box(row1).height(iced::Fill).width(iced::Fill), row2]
-        .padding(24)
-        .spacing(24)
-        .into()
-}
-
-/// |--------|
-/// |        |
-/// |  row1  |
-/// |        |
-/// |--------|
-/// |  btns  |
-/// |--------|
-pub(crate) fn page_type3<'a>(
-    row1: Element<'a, Message>,
-    btns: impl IntoIterator<Item = widget::Button<'a, Message>>,
-) -> Element<'a, Message> {
-    let row2 = widget::row(
-        [widget::space::horizontal().into()]
-            .into_iter()
-            .chain(btns.into_iter().map(Into::into)),
-    )
-    .align_y(iced::Center)
-    .width(iced::Length::Fill)
-    .spacing(24);
-
-    widget::column![card_box(row1).height(iced::Fill).width(iced::Fill), row2]
-        .padding(24)
-        .spacing(24)
-        .into()
-}
-
-/// Scrollable pane detailing whatever is currently selected in a [`list_pane`].
-pub(crate) fn detail_pane<'a>(
-    content: widget::Column<'a, Message>,
-    scroll_id: &widget::Id,
-) -> Element<'a, Message> {
-    widget::scrollable(content.spacing(16).padding(VIEW_COL_PADDING))
-        .id(scroll_id.clone())
-        .into()
-}
-
-pub(crate) fn progress_finish_view<'a>(
-    label: &'static str,
-    color: iced::Color,
-    details: impl widget::text::IntoFragment<'a>,
-) -> Element<'a, Message> {
-    widget::column![
-        circle_bar(label, 10.0f32, color, constants::FONT_BOLD),
-        widget::text(details)
-    ]
-    .align_x(iced::Center)
-    .padding(VIEW_COL_PADDING)
-    .into()
-}
-
-pub(crate) fn card_btn_style(
-    theme: &iced::Theme,
-    status: widget::button::Status,
-    is_selected: bool,
-) -> widget::button::Style {
-    let mut style = widget::button::Style {
-        text_color: theme.palette().text,
-        ..Default::default()
+    let border = match s {
+        widget::button::Status::Hovered => t.palette().primary,
+        _ => t.extended_palette().background.weak.color,
     };
 
-    if is_selected || matches!(status, widget::button::Status::Hovered) {
-        style.border = iced::Border::default()
-            .color(theme.palette().primary)
-            .width(3)
-            .rounded(5);
-    }
-
+    style.border = style
+        .border
+        .rounded(BORDER_RADIUS)
+        .color(border)
+        .width(BORDER_WIDTH);
     style
 }
 
-pub(crate) fn svg_icon_style(theme: &iced::Theme, _: widget::svg::Status) -> widget::svg::Style {
-    widget::svg::Style {
-        color: Some(theme.palette().text),
-    }
-}
-
-/// Horizontal separator between rows of a list pane.
-pub(crate) fn list_separator<'a>() -> Element<'a, Message> {
-    widget::center(widget::rule::horizontal(2))
-        .padding(iced::Padding::ZERO.left(16))
-        .into()
-}
-
-/// Scrollable pane listing selectable items: a search box, a separator, any
-/// extra `header` rows, then the `items` themselves.
-pub(crate) fn list_pane<'a>(
-    search_text: &'a str,
-    scroll_id: &widget::Id,
-    header: impl IntoIterator<Item = Element<'a, Message>>,
-    items: impl IntoIterator<Item = Element<'a, Message>>,
-) -> Element<'a, Message> {
-    let top = [search_box(search_text).into(), list_separator()];
-
-    widget::scrollable(
-        widget::column(top.into_iter().chain(header).chain(items)).padding(LIST_COL_PADDING),
-    )
-    .id(scroll_id.clone())
-    .into()
-}
-
-/// A selectable row of a [`list_pane`], laid out as a horizontal run of
-/// `contents` (typically a leading icon followed by a label).
-pub(crate) fn list_item<'a>(
-    contents: impl IntoIterator<Item = Element<'a, Message>>,
-    is_selected: bool,
-    msg: Message,
-) -> widget::Button<'a, Message> {
-    widget::button(
-        widget::row(contents)
-            .spacing(12)
-            .padding(8)
-            .align_y(iced::alignment::Vertical::Center),
-    )
-    .on_press(msg)
-    .style(move |theme, status| card_btn_style(theme, status, is_selected))
-}
-
-/// The primary label of a [`list_item`].
-pub(crate) fn list_label<'a>(label: impl widget::text::IntoFragment<'a>) -> widget::Text<'a> {
-    widget::text(label).size(18).width(iced::Length::Fill)
-}
-
-/// Heading of a [`detail_pane`] with nothing selected yet.
-pub(crate) fn placeholder_heading<'a>(label: &'a str) -> widget::Text<'a> {
-    widget::text(label)
-        .size(28)
-        .width(iced::Fill)
-        .align_x(iced::Center)
-        .font(constants::FONT_BOLD)
-}
-
-/// A [`detail_pane`] with nothing selected yet.
-pub(crate) fn placeholder_pane<'a>(label: &'a str) -> Element<'a, Message> {
-    widget::center(placeholder_heading(label))
-        .padding(VIEW_COL_PADDING)
-        .into()
-}
-
-/// A `key: value` line of a [`detail_pane`].
-pub(crate) fn detail_entry<'a>(
-    key: &'a str,
-    val: impl widget::text::IntoFragment<'a>,
-) -> widget::text::Rich<'a, (), Message> {
-    widget::rich_text![
-        widget::span(format!("{key}:")).font(constants::FONT_BOLD),
-        widget::span(" "),
-        widget::span(val),
-    ]
-}
-
-pub(crate) fn copy_btn<'a>(handle: widget::svg::Handle) -> widget::Button<'a, Message> {
-    widget::button(widget::svg(handle))
-        .width(iced::Shrink)
-        .style(widget::button::secondary)
-}
-
-/// A remotely fetched icon, falling back to `def` for items that have none.
-///
-/// Entries still in flight render as a spinner; see
-/// [`bb_iced_widgets::cached_icon::Cache`].
-pub(crate) fn network_image_or_default<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-    img: Option<&std::sync::Arc<url::Url>>,
-    def: widget::svg::Handle,
-    width: impl Into<iced::Length>,
-    height: impl Into<iced::Length>,
-) -> Element<'a, Message> {
-    match img {
-        Some(u) => bb_iced_widgets::cached_icon(cache, u)
-            .width(width)
-            .height(height)
-            .into(),
-        None => widget::svg(def)
-            .width(width)
-            .height(height)
-            .style(svg_icon_style)
-            .into(),
-    }
-}
-
-/// The pane detailing one board: icon, name, description, specification table
-/// and its documentation/OSHW links.
-pub(crate) fn board_details_pane<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-    dev: &'a crate::board_selection::BoardDetails,
-    scroll_id: &widget::Id,
-) -> Element<'a, Message> {
-    let img = network_image_or_default(
-        cache,
-        dev.icon.as_ref(),
-        constants::BOARD_ICON.clone(),
-        iced::Fill,
-        iced::Shrink,
-    );
-
-    let copy_btn =
-        copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyBoardConfig(dev.id));
-
-    let cols = widget::column![
-        img,
-        widget::center(copy_btn),
-        widget::text(dev.name.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-        widget::text(dev.description.as_ref())
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-    ];
-
-    let cols = cols.extend(
-        dev.specification
-            .iter()
-            .map(|(k, v)| -> widget::text::Rich<'a, (), Message> { detail_entry(k, v.as_ref()) })
-            .map(Into::into),
-    );
-
-    let mut btns = Vec::with_capacity(2);
-
-    if let Some(x) = &dev.documentation {
-        btns.push(
-            widget::button(widget::text("DOCUMENTATION"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
-
-    if let Some(x) = &dev.oshw {
-        btns.push(
-            widget::button(widget::text("OSHW"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
-
-    detail_pane(
-        cols.push(widget::center(widget::row(btns).spacing(16))),
-        scroll_id,
-    )
-}
-
-fn search_box<'a>(inp: &'a str) -> widget::Container<'a, Message> {
+pub(crate) fn search_box<'a, D: Clone + 'a>(inp: &'a str) -> widget::Container<'a, Message<D>> {
     widget::container(
         widget::row![
-            widget::svg(constants::SEARCH_ICON.clone())
-                .style(svg_icon_style)
+            widget::svg(SEARCH_ICON.clone())
                 .width(iced::Length::Shrink)
                 .height(18),
             widget::text_input("SEARCH", inp)
@@ -349,17 +50,157 @@ fn search_box<'a>(inp: &'a str) -> widget::Container<'a, Message> {
     })
 }
 
-fn card_box<'a>(content: impl Into<Element<'a, Message>>) -> widget::Container<'a, Message> {
-    widget::container(content).style(|_| {
-        widget::container::Style::default()
-            .background(constants::CARD)
-            .border(iced::border::rounded(8))
-    })
+pub(crate) fn network_image_or_default<'a, M: 'a>(
+    cache: &'a Cache<std::sync::Arc<url::Url>>,
+    u: Option<&'a std::sync::Arc<url::Url>>,
+) -> Element<'a, M> {
+    match u {
+        Some(x) => bb_iced_widgets::cached_icon(cache, x)
+            .width(iced::Fill)
+            .height(iced::Fill)
+            .into(),
+        None => widget::svg(BOARD_ICON.clone()).height(iced::Fill).into(),
+    }
 }
 
-fn info_btn(handle: widget::svg::Handle) -> widget::Button<'static, Message> {
-    widget::button(widget::svg(handle))
-        .on_press(Message::GotoAppInfo)
-        .width(iced::Shrink)
-        .height(iced::Shrink)
+fn sidebar<'a, D: Clone + 'a>(
+    top_items: impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
+    bottom_items: impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
+) -> Element<'a, Message<D>> {
+    let cb = |(label, is_active, msg)| {
+        if is_active {
+            widget::container(label)
+                .width(iced::Fill)
+                .height(iced::Shrink)
+                .padding(8)
+                .style(|t| {
+                    let mut s = widget::container::primary(t);
+                    s.border = s.border.rounded(6);
+                    s
+                })
+                .into()
+        } else {
+            widget::button(label)
+                .on_press_maybe(msg)
+                .width(iced::Fill)
+                .height(iced::Shrink)
+                .padding(8)
+                .style(widget::button::subtle)
+                .into()
+        }
+    };
+
+    widget::column![
+        widget::column(top_items.into_iter().map(cb))
+            .height(iced::Fill)
+            .spacing(8)
+            .padding(8),
+        widget::rule::horizontal(2),
+        widget::column(
+            bottom_items.into_iter().map(cb).chain([
+                widget::button("Issue Tracker")
+                    .on_press(Message::OpenUrl(ISSUE_TRACKER.clone()))
+                    .width(iced::Fill)
+                    .height(iced::Shrink)
+                    .padding(8)
+                    .style(widget::button::subtle)
+                    .into(),
+                widget::svg(BEAGLEBOARD_LOGO.clone()).into()
+            ])
+        )
+        .padding(8)
+        .spacing(8)
+    ]
+    .width(150)
+    .spacing(8)
+    .into()
+}
+
+pub(crate) fn page_layout<'a, D: Clone + 'a>(
+    sidebar_items: (
+        impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
+        impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
+    ),
+    main: impl Into<Element<'a, Message<D>>>,
+) -> Element<'a, Message<D>> {
+    widget::row![
+        sidebar(sidebar_items.0, sidebar_items.1),
+        widget::rule::vertical(2),
+        main.into()
+    ]
+    .width(iced::Fill)
+    .height(iced::Fill)
+    .into()
+}
+
+pub(crate) fn layout_with_search<'a, D: Clone + 'a>(
+    search: &'a str,
+    main: impl Into<Element<'a, Message<D>>>,
+    scroll_id: widget::Id,
+) -> Element<'a, Message<D>> {
+    widget::column![
+        search_box(search),
+        widget::rule::horizontal(2),
+        widget::scrollable(widget::container(main).padding(iced::Padding::from(15).right(20)))
+            .id(scroll_id)
+    ]
+    .width(iced::Fill)
+    .into()
+}
+
+/// A row in one of the selection lists.
+///
+/// `trailing` is pinned to the right edge of the row; see [`chevron`] for the
+/// cue used by entries that open another list instead of selecting something.
+pub(crate) fn list_item<'a, M: 'a>(
+    icon: impl Into<iced::Element<'a, M>>,
+    label: impl widget::text::IntoFragment<'a>,
+    rows: Vec<iced::Element<'a, M>>,
+    trailing: Option<iced::Element<'a, M>>,
+) -> widget::Button<'a, M> {
+    const ICON_WIDTH: u32 = 60;
+
+    let info = widget::column![widget::text(label).font(FONT_BOLD).size(16)]
+        .width(iced::Fill)
+        .extend(rows);
+
+    widget::button(
+        widget::row![
+            widget::container(icon.into())
+                .width(ICON_WIDTH)
+                .height(ICON_WIDTH),
+            info
+        ]
+        .extend(trailing)
+        .spacing(12)
+        .padding(8)
+        .align_y(iced::alignment::Vertical::Center),
+    )
+    .style(card_btn_style)
+}
+
+pub(crate) fn pretty_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+
+    let mut size = bytes as f64;
+    let mut unit = 0;
+
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+
+    if unit == 0 {
+        format!("{} {}", bytes, UNITS[unit])
+    } else {
+        format!("{:.2} {}", size, UNITS[unit])
+    }
+}
+
+pub(crate) fn svg<'a, M>(h: widget::svg::Handle) -> iced::Element<'a, M> {
+    widget::svg(h).width(iced::Fill).height(iced::Fill).into()
 }

@@ -73,9 +73,6 @@ SYSTEM_DEPS ?= 0
 SHARED_HIDRAW ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
 UPDATER ?= 0
-## variable: SANDBOXED: Build the GUI for a sandbox (Flatpak/snap), which shows
-## the first-run udev notice.
-SANDBOXED ?= 0
 ## variable: NOTIFY_RUST: Use notify-rust for notification. Not needed when using xdg-portal on linux.
 NOTIFY_RUST ?= 1
 ## variable: APPIMAGE_ARCH: Target arch for Appimage
@@ -131,11 +128,6 @@ endif
 # Add updater feature
 ifeq ($(UPDATER),1)
 	_RUST_ARGS_GUI += --features updater
-endif
-
-# Enable the sandboxed udev notice for Flatpak/snap package builds.
-ifeq ($(SANDBOXED),1)
-	_RUST_ARGS_GUI += --features sandboxed
 endif
 
 # Add pre-relase feature
@@ -488,7 +480,7 @@ _fetch-gui-deps:
 ## package: package-gui-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
 .PHONY: package-gui-flatpak
 package-gui-flatpak:
-	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0 SANDBOXED=1
+	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui
@@ -538,46 +530,50 @@ profile-gui:
 	$(RUST_BUILD) --profile profiling -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 	heaptrack target/${TARGET}/profiling/bb-imager-gui
 
+## preview: preview-board-selection: Preview Board selection page.
+preview-board-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board_selection --features debug
+
+## preview: preview-image-selection: Preview Image selection page.
+preview-img-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example img_selection --features debug
+
+## preview: preview-dest-selection: Preview Destination selection page.
+preview-dest-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example dest_selection --features debug
+
+## preview: preview-customization-sysconfig: Preview Sysconfig Customization page.
+preview-customization-sysconfig:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-sysconfig --features debug
+
+## preview: preview-customization-cloudinit: Preview Cloudinit Customization page.
+preview-customization-cloudinit:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-cloudinit --features debug
+
+## preview: preview-customization-selectable-sd: Preview Selectable Sd Customization page.
+preview-customization-selectable-sd:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-selectable-sd --features debug
+
 ## preview: preview-review: Preview Review page.
 preview-review:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example review --features debug
-
-## preview: preview-flash-fail: Preview Flash Fail page.
-preview-flash-fail:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
-
-## preview: preview-flash-success: Preview Flash Success page.
-preview-flash-success:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
-
-## preview: preview-flash-cancel: Preview Flash Cancel page.
-preview-flash-cancel:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-cancel --features debug
 
 ## preview: preview-flashing: Preview Flashing progress page.
 preview-flashing:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flashing --features debug
 
-## preview: preview-app-info: Preview App options page.
-preview-app-info:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
+## preview: preview-flash-success: Preview Flash Success page.
+preview-flash-success:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
 
-## preview: preview-configuration-sysconfig: Preview Configuration page for sysconf images.
-preview-configuration-sysconfig:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-sysconfig --features debug
+## preview: preview-flash-fail: Preview Flash Fail page.
+preview-flash-fail:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
 
-## preview: preview-configuration-cloudinit: Preview Configuration page for cloud-init images.
-preview-configuration-cloudinit:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-cloudinit --features debug
+## preview: preview-flash-cancel: Preview Flash Cancel page.
+preview-flash-cancel:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-cancel --features debug
 
-## preview: preview-board-selection: Preview Board selection page.
-preview-board-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board-selection --features debug
-
-## preview: preview-image-selection: Preview OS image selection page.
-preview-image-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example image-selection --features debug
-
-## preview: preview-destination-selection: Preview Destination selection page.
-preview-destination-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example destination-selection --features debug
+## preview: preview-app-options: Preview App options page.
+preview-app-options:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-options --features debug
