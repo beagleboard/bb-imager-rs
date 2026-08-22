@@ -194,12 +194,6 @@ impl ChooseOsState {
     }
 }
 
-impl From<CustomizeState> for ChooseOsState {
-    fn from(value: CustomizeState) -> Self {
-        ChooseDestState::from(value).into()
-    }
-}
-
 impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
         Self {
@@ -249,13 +243,43 @@ impl ChooseDestState {
     }
 }
 
-impl From<CustomizeState> for ChooseDestState {
-    fn from(value: CustomizeState) -> Self {
-        Self {
-            common: value.common,
-            selected_board: value.selected_board,
-            selected_image: value.selected_image,
-            selected_dest: Some(value.selected_dest),
+/// The choices that make up a flashing job.
+///
+/// Complete once a destination has been picked, and carried unchanged from
+/// there through Customize, Review, Flashing and the failure page.
+#[derive(Debug)]
+pub(crate) struct FlashingContext {
+    pub(crate) selected_board: Board,
+    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
+    /// Whether the Customize page is part of this flow.
+    ///
+    /// Decided once, when the destination is picked, so going back from Review
+    /// does not have to ask [`helpers::no_customization`] the same question a
+    /// second time and hope it answers consistently.
+    pub(crate) has_customization: bool,
+}
+
+impl FlashingContext {
+    pub(crate) fn selected_destination(&self) -> String {
+        match self.selected_dest.size() {
+            Some(x) => format!("{} ({})", self.selected_dest, helpers::pretty_bytes(x)),
+            None => self.selected_dest.to_string(),
+        }
+    }
+
+    pub(crate) fn is_download(&self) -> bool {
+        self.selected_dest.is_download_action()
+    }
+
+    /// Rebuild the destination page this context was completed on.
+    pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
+        ChooseDestState {
+            common,
+            selected_board: self.selected_board,
+            selected_image: self.selected_image,
+            selected_dest: Some(self.selected_dest),
             destinations: Box::default(),
             filter_destination: true,
             search_text: "".into(),
@@ -266,10 +290,7 @@ impl From<CustomizeState> for ChooseDestState {
 #[derive(Debug)]
 pub(crate) struct CustomizeState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
-    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
-    pub(crate) customization: helpers::FlashingCustomization,
+    pub(crate) ctx: FlashingContext,
 }
 
 impl CustomizeState {
@@ -282,30 +303,15 @@ impl CustomizeState {
             BBImagerMessage::Null
         }))
     }
-
-    pub(crate) fn selected_destination(&self) -> String {
-        match self.selected_dest.size() {
-            Some(x) => format!("{} ({})", self.selected_dest, helpers::pretty_bytes(x)),
-            None => self.selected_dest.to_string(),
-        }
-    }
-
-    pub(crate) fn is_download(&self) -> bool {
-        self.selected_dest.is_download_action()
-    }
 }
 
 #[derive(Debug)]
 pub(crate) struct FlashingState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
+    pub(crate) ctx: FlashingContext,
     pub(crate) cancel_flashing: iced::task::Handle,
     pub(crate) progress: bb_flasher::DownloadFlashingStatus,
     pub(crate) start_timestamp: Option<Instant>,
-    pub(crate) is_download: bool,
-    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
-    pub(crate) customization: helpers::FlashingCustomization,
 }
 
 impl FlashingState {
@@ -369,31 +375,31 @@ pub(crate) struct FlashingFinishState {
 impl From<FlashingState> for FlashingFinishState {
     fn from(value: FlashingState) -> Self {
         Self {
+            is_download: value.ctx.is_download(),
             common: value.common,
-            selected_board: value.selected_board,
-            is_download: value.is_download,
+            selected_board: value.ctx.selected_board,
         }
     }
 }
 
 pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
+    pub(crate) ctx: FlashingContext,
     pub(crate) err: String,
     pub(crate) logs: widget::text_editor::Content,
-    pub(crate) selected_board: Board,
-    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
-    pub(crate) customization: helpers::FlashingCustomization,
 }
 
-impl From<FlashingFailState> for CustomizeState {
-    fn from(value: FlashingFailState) -> Self {
+impl FlashingFailState {
+    pub(crate) fn new(
+        state: FlashingState,
+        err: String,
+        logs: widget::text_editor::Content,
+    ) -> Self {
         Self {
-            common: value.common,
-            selected_board: value.selected_board,
-            selected_image: value.selected_image,
-            selected_dest: value.selected_dest,
-            customization: value.customization,
+            common: state.common,
+            ctx: state.ctx,
+            err,
+            logs,
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::{BBImagerMessage, state::FlashingState};
 
 pub(crate) fn view(state: &FlashingState) -> Element<'_, BBImagerMessage> {
     page_type1(
-        helpers::board_view_pane(&state.selected_board, &state.common),
+        helpers::board_view_pane(&state.ctx.selected_board, &state.common),
         progress_view(state),
         [button("Cancel")
             .style(widget::button::danger)

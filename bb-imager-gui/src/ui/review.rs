@@ -13,7 +13,7 @@ use crate::{
 const HEADING_SIZE: u32 = 26;
 
 pub(crate) fn view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
-    let btn_label = if state.is_download() {
+    let btn_label = if state.ctx.is_download() {
         "DOWNLOAD"
     } else {
         "WRITE"
@@ -42,18 +42,18 @@ fn review_view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
             .size(HEADING_SIZE),
         widget::grid![
             text("Device"),
-            text(state.selected_board.name.as_str()),
+            text(state.ctx.selected_board.name.as_str()),
             text("Operating System"),
-            text(state.selected_image.1.to_string()),
+            text(state.ctx.selected_image.1.to_string()),
             text("Storage"),
-            text(state.selected_destination())
+            text(state.ctx.selected_destination())
         ]
         .height(iced::Length::Shrink)
         .spacing(8)
         .columns(2),
     ];
 
-    let modifications = state.customization.modifications();
+    let modifications = state.ctx.customization.modifications();
     if !modifications.is_empty() {
         col = col.extend([
             widget::rule::horizontal(2).into(),

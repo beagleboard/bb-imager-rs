@@ -251,19 +251,19 @@ impl BBImager {
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
-        let state = match std::mem::take(self) {
-            Self::Review(inner) => inner,
-            Self::FlashingFail(inner) => inner.into(),
+        // Retrying from the failure page re-runs with the same choices.
+        let (common, ctx) = match std::mem::take(self) {
+            Self::Review(inner) => (inner.common, inner.ctx),
+            Self::FlashingFail(inner) => (inner.common, inner.ctx),
             _ => panic!("Unexpected page"),
         };
 
-        let is_download = state.is_download();
-        let customization = state.customization.clone();
-        let img = state.selected_image.1.clone();
-        let dst = state.selected_dest.clone();
+        let customization = ctx.customization.clone();
+        let img = ctx.selected_image.1.clone();
+        let dst = ctx.selected_dest.clone();
 
         tracing::info!("Starting Flashing Process");
-        tracing::info!("Selected Board: {:#?}", state.selected_board);
+        tracing::info!("Selected Board: {:#?}", ctx.selected_board);
         tracing::info!("Selected Image: {:#?}", img);
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
@@ -307,15 +307,11 @@ impl BBImager {
         let (t, h) = Task::stream(s).abortable();
 
         *self = Self::Flashing(state::FlashingState {
-            is_download,
-            common: state.common,
-            selected_board: state.selected_board,
+            common,
+            ctx,
             cancel_flashing: h,
             progress: bb_flasher::DownloadFlashingStatus::Preparing,
             start_timestamp: None,
-            selected_image: state.selected_image,
-            selected_dest: state.selected_dest,
-            customization: state.customization,
         });
 
         t
@@ -340,17 +336,12 @@ impl BBImager {
         *self = match std::mem::take(self) {
             Self::ChooseOs(inner) => Self::ChooseBoard(inner.into()),
             Self::ChooseDest(inner) => Self::ChooseOs(inner.into()),
-            Self::Customize(inner) => Self::ChooseDest(inner.into()),
+            Self::Customize(inner) => Self::ChooseDest(inner.ctx.choose_dest(inner.common)),
             Self::Review(inner) => {
-                if helpers::no_customization(
-                    inner.selected_image.1.flasher(),
-                    &inner.selected_image.1,
-                )
-                .is_none()
-                {
+                if inner.ctx.has_customization {
                     Self::Customize(inner)
                 } else {
-                    Self::ChooseDest(inner.into())
+                    Self::ChooseDest(inner.ctx.choose_dest(inner.common))
                 }
             }
             Self::AppInfo(inner) => inner.page.into(),
@@ -414,31 +405,37 @@ impl BBImager {
                     .selected_dest
                     .expect("Destination should already be selcted");
 
-                if let Some(customization) = helpers::no_customization(
-                    inner.selected_image.1.flasher(),
-                    &inner.selected_image.1,
-                ) {
-                    Self::Review(state::CustomizeState {
-                        common: inner.common,
+                let flasher = inner.selected_image.1.flasher();
+
+                // A flasher with nothing to configure skips the Customize page.
+                let (customization, has_customization) =
+                    match helpers::no_customization(flasher, &inner.selected_image.1) {
+                        Some(c) => (c, false),
+                        None => (
+                            helpers::FlashingCustomization::new(
+                                flasher,
+                                &inner.selected_image.1,
+                                &inner.common.app_config,
+                            ),
+                            true,
+                        ),
+                    };
+
+                let page = state::CustomizeState {
+                    common: inner.common,
+                    ctx: state::FlashingContext {
                         selected_board: inner.selected_board,
                         selected_image: inner.selected_image,
                         selected_dest,
                         customization,
-                    })
-                } else {
-                    let temp = helpers::FlashingCustomization::new(
-                        inner.selected_image.1.flasher(),
-                        &inner.selected_image.1,
-                        &inner.common.app_config,
-                    );
+                        has_customization,
+                    },
+                };
 
-                    Self::Customize(state::CustomizeState {
-                        common: inner.common,
-                        selected_board: inner.selected_board,
-                        selected_image: inner.selected_image,
-                        selected_dest,
-                        customization: temp,
-                    })
+                if has_customization {
+                    Self::Customize(page)
+                } else {
+                    Self::Review(page)
                 }
             }
             Self::Customize(inner) => Self::Review(inner),
@@ -463,7 +460,7 @@ impl BBImager {
                     self.scroll_reset(),
                 ])
             }
-            Self::Review(inner) => match &inner.customization {
+            Self::Review(inner) => match &inner.ctx.customization {
                 // Both variants are backed by the same `sysconf` slot, matching how
                 // `FlashingCustomization::new` loads them.
                 helpers::FlashingCustomization::LinuxSdSysconfig(c)
