@@ -705,6 +705,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-imager-ui"
+version = "1.0.16"
+dependencies = [
+ "bb-config",
+ "bb-downloader",
+ "bb-iced-widgets",
+ "chrono",
+ "chrono-tz",
+ "iced",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "bb-os-list-generator"
 version = "1.0.16"
 dependencies = [
