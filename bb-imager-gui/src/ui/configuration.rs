@@ -22,7 +22,7 @@ pub(crate) fn view<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, B
             widget::button("BACK")
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
-            widget::button("NEXT").on_press_maybe(if state.customization.validate() {
+            widget::button("NEXT").on_press_maybe(if state.ctx.customization.validate() {
                 Some(BBImagerMessage::Next)
             } else {
                 None
@@ -32,7 +32,7 @@ pub(crate) fn view<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, B
 }
 
 fn customization_pane<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, BBImagerMessage> {
-    match &state.customization {
+    match &state.ctx.customization {
         FlashingCustomization::LinuxSdSysconfig(inner) => linux_sd_card_sysconfig(state, inner),
         FlashingCustomization::LinuxSdCloudInit(inner) => linux_sd_card_cloudinit(state, inner),
         _ => panic!("No customization"),

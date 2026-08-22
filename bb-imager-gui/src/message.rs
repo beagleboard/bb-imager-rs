@@ -350,13 +350,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         },
         BBImagerMessage::UpdateFlashConfig(x) => match state {
             BBImager::Customize(inner) => {
-                inner.customization = x;
+                inner.ctx.customization = x;
             }
             _ => panic!("Unexpected message"),
         },
         BBImagerMessage::ResetFlashingConfig => match state {
             BBImager::Customize(inner) => {
-                inner.customization.reset();
+                inner.ctx.customization.reset();
             }
             _ => panic!("Unexpected message"),
         },
@@ -367,7 +367,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImager::Flashing(inner) => {
                     inner.cancel_flashing.abort();
 
-                    if inner.is_download {
+                    if inner.ctx.is_download() {
                         msg = "Download cancelled by user";
                     }
                     BBImager::FlashingCancel(inner.into())
@@ -376,7 +376,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     OverlayData::Flashing(flashing_state) => {
                         flashing_state.cancel_flashing.abort();
 
-                        if flashing_state.is_download {
+                        if flashing_state.ctx.is_download() {
                             msg = "Download cancelled by user";
                         }
 
@@ -404,41 +404,29 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             *state = match std::mem::take(state) {
                 BBImager::Flashing(inner) => {
-                    if inner.is_download {
+                    if inner.ctx.is_download() {
                         msg = "Download failed";
                     }
 
-                    BBImager::FlashingFail(crate::state::FlashingFailState {
-                        common: inner.common,
-                        err,
-                        logs,
-                        selected_board: inner.selected_board,
-                        selected_image: inner.selected_image,
-                        selected_dest: inner.selected_dest,
-                        customization: inner.customization,
-                    })
+                    BBImager::FlashingFail(crate::state::FlashingFailState::new(inner, err, logs))
                 }
-                BBImager::AppInfo(inner) => match inner.page {
-                    OverlayData::Flashing(flashing_state) => {
-                        if flashing_state.is_download {
-                            msg = "Download failed";
-                        }
+                BBImager::AppInfo(inner) => {
+                    match inner.page {
+                        OverlayData::Flashing(flashing_state) => {
+                            if flashing_state.ctx.is_download() {
+                                msg = "Download failed";
+                            }
 
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FlashingFail(crate::state::FlashingFailState {
-                                common: flashing_state.common,
-                                err,
-                                logs,
-                                selected_board: flashing_state.selected_board,
-                                selected_image: flashing_state.selected_image,
-                                selected_dest: flashing_state.selected_dest,
-                                customization: flashing_state.customization,
-                            }),
-                            ..inner
-                        })
+                            BBImager::AppInfo(OverlayState {
+                                page: OverlayData::FlashingFail(
+                                    crate::state::FlashingFailState::new(flashing_state, err, logs),
+                                ),
+                                ..inner
+                            })
+                        }
+                        _ => panic!("Unexpected message"),
                     }
-                    _ => panic!("Unexpected message"),
-                },
+                }
                 _ => panic!("Unexpected message"),
             };
 
@@ -463,14 +451,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             *state = match std::mem::take(state) {
                 BBImager::Flashing(inner) => {
-                    if inner.is_download {
+                    if inner.ctx.is_download() {
                         msg = "Download finished successfully";
                     }
                     BBImager::FlashingSuccess(inner.into())
                 }
                 BBImager::AppInfo(inner) => match inner.page {
                     OverlayData::Flashing(flashing_state) => {
-                        if flashing_state.is_download {
+                        if flashing_state.ctx.is_download() {
                             msg = "Download finished successfully";
                         }
 
