@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use bb_config::config;
+use bb_imager_ui::dest_selection::Destination as _;
 use iced::{Task, widget};
-
-use bb_imager_ui::image_selection::ImageId;
 
 use crate::{
     BBImager, constants,
@@ -18,9 +16,7 @@ use crate::{
 pub(crate) struct BBImagerCommon {
     pub(crate) app_config: persistance::GuiConfiguration,
     pub(crate) downloader: bb_downloader::Downloader,
-
     pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-
     pub(crate) scroll_id: widget::Id,
     pub(crate) db: db::Db,
 }
@@ -55,56 +51,25 @@ impl BBImagerCommon {
             BBImagerMessage::FilterResolveImages,
         )
     }
-
-    pub(crate) fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
-        let db = self.db.clone();
-        Task::perform(
-            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
-            BBImagerMessage::FilterResolveImages,
-        )
-    }
-}
-
-/// The first-run udev notice for sandboxed installs. Static page; only the
-/// shared `common` travels through it.
-#[derive(Debug)]
-pub(crate) struct SandboxNoticeState {
-    pub(crate) common: BBImagerCommon,
-}
-
-impl SandboxNoticeState {
-    pub(crate) fn new(common: BBImagerCommon) -> Self {
-        Self { common }
-    }
 }
 
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    /// The full board, kept for the rest of the flow (`flasher`, `instructions`,
-    /// `bootfs`), none of which the page renders.
-    pub(crate) selected_board: Option<Board>,
-    pub(crate) state: bb_imager_ui::board_selection::State,
+    pub(crate) inner: bb_imager_ui::board_selection::State,
 }
 
 impl ChooseBoardState {
     pub(crate) fn new(common: BBImagerCommon) -> Self {
         Self {
             common,
-            selected_board: None,
-            state: Default::default(),
+            inner: Default::default(),
         }
-    }
-
-    /// Record `board` as the selection, both for the flow and for the page.
-    pub(crate) fn select_board(&mut self, board: Board) {
-        self.state.selected = Some((&board).into());
-        self.selected_board = Some(board);
     }
 
     pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
-        let search = self.state.search.clone();
+        let search = self.inner.search.clone();
 
         Task::perform(
             blocking_future(move || db.board_list(&search).unwrap()),
@@ -112,35 +77,9 @@ impl ChooseBoardState {
         )
     }
 
-    pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
-        self.state.search = search;
+    pub(crate) fn update_search(&mut self, search: std::sync::Arc<str>) -> Task<BBImagerMessage> {
+        self.inner.search = search;
         self.refresh_board_list()
-    }
-}
-
-impl From<ChooseOsState> for ChooseBoardState {
-    fn from(value: ChooseOsState) -> Self {
-        let mut res = Self::new(value.common);
-        res.select_board(value.selected_board);
-        res
-    }
-}
-
-impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
-    fn from(value: &Board) -> Self {
-        Self {
-            id: value.id,
-            name: value.name.clone(),
-            icon: value.icon.clone(),
-            description: value.description.clone().into(),
-            specification: value.specification.clone().into(),
-            documentation: value.documentation.clone(),
-            // The page renders a plain link, so the OSHWA id is resolved here
-            // where the parse can still fail quietly.
-            oshw: value.oshw.as_ref().and_then(|x| {
-                url::Url::parse(&format!("{}/{}.html", constants::OSHW_BASE_URL, x)).ok()
-            }),
-        }
     }
 }
 
@@ -149,10 +88,7 @@ pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
     pub(crate) flasher: config::Flasher,
-    /// Carries the flasher machinery the page cannot render; the page keeps its
-    /// own renderable projection in `state.selected`.
-    pub(crate) selected_image: Option<(ImageId, helpers::BoardImage)>,
-    pub(crate) state: bb_imager_ui::image_selection::State,
+    pub(crate) inner: bb_imager_ui::image_selection::State,
 }
 
 impl ChooseOsState {
@@ -163,26 +99,26 @@ impl ChooseOsState {
     ) {
         if self.flasher == config::Flasher::SdCard {
             imgs.push(bb_imager_ui::image_selection::ImageItem {
-                id: ImageId::Format,
-                icon: None,
+                id: bb_imager_ui::image_selection::ImageId::Format,
                 label: "Format SD Card".into(),
-            });
+                icon: None,
+                description: "".into(),
+                size: None,
+                release_date: None,
+            })
         }
 
         imgs.push(bb_imager_ui::image_selection::ImageItem {
-            id: ImageId::Local(self.flasher),
-            icon: None,
+            id: bb_imager_ui::image_selection::ImageId::Local(self.flasher),
             label: "Select Local Image".into(),
+            icon: None,
+            description: "".into(),
+            size: None,
+            release_date: None,
         });
 
-        self.state.images = imgs.into();
-        self.state.pos = pos;
-    }
-
-    /// Record `img` as the selection, both for the flow and for the page.
-    pub(crate) fn select_image(&mut self, id: ImageId, img: helpers::BoardImage) {
-        self.state.selected = Some(helpers::image_details(id, &img));
-        self.selected_image = Some((id, img));
+        self.inner.imgs = imgs.into();
+        self.inner.pos = pos;
     }
 
     pub(crate) fn resolve_remote_sublists(
@@ -211,10 +147,10 @@ impl ChooseOsState {
 
     pub(crate) fn refresh_image_list(&self) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
-        let pos = self.state.pos;
+        let pos = self.inner.pos;
         let board_id = self.selected_board.id;
 
-        if self.state.search.is_empty() {
+        if self.inner.search.is_empty() {
             Task::perform(
                 blocking_future(move || {
                     let imgs = db.os_image_items(board_id, pos).unwrap();
@@ -223,7 +159,7 @@ impl ChooseOsState {
                 BBImagerMessage::UpdateOsList,
             )
         } else {
-            let search = self.state.search.clone();
+            let search = self.inner.search.clone();
             Task::perform(
                 blocking_future(move || {
                     let imgs = db.os_images_by_name(board_id, &search).unwrap();
@@ -234,8 +170,16 @@ impl ChooseOsState {
         }
     }
 
-    pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
-        self.state.search = search;
+    pub(crate) fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
+        let db = self.common.db.clone();
+        Task::perform(
+            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
+            BBImagerMessage::FilterResolveImages,
+        )
+    }
+
+    pub(crate) fn update_search(&mut self, search: std::sync::Arc<str>) -> Task<BBImagerMessage> {
+        self.inner.search = search;
         self.refresh_image_list()
     }
 
@@ -244,24 +188,32 @@ impl ChooseOsState {
         pos: Option<i64>,
         flasher: config::Flasher,
     ) -> Task<BBImagerMessage> {
-        self.state.pos = pos;
+        self.inner.pos = pos;
         self.flasher = flasher;
         self.refresh_image_list()
     }
 }
 
+impl From<CustomizeState> for ChooseOsState {
+    fn from(value: CustomizeState) -> Self {
+        ChooseDestState::from(value).into()
+    }
+}
+
 impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
-        let mut res = Self {
+        Self {
             common: value.common,
             flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
-            selected_image: None,
-            state: Default::default(),
-        };
-        let (id, img) = value.selected_image;
-        res.select_image(id, img);
-        res
+            inner: Default::default(),
+        }
+    }
+}
+
+impl From<ReviewState> for ChooseOsState {
+    fn from(value: ReviewState) -> Self {
+        CustomizeState::from(value).into()
     }
 }
 
@@ -269,31 +221,26 @@ impl From<ChooseDestState> for ChooseOsState {
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
-    pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    /// Carries the flasher machinery the page cannot render.
-    pub(crate) selected_dest: Option<helpers::Destination>,
-    /// Kept so a [`DestId`] can be resolved back to a real destination, and so
-    /// the 1 Hz refresh can skip redraws when nothing changed.
-    pub(crate) destinations: Box<[helpers::Destination]>,
-    pub(crate) state: bb_imager_ui::destination_selection::State,
+    pub(crate) selected_image: helpers::BoardImage,
+    pub(crate) inner: bb_imager_ui::dest_selection::State<helpers::Destination>,
 }
 
 impl ChooseDestState {
     pub(crate) fn new(
         common: BBImagerCommon,
         selected_board: Board,
-        selected_image: (ImageId, helpers::BoardImage),
+        selected_image: helpers::BoardImage,
     ) -> Self {
         // The image's own note wins over the board-wide one.
-        let instruction = match selected_image.1.info_text() {
-            Some(x) => Some(x.into()),
-            None => selected_board.instructions.clone(),
-        };
+        let instructions = selected_image
+            .info_text()
+            .or(selected_board.instructions.as_deref())
+            .unwrap_or_default()
+            .into();
 
         // `Some` only for images with something to write out, which is what
         // offers the "Save To File" row.
         let image_file_name = selected_image
-            .1
             .file_name()
             .map(|x| helpers::normalize_file_dest(&x).into());
 
@@ -301,95 +248,47 @@ impl ChooseDestState {
             common,
             selected_board,
             selected_image,
-            selected_dest: None,
-            destinations: Box::default(),
-            state: bb_imager_ui::destination_selection::State {
-                instruction,
+            inner: bb_imager_ui::dest_selection::State {
+                instructions,
                 image_file_name,
                 ..Default::default()
             },
         }
     }
 
-    /// Rebuild the page's device rows. The "Save To File" row is derived by the
-    /// page from `image_file_name`, so it is unaffected by this.
-    pub(crate) fn update_destinations(&mut self, destinations: Box<[helpers::Destination]>) {
-        self.state.destinations = destinations.iter().map(helpers::dest_item).collect();
-        self.destinations = destinations;
-    }
-
-    /// Record `dest` as the selection, both for the flow and for the page.
-    pub(crate) fn select_dest(&mut self, dest: helpers::Destination) {
-        self.state.selected = Some(helpers::dest_details(&dest));
-        self.selected_dest = Some(dest);
-    }
-
-    pub(crate) fn update_search(&mut self, search: Arc<str>) {
-        self.state.search = search;
+    pub(crate) fn update_search(&mut self, search: std::sync::Arc<str>) {
+        self.inner.search = search;
     }
 }
 
-/// The choices that make up a flashing job.
-///
-/// Complete once a destination has been picked, and carried unchanged from
-/// there through Customize, Review, Flashing and the failure page.
-#[derive(Debug)]
-pub(crate) struct FlashingContext {
-    pub(crate) selected_board: Board,
-    pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
-    pub(crate) customization: helpers::FlashingCustomization,
-    /// Whether the Customize page is part of this flow.
-    ///
-    /// Decided once, when the destination is picked, so going back from Review
-    /// does not have to ask [`helpers::no_customization`] the same question a
-    /// second time and hope it answers consistently.
-    pub(crate) has_customization: bool,
+impl From<CustomizeState> for ChooseDestState {
+    fn from(value: CustomizeState) -> Self {
+        Self::new(value.common, value.selected_board, value.selected_image)
+    }
 }
 
-impl FlashingContext {
-    pub(crate) fn selected_destination(&self) -> String {
-        match self.selected_dest.size() {
-            Some(x) => format!("{} ({})", self.selected_dest, helpers::pretty_bytes(x)),
-            None => self.selected_dest.to_string(),
-        }
-    }
-
-    pub(crate) fn is_download(&self) -> bool {
-        self.selected_dest.is_download_action()
-    }
-
-    /// Rebuild the destination page this context was completed on.
-    pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
-        let mut res = ChooseDestState::new(common, self.selected_board, self.selected_image);
-        res.select_dest(self.selected_dest);
-        res
+impl From<ReviewState> for ChooseDestState {
+    fn from(value: ReviewState) -> Self {
+        CustomizeState::from(value).into()
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct CustomizeState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) ctx: FlashingContext,
-    pub(crate) state: Box<bb_imager_ui::configuration::State>,
+    pub(crate) selected_board: Board,
+    pub(crate) selected_image: helpers::BoardImage,
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) inner: bb_imager_ui::customization::State,
+}
+
+impl From<ReviewState> for CustomizeState {
+    fn from(value: ReviewState) -> Self {
+        value.ctx.customize(value.common)
+    }
 }
 
 impl CustomizeState {
-    pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
-        Self {
-            common,
-            state: Box::new(bb_imager_ui::configuration::State {
-                customization: ctx.customization.clone().into(),
-                default_username: helpers::default_user(),
-                default_timezone: helpers::system_timezone(),
-                default_keymap: helpers::system_keymap(),
-                timezones: widget::combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
-                keymaps: widget::combo_box::State::new(constants::KEYMAP_LAYOUTS.to_vec()),
-            }),
-            ctx,
-        }
-    }
-
     pub(crate) fn save_app_config(&self) -> Task<BBImagerMessage> {
         let config = self.common.app_config.clone();
         Task::future(blocking_future(move || {
@@ -401,9 +300,103 @@ impl CustomizeState {
     }
 }
 
-impl From<ReviewState> for CustomizeState {
-    fn from(value: ReviewState) -> Self {
-        Self::new(value.common, value.ctx)
+/// Everything the user picked over the course of the flow.
+///
+/// Carried unchanged from [`ReviewState`] through flashing and on to the
+/// finish pages, so their sidebars can rebuild any earlier page on demand.
+#[derive(Debug)]
+pub(crate) struct FlashingContext {
+    pub(crate) selected_board: Board,
+    pub(crate) selected_image: helpers::BoardImage,
+    pub(crate) selected_dest: helpers::Destination,
+    pub(crate) customization: helpers::FlashingCustomization,
+    /// Whether the customization page is part of this flow. Images with no
+    /// supported init format skip straight from destination to review.
+    pub(crate) has_customization: bool,
+}
+
+impl FlashingContext {
+    pub(crate) fn is_download(&self) -> bool {
+        self.selected_dest.is_download_action()
+    }
+
+    fn device_name(&self) -> Box<str> {
+        self.selected_board.name.clone()
+    }
+
+    fn software_name(&self) -> Box<str> {
+        self.selected_image.to_string().into()
+    }
+
+    fn storage(&self) -> (Box<str>, Option<u64>) {
+        (
+            self.selected_dest.to_string().into(),
+            self.selected_dest.size(),
+        )
+    }
+
+    pub(crate) fn review_page(&self) -> bb_imager_ui::review::State {
+        let modificiations = self.customization.modifications();
+
+        bb_imager_ui::review::State {
+            has_customization: self.has_customization,
+            device_name: self.device_name(),
+            software_name: self.software_name(),
+            storage: self.storage(),
+            modificiations,
+        }
+    }
+
+    pub(crate) fn success_page(&self) -> bb_imager_ui::flash_success::State {
+        let modificiations = self.customization.modifications();
+
+        bb_imager_ui::flash_success::State {
+            has_customization: self.has_customization,
+            device_name: self.device_name(),
+            software_name: self.software_name(),
+            storage: self.storage(),
+            modificiations: modificiations.into_vec(),
+        }
+    }
+
+    pub(crate) fn choose_os(self, common: BBImagerCommon) -> ChooseOsState {
+        ChooseOsState {
+            common,
+            flasher: self.selected_board.flasher,
+            selected_board: self.selected_board,
+            inner: Default::default(),
+        }
+    }
+
+    pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
+        ChooseDestState::new(common, self.selected_board, self.selected_image)
+    }
+
+    pub(crate) fn customize(self, common: BBImagerCommon) -> CustomizeState {
+        CustomizeState {
+            common,
+            selected_board: self.selected_board,
+            selected_image: self.selected_image,
+            selected_dest: self.selected_dest,
+            inner: bb_imager_ui::customization::State {
+                customization: self.customization.into(),
+                default_username: helpers::default_user(),
+                default_timezone: helpers::system_timezone(),
+                default_keymap: helpers::system_keymap(),
+                timezones: iced::widget::combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
+                keymaps: iced::widget::combo_box::State::new(
+                    crate::constants::KEYMAP_LAYOUTS.to_vec(),
+                ),
+            },
+        }
+    }
+
+    pub(crate) fn review(self, common: BBImagerCommon) -> ReviewState {
+        ReviewState {
+            common,
+            inner: self.review_page(),
+            ctx: self,
+        }
     }
 }
 
@@ -411,23 +404,7 @@ impl From<ReviewState> for CustomizeState {
 pub(crate) struct ReviewState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::review::State,
-}
-
-impl ReviewState {
-    pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
-        Self {
-            common,
-            state: bb_imager_ui::review::State {
-                is_download: ctx.is_download(),
-                board: ctx.selected_board.name.clone(),
-                image: ctx.selected_image.1.to_string().into(),
-                destination: ctx.selected_destination().into(),
-                modifications: ctx.customization.modifications(),
-            },
-            ctx,
-        }
-    }
+    pub(crate) inner: bb_imager_ui::review::State,
 }
 
 #[derive(Debug)]
@@ -435,7 +412,7 @@ pub(crate) struct FlashingState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
     pub(crate) cancel_flashing: iced::task::Handle,
-    pub(crate) state: Box<bb_imager_ui::flashing::State>,
+    pub(crate) inner: bb_imager_ui::flashing::State,
 }
 
 impl FlashingState {
@@ -444,61 +421,67 @@ impl FlashingState {
         match u {
             bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
             | bb_flasher::DownloadFlashingStatus::FlashingProgress(_)
-                if self.state.start_timestamp.is_none() =>
+                if self.inner.start_timestamp.is_none() =>
             {
-                self.state.start_timestamp = Some(Instant::now())
+                self.inner.start_timestamp = Some(Instant::now())
             }
             _ => {}
         }
 
-        self.state.progress = progress_from(u);
+        self.inner.progress = progress_from(u);
     }
 }
 
-/// Both types are foreign to this crate, so this cannot be a `From` impl.
-fn progress_from(value: bb_flasher::DownloadFlashingStatus) -> bb_imager_ui::flashing::Progress {
-    use bb_imager_ui::flashing::Progress;
-
-    match value {
-        bb_flasher::DownloadFlashingStatus::Preparing => Progress::Preparing,
-        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => Progress::Downloading(x),
-        bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => Progress::Flashing(x),
-        bb_flasher::DownloadFlashingStatus::Verifying => Progress::Verifying,
-        bb_flasher::DownloadFlashingStatus::Customizing => Progress::Customizing,
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct FlashingSuccessState {
-    pub(crate) common: BBImagerCommon,
-    pub(crate) state: bb_imager_ui::flash_success::State,
-}
-
-impl From<FlashingState> for FlashingSuccessState {
-    fn from(value: FlashingState) -> Self {
-        Self {
-            state: bb_imager_ui::flash_success::State {
-                is_download: value.ctx.is_download(),
-                board: (&value.ctx.selected_board).into(),
-            },
-            common: value.common,
+/// The UI collapses downloading into writing, since both are just bytes moving
+/// towards the destination from the user's point of view.
+fn progress_from(u: bb_flasher::DownloadFlashingStatus) -> bb_imager_ui::flashing::Progress {
+    match u {
+        bb_flasher::DownloadFlashingStatus::Preparing => {
+            bb_imager_ui::flashing::Progress::Preparing
+        }
+        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x)
+        | bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => {
+            bb_imager_ui::flashing::Progress::Writing(x)
+        }
+        bb_flasher::DownloadFlashingStatus::Verifying => {
+            bb_imager_ui::flashing::Progress::Verifying
+        }
+        bb_flasher::DownloadFlashingStatus::Customizing => {
+            bb_imager_ui::flashing::Progress::Customizing
         }
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct FlashingCancelState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) state: bb_imager_ui::flash_cancel::State,
+    pub(crate) ctx: FlashingContext,
+    pub(crate) inner: bb_imager_ui::flash_cancel::State,
 }
 
 impl From<FlashingState> for FlashingCancelState {
     fn from(value: FlashingState) -> Self {
         Self {
-            state: bb_imager_ui::flash_cancel::State {
-                board: (&value.ctx.selected_board).into(),
-            },
             common: value.common,
+            inner: bb_imager_ui::flash_cancel::State {
+                has_customization: value.ctx.has_customization,
+            },
+            ctx: value.ctx,
+        }
+    }
+}
+
+pub(crate) struct FlashingSuccessState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) ctx: FlashingContext,
+    pub(crate) inner: bb_imager_ui::flash_success::State,
+}
+
+impl From<FlashingState> for FlashingSuccessState {
+    fn from(value: FlashingState) -> Self {
+        Self {
+            common: value.common,
+            inner: value.ctx.success_page(),
+            ctx: value.ctx,
         }
     }
 }
@@ -506,22 +489,24 @@ impl From<FlashingState> for FlashingCancelState {
 pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::flash_fail::State,
+    pub(crate) inner: bb_imager_ui::flash_fail::State,
 }
 
 impl FlashingFailState {
     pub(crate) fn new(
-        state: FlashingState,
+        common: BBImagerCommon,
+        ctx: FlashingContext,
         err: String,
         logs: widget::text_editor::Content,
     ) -> Self {
         Self {
-            common: state.common,
-            ctx: state.ctx,
-            state: bb_imager_ui::flash_fail::State {
+            common,
+            inner: bb_imager_ui::flash_fail::State {
+                has_customization: ctx.has_customization,
                 reason: err.into(),
                 logs,
             },
+            ctx,
         }
     }
 }
@@ -568,6 +553,33 @@ impl OverlayData {
             Self::FlashingSuccess(x) => &x.common,
         }
     }
+
+    /// Which sidebar entries the app-options page should offer to return to.
+    fn previous_page(&self) -> bb_imager_ui::app_options::PreviousPage {
+        use bb_imager_ui::app_options::PreviousPage;
+
+        match self {
+            Self::ChooseBoard(_) => PreviousPage::Device,
+            Self::ChooseOs(_) => PreviousPage::Software,
+            Self::ChooseDest(_) => PreviousPage::Destination,
+            Self::Customize(_) => PreviousPage::Customization,
+            Self::Review(x) => PreviousPage::Review {
+                has_customization: x.ctx.has_customization,
+            },
+            Self::Flashing(x) => PreviousPage::Flashing {
+                has_customization: x.ctx.has_customization,
+            },
+            Self::FlashingCancel(x) => PreviousPage::Flashing {
+                has_customization: x.ctx.has_customization,
+            },
+            Self::FlashingFail(x) => PreviousPage::Flashing {
+                has_customization: x.ctx.has_customization,
+            },
+            Self::FlashingSuccess(x) => PreviousPage::Flashing {
+                has_customization: x.ctx.has_customization,
+            },
+        }
+    }
 }
 
 impl TryFrom<BBImager> for OverlayData {
@@ -584,7 +596,8 @@ impl TryFrom<BBImager> for OverlayData {
             BBImager::FlashingCancel(x) => Ok(Self::FlashingCancel(x)),
             BBImager::FlashingFail(x) => Ok(Self::FlashingFail(x)),
             BBImager::FlashingSuccess(x) => Ok(Self::FlashingSuccess(x)),
-            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::SandboxNotice(_) => Err(()),
+            // The overlay cannot wrap itself, and `Dummy` is never observable.
+            BBImager::AppInfo(_) | BBImager::Dummy => Err(()),
         }
     }
 }
@@ -607,32 +620,27 @@ impl From<OverlayData> for BBImager {
 
 pub(crate) struct OverlayState {
     pub(crate) page: OverlayData,
-    pub(crate) state: bb_imager_ui::app_info::State,
+    pub(crate) inner: bb_imager_ui::app_options::State,
 }
 
 impl OverlayState {
     pub(crate) fn new(page: OverlayData) -> Self {
-        let log_path = helpers::log_file_path().to_string_lossy().to_string();
+        let log_file = helpers::log_file_path().to_string_lossy().into();
         let license = widget::text_editor::Content::with_text(constants::APP_LINCESE);
         let cache_dir = helpers::project_dirs()
             .unwrap()
             .cache_dir()
             .to_string_lossy()
-            .to_string();
+            .into();
 
-        Self {
-            page,
-            state: bb_imager_ui::app_info::State {
-                app_name: constants::APP_NAME,
-                app_release: constants::APP_RELEASE,
-                app_desc: constants::APP_DESC,
-                license,
-                // TODO: Make Arc
-                cache_dir: cache_dir.into(),
-                // TODO: Make Arc
-                log_path: log_path.into(),
-            },
-        }
+        let inner = bb_imager_ui::app_options::State {
+            previous_page: page.previous_page(),
+            cache_dir,
+            log_file,
+            license,
+        };
+
+        Self { page, inner }
     }
 
     pub(crate) fn common(&self) -> &BBImagerCommon {

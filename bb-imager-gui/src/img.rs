@@ -6,6 +6,7 @@ use tokio_util::task::AbortOnDropHandle;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
+    pub(crate) id: i64,
     name: Box<str>,
     item: RemoteItem,
 }
@@ -23,6 +24,7 @@ impl RemoteImage {
         };
 
         Self {
+            id: img.id,
             name: img.name.clone(),
             item: RemoteItem::new(
                 img.url.clone(),

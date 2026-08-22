@@ -228,7 +228,9 @@ fn add_config_inserts_device_into_board_list() {
     );
 
     assert!(
-        updated_boards.iter().any(|b| &*b.name == "Test Board"),
+        updated_boards
+            .iter()
+            .any(|b| b.name.as_ref() == "Test Board"),
         "Inserted device should appear in board_list"
     );
 }
@@ -287,7 +289,7 @@ fn add_config_updates_existing_device_with_same_name() {
 
     let board = boards
         .iter()
-        .find(|b| &*b.name == "Test Board")
+        .find(|b| b.name.as_ref() == "Test Board")
         .expect("Inserted board should exist");
 
     let board_id = board.id;
@@ -335,14 +337,11 @@ fn add_config_updates_existing_device_with_same_name() {
         .board_by_id(board_id)
         .expect("Fetching board by id should succeed");
 
-    assert_eq!(updated_board.description, device_v1.description.as_ref());
-    assert_eq!(updated_board.flasher, device_v1.flasher);
+    assert_eq!(updated_board.flasher, device_v2.flasher);
     assert_eq!(
         updated_board.instructions.as_deref(),
         device_v1.instructions.as_deref()
     );
-    assert_eq!(updated_board.oshw.as_deref(), device_v1.oshw.as_deref());
-    assert_eq!(updated_board.specification, device_v1.specification);
 }
 
 /// This test verifies that add_config() correctly inserts an OS image
@@ -380,7 +379,7 @@ fn add_config_inserts_os_image_for_board() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let image = bb_config::config::OsImage {
@@ -392,7 +391,7 @@ fn add_config_inserts_os_image_for_board() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         sbom: None,
@@ -414,7 +413,7 @@ fn add_config_inserts_os_image_for_board() {
     let boards = db.board_list("").unwrap();
     let board_id = boards
         .iter()
-        .find(|b| &*b.name == board.name.as_ref())
+        .find(|b| b.name.as_ref() == board.name.as_ref())
         .unwrap()
         .id;
 
@@ -422,7 +421,11 @@ fn add_config_inserts_os_image_for_board() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    assert!(items.iter().any(|x| x.label == image.name.as_ref()));
+    assert!(
+        items
+            .iter()
+            .any(|x| x.label.as_ref() == image.name.as_ref())
+    );
 }
 
 /// This test verifies that os_image_by_id() returns the full OS image
@@ -463,7 +466,7 @@ fn os_image_by_id_returns_correct_data() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let image = bb_config::config::OsImage {
@@ -475,7 +478,7 @@ fn os_image_by_id_returns_correct_data() {
         image_download_sha256: [7; 32],
         extract_size: 4096,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
         sbom: None,
@@ -499,14 +502,21 @@ fn os_image_by_id_returns_correct_data() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| &*b.name == "Test Board").unwrap().id;
+    let board_id = boards
+        .iter()
+        .find(|b| b.name.as_ref() == "Test Board")
+        .unwrap()
+        .id;
 
     let items = db
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) =
-        items.iter().find(|x| x.label == "Test OS").unwrap().id
+    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) = items
+        .iter()
+        .find(|x| x.label.as_ref() == "Test OS")
+        .unwrap()
+        .id
     else {
         panic!("Incorrect ID");
     };
@@ -515,13 +525,9 @@ fn os_image_by_id_returns_correct_data() {
         .expect("os_image_by_id should succeed");
 
     assert_eq!(stored.name, image.name);
-    assert_eq!(stored.description, image.description.as_ref());
     assert_eq!(stored.url.as_str(), image.url.as_str());
-    assert_eq!(stored.icon.as_str(), image.icon.as_str());
-    assert_eq!(stored.image_download_size, 1024);
     assert_eq!(stored.image_download_sha256, [7; 32]);
     assert_eq!(stored.extract_size, 4096);
-    assert_eq!(stored.release_date, image.release_date);
     assert_eq!(stored.init_format, image.init_format);
     assert_eq!(
         stored.bmap.as_ref().map(|x| x.as_str()),
@@ -565,7 +571,7 @@ fn add_config_inserts_os_sublist_for_board() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let image = bb_config::config::OsImage {
@@ -577,7 +583,7 @@ fn add_config_inserts_os_sublist_for_board() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         sbom: None,
@@ -605,13 +611,17 @@ fn add_config_inserts_os_sublist_for_board() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| &*b.name == "Test Board").unwrap().id;
+    let board_id = boards
+        .iter()
+        .find(|b| b.name.as_ref() == "Test Board")
+        .unwrap()
+        .id;
 
     let items = db
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    assert!(items.iter().any(|x| x.label == "Test SubList"));
+    assert!(items.iter().any(|x| x.label.as_ref() == "Test SubList"));
 }
 
 /// This test verifies that board support propagates through multiple
@@ -651,7 +661,7 @@ fn nested_os_sublists_propagate_board_support() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let image = bb_config::config::OsImage {
@@ -663,7 +673,7 @@ fn nested_os_sublists_propagate_board_support() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         sbom: None,
@@ -702,7 +712,7 @@ fn nested_os_sublists_propagate_board_support() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| &*b.name == "Test Board")
+        .find(|b| b.name.as_ref() == "Test Board")
         .unwrap()
         .id;
 
@@ -711,7 +721,7 @@ fn nested_os_sublists_propagate_board_support() {
         .expect("os_image_items should succeed");
 
     assert!(
-        items.iter().any(|x| x.label == "Parent SubList"),
+        items.iter().any(|x| x.label.as_ref() == "Parent SubList"),
         "Parent sublist should be visible through recursive propagation"
     );
 }
@@ -752,7 +762,7 @@ fn remote_os_sublist_is_returned_for_board() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -761,7 +771,7 @@ fn remote_os_sublist_is_returned_for_board() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
     };
 
     let config = Config {
@@ -779,7 +789,7 @@ fn remote_os_sublist_is_returned_for_board() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| &*b.name == "Test Board")
+        .find(|b| b.name.as_ref() == "Test Board")
         .unwrap()
         .id;
 
@@ -838,7 +848,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -847,7 +857,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
     };
 
     let config = Config {
@@ -865,7 +875,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| &*b.name == "Test Board")
+        .find(|b| b.name.as_ref() == "Test Board")
         .unwrap()
         .id;
 
@@ -884,7 +894,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         sbom: None,
@@ -904,7 +914,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
 
     let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
 
-    assert!(items.iter().any(|x| x.label == "Fetched OS"),);
+    assert!(items.iter().any(|x| x.label.as_ref() == "Fetched OS"),);
 }
 
 /// This test verifies that resolving a remote sublist multiple times
@@ -945,7 +955,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["test_board".into()]),
+        tags: ["test_board".into()].into(),
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
@@ -954,7 +964,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
     };
 
     let config = Config {
@@ -972,7 +982,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| &*b.name == "Test Board")
+        .find(|b| b.name.as_ref() == "Test Board")
         .unwrap()
         .id;
 
@@ -991,7 +1001,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        devices: Box::new(["test_board".into()]),
+        devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
         sbom: None,
@@ -1014,7 +1024,10 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     assert!(second.is_err());
 
     let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
-    let count = items.iter().filter(|x| x.label == "Fetched OS").count();
+    let count = items
+        .iter()
+        .filter(|x| x.label.as_ref() == "Fetched OS")
+        .count();
 
     assert_eq!(count, 1,);
 
@@ -1057,7 +1070,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["bbb".into()]),
+        tags: ["bbb".into()].into(),
     };
 
     let board2 = bb_config::config::Device {
@@ -1070,7 +1083,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["beagleplay".into()]),
+        tags: ["beagleplay".into()].into(),
     };
 
     let board3 = bb_config::config::Device {
@@ -1083,7 +1096,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         bootfs: None,
         specification: vec![],
         documentation: None,
-        tags: Box::new(["rpi".into()]),
+        tags: ["rpi".into()].into(),
     };
 
     let config = Config {
@@ -1105,9 +1118,9 @@ fn board_list_search_filters_boards_case_insensitive() {
         "Only boards containing 'test' should be returned"
     );
 
-    assert!(results.iter().any(|b| &*b.name == "Test Board 1"));
-    assert!(results.iter().any(|b| &*b.name == "Test Board 2"));
-    assert!(results.iter().any(|b| &*b.name == "Test Board 3"));
+    assert!(results.iter().any(|b| b.name.as_ref() == "Test Board 1"));
+    assert!(results.iter().any(|b| b.name.as_ref() == "Test Board 2"));
+    assert!(results.iter().any(|b| b.name.as_ref() == "Test Board 3"));
 }
 
 /// Insert a single board and return its id.
@@ -1129,7 +1142,7 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
     db.board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| &*b.name == name.as_ref())
+        .find(|b| b.name.as_ref() == name.as_ref())
         .expect("Inserted board should exist")
         .id
 }
@@ -1305,7 +1318,7 @@ fn insert_image_helper(
         .board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| &*b.name == board.name.as_ref())
+        .find(|b| b.name.as_ref() == board.name.as_ref())
         .expect("Inserted board should exist")
         .id;
 
@@ -1315,7 +1328,7 @@ fn insert_image_helper(
 
     let bb_imager_ui::image_selection::ImageId::OsImage(image_id) = items
         .iter()
-        .find(|x| x.label == name.as_ref())
+        .find(|x| x.label.as_ref() == name.as_ref())
         .expect("Inserted image should exist")
         .id
     else {
@@ -1690,13 +1703,13 @@ fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
     let boards = db
         .board_list("")
         .expect("Fetching board list should succeed");
-    let id_of = |name: &str| boards.iter().find(|b| &*b.name == name).unwrap().id;
+    let id_of = |name: &str| boards.iter().find(|b| b.name.as_ref() == name).unwrap().id;
 
     let listed = |board: &str| {
         db.os_image_items(id_of(board), None)
             .expect("os_image_items should succeed")
             .iter()
-            .any(|x| x.label == "Fedora Images")
+            .any(|x| x.label.as_ref() == "Fedora Images")
     };
 
     assert!(

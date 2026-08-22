@@ -19,11 +19,6 @@ pub(crate) struct Db {
 pub(crate) struct Board {
     pub(crate) id: i64,
     pub(crate) name: Box<str>,
-    pub(crate) icon: Option<Arc<Url>>,
-    pub(crate) description: String,
-    pub(crate) documentation: Option<Url>,
-    pub(crate) specification: Vec<(Box<str>, Box<str>)>,
-    pub(crate) oshw: Option<String>,
     pub(crate) flasher: config::Flasher,
     pub(crate) instructions: Option<Box<str>>,
     pub(crate) bootfs: Option<config::Bootfs>,
@@ -31,17 +26,11 @@ pub(crate) struct Board {
 
 impl Board {
     fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        let spec: Vec<u8> = value.get("specification")?;
         let bootfs: Option<Vec<u8>> = value.get("bootfs")?;
 
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
-            description: value.get("description")?,
-            documentation: value.get("documentation")?,
-            specification: serde_json::from_slice(&spec).unwrap(),
-            oshw: value.get("oshw")?,
             flasher: value.get("flasher")?,
             instructions: value.get("instructions")?,
             bootfs: bootfs.map(|x| serde_json::from_slice(&x).unwrap()),
@@ -53,18 +42,13 @@ impl Board {
 pub(crate) struct OsImage {
     pub(crate) id: i64,
     pub(crate) name: Box<str>,
-    pub(crate) description: String,
-    pub(crate) icon: Arc<Url>,
     pub(crate) url: Box<Url>,
     pub(crate) image_download_size: i64,
     pub(crate) image_download_sha256: [u8; 32],
     pub(crate) extract_size: i64,
-    pub(crate) release_date: chrono::NaiveDate,
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Box<Url>>,
-    pub(crate) sbom: Option<Box<Url>>,
     pub(crate) info_text: Option<Arc<str>>,
-    pub(crate) support: Option<Url>,
 }
 
 impl OsImage {
@@ -72,18 +56,13 @@ impl OsImage {
         Ok(Self {
             id: value.get("id")?,
             name: value.get("name")?,
-            icon: Arc::new(value.get("icon")?),
-            description: value.get("description")?,
             url: Box::new(value.get("url")?),
             image_download_size: value.get("image_download_size")?,
             image_download_sha256: value.get("image_download_sha256")?,
             extract_size: value.get("extract_size")?,
-            release_date: value.get("release_date")?,
             init_format: value.get("init_format")?,
             bmap: value.get::<_, Option<Url>>("bmap")?.map(Box::new),
-            sbom: value.get::<_, Option<Url>>("sbom")?.map(Box::new),
             info_text: value.get("info_text")?,
-            support: value.get("support")?,
         })
     }
 }
@@ -502,8 +481,7 @@ impl Db {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
-        SELECT id, name, icon, description, documentation, specification, oshw, 
-            flasher, instructions, bootfs
+        SELECT id, name, flasher, instructions, bootfs
         FROM boards
         WHERE id = $1"#,
         )?;
@@ -514,9 +492,8 @@ impl Db {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
-            SELECT id, name, description, icon, url, image_download_size,
-                image_download_sha256, extract_size, release_date, init_format,
-                bmap, sbom, info_text, support
+            SELECT id, name, url, image_download_size, image_download_sha256, extract_size,
+                init_format, bmap, info_text
             FROM os_images WHERE id = $1"#,
         )?;
         stmt.query_row([id], OsImage::from_row)
@@ -541,7 +518,7 @@ impl Db {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
-            SELECT oi.id, oi.name, oi.icon
+            SELECT oi.id, oi.name, oi.icon, oi.description, oi.release_date, oi.extract_size
             FROM os_images oi
             JOIN os_image_boards oib ON oi.id = oib.image_id
             WHERE oib.board_id = $1 
@@ -553,10 +530,14 @@ impl Db {
         )?;
         let res = stmt
             .query_map(rusqlite::params![board_id, parent_id], |value| {
+                let size: i64 = value.get("extract_size")?;
                 Ok(bb_imager_ui::image_selection::ImageItem {
                     id: bb_imager_ui::image_selection::ImageId::OsImage(value.get("id")?),
-                    icon: Some(Arc::new(value.get("icon")?)),
-                    label: value.get::<_, String>("name")?.into(),
+                    label: value.get("name")?,
+                    icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
+                    description: value.get("description")?,
+                    size: Some(size as u64),
+                    release_date: value.get("release_date")?,
                 })
             })?
             .map(|x| x.unwrap())
@@ -573,7 +554,7 @@ impl Db {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
-            SELECT s.id, s.name, s.icon, s.flasher
+            SELECT s.id, s.name, s.icon, s.flasher, s.description
             FROM os_sublists s
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
             JOIN boards b ON b.id = sb.board_id
@@ -595,8 +576,11 @@ impl Db {
                             value.get("id")?,
                             value.get("flasher")?,
                         )),
-                        icon: Some(Arc::new(value.get("icon")?)),
-                        label: value.get::<_, String>("name")?.into(),
+                        label: value.get("name")?,
+                        icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
+                        description: value.get("description")?,
+                        size: None,
+                        release_date: None,
                     })
                 },
             )?
@@ -721,7 +705,7 @@ impl Db {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
-            SELECT oi.id, oi.name, oi.icon
+            SELECT oi.id, oi.name, oi.icon, oi.description, oi.release_date, oi.extract_size
             FROM os_images oi
             JOIN os_image_boards oib ON oi.id = oib.image_id
             WHERE oib.board_id = $1 AND oi.name LIKE $2"#,
@@ -730,10 +714,14 @@ impl Db {
             .query_map(
                 rusqlite::params![board_id, format!("%{search}%")],
                 |value| {
+                    let size: i64 = value.get("extract_size")?;
                     Ok(bb_imager_ui::image_selection::ImageItem {
                         id: bb_imager_ui::image_selection::ImageId::OsImage(value.get("id")?),
-                        icon: Some(Arc::new(value.get("icon")?)),
-                        label: value.get::<_, String>("name")?.into(),
+                        label: value.get("name")?,
+                        icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
+                        description: value.get("description")?,
+                        size: Some(size as u64),
+                        release_date: value.get("release_date")?,
                     })
                 },
             )?
@@ -745,8 +733,8 @@ impl Db {
 
     /// Reconstruct the [`config::Device`] entry for a board, as it was inserted from the config.
     ///
-    /// Statements here are not cached: this only runs when the user copies a board to the
-    /// clipboard, so a cache slot would be wasted on it.
+    /// Statements here are not cached: this only runs when the user copies the
+    /// flashing summary to the clipboard, so a cache slot would be wasted on it.
     pub(crate) fn os_board_json_by_id(&self, id: i64) -> rusqlite::Result<config::Device> {
         let db = self.db.lock().unwrap();
 

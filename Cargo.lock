@@ -693,7 +693,6 @@ dependencies = [
  "embed-resource",
  "iana-time-zone",
  "iced",
- "image",
  "notify-rust",
  "rfd",
  "rusqlite",

@@ -1,7 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::Arc;
-
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
@@ -74,18 +72,9 @@ enum BBImager {
     FlashingFail(state::FlashingFailState),
     FlashingSuccess(state::FlashingSuccessState),
     AppInfo(state::OverlayState),
-    SandboxNotice(state::SandboxNoticeState),
 }
 
 impl BBImager {
-    fn choose_board(common: BBImagerCommon) -> Self {
-        Self::ChooseBoard(state::ChooseBoardState::new(common))
-    }
-
-    fn sandbox_notice(common: BBImagerCommon) -> Self {
-        Self::SandboxNotice(state::SandboxNoticeState::new(common))
-    }
-
     fn new() -> (Self, Task<BBImagerMessage>) {
         let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
 
@@ -106,9 +95,7 @@ impl BBImager {
         let common = BBImagerCommon {
             app_config,
             downloader: downloader.clone(),
-
             img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
-
             scroll_id: widget::Id::unique(),
             db: db.clone(),
         };
@@ -119,14 +106,8 @@ impl BBImager {
         }));
         let updater_task = common.updater_task();
 
-        let app = if cfg!(feature = "sandboxed") && !common.app_config.udev_notice_shown {
-            Self::sandbox_notice(common)
-        } else {
-            Self::choose_board(common)
-        };
-
         (
-            app,
+            BBImager::ChooseBoard(state::ChooseBoardState::new(common)),
             Task::batch([db_task, updater_task]),
         )
     }
@@ -143,7 +124,6 @@ impl BBImager {
             BBImager::FlashingFail(x) => &mut x.common,
             BBImager::FlashingSuccess(x) => &mut x.common,
             BBImager::AppInfo(x) => x.common_mut(),
-            BBImager::SandboxNotice(x) => &mut x.common,
             BBImager::Dummy => panic!("Invalid State"),
         }
     }
@@ -160,36 +140,8 @@ impl BBImager {
             BBImager::FlashingFail(x) => &x.common,
             BBImager::FlashingSuccess(x) => &x.common,
             BBImager::AppInfo(x) => x.common(),
-            BBImager::SandboxNotice(x) => &x.common,
             BBImager::Dummy => panic!("Invalid state"),
         }
-    }
-
-    fn image_cache_insert(&mut self, k: Arc<url::Url>, v: std::path::PathBuf) {
-        self.common_mut().img_handle_cache.insert(k, v)
-    }
-
-    fn restart(&mut self) -> Task<BBImagerMessage> {
-        *self = match std::mem::take(self) {
-            BBImager::ChooseOs(x) => BBImager::choose_board(x.common),
-            BBImager::ChooseDest(x) => BBImager::choose_board(x.common),
-            BBImager::Customize(x) => BBImager::choose_board(x.common),
-            BBImager::Review(x) => BBImager::choose_board(x.common),
-            BBImager::Flashing(x) => BBImager::choose_board(x.common),
-            BBImager::FlashingCancel(x) => BBImager::choose_board(x.common),
-            BBImager::FlashingSuccess(x) => BBImager::choose_board(x.common),
-            BBImager::FlashingFail(x) => BBImager::choose_board(x.common),
-            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::ChooseBoard(_) => {
-                panic!("Unexpected screen")
-            }
-            BBImager::SandboxNotice(x) => BBImager::choose_board(x.common),
-        };
-
-        if let BBImager::ChooseBoard(x) = self {
-            return x.refresh_board_list();
-        }
-
-        Task::none()
     }
 
     fn subscription(&self) -> Subscription<BBImagerMessage> {
@@ -198,9 +150,9 @@ impl BBImager {
         match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
-                    x.selected_image.1.flasher(),
-                    x.state.filter_destination,
-                    Arc::<str>::from(x.state.search.to_lowercase()),
+                    x.selected_image.flasher(),
+                    x.inner.filter_destination,
+                    x.inner.search.to_lowercase(),
                 ),
                 |(flasher, filter, search_text)| {
                     let mut interval = interval(INTERVAL);
@@ -235,7 +187,7 @@ impl BBImager {
         };
 
         let customization = ctx.customization.clone();
-        let img = ctx.selected_image.1.clone();
+        let img = ctx.selected_image.clone();
         let dst = ctx.selected_dest.clone();
         let bootfs = ctx.selected_board.bootfs.as_ref().map(|x| {
             img::RemoteItem::new(
@@ -293,16 +245,22 @@ impl BBImager {
         *self = Self::Flashing(state::FlashingState {
             common,
             cancel_flashing: h,
-            // Built before `ctx` is moved in below.
-            state: Box::new(bb_imager_ui::flashing::State {
-                board: (&ctx.selected_board).into(),
-                progress: Default::default(),
-                start_timestamp: None,
-            }),
+            inner: bb_imager_ui::flashing::State {
+                has_customization: ctx.has_customization,
+                ..Default::default()
+            },
             ctx,
         });
 
         t
+    }
+
+    fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
+        let db = self.common().db.clone();
+        Task::perform(
+            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
+            BBImagerMessage::FilterResolveImages,
+        )
     }
 
     fn scroll_reset(&self) -> Task<BBImagerMessage> {
@@ -310,172 +268,5 @@ impl BBImager {
             self.common().scroll_id.clone(),
             widget::operation::RelativeOffset::START,
         )
-    }
-
-    fn back(&mut self) -> Task<BBImagerMessage> {
-        *self = match std::mem::take(self) {
-            Self::ChooseOs(inner) => Self::ChooseBoard(inner.into()),
-            Self::ChooseDest(inner) => Self::ChooseOs(inner.into()),
-            Self::Customize(inner) => Self::ChooseDest(inner.ctx.choose_dest(inner.common)),
-            Self::Review(inner) => {
-                if inner.ctx.has_customization {
-                    Self::Customize(inner.into())
-                } else {
-                    Self::ChooseDest(inner.ctx.choose_dest(inner.common))
-                }
-            }
-            Self::AppInfo(inner) => inner.page.into(),
-            Self::Dummy
-            | Self::SandboxNotice(_)
-            | Self::FlashingSuccess(_)
-            | Self::FlashingFail(_)
-            | Self::FlashingCancel(_)
-            | Self::Flashing(_)
-            | Self::ChooseBoard(_) => panic!("Unexpected message"),
-        };
-
-        match self {
-            BBImager::ChooseBoard(inner) => {
-                Task::batch([inner.refresh_board_list(), self.scroll_reset()])
-            }
-            BBImager::ChooseOs(inner) => {
-                let board_id = inner.selected_board.id;
-                Task::batch([
-                    inner.refresh_image_list(),
-                    self.common().refresh_image_icons(board_id),
-                    self.scroll_reset(),
-                ])
-            }
-            _ => self.scroll_reset(),
-        }
-    }
-
-    fn next(&mut self) -> Task<BBImagerMessage> {
-        let (state, task) = match std::mem::take(self) {
-            Self::ChooseBoard(inner) => {
-                let selected_board = inner
-                    .selected_board
-                    .expect("Board should alread have been selected");
-                let board_id = selected_board.id;
-
-                let temp = state::ChooseOsState {
-                    common: inner.common,
-                    flasher: selected_board.flasher,
-                    selected_board,
-                    selected_image: None,
-                    state: Default::default(),
-                };
-
-                let tasks = Task::batch([
-                    temp.resolve_all_remote_sublists(board_id),
-                    temp.refresh_image_list(),
-                    temp.common.refresh_image_icons(board_id),
-                ]);
-
-                (Self::ChooseOs(temp), tasks)
-            }
-            Self::ChooseOs(inner) => {
-                let selected_image = inner
-                    .selected_image
-                    .expect("Image should already be selected");
-
-                (
-                    Self::ChooseDest(state::ChooseDestState::new(
-                        inner.common,
-                        inner.selected_board,
-                        selected_image,
-                    )),
-                    Task::none(),
-                )
-            }
-            Self::ChooseDest(inner) => {
-                let selected_dest = inner
-                    .selected_dest
-                    .expect("Destination should already be selcted");
-
-                let flasher = inner.selected_image.1.flasher();
-
-                // A flasher with nothing to configure skips the Customize page.
-                let (customization, has_customization) =
-                    match helpers::no_customization(flasher, &inner.selected_image.1) {
-                        Some(c) => (c, false),
-                        None => (
-                            helpers::FlashingCustomization::new(
-                                flasher,
-                                &inner.selected_image.1,
-                                &inner.common.app_config,
-                            ),
-                            true,
-                        ),
-                    };
-
-                let ctx = state::FlashingContext {
-                    selected_board: inner.selected_board,
-                    selected_image: inner.selected_image,
-                    selected_dest,
-                    customization,
-                    has_customization,
-                };
-
-                let temp = if has_customization {
-                    Self::Customize(state::CustomizeState::new(inner.common, ctx))
-                } else {
-                    Self::Review(state::ReviewState::new(inner.common, ctx))
-                };
-
-                (temp, Task::none())
-            }
-            Self::Customize(mut inner) => {
-                // The page edits its own state, so the context only catches up
-                // here, on the way to Review.
-                inner.ctx.customization = (&inner.state.customization).into();
-
-                let temp = match &inner.ctx.customization {
-                    helpers::FlashingCustomization::LinuxSdSysconfig(c)
-                    | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
-                        let mut temp = inner.common.app_config.sd_customization.clone();
-                        temp.sysconf = c.clone();
-                        inner.common.app_config.sd_customization = temp;
-
-                        inner.save_app_config()
-                    }
-                    _ => Task::none(),
-                };
-
-                (
-                    Self::Review(state::ReviewState::new(inner.common, inner.ctx)),
-                    temp,
-                )
-            }
-            Self::SandboxNotice(mut inner) => {
-                inner.common.app_config.udev_notice_shown = true;
-                let task = {
-                    let config = inner.common.app_config.clone();
-                    Task::future(blocking_future(move || {
-                        if let Err(e) = config.save() {
-                            tracing::error!("Failed to save config: {e}");
-                        }
-                        BBImagerMessage::Null
-                    }))
-                };
-                (
-                    Self::ChooseBoard(state::ChooseBoardState::new(inner.common)),
-                    task,
-                )
-            }
-            Self::Dummy
-            | Self::Review(_)
-            | Self::Flashing(_)
-            | Self::FlashingFail(_)
-            | Self::FlashingCancel(_)
-            | Self::FlashingSuccess(_)
-            | Self::AppInfo(_) => {
-                panic!("Unexpected message")
-            }
-        };
-
-        *self = state;
-
-        Task::batch([task, self.scroll_reset()])
     }
 }
