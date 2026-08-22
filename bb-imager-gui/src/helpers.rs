@@ -730,6 +730,23 @@ impl FlashingCustomization {
         }
     }
 
+    /// What this customization will change on the flashed image.
+    pub(crate) fn modifications(&self) -> Box<[&'static str]> {
+        match self {
+            Self::LinuxSdSysconfig(x) => {
+                let mut ans = sd_modifications_common(x);
+                if x.usb_enable_dhcp == Some(true) {
+                    ans.push("USB DHCP enabled");
+                }
+
+                ans.into()
+            }
+            Self::LinuxSdCloudInit(x) => sd_modifications_common(x).into(),
+            // Nothing is written for these, so there is nothing to report.
+            Self::NoneSd | Self::Msp430 | Self::Bcf | Self::Zepto => Box::default(),
+        }
+    }
+
     pub(crate) fn validate(&self) -> bool {
         match self {
             FlashingCustomization::LinuxSdSysconfig(sd_customization)
@@ -1039,22 +1056,22 @@ pub(crate) fn sd_modifications_common(
     let mut ans = Vec::new();
 
     if x.user.is_some() {
-        ans.push("• User account configured");
+        ans.push("User account configured");
     }
     if x.wifi.is_some() {
-        ans.push("• Wifi configured");
+        ans.push("Wifi configured");
     }
     if x.hostname.is_some() {
-        ans.push("• Hostname configured");
+        ans.push("Hostname configured");
     }
     if x.keymap.is_some() {
-        ans.push("• Keymap configured");
+        ans.push("Keymap configured");
     }
     if x.timezone.is_some() {
-        ans.push("• Timezone configured");
+        ans.push("Timezone configured");
     }
     if x.ssh.is_some() {
-        ans.push("• SSH Key configured");
+        ans.push("SSH Key configured");
     }
 
     ans
@@ -1140,9 +1157,39 @@ mod tests {
             .update_wifi(Some(SdCustomizationWifi::default()));
         let mods = sd_modifications_common(&full);
         assert_eq!(mods.len(), 6);
-        assert!(mods.contains(&"• User account configured"));
-        assert!(mods.contains(&"• Wifi configured"));
-        assert!(mods.contains(&"• SSH Key configured"));
+        assert!(mods.contains(&"User account configured"));
+        assert!(mods.contains(&"Wifi configured"));
+        assert!(mods.contains(&"SSH Key configured"));
+    }
+
+    #[test]
+    fn modifications_reports_only_what_gets_written() {
+        // Nothing is applied for these, so the review page shows no list.
+        for c in [
+            FlashingCustomization::NoneSd,
+            FlashingCustomization::Msp430,
+            FlashingCustomization::Bcf,
+            FlashingCustomization::Zepto,
+        ] {
+            assert!(c.modifications().is_empty());
+        }
+
+        let hostname = SdSysconfCustomization::default().update_hostname(Some("h".into()));
+        assert_eq!(
+            FlashingCustomization::LinuxSdCloudInit(hostname.clone()).modifications(),
+            ["Hostname configured"].into()
+        );
+
+        // USB DHCP is sysconf-only: cloud-init has no such field to write.
+        let dhcp = hostname.update_usb_enable_dhcp(Some(true));
+        assert_eq!(
+            FlashingCustomization::LinuxSdSysconfig(dhcp.clone()).modifications(),
+            ["Hostname configured", "USB DHCP enabled"].into()
+        );
+        assert_eq!(
+            FlashingCustomization::LinuxSdCloudInit(dhcp).modifications(),
+            ["Hostname configured"].into()
+        );
     }
 
     #[test]

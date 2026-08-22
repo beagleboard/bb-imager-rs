@@ -53,7 +53,7 @@ fn review_view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
         .columns(2),
     ];
 
-    let modifications = state.modifications();
+    let modifications = state.customization.modifications();
     if !modifications.is_empty() {
         col = col.extend([
             widget::rule::horizontal(2).into(),
@@ -61,9 +61,15 @@ fn review_view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage> {
                 .font(constants::FONT_BOLD)
                 .size(HEADING_SIZE)
                 .into(),
-            widget::column(state.modifications().into_iter().map(Into::into))
-                .spacing(8)
-                .into(),
+            widget::column(modifications.iter().map(|x| {
+                widget::rich_text![
+                    widget::span::<'_, (), _>("• "),
+                    widget::span::<'_, (), _>(*x)
+                ]
+                .into()
+            }))
+            .spacing(8)
+            .into(),
         ]);
     }
 

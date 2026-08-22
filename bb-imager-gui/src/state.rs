@@ -293,23 +293,6 @@ impl CustomizeState {
     pub(crate) fn is_download(&self) -> bool {
         self.selected_dest.is_download_action()
     }
-
-    pub(crate) fn modifications(&self) -> Vec<&'static str> {
-        match &self.customization {
-            helpers::FlashingCustomization::LinuxSdSysconfig(x) => {
-                let mut ans = helpers::sd_modifications_common(x);
-                if x.usb_enable_dhcp == Some(true) {
-                    ans.push("• USB DHCP enabled");
-                }
-
-                ans
-            }
-            helpers::FlashingCustomization::LinuxSdCloudInit(x) => {
-                helpers::sd_modifications_common(x)
-            }
-            _ => Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug)]
