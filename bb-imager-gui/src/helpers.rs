@@ -33,7 +33,7 @@ pub(crate) enum BoardImage {
         // `Bmap` and its downloader are dead weight.
         #[cfg(feature = "sd")]
         bmap: Option<Bmap>,
-        info_text: Option<String>,
+        info_text: Option<Arc<str>>,
         description: Option<String>,
         icon: BoardImageIcon,
         details: Vec<(&'static str, String)>,
@@ -135,7 +135,7 @@ impl BoardImage {
 
     pub(crate) fn info_text(&self) -> Option<&str> {
         match self {
-            BoardImage::Image { info_text, .. } => info_text.as_ref().map(|x| x.as_str()),
+            BoardImage::Image { info_text, .. } => info_text.as_ref().map(|x| x.as_ref()),
             BoardImage::SdFormat { .. } => None,
         }
     }

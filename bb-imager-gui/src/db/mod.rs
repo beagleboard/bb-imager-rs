@@ -112,7 +112,7 @@ pub(crate) struct OsImage {
     pub(crate) release_date: chrono::NaiveDate,
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Box<Url>>,
-    pub(crate) info_text: Option<String>,
+    pub(crate) info_text: Option<Arc<str>>,
     pub(crate) support: Option<Url>,
 }
 

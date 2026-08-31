@@ -513,7 +513,7 @@ fn os_image_by_id_returns_correct_data() {
         stored.bmap.as_ref().map(|x| x.as_str()),
         image.bmap.as_ref().map(|x| x.as_str())
     );
-    assert_eq!(stored.info_text, image.info_text);
+    assert_eq!(stored.info_text.as_deref(), image.info_text.as_deref());
 }
 
 /// This test verifies that add_config() correctly inserts an OsSubList
