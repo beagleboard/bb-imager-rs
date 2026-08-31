@@ -35,7 +35,7 @@ impl BoardListItem {
 #[derive(Debug, Clone)]
 pub(crate) struct Board {
     pub(crate) id: i64,
-    pub(crate) name: String,
+    pub(crate) name: Box<str>,
     pub(crate) icon: Option<Arc<Url>>,
     pub(crate) description: String,
     pub(crate) documentation: Option<Url>,
