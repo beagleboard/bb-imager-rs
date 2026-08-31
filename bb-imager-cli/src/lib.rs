@@ -239,8 +239,11 @@ fn flash_internal(
                 panic!("Failed to parse input images");
             }
 
-            let img_list = imgs
-                .chunks_exact(2)
+            let (chunks, []) = imgs.as_chunks::<2>() else {
+                panic!("imgs should be even")
+            };
+            let img_list = chunks
+                .iter()
                 .map(|x| {
                     (
                         x[0].to_string(),
