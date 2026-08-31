@@ -80,7 +80,7 @@ impl BoardImage {
 
         Self::Image {
             img: RemoteImage::new(
-                image.name.into(),
+                image.name,
                 Box::new(image.url),
                 image.image_download_sha256,
                 image.extract_size as u64,
@@ -1203,7 +1203,7 @@ mod tests {
         BoardImage::remote(
             crate::db::OsImage {
                 id: 1,
-                name: "test-image".to_string(),
+                name: "test-image".into(),
                 description: "test".to_string(),
                 icon: std::sync::Arc::new(url::Url::parse("https://example.com/icon.png").unwrap()),
                 url: url::Url::parse("https://example.com/os.img.xz").unwrap(),
