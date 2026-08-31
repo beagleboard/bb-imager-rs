@@ -179,7 +179,7 @@ pub(crate) fn board_view_pane<'a>(
     let cols = widget::column![
         img,
         widget::center(copy_btn),
-        widget::text(&dev.name)
+        widget::text(dev.name.as_ref())
             .size(24)
             .align_x(iced::alignment::Alignment::Center)
             .width(iced::Length::Fill),
