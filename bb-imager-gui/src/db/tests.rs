@@ -331,7 +331,10 @@ fn add_config_updates_existing_device_with_same_name() {
 
     assert_eq!(updated_board.description, device_v2.description);
     assert_eq!(updated_board.flasher, device_v2.flasher);
-    assert_eq!(updated_board.instructions, device_v2.instructions);
+    assert_eq!(
+        updated_board.instructions.as_deref(),
+        device_v2.instructions.as_deref()
+    );
     assert_eq!(updated_board.oshw, device_v2.oshw);
     assert_eq!(updated_board.specification, device_v2.specification);
 }

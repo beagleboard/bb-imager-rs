@@ -42,7 +42,7 @@ pub(crate) struct Board {
     pub(crate) specification: Vec<(String, String)>,
     pub(crate) oshw: Option<String>,
     pub(crate) flasher: config::Flasher,
-    pub(crate) instructions: Option<String>,
+    pub(crate) instructions: Option<Box<str>>,
 }
 
 impl Board {
