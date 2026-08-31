@@ -88,10 +88,7 @@ impl BoardImage {
             )
             .into(),
             #[cfg(feature = "sd")]
-            bmap: image.bmap.map(|url| Bmap {
-                url: Box::new(url),
-                downloader,
-            }),
+            bmap: image.bmap.map(|url| Bmap { url, downloader }),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
