@@ -500,7 +500,7 @@ fn os_image_by_id_returns_correct_data() {
         .os_image_by_id(image_id)
         .expect("os_image_by_id should succeed");
 
-    assert_eq!(stored.name, image.name);
+    assert_eq!(stored.name.as_ref(), image.name.as_str());
     assert_eq!(stored.description, image.description);
     assert_eq!(stored.url.as_str(), image.url.as_str());
     assert_eq!(stored.icon.as_str(), image.icon.as_str());

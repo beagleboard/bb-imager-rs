@@ -102,7 +102,7 @@ impl OsSublistListItem {
 #[derive(Debug, Clone)]
 pub(crate) struct OsImage {
     pub(crate) id: i64,
-    pub(crate) name: String,
+    pub(crate) name: Box<str>,
     pub(crate) description: String,
     pub(crate) icon: Arc<Url>,
     pub(crate) url: Url,
