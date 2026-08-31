@@ -111,7 +111,7 @@ pub(crate) struct OsImage {
     pub(crate) extract_size: i64,
     pub(crate) release_date: chrono::NaiveDate,
     pub(crate) init_format: bb_config::config::InitFormat,
-    pub(crate) bmap: Option<Url>,
+    pub(crate) bmap: Option<Box<Url>>,
     pub(crate) info_text: Option<String>,
     pub(crate) support: Option<Url>,
 }
@@ -129,7 +129,7 @@ impl OsImage {
             extract_size: value.get("extract_size")?,
             release_date: value.get("release_date")?,
             init_format: value.get("init_format")?,
-            bmap: value.get("bmap")?,
+            bmap: value.get::<_, Option<Url>>("bmap")?.map(Box::new),
             info_text: value.get("info_text")?,
             support: value.get("support")?,
         })
