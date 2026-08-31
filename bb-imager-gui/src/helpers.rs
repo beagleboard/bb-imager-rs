@@ -81,7 +81,7 @@ impl BoardImage {
         Self::Image {
             img: RemoteImage::new(
                 image.name,
-                Box::new(image.url),
+                image.url,
                 image.image_download_sha256,
                 image.extract_size as u64,
                 downloader.clone(),
@@ -1206,7 +1206,7 @@ mod tests {
                 name: "test-image".into(),
                 description: "test".to_string(),
                 icon: std::sync::Arc::new(url::Url::parse("https://example.com/icon.png").unwrap()),
-                url: url::Url::parse("https://example.com/os.img.xz").unwrap(),
+                url: Box::new(url::Url::parse("https://example.com/os.img.xz").unwrap()),
                 image_download_size: None,
                 image_download_sha256: [0u8; 32],
                 extract_size: 0,
