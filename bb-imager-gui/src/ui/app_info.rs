@@ -3,7 +3,9 @@ use iced::{Element, widget};
 use crate::{
     message::BBImagerMessage,
     state::OverlayState,
-    ui::helpers::{VIEW_COL_PADDING, WINDOW_ICON, element_with_label, page_type3, selectable_text},
+    ui::helpers::{
+        self, VIEW_COL_PADDING, WINDOW_ICON, element_with_label, page_type3, selectable_text,
+    },
 };
 
 const INP_BOX_WIDTH: u32 = 420;
@@ -11,7 +13,7 @@ const INP_BOX_WIDTH: u32 = 420;
 pub(crate) fn view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> {
     page_type3(
         review_view(state),
-        [widget::button("BACK")
+        [helpers::action_button("BACK")
             .on_press(BBImagerMessage::Back)
             .style(widget::button::secondary)],
     )

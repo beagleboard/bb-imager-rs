@@ -42,7 +42,8 @@ pub(crate) const FONT_BOLD: iced::Font = {
 };
 
 // Base Fonts
-pub(crate) const FONT_NORMAL_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Regular-subset.ttf");
+pub(crate) const FONT_NORMAL_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/Nunito-Regular-subset.ttf");
 pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold-subset.ttf");
 
 // Theme
@@ -52,6 +53,33 @@ pub(crate) const HAIR_LIGHT_BROWN: iced::Color = color!(171, 131, 60);
 pub(crate) const BACKGROUND: iced::Color = color!(30, 30, 30);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
 pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
+
+const HC_BACKGROUND: iced::Color = color!(0, 0, 0);
+const HC_TEXT: iced::Color = color!(255, 255, 255);
+
+pub(crate) fn is_high_contrast_palette(palette: &iced::theme::Palette) -> bool {
+    palette.background == HC_BACKGROUND
+}
+
+/// Inner and outer focus-ring colors.
+///
+/// High contrast uses a black inner stroke plus a white outer stroke so the
+/// ring stays visible on both yellow primary buttons and dark fills. The
+/// default theme is a single white ring (inner == outer).
+pub(crate) fn focus_ring_colors(high_contrast: bool) -> (iced::Color, iced::Color) {
+    if high_contrast {
+        (HC_BACKGROUND, HC_TEXT)
+    } else {
+        (iced::Color::WHITE, iced::Color::WHITE)
+    }
+}
+
+pub(crate) fn focus_ring_width(high_contrast: bool) -> f32 {
+    if high_contrast { 4.0 } else { 3.0 }
+}
+
+/// How far the focus ring sits outside the button bounds.
+pub(crate) const FOCUS_RING_OUTSET: f32 = 3.0;
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",
