@@ -47,6 +47,9 @@ pub(crate) const FONT_NORMAL_BYTES: &[u8] =
 pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold-subset.ttf");
 
 // Theme
+pub(crate) const DEFAULT_THEME: &str = "Beagle";
+pub(crate) const HIGH_CONTRAST_THEME: &str = "Beagle High Contrast";
+
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
 pub(crate) const CHECK_MARK_GREEN: iced::Color = color!(142, 201, 105);
 pub(crate) const HAIR_LIGHT_BROWN: iced::Color = color!(171, 131, 60);
@@ -56,6 +59,58 @@ pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 
 const HC_BACKGROUND: iced::Color = color!(0, 0, 0);
 const HC_TEXT: iced::Color = color!(255, 255, 255);
+const HC_PRIMARY: iced::Color = color!(255, 255, 0);
+const HC_SUCCESS: iced::Color = color!(0, 255, 128);
+const HC_WARNING: iced::Color = color!(255, 200, 0);
+const HC_DANGER: iced::Color = color!(255, 80, 80);
+
+pub(crate) fn theme_palette(high_contrast: bool) -> (&'static str, iced::theme::Palette) {
+    if high_contrast {
+        (
+            HIGH_CONTRAST_THEME,
+            iced::theme::Palette {
+                background: HC_BACKGROUND,
+                text: HC_TEXT,
+                primary: HC_PRIMARY,
+                success: HC_SUCCESS,
+                warning: HC_WARNING,
+                danger: HC_DANGER,
+            },
+        )
+    } else {
+        (
+            DEFAULT_THEME,
+            iced::theme::Palette {
+                background: BACKGROUND,
+                text: iced::Color::WHITE,
+                primary: TONGUE_ORANGE,
+                success: CHECK_MARK_GREEN,
+                warning: HAIR_LIGHT_BROWN,
+                danger: DANGER,
+            },
+        )
+    }
+}
+
+pub(crate) fn progress_primary(high_contrast: bool) -> iced::Color {
+    if high_contrast {
+        HC_PRIMARY
+    } else {
+        TONGUE_ORANGE
+    }
+}
+
+pub(crate) fn progress_success(high_contrast: bool) -> iced::Color {
+    if high_contrast {
+        HC_SUCCESS
+    } else {
+        CHECK_MARK_GREEN
+    }
+}
+
+pub(crate) fn progress_danger(high_contrast: bool) -> iced::Color {
+    if high_contrast { HC_DANGER } else { DANGER }
+}
 
 pub(crate) fn is_high_contrast_palette(palette: &iced::theme::Palette) -> bool {
     palette.background == HC_BACKGROUND
@@ -136,5 +191,25 @@ mod tests {
         assert_eq!(keymap_layout(""), None);
         // Matching is exact: the table is lowercase, locale regions are not.
         assert_eq!(keymap_layout("US"), None);
+    }
+
+    #[test]
+    fn high_contrast_palette_is_distinct_and_detected() {
+        let (_, default) = super::theme_palette(false);
+        let (_, hc) = super::theme_palette(true);
+
+        assert_ne!(default.background, hc.background);
+        assert_ne!(default.primary, hc.primary);
+        assert!(super::is_high_contrast_palette(&hc));
+        assert!(!super::is_high_contrast_palette(&default));
+    }
+
+    #[test]
+    fn focus_ring_is_not_primary_fill() {
+        let (_, hc) = super::theme_palette(true);
+        let (inner, outer) = super::focus_ring_colors(true);
+        assert_ne!(inner, hc.primary);
+        assert_ne!(outer, hc.primary);
+        assert_ne!(inner, outer);
     }
 }

@@ -105,6 +105,9 @@ pub(crate) enum BBImagerMessage {
     },
     KeyboardListPrevious,
     KeyboardListNext,
+
+    /// High-contrast theme toggle (App Info)
+    SetHighContrast(bool),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
@@ -614,6 +617,16 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             if let Some(msg) = state.keyboard_list_message(1) {
                 return update(state, msg);
             }
+        }
+        BBImagerMessage::SetHighContrast(enabled) => {
+            state.common_mut().app_config.high_contrast = enabled;
+            let config = state.common().app_config.clone();
+            return Task::future(blocking_future(move || {
+                if let Err(e) = config.save() {
+                    tracing::error!("Failed to save config: {e}");
+                }
+                BBImagerMessage::Null
+            }));
         }
         BBImagerMessage::Null => {}
     }

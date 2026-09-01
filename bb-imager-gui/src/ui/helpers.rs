@@ -270,10 +270,21 @@ fn card_box<'a>(
 ) -> widget::Container<'a, BBImagerMessage> {
     widget::container(content)
         .padding(CARD_INSET)
-        .style(|_: &iced::Theme| {
-            widget::container::Style::default()
-                .background(constants::CARD)
-                .border(iced::border::rounded(8))
+        .style(|theme: &iced::Theme| {
+            if constants::is_high_contrast_palette(&theme.palette()) {
+                widget::container::Style::default()
+                    .background(theme.palette().background)
+                    .border(
+                        iced::Border::default()
+                            .color(theme.palette().text)
+                            .width(2)
+                            .rounded(8),
+                    )
+            } else {
+                widget::container::Style::default()
+                    .background(constants::CARD)
+                    .border(iced::border::rounded(8))
+            }
         })
 }
 

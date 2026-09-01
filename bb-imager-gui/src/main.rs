@@ -153,17 +153,9 @@ impl BBImager {
     }
 
     fn theme(&self) -> iced::Theme {
-        iced::Theme::custom(
-            "Beagle",
-            iced::theme::Palette {
-                background: constants::BACKGROUND,
-                text: iced::Color::WHITE,
-                primary: constants::TONGUE_ORANGE,
-                success: constants::CHECK_MARK_GREEN,
-                warning: constants::HAIR_LIGHT_BROWN,
-                danger: constants::DANGER,
-            },
-        )
+        let high_contrast = self.common().app_config.high_contrast;
+        let (name, palette) = constants::theme_palette(high_contrast);
+        iced::Theme::custom(name, palette)
     }
 
     fn scroll_selection(&self) -> Task<BBImagerMessage> {

@@ -20,11 +20,19 @@ pub(crate) fn view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> 
 }
 
 fn review_view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> {
+    let high_contrast = state.common().app_config.high_contrast;
+
     let col = widget::column![
         widget::image(WINDOW_ICON.clone()),
         crate::constants::APP_NAME,
         crate::constants::APP_RELEASE,
         crate::constants::APP_DESC,
+        widget::rule::horizontal(2),
+        helpers::focusable_toggler(
+            high_contrast,
+            "High contrast theme",
+            BBImagerMessage::SetHighContrast,
+        ),
         widget::rule::horizontal(2),
         element_with_label(
             "Cache Directory",
