@@ -14,7 +14,7 @@
   <Identity
     Name="BeagleBoard.org.BBImager"
     Publisher="CN=BeagleBoard.org"
-    Version="1.0.14.0" />
+    Version="1.0.15.0" />
 
   <Properties>
     <DisplayName>BeagleBoard Imager</DisplayName>

@@ -28,7 +28,7 @@ inherits = "release"
 debug = 1
 
 [workspace.package]
-version = "1.0.14"
+version = "1.0.15"
 edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://github.com/beagleboard/bb-imager-rs"
