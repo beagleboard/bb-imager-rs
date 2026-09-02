@@ -1,49 +1,13 @@
 #![cfg(feature = "mock_sd")]
 
+use bb_flasher_sd::Destination;
 use bb_flasher_sd::bootfs_update::flash;
-use bb_flasher_sd::{ContentType, Destination};
-use std::io::{self, Read, Write};
-use std::path::Path;
+use bb_flasher_sd::mock_sd::{MockArchive, MockContent};
+use std::io::{Read, Write};
 use tempfile::NamedTempFile;
 
-struct MockArchive {
-    file_path: Box<Path>,
-}
-
-impl MockArchive {
-    const READER_CONTENTS: &'static str = "reader";
-    const APPEND_CONTENTS: &'static str = "append";
-
-    fn new(file_path: Box<Path>) -> Self {
-        Self { file_path }
-    }
-}
-
-impl<'b> IntoIterator for &'b mut MockArchive {
-    type Item = (Box<str>, ContentType<'b>);
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'b>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Box::new(
-            vec![
-                ("config_dir".into(), ContentType::Dir),
-                (
-                    "config_dir/reader.txt".into(),
-                    ContentType::Reader(Box::new(io::Cursor::new(MockArchive::READER_CONTENTS))),
-                ),
-                (
-                    "config_dir/file.txt".into(),
-                    ContentType::File(self.file_path.clone()),
-                ),
-                (
-                    "config_dir/reader.txt".into(),
-                    ContentType::DataAppend(MockArchive::APPEND_CONTENTS.as_bytes().into()),
-                ),
-            ]
-            .into_iter(),
-        )
-    }
-}
+const READER_CONTENTS: &str = "reader";
+const APPEND_CONTENTS: &str = "append";
 
 #[test]
 fn test_flash_workflow_with_helper_inspection() {
@@ -55,7 +19,23 @@ fn test_flash_workflow_with_helper_inspection() {
     temp_file.write_all(temp_file_data.as_bytes()).unwrap();
 
     // 2. Setup archive and closure
-    let archive = MockArchive::new(temp_file.path().into());
+    let archive = MockArchive::from_entries(vec![
+        ("config_dir".into(), MockContent::Dir),
+        (
+            "config_dir/reader.txt".into(),
+            MockContent::Reader(READER_CONTENTS.as_bytes().into()),
+        ),
+        (
+            "config_dir/file.txt".into(),
+            MockContent::File(temp_file.path().into()),
+        ),
+        // Same path as the reader above on purpose: appends onto the entry
+        // created earlier in this same archive.
+        (
+            "config_dir/reader.txt".into(),
+            MockContent::DataAppend(APPEND_CONTENTS.as_bytes().into()),
+        ),
+    ]);
     let img_closure = move || Ok(archive);
 
     // 3. Execute the public API over the MockSD's path
@@ -85,10 +65,7 @@ fn test_flash_workflow_with_helper_inspection() {
         .read_to_string(&mut actual_contents)
         .unwrap();
 
-    assert_eq!(
-        actual_contents,
-        [MockArchive::READER_CONTENTS, MockArchive::APPEND_CONTENTS].join("")
-    );
+    assert_eq!(actual_contents, [READER_CONTENTS, APPEND_CONTENTS].join(""));
 
     actual_contents.clear();
     root_dir

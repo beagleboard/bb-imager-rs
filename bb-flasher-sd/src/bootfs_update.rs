@@ -66,77 +66,36 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::mock_sd::MockSd;
+    use crate::mock_sd::{MockArchive, MockContent, MockSd};
     use std::io;
 
     use super::*;
 
-    #[derive(Debug, Clone)]
-    struct MockArchive(Vec<(Box<str>, Option<Vec<u8>>)>);
-
-    impl Default for MockArchive {
-        fn default() -> Self {
-            Self(vec![
-                ("config".into(), None),
-                ("config/cmdline.txt".into(), Some(b"console=ttyS0".to_vec())),
-            ])
-        }
-    }
-
-    impl IntoIterator for MockArchive {
-        type Item = (Box<str>, ContentType<'static>);
-        type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
-
-        fn into_iter(self) -> Self::IntoIter {
-            Box::new(
-                self.0
-                    .iter()
-                    .map(|(p, f)| match f {
-                        Some(x) => (
-                            p.clone(),
-                            ContentType::Reader(Box::new(io::Cursor::new(x.clone()))),
-                        ),
-                        None => (p.clone(), ContentType::Dir),
-                    })
-                    .collect::<Vec<Self::Item>>()
-                    .into_iter(),
-            )
-        }
-    }
-
-    impl<'b> IntoIterator for &'b mut MockArchive {
-        type Item = (Box<str>, ContentType<'b>);
-        type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'b>;
-
-        fn into_iter(self) -> Self::IntoIter {
-            Box::new(
-                self.0
-                    .iter()
-                    .map(|(p, f)| match f {
-                        Some(x) => (
-                            p.clone(),
-                            ContentType::Reader(Box::new(io::Cursor::new(x.clone()))),
-                        ),
-                        None => (p.clone(), ContentType::Dir),
-                    })
-                    .collect::<Vec<Self::Item>>()
-                    .into_iter(),
-            )
-        }
+    /// The BOOT entries these tests flash: a directory and one file under it.
+    fn archive() -> MockArchive {
+        MockArchive::from_entries(vec![
+            ("config".into(), MockContent::Dir),
+            (
+                "config/cmdline.txt".into(),
+                MockContent::Reader("console=ttyS0".as_bytes().into()),
+            ),
+        ])
     }
 
     #[test]
     fn basic() {
-        let iter = MockArchive::default();
         let mut sd = MockSd::new();
+        let archive = archive();
 
-        internal(iter.clone().into_iter(), &mut sd, None).unwrap();
+        internal((&archive).into_iter(), &mut sd, None).unwrap();
         sd.rewind().unwrap();
 
         let boot_part = crate::customization::ParitionType::Boot.open(sd).unwrap();
         let root = boot_part.root_dir();
 
-        for (path, f) in iter {
+        let mut checked = 0;
+        for (path, f) in &archive {
+            checked += 1;
             match f {
                 ContentType::Dir => {
                     root.open_dir(&path).unwrap();
@@ -154,6 +113,10 @@ mod test {
                 _ => unreachable!(),
             }
         }
+        assert_eq!(
+            checked, 2,
+            "expected the default archive to yield 2 entries"
+        );
     }
 
     #[test]
@@ -161,10 +124,10 @@ mod test {
         let cancel = CancellationToken::default();
         drop(cancel.drop_guard());
 
-        let iter = MockArchive::default();
+        let iter = archive();
         let mut sd = MockSd::new();
 
-        let result = internal(iter.into_iter(), &mut sd, Some(cancel));
+        let result = internal((&iter).into_iter(), &mut sd, Some(cancel));
         assert!(
             matches!(result.unwrap_err(), crate::Error::Aborted),
             "Expected flashing to fail due to cancellation"
@@ -187,13 +150,13 @@ mod test {
 
     #[test]
     fn test_immediate_storage_failure() {
-        let mut iter = MockArchive::default();
+        let iter = archive();
         let mut sd = MockSd::new();
 
         // Break the device immediately before passing it in
         drop(sd.fail_token().drop_guard());
 
-        let result = internal((&mut iter).into_iter(), &mut sd, None);
+        let result = internal((&iter).into_iter(), &mut sd, None);
 
         assert!(
             result.is_err(),
@@ -205,7 +168,7 @@ mod test {
     fn test_mid_flight_storage_failure() {
         let mut sd = MockSd::new();
         let fail_handle = sd.fail_token().drop_guard();
-        let mut archive = MockArchive::default();
+        let archive = archive();
 
         // Two-way synchronization channels just to orchestrate the steps
         let (signal_tx, signal_rx) = std::sync::mpsc::channel::<()>();
@@ -225,7 +188,7 @@ mod test {
 
             // We wrap the iterator on the MAIN thread. No Send bounds broken!
             let mut step = 0;
-            let triggering_iter = (&mut archive).into_iter().inspect(move |_| {
+            let triggering_iter = (&archive).into_iter().inspect(move |_| {
                 if step == 1 {
                     // Signal the background thread to kill the drive
                     let _ = signal_tx.send(());
