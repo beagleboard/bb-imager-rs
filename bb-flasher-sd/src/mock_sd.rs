@@ -86,6 +86,8 @@ impl MockSd {
     }
 
     pub fn open_boot(&mut self) -> fatfs::FileSystem<BufStream<StreamSlice<&mut Self>>> {
+        // The partition table is read from the current cursor.
+        self.rewind().unwrap();
         crate::customization::ParitionType::Boot.open(self).unwrap()
     }
 }
