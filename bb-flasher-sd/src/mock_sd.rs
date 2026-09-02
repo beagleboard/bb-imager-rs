@@ -5,6 +5,8 @@ use mbrman::{CHS, MBR, MBRPartitionEntry};
 
 use bb_helper::cancel::CancellationToken;
 
+use crate::ContentType;
+
 const DISK_SIZE: u64 = 128 * 1024 * 1024; // 128 MiB
 const SECTOR_SIZE: u32 = 512;
 const FIRST_LBA: u32 = 2048;
@@ -129,5 +131,57 @@ impl Read for MockSd {
 impl crate::helpers::Eject for MockSd {
     fn eject(self) -> io::Result<()> {
         self.as_file().sync_all()
+    }
+}
+
+/// Replayable description of one archive entry.
+///
+/// Mirrors [`ContentType`], but stores reader contents as bytes so the same entry
+/// can be handed out again on every iteration.
+pub enum MockContent {
+    Dir,
+    Reader(Box<[u8]>),
+    File(Box<std::path::Path>),
+    DataAppend(Box<[u8]>),
+}
+
+impl MockContent {
+    fn as_content_type(&self) -> ContentType<'_> {
+        match self {
+            Self::Dir => ContentType::Dir,
+            Self::Reader(data) => ContentType::Reader(Box::new(data.as_ref())),
+            Self::File(path) => ContentType::File(path.clone()),
+            Self::DataAppend(data) => ContentType::DataAppend(data.clone()),
+        }
+    }
+}
+
+pub struct MockArchive(Vec<(Box<str>, MockContent)>);
+
+impl MockArchive {
+    pub fn from_entries(entries: Vec<(Box<str>, MockContent)>) -> Self {
+        Self(entries)
+    }
+}
+
+impl<'a> IntoIterator for &'a MockArchive {
+    type Item = (Box<str>, ContentType<'a>);
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(
+            self.0
+                .iter()
+                .map(|(path, content)| (path.clone(), content.as_content_type())),
+        )
+    }
+}
+
+impl<'a> IntoIterator for &'a mut MockArchive {
+    type Item = (Box<str>, ContentType<'a>);
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&*self).into_iter()
     }
 }
