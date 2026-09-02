@@ -6,6 +6,7 @@ mod configuration;
 mod destination_selection;
 mod flash;
 mod flash_finish;
+mod focusable;
 mod helpers;
 mod image_selection;
 mod review;

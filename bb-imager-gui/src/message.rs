@@ -95,6 +95,19 @@ pub(crate) enum BBImagerMessage {
 
     /// Search
     UpdateSearchText(Arc<str>),
+
+    /// Keyboard navigation
+    FocusSearch,
+    KeyboardEscape,
+    KeyboardEnter,
+    KeyboardTab {
+        shift: bool,
+    },
+    KeyboardListPrevious,
+    KeyboardListNext,
+
+    /// High-contrast theme toggle (App Info)
+    SetHighContrast(bool),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
@@ -120,17 +133,20 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => {}
             }
         }
-        BBImagerMessage::SelectBoard(b) => match state {
-            BBImager::ChooseBoard(inner) => {
-                inner.selected_board = Some(b);
-            }
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseBoard(inner) = &mut overlay_state.page {
-                    inner.selected_board = Some(b)
+        BBImagerMessage::SelectBoard(b) => {
+            match state {
+                BBImager::ChooseBoard(inner) => {
+                    inner.selected_board = Some(b);
                 }
+                BBImager::AppInfo(overlay_state) => {
+                    if let OverlayData::ChooseBoard(inner) = &mut overlay_state.page {
+                        inner.selected_board = Some(b)
+                    }
+                }
+                _ => {}
             }
-            _ => {}
-        },
+            return state.scroll_selection();
+        }
         BBImagerMessage::UpdateOsList((imgs, pos)) => {
             match state {
                 BBImager::ChooseOs(inner) => inner.update_images(imgs, pos),
@@ -145,7 +161,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::SelectOs(id) => match state {
             BBImager::ChooseOs(inner) => match id {
                 helpers::OsImageId::Format => {
-                    inner.selected_image = Some((id, helpers::BoardImage::format()))
+                    let scroll = inner.common.list_selection_id.clone();
+                    inner.selected_image = Some((id, helpers::BoardImage::format()));
+                    return crate::focus_scroll::scroll_widget_into_view(scroll);
                 }
                 helpers::OsImageId::Local(flasher) => {
                     let extensions = helpers::file_filter(flasher);
@@ -190,15 +208,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             },
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::SelectRemoteOs((image, flasher)) => match state {
-            BBImager::ChooseOs(inner) => {
-                inner.selected_image = Some((
-                    helpers::OsImageId::OsImage(image.id),
-                    helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
-                ));
-            }
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
+        BBImagerMessage::SelectRemoteOs((image, flasher)) => {
+            match state {
+                BBImager::ChooseOs(inner) => {
                     inner.selected_image = Some((
                         helpers::OsImageId::OsImage(image.id),
                         helpers::BoardImage::remote(
@@ -208,9 +220,22 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         ),
                     ));
                 }
+                BBImager::AppInfo(overlay_state) => {
+                    if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
+                        inner.selected_image = Some((
+                            helpers::OsImageId::OsImage(image.id),
+                            helpers::BoardImage::remote(
+                                image,
+                                flasher,
+                                inner.common.downloader.clone(),
+                            ),
+                        ));
+                    }
+                }
+                _ => {}
             }
-            _ => {}
-        },
+            return state.scroll_selection();
+        }
         BBImagerMessage::SelectLocalOs(image) => match state {
             BBImager::ChooseOs(inner) => {
                 inner.selected_image = Some((helpers::OsImageId::Local(image.flasher()), image))
@@ -321,12 +346,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 inner.destinations = x;
             }
         }
-        BBImagerMessage::SelectDest(x) => match state {
-            BBImager::ChooseDest(inner) => {
-                inner.selected_dest = Some(x);
+        BBImagerMessage::SelectDest(x) => {
+            match state {
+                BBImager::ChooseDest(inner) => inner.selected_dest = Some(x),
+                _ => panic!("Unexpected message"),
             }
-            _ => panic!("Unexpected message"),
-        },
+            return state.scroll_selection();
+        }
         BBImagerMessage::SelectFileDest(x) => {
             return Task::perform(
                 async move {
@@ -569,6 +595,38 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             {
                 img.update_init_format(f);
             }
+        }
+        BBImagerMessage::FocusSearch => return state.focus_search(),
+        BBImagerMessage::KeyboardEscape => {
+            if let Some(msg) = state.keyboard_escape_message() {
+                return update(state, msg);
+            }
+        }
+        BBImagerMessage::KeyboardEnter => {
+            if let Some(msg) = state.keyboard_enter_message() {
+                return update(state, msg);
+            }
+        }
+        BBImagerMessage::KeyboardTab { shift } => return state.keyboard_tab(shift),
+        BBImagerMessage::KeyboardListPrevious => {
+            if let Some(msg) = state.keyboard_list_message(-1) {
+                return update(state, msg);
+            }
+        }
+        BBImagerMessage::KeyboardListNext => {
+            if let Some(msg) = state.keyboard_list_message(1) {
+                return update(state, msg);
+            }
+        }
+        BBImagerMessage::SetHighContrast(enabled) => {
+            state.common_mut().app_config.high_contrast = enabled;
+            let config = state.common().app_config.clone();
+            return Task::future(blocking_future(move || {
+                if let Err(e) = config.save() {
+                    tracing::error!("Failed to save config: {e}");
+                }
+                BBImagerMessage::Null
+            }));
         }
         BBImagerMessage::Null => {}
     }

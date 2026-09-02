@@ -984,7 +984,9 @@ impl<'a> DestinationItem<'a> {
 
     pub(crate) fn is_selected(&'a self, dst: &'a Destination) -> bool {
         match self {
-            DestinationItem::SaveToFile(_) => false,
+            // After the file picker, the selection is a `LocalFile` path; this
+            // list row is the action that produced it, so match by variant.
+            DestinationItem::SaveToFile(_) => matches!(dst, Destination::LocalFile(_)),
             DestinationItem::Destination(d) => dst.eq(d),
         }
     }
@@ -1409,10 +1411,10 @@ mod tests {
     #[test]
     fn destination_item_save_to_file() {
         let item = DestinationItem::SaveToFile("os.img.xz".to_string());
-        let other = Destination::LocalFile(PathBuf::from("/tmp/x"));
+        let selected = Destination::LocalFile(PathBuf::from("/tmp/x"));
 
         assert_eq!(item.to_string(), "Save To File");
-        assert!(!item.is_selected(&other));
+        assert!(item.is_selected(&selected));
         assert!(item.subtitle().is_none());
         match item.msg() {
             BBImagerMessage::SelectFileDest(name) => assert_eq!(name, "os.img"),

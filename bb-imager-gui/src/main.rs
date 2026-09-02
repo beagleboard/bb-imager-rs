@@ -13,7 +13,9 @@ use crate::{helpers::blocking_future, state::BBImagerCommon};
 
 mod constants;
 mod db;
+mod focus_scroll;
 mod helpers;
+mod keyboard;
 mod message;
 mod persistance;
 mod state;
@@ -52,11 +54,11 @@ fn main() -> iced::Result {
         Some(image::ImageFormat::Png),
     )
     .ok();
-    assert!(icon.is_some());
-
-    #[cfg(target_os = "macos")]
-    // HACK: mac_notification_sys set application name (not an option in notify-rust)
-    let _ = notify_rust::set_application("org.beagleboard.imagingutility");
+    if icon.is_none() {
+        tracing::warn!(
+            "Window icon could not be loaded (is git-lfs installed and have you run `git lfs pull`?)"
+        );
+    }
 
     let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
@@ -64,6 +66,10 @@ fn main() -> iced::Result {
         icon,
         ..Default::default()
     };
+
+    #[cfg(all(target_os = "macos", feature = "notify-rust"))]
+    // HACK: mac_notification_sys set application name (not an option in notify-rust)
+    let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
     iced::application(BBImager::new, message::update, ui::view)
         .title(helpers::app_title)
@@ -129,6 +135,8 @@ impl BBImager {
             img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
 
             scroll_id: widget::Id::unique(),
+            search_id: widget::Id::unique(),
+            list_selection_id: widget::Id::unique(),
             db: db.clone(),
         };
 
@@ -145,17 +153,77 @@ impl BBImager {
     }
 
     fn theme(&self) -> iced::Theme {
-        iced::Theme::custom(
-            "Beagle",
-            iced::theme::Palette {
-                background: constants::BACKGROUND,
-                text: iced::Color::WHITE,
-                primary: constants::TONGUE_ORANGE,
-                success: constants::CHECK_MARK_GREEN,
-                warning: constants::HAIR_LIGHT_BROWN,
-                danger: constants::DANGER,
-            },
-        )
+        let high_contrast = self.common().app_config.high_contrast;
+        let (name, palette) = constants::theme_palette(high_contrast);
+        iced::Theme::custom(name, palette)
+    }
+
+    fn scroll_selection(&self) -> Task<BBImagerMessage> {
+        crate::focus_scroll::scroll_widget_into_view(self.common().list_selection_id.clone())
+    }
+
+    fn focus_search(&self) -> Task<BBImagerMessage> {
+        match self {
+            Self::ChooseBoard(_) | Self::ChooseOs(_) | Self::ChooseDest(_) => {
+                widget::operation::focus(self.common().search_id.clone())
+                    .chain(focus_scroll::scroll_focused_into_view())
+            }
+            _ => Task::none(),
+        }
+    }
+
+    fn keyboard_tab(&self, shift: bool) -> Task<BBImagerMessage> {
+        let focus = if shift {
+            widget::operation::focus_previous()
+        } else {
+            widget::operation::focus_next()
+        };
+
+        focus.chain(focus_scroll::scroll_focused_into_view())
+    }
+
+    fn keyboard_escape_message(&self) -> Option<BBImagerMessage> {
+        match self {
+            Self::ChooseBoard(x) if !x.search_text.is_empty() => {
+                Some(BBImagerMessage::UpdateSearchText("".into()))
+            }
+            Self::ChooseOs(x) if !x.search_text.is_empty() => {
+                Some(BBImagerMessage::UpdateSearchText("".into()))
+            }
+            Self::ChooseOs(x) if x.pos.is_some() => Some(BBImagerMessage::GotoOsListParent),
+            Self::ChooseDest(x) if !x.search_text.is_empty() => {
+                Some(BBImagerMessage::UpdateSearchText("".into()))
+            }
+            Self::ChooseBoard(_) | Self::Flashing(_) => None,
+            Self::AppInfo(_)
+            | Self::ChooseOs(_)
+            | Self::ChooseDest(_)
+            | Self::Customize(_)
+            | Self::Review(_) => Some(BBImagerMessage::Back),
+            _ => None,
+        }
+    }
+
+    fn keyboard_enter_message(&self) -> Option<BBImagerMessage> {
+        match self {
+            Self::ChooseBoard(x) if x.selected_board.is_some() => Some(BBImagerMessage::Next),
+            Self::ChooseOs(x) if x.selected_image.is_some() => Some(BBImagerMessage::Next),
+            Self::ChooseDest(x) if x.selected_dest.is_some() => Some(BBImagerMessage::Next),
+            Self::Customize(x) if x.ctx.customization.validate() => Some(BBImagerMessage::Next),
+            Self::Review(_) => Some(BBImagerMessage::FlashStart),
+            Self::FlashingFail(_) => Some(BBImagerMessage::Retry),
+            Self::FlashingCancel(_) | Self::FlashingSuccess(_) => Some(BBImagerMessage::Restart),
+            _ => None,
+        }
+    }
+
+    fn keyboard_list_message(&self, delta: i32) -> Option<BBImagerMessage> {
+        match self {
+            Self::ChooseBoard(x) => x.list_select_relative(delta),
+            Self::ChooseOs(x) => x.list_select_relative(delta),
+            Self::ChooseDest(x) => x.list_select_relative(delta),
+            _ => None,
+        }
     }
 
     fn common_mut(&mut self) -> &mut BBImagerCommon {
@@ -219,7 +287,9 @@ impl BBImager {
     fn subscription(&self) -> Subscription<BBImagerMessage> {
         const INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-        match self {
+        let keyboard = crate::keyboard::subscription();
+
+        let destinations = match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
                     x.selected_image.1.flasher(),
@@ -247,7 +317,9 @@ impl BBImager {
                 },
             ),
             _ => Subscription::none(),
-        }
+        };
+
+        Subscription::batch([keyboard, destinations])
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {

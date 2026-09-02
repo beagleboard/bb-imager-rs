@@ -1,6 +1,6 @@
 use iced::{
     Element,
-    widget::{self, button, text},
+    widget::{self, text},
 };
 
 use crate::{
@@ -16,10 +16,10 @@ pub(crate) fn view<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BB
         os_list_pane(state),
         os_view_pane(state),
         [
-            widget::button("BACK")
+            helpers::action_button("BACK")
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
-            widget::button("NEXT")
+            helpers::action_button("NEXT")
                 .on_press_maybe(state.selected_image.as_ref().map(|_| BBImagerMessage::Next)),
         ],
     )
@@ -35,53 +35,53 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
         )
         .into()
     } else {
-        let items = state
-            .images
-            .iter()
-            .map(|img| {
-                let is_selected = state
-                    .selected_image
-                    .as_ref()
-                    .map(|(x, _)| *x == img.id)
-                    .unwrap_or(false);
+        let items = state.images.iter().map(|img| {
+            let is_selected = state
+                .selected_image
+                .as_ref()
+                .map(|(x, _)| *x == img.id)
+                .unwrap_or(false);
 
-                let icon: Element<BBImagerMessage> = match img.id {
-                    crate::helpers::OsImageId::Format => widget::svg(helpers::FORMAT_ICON.clone())
-                        .height(ICON_WIDTH)
-                        .width(ICON_WIDTH)
-                        .style(svg_icon_style)
-                        .into(),
-                    crate::helpers::OsImageId::Local(_) => {
-                        widget::svg(helpers::FILE_ADD_ICON.clone())
-                            .height(ICON_WIDTH)
-                            .width(ICON_WIDTH)
-                            .style(svg_icon_style)
-                            .into()
-                    }
-                    crate::helpers::OsImageId::OsImage(_)
-                    | crate::helpers::OsImageId::OsSublist(_) => bb_iced_widgets::cached_icon(
+            let icon: Element<BBImagerMessage> = match img.id {
+                crate::helpers::OsImageId::Format => widget::svg(helpers::FORMAT_ICON.clone())
+                    .height(ICON_WIDTH)
+                    .width(ICON_WIDTH)
+                    .style(svg_icon_style)
+                    .into(),
+                crate::helpers::OsImageId::Local(_) => widget::svg(helpers::FILE_ADD_ICON.clone())
+                    .height(ICON_WIDTH)
+                    .width(ICON_WIDTH)
+                    .style(svg_icon_style)
+                    .into(),
+                crate::helpers::OsImageId::OsImage(_) | crate::helpers::OsImageId::OsSublist(_) => {
+                    bb_iced_widgets::cached_icon(
                         &state.common.img_handle_cache,
                         img.icon.as_ref().expect("Missing Os Image icon"),
                     )
                     .width(ICON_WIDTH)
                     .height(ICON_WIDTH)
-                    .into(),
-                };
-
-                let mut contents = vec![icon, helpers::list_label(img.label()).into()];
-                if img.is_sublist() {
-                    contents.push(
-                        widget::svg(helpers::ARROW_FORWARD_IOS_ICON.clone())
-                            .height(20)
-                            .width(iced::Shrink)
-                            .style(svg_icon_style)
-                            .into(),
-                    );
+                    .into()
                 }
+            };
 
-                helpers::list_item(contents, is_selected, BBImagerMessage::SelectOs(img.id))
-            })
-            .map(Into::into);
+            let mut contents = vec![icon, helpers::list_label(img.label()).into()];
+            if img.is_sublist() {
+                contents.push(
+                    widget::svg(helpers::ARROW_FORWARD_IOS_ICON.clone())
+                        .height(20)
+                        .width(iced::Shrink)
+                        .style(svg_icon_style)
+                        .into(),
+                );
+            }
+
+            helpers::list_item(
+                contents,
+                is_selected,
+                BBImagerMessage::SelectOs(img.id),
+                &state.common.list_selection_id,
+            )
+        });
 
         // Nested sublists get a row to walk back up to their parent.
         let back: Vec<Element<BBImagerMessage>> = if state.pos.is_none() {
@@ -91,17 +91,21 @@ fn os_list_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
                 .height(ICON_WIDTH)
                 .width(ICON_WIDTH)
                 .style(svg_icon_style);
-            vec![
-                helpers::list_item(
-                    [icon.into(), helpers::list_label("Back").into()],
-                    false,
-                    BBImagerMessage::GotoOsListParent,
-                )
-                .into(),
-            ]
+            vec![helpers::list_item(
+                [icon.into(), helpers::list_label("Back").into()],
+                false,
+                BBImagerMessage::GotoOsListParent,
+                &state.common.list_selection_id,
+            )]
         };
 
-        helpers::list_pane(&state.search_text, &state.common.scroll_id, back, items)
+        helpers::list_pane(
+            &state.search_text,
+            &state.common.scroll_id,
+            &state.common.search_id,
+            back,
+            items,
+        )
     }
 }
 
@@ -185,9 +189,10 @@ fn os_view_pane<'a>(state: &'a crate::state::ChooseOsState) -> Element<'a, BBIma
             }
 
             if let Some(x) = img.support() {
-                let row =
-                    widget::row![button("SUPPORT").on_press(BBImagerMessage::OpenUrl(x.clone()))]
-                        .spacing(16);
+                let row = widget::row![
+                    helpers::action_button("SUPPORT").on_press(BBImagerMessage::OpenUrl(x.clone()))
+                ]
+                .spacing(16);
                 col = col.push(widget::center(row));
             }
 

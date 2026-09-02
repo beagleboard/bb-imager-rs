@@ -1,19 +1,26 @@
 use iced::Element;
-use iced::widget::{self, button};
+use iced::widget;
 
 use crate::state::{FlashingFailState, FlashingFinishState};
-use crate::ui::helpers::{board_view_pane, page_type1, progress_finish_view, selectable_text};
+use crate::ui::helpers::{
+    action_button, board_view_pane, page_type1, progress_finish_view, selectable_text,
+};
 use crate::{BBImagerMessage, constants};
 
 pub(crate) fn fail(state: &FlashingFailState) -> Element<'_, BBImagerMessage> {
+    let high_contrast = state.common.app_config.high_contrast;
     page_type1(
         info_view(state),
-        progress_finish_view("Failed", constants::DANGER, &state.err),
+        progress_finish_view(
+            "Failed",
+            constants::progress_danger(high_contrast),
+            &state.err,
+        ),
         [
-            button("Flash New")
+            action_button("Flash New")
                 .style(widget::button::danger)
                 .on_press(BBImagerMessage::Restart),
-            button("Retry")
+            action_button("Retry")
                 .style(widget::button::primary)
                 .on_press(BBImagerMessage::Retry),
         ],
@@ -32,20 +39,22 @@ pub(crate) fn info_view(state: &FlashingFailState) -> Element<'_, BBImagerMessag
 }
 
 pub(crate) fn cancel(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
+    let high_contrast = state.common.app_config.high_contrast;
     page_type1(
         board_view_pane(&state.selected_board, &state.common),
         progress_finish_view(
             "Cancelled",
-            constants::DANGER,
+            constants::progress_danger(high_contrast),
             "Flashing Cancelled by the user",
         ),
-        [button("Restart")
+        [action_button("Restart")
             .style(widget::button::danger)
             .on_press(BBImagerMessage::Restart)],
     )
 }
 
 pub(crate) fn success(state: &FlashingFinishState) -> Element<'_, BBImagerMessage> {
+    let high_contrast = state.common.app_config.high_contrast;
     let msg = if state.is_download {
         "Successfully Downloaded Image"
     } else {
@@ -54,8 +63,8 @@ pub(crate) fn success(state: &FlashingFinishState) -> Element<'_, BBImagerMessag
 
     page_type1(
         board_view_pane(&state.selected_board, &state.common),
-        progress_finish_view("100%", constants::CHECK_MARK_GREEN, msg),
-        [button("Flash Another")
+        progress_finish_view("100%", constants::progress_success(high_contrast), msg),
+        [action_button("Flash Another")
             .style(widget::button::primary)
             .on_press(BBImagerMessage::Restart)],
     )
