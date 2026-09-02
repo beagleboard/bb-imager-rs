@@ -36,6 +36,7 @@ liblzma = { version = "0.4", features = ["parallel"] }
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "macros"] }
 tempfile = "3.27"
 zip = { version = "8.6", default-features = false }
+bb-flasher-sd = { path = "../bb-flasher-sd", features = ["mock_sd"] }
 
 [features]
 default = []

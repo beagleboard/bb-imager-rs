@@ -85,8 +85,31 @@ impl MockSd {
         self.file.path()
     }
 
+    /// A standalone copy of the current bytes.
+    ///
+    /// Flashing truncates its destination, so a test that flashes onto this
+    /// `MockSd` (the only way [`Self::open_boot`] can inspect the result) needs
+    /// its OS image in a separate file.
+    pub fn image_copy(&self) -> tempfile::NamedTempFile {
+        let mut image = tempfile::NamedTempFile::new().unwrap();
+        let mut src = std::fs::File::open(self.path()).unwrap();
+        io::copy(&mut src, image.as_file_mut()).unwrap();
+        image.flush().unwrap();
+        image
+    }
+
     pub fn open_boot(&mut self) -> fatfs::FileSystem<BufStream<StreamSlice<&mut Self>>> {
+        // The partition table is read from the current cursor.
+        self.rewind().unwrap();
         crate::customization::ParitionType::Boot.open(self).unwrap()
+    }
+
+    /// Read a file from the boot partition.
+    pub fn boot_file(&mut self, path: &str) -> io::Result<String> {
+        let fs = self.open_boot();
+        let mut out = String::new();
+        fs.root_dir().open_file(path)?.read_to_string(&mut out)?;
+        Ok(out)
     }
 }
 
