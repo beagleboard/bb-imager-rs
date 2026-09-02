@@ -61,9 +61,16 @@ impl BBFlasherTarget for Target {
     }
 }
 
+/// A boot partition path and its contents, with `None` denoting a directory.
+type Entry = (Box<str>, Option<Box<[u8]>>);
+
 /// Linux Image post-install customization options.
+///
+/// `bb_flasher_sd` writes entries with fatfs' `create_file`, which does not
+/// create missing parent directories, so an entry under a directory has to be
+/// preceded by the directory itself.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FlashingSdLinuxConfig(Vec<(Box<str>, Box<[u8]>)>);
+pub struct FlashingSdLinuxConfig(Vec<Entry>);
 
 fn sysconf_w(sysconf: &mut Vec<u8>, key: &str, value: &str) {
     sysconf.extend(key.as_bytes());
@@ -109,16 +116,24 @@ impl FlashingSdLinuxConfig {
                 sysconf_w(&mut content, "iwd_psk_file", &format!("{ssid}.psk"));
 
                 Self(vec![
-                    ("sysconf.txt".to_string().into(), content.into()),
+                    ("sysconf.txt".to_string().into(), Some(content.into())),
+                    // The psk file lives in `services/`, which images are not
+                    // guaranteed to already have.
+                    ("services".to_string().into(), None),
                     (
                         format!("services/{ssid}.psk").into(),
-                        format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
-                            .into_bytes()
-                            .into(),
+                        Some(
+                            format!("[Security]\nPassphrase={psk}\n\n[Settings]\nAutoConnect=true")
+                                .into_bytes()
+                                .into(),
+                        ),
                     ),
                 ])
             }
-            None => Self(vec![("sysconf.txt".to_string().into(), content.into())]),
+            None => Self(vec![(
+                "sysconf.txt".to_string().into(),
+                Some(content.into()),
+            )]),
         }
     }
 
@@ -131,11 +146,14 @@ impl FlashingSdLinuxConfig {
         ssh: Option<Box<str>>,
     ) -> Self {
         let data = cloud_init::CloudInitConfig::new(hostname, timezone, keymap, user, wifi, ssh);
-        Self(vec![("cloud-init".to_string().into(), data.to_file_data())])
+        Self(vec![(
+            "cloud-init".to_string().into(),
+            Some(data.to_file_data()),
+        )])
     }
 
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
-        Self(vec![(file_name, file_content.into_boxed_bytes())])
+        Self(vec![(file_name, Some(file_content.into_boxed_bytes()))])
     }
 
     pub const fn none() -> Self {
@@ -226,7 +244,13 @@ where
         let customization = if self.customization.0.is_empty() {
             vec![]
         } else {
-            let content = self.customization.0.into_iter().map(|(p, d)| (p, d.into()));
+            // `ContentType` is not Send, so build it lazily inside the map:
+            // a Map iterator is Send when its inner iterator and closure are,
+            // regardless of the item type.
+            let content = self.customization.0.into_iter().map(|(p, d)| {
+                use bb_flasher_sd::ContentType;
+                (p, d.map_or(ContentType::Dir, ContentType::DataAppend))
+            });
             vec![bb_flasher_sd::Customization {
                 partition: bb_flasher_sd::ParitionType::Boot,
                 content,
