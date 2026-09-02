@@ -24,7 +24,7 @@ use thiserror::Error;
 
 pub mod bootfs_update;
 pub(crate) mod customization;
-mod flashing;
+pub mod flashing;
 mod helpers;
 #[cfg(any(feature = "mock_sd", test))]
 pub mod mock_sd;

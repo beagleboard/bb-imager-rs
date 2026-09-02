@@ -11,6 +11,8 @@ use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
+pub const NONE_BOOTFS: Option<fn() -> std::io::Result<crate::img::OsArchive>> = None;
+
 /// SD Card
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Target(bb_flasher_sd::Device);
@@ -188,17 +190,25 @@ impl FormatFlasher {
 /// - img: Raw images
 /// - xz: Xz compressed raw images
 #[derive(Debug, Clone)]
-pub struct Flasher<I, B> {
+pub struct Flasher<I, B, T> {
     img: I,
+    bootfs: Option<T>,
     bmap: Option<B>,
     dst: bb_flasher_sd::Destination,
     customization: FlashingSdLinuxConfig,
 }
 
-impl<I, B> Flasher<I, B> {
-    pub fn new(img: I, bmap: Option<B>, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
+impl<I, B, T> Flasher<I, B, T> {
+    pub fn new(
+        img: I,
+        bootfs: Option<T>,
+        bmap: Option<B>,
+        dst: Target,
+        customization: FlashingSdLinuxConfig,
+    ) -> Self {
         Self {
             img,
+            bootfs,
             bmap,
             dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
             customization,
@@ -207,12 +217,14 @@ impl<I, B> Flasher<I, B> {
 
     pub fn with_file_dest(
         img: I,
+        bootfs: Option<T>,
         bmap: Option<B>,
         dst: PathBuf,
         customization: FlashingSdLinuxConfig,
     ) -> Self {
         Self {
             img,
+            bootfs,
             bmap,
             dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
             customization,
@@ -224,16 +236,11 @@ impl<I, B> Flasher<I, B> {
     }
 }
 
-impl<I> Flasher<I, std::future::Ready<std::io::Result<Box<str>>>> {
-    pub fn without_bmap(img: I, dst: Target, customization: FlashingSdLinuxConfig) -> Self {
-        Self::new(img, None, dst, customization)
-    }
-}
-
-impl<I, B> Flasher<I, B>
+impl<I, B, T> Flasher<I, B, T>
 where
     I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send,
     B: FnOnce() -> std::io::Result<Box<str>> + Send,
+    T: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
     pub fn flash(
         self,
@@ -280,8 +287,16 @@ where
             None => None,
         };
 
-        bb_flasher_sd::flash(self.img, self.bmap, self.dst, tx, customization, cancel)
-            .map_err(Into::into)
+        bb_flasher_sd::flash(
+            self.img,
+            self.bootfs,
+            self.bmap,
+            self.dst,
+            tx,
+            customization,
+            cancel,
+        )
+        .map_err(Into::into)
     }
 }
 

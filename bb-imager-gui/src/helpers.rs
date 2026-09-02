@@ -442,6 +442,7 @@ pub(crate) async fn flash(
         ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
             bb_flasher::sd::Flasher::with_file_dest(
                 img.into_image_fn(),
+                bb_flasher::sd::NONE_BOOTFS,
                 bmap.map(|x| x.into_fn()),
                 f,
                 customization.sd_customization(),
@@ -460,6 +461,7 @@ pub(crate) async fn flash(
         ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
             bb_flasher::sd::Flasher::new(
                 img.into_image_fn(),
+                bb_flasher::sd::NONE_BOOTFS,
                 bmap.map(|x| x.into_fn()),
                 t,
                 customization.sd_customization(),

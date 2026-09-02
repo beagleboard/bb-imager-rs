@@ -170,6 +170,7 @@ fn flash_internal(
             if file_destination {
                 bb_flasher::sd::Flasher::with_file_dest(
                     LocalImage::new(img).into_image_fn(),
+                    bb_flasher::sd::NONE_BOOTFS,
                     bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
                     dst,
                     customization,
@@ -177,6 +178,7 @@ fn flash_internal(
             } else {
                 bb_flasher::sd::Flasher::new(
                     LocalImage::new(img).into_image_fn(),
+                    bb_flasher::sd::NONE_BOOTFS,
                     bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
                     dst.try_into().unwrap(),
                     customization,

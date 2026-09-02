@@ -8,6 +8,7 @@
 
 use std::io::{Cursor, Read};
 
+use bb_flasher_sd::flashing::NO_BOOTFS;
 use bb_flasher_sd::mock_sd::MockSd;
 use bb_flasher_sd::{ContentType, Customization, Destination, ParitionType};
 
@@ -41,6 +42,7 @@ fn flash_applies_customization_through_public_api() {
     // on the customization loop, so it flashes without a progress channel.
     bb_flasher_sd::flash(
         img_resolver,
+        NO_BOOTFS,
         bmap,
         Destination::File(mock.path().into()),
         None,
