@@ -8,8 +8,61 @@ use serde::{Deserialize, Serialize};
 /// Configuration for GUI that should be presisted
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) sd_customization: Option<SdCustomization>,
+    #[serde(default)]
+    pub(crate) sd_customization: SdCustomization,
+}
+
+impl From<&GuiConfiguration> for bb_imager_ui::customization::SysConfig {
+    fn from(value: &GuiConfiguration) -> Self {
+        Self {
+            common: value.into(),
+            usb_enable_dhcp: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.usb_enable_dhcp)
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&GuiConfiguration> for bb_imager_ui::customization::CloudInit {
+    fn from(value: &GuiConfiguration) -> Self {
+        Self {
+            hostname: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.hostname.clone().map(Into::into)),
+            timezone: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.timezone),
+            keymap: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.keymap.as_deref())
+                .and_then(crate::constants::keymap_layout),
+            user: value.sd_customization.sysconf.as_ref().and_then(|y| {
+                y.user
+                    .clone()
+                    .map(|u| (u.username.into(), u.password.into()))
+            }),
+            wifi: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.wifi.clone().map(|u| (u.ssid.into(), u.password.into()))),
+            ssh: value
+                .sd_customization
+                .sysconf
+                .as_ref()
+                .and_then(|y| y.ssh.clone().map(Into::into))
+                .unwrap_or_default(),
+        }
+    }
 }
 
 impl GuiConfiguration {
@@ -47,7 +100,7 @@ impl GuiConfiguration {
     }
 
     pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
-        self.sd_customization = Some(t);
+        self.sd_customization = t;
     }
 }
 
@@ -58,10 +111,6 @@ pub(crate) struct SdCustomization {
 }
 
 impl SdCustomization {
-    pub(crate) fn sysconf_customization(&self) -> Option<&SdSysconfCustomization> {
-        self.sysconf.as_ref()
-    }
-
     pub(crate) fn update_sysconfig(&mut self, t: SdSysconfCustomization) {
         self.sysconf = Some(t)
     }
@@ -85,6 +134,68 @@ pub(crate) struct SdSysconfCustomization {
     pub(crate) usb_enable_dhcp: Option<bool>,
 }
 
+impl From<&bb_imager_ui::customization::SysConfig> for SdSysconfCustomization {
+    fn from(value: &bb_imager_ui::customization::SysConfig) -> Self {
+        let mut temp: Self = (&value.common).into();
+        temp.usb_enable_dhcp = Some(value.usb_enable_dhcp);
+
+        temp
+    }
+}
+
+impl From<&bb_imager_ui::customization::CloudInit> for SdSysconfCustomization {
+    fn from(value: &bb_imager_ui::customization::CloudInit) -> Self {
+        let ssh = if value.ssh.is_empty() {
+            None
+        } else {
+            Some(value.ssh.to_string())
+        };
+
+        Self {
+            hostname: value.hostname.as_ref().map(ToString::to_string),
+            timezone: value.timezone,
+            keymap: value.keymap.map(Into::into),
+            user: value.user.as_ref().map(|(u, p)| SdCustomizationUser {
+                username: u.to_string(),
+                password: p.to_string(),
+            }),
+            wifi: value.wifi.as_ref().map(|(s, p)| SdCustomizationWifi {
+                ssid: s.to_string(),
+                password: p.to_string(),
+            }),
+            ssh,
+            usb_enable_dhcp: None,
+        }
+    }
+}
+impl From<SdSysconfCustomization> for bb_imager_ui::customization::SysConfig {
+    fn from(value: SdSysconfCustomization) -> Self {
+        Self {
+            usb_enable_dhcp: value.usb_enable_dhcp.unwrap_or_default(),
+            common: value.into(),
+        }
+    }
+}
+
+impl From<SdSysconfCustomization> for bb_imager_ui::customization::CloudInit {
+    fn from(value: SdSysconfCustomization) -> Self {
+        Self {
+            hostname: value.hostname.map(Into::into),
+            timezone: value.timezone,
+            keymap: value
+                .keymap
+                .as_deref()
+                .and_then(crate::constants::keymap_layout),
+            user: value.user.map(|u| (u.username.into(), u.password.into())),
+            wifi: value
+                .wifi
+                .clone()
+                .map(|u| (u.ssid.into(), u.password.into())),
+            ssh: value.ssh.map(Into::into).unwrap_or_default(),
+        }
+    }
+}
+
 impl Default for SdSysconfCustomization {
     fn default() -> Self {
         Self {
@@ -104,48 +215,6 @@ impl Default for SdSysconfCustomization {
 }
 
 impl SdSysconfCustomization {
-    pub(crate) fn update_hostname(mut self, t: Option<String>) -> Self {
-        self.hostname = t;
-        self
-    }
-
-    pub(crate) fn update_timezone(mut self, t: Option<chrono_tz::Tz>) -> Self {
-        self.timezone = t;
-        self
-    }
-
-    pub(crate) fn update_keymap(mut self, t: Option<String>) -> Self {
-        self.keymap = t;
-        self
-    }
-
-    pub(crate) fn update_user(mut self, t: Option<SdCustomizationUser>) -> Self {
-        self.user = t;
-        self
-    }
-
-    pub(crate) fn update_wifi(mut self, t: Option<SdCustomizationWifi>) -> Self {
-        self.wifi = t;
-        self
-    }
-
-    pub(crate) fn update_ssh(mut self, t: Option<String>) -> Self {
-        self.ssh = t;
-        self
-    }
-
-    pub(crate) fn update_usb_enable_dhcp(mut self, t: Option<bool>) -> Self {
-        self.usb_enable_dhcp = t;
-        self
-    }
-
-    pub(crate) fn validate_user(&self) -> bool {
-        match &self.user {
-            Some(x) => x.validate_username(),
-            None => true,
-        }
-    }
-
     #[cfg(feature = "sd")]
     pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
@@ -178,120 +247,15 @@ pub(crate) struct SdCustomizationUser {
     pub(crate) password: String,
 }
 
-impl SdCustomizationUser {
-    pub(crate) const fn new(username: String, password: String) -> Self {
-        Self { username, password }
-    }
-
-    pub(crate) fn update_username(mut self, t: String) -> Self {
-        self.username = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-
-    pub(crate) fn validate_username(&self) -> bool {
-        self.username != "root"
-    }
-}
-
-impl Default for SdCustomizationUser {
-    fn default() -> Self {
-        Self::new(crate::helpers::default_user().to_owned(), String::new())
-    }
-}
-
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomizationWifi {
     pub(crate) ssid: String,
     pub(crate) password: String,
 }
 
-impl SdCustomizationWifi {
-    pub(crate) fn update_ssid(mut self, t: String) -> Self {
-        self.ssid = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn sd_user_validate_rejects_root() {
-        assert!(!SdCustomizationUser::new("root".into(), "pw".into()).validate_username());
-        assert!(SdCustomizationUser::new("beagle".into(), "pw".into()).validate_username());
-    }
-
-    #[test]
-    fn sd_user_default_has_empty_password() {
-        assert!(SdCustomizationUser::default().password.is_empty());
-    }
-
-    #[test]
-    fn sd_user_builders_set_fields() {
-        let user = SdCustomizationUser::default()
-            .update_username("alice".into())
-            .update_password("secret".into());
-        assert_eq!(user.username, "alice");
-        assert_eq!(user.password, "secret");
-    }
-
-    #[test]
-    fn sd_wifi_builders_set_fields() {
-        let wifi = SdCustomizationWifi::default()
-            .update_ssid("net".into())
-            .update_password("pw".into());
-        assert_eq!(wifi.ssid, "net");
-        assert_eq!(wifi.password, "pw");
-    }
-
-    #[test]
-    fn sysconf_validate_user_follows_inner_user() {
-        // No user configured is always valid.
-        assert!(SdSysconfCustomization::default().validate_user());
-        // A configured non-root user is valid; root is not.
-        let ok = SdSysconfCustomization::default()
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
-        assert!(ok.validate_user());
-        let bad = SdSysconfCustomization::default()
-            .update_user(Some(SdCustomizationUser::new("root".into(), "pw".into())));
-        assert!(!bad.validate_user());
-    }
-
-    #[test]
-    fn sysconf_builders_populate_all_fields() {
-        let cfg = SdSysconfCustomization::default()
-            .update_hostname(Some("beagle".into()))
-            .update_timezone(Some("UTC".parse().unwrap()))
-            .update_keymap(Some("us".into()))
-            .update_ssh(Some("ssh-key".into()))
-            .update_usb_enable_dhcp(Some(true))
-            .update_wifi(Some(
-                SdCustomizationWifi::default().update_ssid("net".into()),
-            ))
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
-
-        assert_eq!(cfg.hostname.as_deref(), Some("beagle"));
-        assert_eq!(cfg.timezone, Some(chrono_tz::Tz::UTC));
-        assert_eq!(cfg.keymap.as_deref(), Some("us"));
-        assert_eq!(cfg.ssh.as_deref(), Some("ssh-key"));
-        assert_eq!(cfg.usb_enable_dhcp, Some(true));
-        assert_eq!(cfg.wifi.as_ref().map(|w| w.ssid.as_str()), Some("net"));
-        assert_eq!(
-            cfg.user.as_ref().map(|u| u.username.as_str()),
-            Some("beagle")
-        );
-    }
 
     #[test]
     fn sysconf_default_usb_dhcp_is_platform_specific() {
@@ -303,69 +267,63 @@ mod tests {
         }
     }
 
-    #[test]
-    fn sd_customization_wraps_sysconf() {
-        let mut sd = SdCustomization::default();
-        assert!(sd.sysconf_customization().is_none());
-        sd.update_sysconfig(SdSysconfCustomization::default().update_hostname(Some("bb".into())));
-        assert_eq!(
-            sd.sysconf_customization()
-                .and_then(|s| s.hostname.as_deref()),
-            Some("bb")
-        );
-    }
-
-    #[test]
-    fn gui_configuration_updates_sd_slot() {
+    fn saved_config_with_keymap(keymap: &str) -> GuiConfiguration {
         let mut gui = GuiConfiguration::default();
-        assert!(gui.sd_customization.is_none());
-
-        gui.update_sd_customization(SdCustomization::default());
-
-        assert!(gui.sd_customization.is_some());
-    }
-
-    #[test]
-    fn empty_gui_configuration_serializes_to_empty_object() {
-        // All fields are `skip_serializing_if = "Option::is_none"`.
-        let json = serde_json::to_string(&GuiConfiguration::default()).unwrap();
-        assert_eq!(json, "{}");
-    }
-
-    #[test]
-    fn gui_configuration_round_trips_through_json() {
-        let mut gui = GuiConfiguration::default();
-        gui.update_sd_customization({
-            let mut sd = SdCustomization::default();
-            sd.update_sysconfig(
-                SdSysconfCustomization::default().update_hostname(Some("host".into())),
-            );
-            sd
+        gui.update_sd_customization(SdCustomization {
+            sysconf: Some(SdSysconfCustomization {
+                keymap: Some(keymap.to_owned()),
+                ..Default::default()
+            }),
         });
-
-        let json = serde_json::to_string(&gui).unwrap();
-        let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(
-            back.sd_customization
-                .and_then(|s| s.sysconf_customization().and_then(|c| c.hostname.clone())),
-            Some("host".to_string())
-        );
+        gui
     }
 
-    #[cfg(feature = "sd")]
+    /// A saved keymap has to come back into the UI, or the Customize page shows
+    /// nothing while a keymap is still written to the image.
     #[test]
-    fn sysconf_converts_to_flasher_configs_without_panicking() {
-        // Exercises the sysconfig/cloudinit bridges into bb_flasher.
-        let base = SdSysconfCustomization::default()
-            .update_hostname(Some("beagle".into()))
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
-            .update_wifi(Some(
-                SdCustomizationWifi::default()
-                    .update_ssid("net".into())
-                    .update_password("pw".into()),
-            ));
-        let _ = base.clone().sysconfig();
-        let _ = base.cloudinit();
+    fn saved_keymap_is_restored_into_the_ui() {
+        let gui = saved_config_with_keymap("de");
+
+        let ui: bb_imager_ui::customization::CloudInit = (&gui).into();
+
+        assert_eq!(ui.keymap, Some("de"));
+    }
+
+    /// The damaging half of the same bug: the UI value is written back on every
+    /// edit, so a keymap that fails to load is erased the next time the user
+    /// touches any other field.
+    #[test]
+    fn restored_keymap_survives_a_round_trip_through_the_ui() {
+        let gui = saved_config_with_keymap("de");
+
+        let ui: bb_imager_ui::customization::CloudInit = (&gui).into();
+        let saved_again: SdSysconfCustomization = (&ui).into();
+
+        assert_eq!(saved_again.keymap.as_deref(), Some("de"));
+    }
+
+    /// The other conversion into the UI, used when a customization is carried
+    /// between pages rather than loaded from disk.
+    #[test]
+    fn keymap_is_restored_from_a_stored_customization() {
+        let stored = SdSysconfCustomization {
+            keymap: Some("fr".to_owned()),
+            ..Default::default()
+        };
+
+        let ui: bb_imager_ui::customization::CloudInit = stored.into();
+
+        assert_eq!(ui.keymap, Some("fr"));
+    }
+
+    /// A hand-edited config can name a layout that does not exist; it should
+    /// read as unset rather than be forced into the picker.
+    #[test]
+    fn unknown_keymap_is_dropped() {
+        let gui = saved_config_with_keymap("not-a-layout");
+
+        let ui: bb_imager_ui::customization::CloudInit = (&gui).into();
+
+        assert_eq!(ui.keymap, None);
     }
 }
