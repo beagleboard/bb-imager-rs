@@ -200,6 +200,7 @@ fn add_config_inserts_device_into_board_list() {
         instructions: None,
         specification: vec![],
         oshw: None,
+        bootfs: None,
     };
 
     let mut imager = bb_config::config::Imager::default();
@@ -261,6 +262,7 @@ fn add_config_updates_existing_device_with_same_name() {
         instructions: None,
         specification: vec![],
         oshw: None,
+        bootfs: None,
     };
 
     let mut imager = bb_config::config::Imager::default();
@@ -299,6 +301,7 @@ fn add_config_updates_existing_device_with_same_name() {
         instructions: Some("New instructions".to_string()),
         specification: vec![("CPU".to_string(), "Test CPU".to_string())],
         oshw: Some("us000000".to_string()),
+        bootfs: None,
     };
 
     let mut imager = bb_config::config::Imager::default();
@@ -371,6 +374,7 @@ fn add_config_inserts_os_image_for_board() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -448,6 +452,7 @@ fn os_image_by_id_returns_correct_data() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -548,6 +553,7 @@ fn add_config_inserts_os_sublist_for_board() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -632,6 +638,7 @@ fn nested_os_sublists_propagate_board_support() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -731,6 +738,7 @@ fn remote_os_sublist_is_returned_for_board() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -816,6 +824,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -921,6 +930,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["test_board".into()]),
@@ -1031,6 +1041,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["bbb".into()]),
@@ -1043,6 +1054,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["beagleplay".into()]),
@@ -1055,6 +1067,7 @@ fn board_list_search_filters_boards_case_insensitive() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::new(["rpi".into()]),
@@ -1134,6 +1147,7 @@ fn os_board_json_by_id_round_trips_device() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: Some("Hold the boot button".to_string()),
         oshw: Some("us000000".to_string()),
+        bootfs: None,
         specification: vec![
             ("CPU".to_string(), "Test CPU".to_string()),
             ("RAM".to_string(), "1GB".to_string()),
@@ -1176,6 +1190,7 @@ fn os_board_json_by_id_handles_board_without_optional_fields() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: Box::default(),
@@ -1214,6 +1229,7 @@ fn os_board_json_by_id_reflects_updated_board() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: ["old-tag".into()].into(),
@@ -1228,6 +1244,7 @@ fn os_board_json_by_id_reflects_updated_board() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: Some("New instructions".to_string()),
         oshw: Some("us000000".to_string()),
+        bootfs: None,
         specification: vec![("CPU".to_string(), "Test CPU".to_string())],
         documentation: None,
         tags: ["new-tag".into()].into(),
@@ -1315,6 +1332,7 @@ fn os_image_json_by_id_round_trips_image() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: ["test_board".into()].into(),
@@ -1371,6 +1389,7 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: ["test_board".into()].into(),
@@ -1425,6 +1444,7 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
         oshw: None,
+        bootfs: None,
         specification: vec![],
         documentation: None,
         tags: ["test_board".into(), "test_board_alt".into()].into(),
@@ -1500,5 +1520,168 @@ fn os_board_json_by_id_unknown_id_returns_no_rows() {
     assert!(
         matches!(res, Err(rusqlite::Error::QueryReturnedNoRows)),
         "Unknown board id should return QueryReturnedNoRows, got {res:?}"
+    );
+}
+
+/// A board's bootfs tarball, used by images flashed with
+/// [`bb_config::config::Flasher::SdCardNoBootloader`].
+fn test_bootfs() -> bb_config::config::Bootfs {
+    bb_config::config::Bootfs {
+        url: "https://example.com/bootfs.tar.xz".try_into().unwrap(),
+        extract_size: 4096,
+        image_download_sha256: [7; 32],
+    }
+}
+
+fn board_with_bootfs(
+    name: &str,
+    tag: &str,
+    bootfs: Option<bb_config::config::Bootfs>,
+) -> bb_config::config::Device {
+    bb_config::config::Device {
+        name: name.to_string(),
+        description: "Test Board description".to_string(),
+        icon: None,
+        flasher: bb_config::config::Flasher::SdCard,
+        instructions: None,
+        oshw: None,
+        bootfs,
+        specification: vec![],
+        documentation: None,
+        tags: Box::new([tag.into()]),
+    }
+}
+
+/// A sublist of images that carry no bootloader, plus one image inside it.
+fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
+    bb_config::config::OsSubList {
+        name: "Fedora Images".to_string(),
+        description: "Images without a bootloader".to_string(),
+        icon: "https://example.com/sublist.png".try_into().unwrap(),
+        flasher: bb_config::config::Flasher::SdCardNoBootloader,
+        subitems: vec![bb_config::config::OsListItem::Image(
+            bb_config::config::OsImage {
+                name: "Fedora Minimal".to_string(),
+                description: "Test OS description".to_string(),
+                icon: "https://example.com/icon.png".try_into().unwrap(),
+                url: "https://example.com/os.raw.xz".try_into().unwrap(),
+                image_download_size: Some(1024),
+                image_download_sha256: [1; 32],
+                extract_size: 2048,
+                release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+                devices: Box::new([tag.into()]),
+                init_format: bb_config::config::InitFormat::None,
+                bmap: None,
+                info_text: None,
+                support: None,
+            },
+        )],
+    }
+}
+
+/// This test verifies that a board's bootfs tarball survives the round trip
+/// through the `boards` table.
+///
+/// What this test checks:
+/// 1. A device with a bootfs is inserted.
+/// 2. board_by_id() returns all three of url, extract size and sha256.
+/// 3. os_board_json_by_id() reconstructs the same [`bb_config::config::Device`].
+///
+/// Why this matters:
+/// - The tarball is stored as three separate nullable columns; dropping one of
+///   them from an INSERT or SELECT would silently yield a board that cannot
+///   flash bootloader-less images, or a wrong sha that fails verification only
+///   after a full download.
+#[test]
+fn board_bootfs_round_trips() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let board = board_with_bootfs("Test Board", "test_board", Some(test_bootfs()));
+    let id = insert_board_helper(&db, board.clone());
+
+    assert_eq!(
+        db.board_by_id(id)
+            .expect("Fetching board should succeed")
+            .bootfs,
+        Some(test_bootfs())
+    );
+    assert_eq!(
+        db.os_board_json_by_id(id)
+            .expect("Fetching board json should succeed"),
+        board
+    );
+}
+
+/// The counterpart: a board without a tarball reads back as `None` rather than
+/// a half-built [`bb_config::config::Bootfs`].
+#[test]
+fn board_without_bootfs_reads_back_as_none() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    let id = insert_board_helper(&db, board_with_bootfs("Test Board", "test_board", None));
+
+    assert!(
+        db.board_by_id(id)
+            .expect("Fetching board should succeed")
+            .bootfs
+            .is_none()
+    );
+}
+
+/// This test verifies that images which need a bootloader are only offered for
+/// boards that supply one.
+///
+/// What this test checks:
+/// 1. The same `SdCardNoBootloader` sublist is linked to two boards.
+/// 2. It is listed for the board that has a bootfs tarball.
+/// 3. It is hidden for the board that does not.
+///
+/// Why this matters:
+/// - Flashing such an image onto a board with no tarball produces a card that
+///   never boots, with nothing in the UI explaining why. Hiding the entry is
+///   what keeps the combination unreachable.
+#[test]
+fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
+    let db = Db::new().expect("Failed to create DB");
+    db.init().expect("DB init should succeed");
+
+    db.add_config(
+        Config {
+            imager: bb_config::config::Imager {
+                remote_configs: Default::default(),
+                devices: vec![
+                    board_with_bootfs("With Bootfs", "shared_tag", Some(test_bootfs())),
+                    board_with_bootfs("Without Bootfs", "shared_tag", None),
+                ],
+            },
+            os_list: vec![bb_config::config::OsListItem::SubList(
+                no_bootloader_sublist("shared_tag"),
+            )],
+        },
+        None,
+    )
+    .expect("add_config should succeed");
+
+    let boards = db
+        .board_list("")
+        .expect("Fetching board list should succeed");
+    let id_of = |name: &str| boards.iter().find(|b| b.name == name).unwrap().id;
+
+    let listed = |board: &str| {
+        db.os_image_items(id_of(board), None)
+            .expect("os_image_items should succeed")
+            .iter()
+            .any(|x| x.label() == "Fedora Images")
+    };
+
+    assert!(
+        listed("With Bootfs"),
+        "board supplying a bootfs should be offered the sublist"
+    );
+    assert!(
+        !listed("Without Bootfs"),
+        "board without a bootfs should not be offered images that need one"
     );
 }

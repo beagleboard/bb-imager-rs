@@ -17,7 +17,12 @@ CREATE TABLE boards
 	instructions TEXT,
 	oshw TEXT,
 	specification BLOB,
-	documentation TEXT
+	documentation TEXT,
+	-- Bootfs tarball for images flashed with SdCardNoBootloader. All three are
+	-- set together or all NULL.
+	bootfs_url TEXT,
+	bootfs_extract_size INTEGER,
+	bootfs_sha256 BLOB
 ) STRICT;
 
 CREATE TABLE board_tags

@@ -43,6 +43,24 @@ pub(crate) struct Board {
     pub(crate) oshw: Option<String>,
     pub(crate) flasher: config::Flasher,
     pub(crate) instructions: Option<Box<str>>,
+    pub(crate) bootfs: Option<config::Bootfs>,
+}
+
+/// Read the `bootfs_*` columns back into a [`config::Bootfs`].
+///
+/// The three columns are always written together, so the URL alone decides whether the board
+/// has a tarball.
+fn bootfs_from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Option<config::Bootfs>> {
+    let Some(url) = value.get::<_, Option<Url>>("bootfs_url")? else {
+        return Ok(None);
+    };
+    let extract_size: i64 = value.get("bootfs_extract_size")?;
+
+    Ok(Some(config::Bootfs {
+        url,
+        extract_size: extract_size as u64,
+        image_download_sha256: value.get("bootfs_sha256")?,
+    }))
 }
 
 impl Board {
@@ -59,6 +77,7 @@ impl Board {
             oshw: value.get("oshw")?,
             flasher: value.get("flasher")?,
             instructions: value.get("instructions")?,
+            bootfs: bootfs_from_row(value)?,
         })
     }
 }
@@ -384,9 +403,12 @@ impl Db {
             instructions,
             oshw,
             specification,
-            documentation
+            documentation,
+            bootfs_url,
+            bootfs_extract_size,
+            bootfs_sha256
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT(name) DO UPDATE SET
             description = excluded.description,
             icon = excluded.icon,
@@ -394,7 +416,10 @@ impl Db {
             instructions = excluded.instructions,
             oshw = excluded.oshw,
             specification = excluded.specification,
-            documentation = excluded.documentation
+            documentation = excluded.documentation,
+            bootfs_url = excluded.bootfs_url,
+            bootfs_extract_size = excluded.bootfs_extract_size,
+            bootfs_sha256 = excluded.bootfs_sha256
         RETURNING id
         "#,
         )?;
@@ -407,7 +432,13 @@ impl Db {
                 board.instructions,
                 board.oshw,
                 spec,
-                board.documentation
+                board.documentation,
+                board.bootfs.as_ref().map(|x| &x.url),
+                board
+                    .bootfs
+                    .as_ref()
+                    .map(|x| i64::try_from(x.extract_size).unwrap()),
+                board.bootfs.as_ref().map(|x| x.image_download_sha256)
             ],
             |r| r.get(0),
         )?;
@@ -551,7 +582,7 @@ impl Db {
         let mut stmt = db.prepare_cached(
             r#"
         SELECT id, name, icon, description, documentation, specification, oshw, 
-            flasher, instructions
+            flasher, instructions, bootfs_url, bootfs_extract_size, bootfs_sha256
         FROM boards
         WHERE id = $1"#,
         )?;
@@ -624,16 +655,19 @@ impl Db {
             SELECT s.id, s.name, s.icon, s.flasher
             FROM os_sublists s
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
+            JOIN boards b ON b.id = sb.board_id
             WHERE sb.board_id = $1
               AND (
                     ($2 IS NULL AND s.parent_id IS NULL)
                  OR s.parent_id = $2
               )
+              -- Images without a bootloader are only flashable on boards that supply one
+              AND (s.flasher != $3 OR b.bootfs_url IS NOT NULL)
             ORDER BY s.remote_config_id NULLS LAST"#,
         )?;
         let res = stmt
             .query_map(
-                rusqlite::params![board_id, parent_id],
+                rusqlite::params![board_id, parent_id, config::Flasher::SdCardNoBootloader],
                 OsSublistListItem::from_row,
             )?
             .map(|x| x.unwrap())
@@ -653,17 +687,21 @@ impl Db {
             SELECT s.id, s.subitems_url
             FROM os_sublists s
             JOIN os_sublist_boards sb ON sb.sublist_id = s.id
+            JOIN boards b ON b.id = sb.board_id
             WHERE sb.board_id = $1
                 AND s.subitems_url IS NOT NULL
                 AND (
                     ($2 IS NULL AND s.parent_id IS NULL)
                     OR s.parent_id = $2
-                )"#,
+                )
+                -- Skip fetching subitems for sublists that are not shown. See `os_sublists`.
+                AND (s.flasher != $3 OR b.bootfs_url IS NOT NULL)"#,
         )?;
         let res = stmt
-            .query_map(rusqlite::params![board_id, parent_id], |r| {
-                Ok((r.get(0)?, r.get(1)?))
-            })?
+            .query_map(
+                rusqlite::params![board_id, parent_id, config::Flasher::SdCardNoBootloader],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?
             .map(|x| x.unwrap())
             .collect();
 
@@ -784,7 +822,8 @@ impl Db {
 
         let mut stmt = db.prepare(
             r#"
-            SELECT name, description, icon, flasher, instructions, oshw, specification, documentation
+            SELECT name, description, icon, flasher, instructions, oshw, specification, documentation,
+                bootfs_url, bootfs_extract_size, bootfs_sha256
             FROM boards WHERE id = $1"#)?;
 
         stmt.query_one([id], |value| {
@@ -799,6 +838,7 @@ impl Db {
                 specification: serde_json::from_slice(&spec).unwrap(),
                 documentation: value.get("documentation")?,
                 oshw: value.get("oshw")?,
+                bootfs: bootfs_from_row(value)?,
                 tags,
             })
         })
