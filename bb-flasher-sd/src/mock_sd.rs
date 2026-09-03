@@ -73,6 +73,10 @@ impl MockSd {
         }
     }
 
+    pub fn len(&self) -> u64 {
+        DISK_SIZE
+    }
+
     pub fn fail_token(&self) -> CancellationToken {
         self.fail.clone()
     }

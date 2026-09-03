@@ -3,7 +3,7 @@ use std::{
     sync::mpsc,
 };
 
-use bb_flasher_sd::{ContentType, Customization, Destination};
+use bb_flasher_sd::{ContentType, Customization, Destination, flashing::NO_BOOTFS};
 use tempfile::NamedTempFile;
 
 fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
@@ -45,6 +45,7 @@ fn test_public_flash_with_temp_file() {
     // 6. Execute the public flash function
     let result = bb_flasher_sd::flash(
         img_resolver,
+        NO_BOOTFS,
         bmap_resolver,
         dst,
         Some(tx),
@@ -96,6 +97,7 @@ fn flash_aborts_with_cancelled_token() {
 
     let result = bb_flasher_sd::flash(
         img_resolver,
+        NO_BOOTFS,
         bmap_resolver,
         dst,
         None,

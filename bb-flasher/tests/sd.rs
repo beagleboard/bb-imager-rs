@@ -36,6 +36,7 @@ fn flash_no_progress() {
 
     bb_flasher::sd::Flasher::with_file_dest(
         || Ok((mock_img(), MOCK_IMG_LEN as u64)),
+        bb_flasher::sd::NONE_BOOTFS,
         None::<Box<dyn FnOnce() -> std::io::Result<Box<str>> + Send>>,
         sd.path().to_path_buf(),
         FlashingSdLinuxConfig::none(),
@@ -60,6 +61,7 @@ fn flash_progress() {
     let handle = std::thread::spawn(move || {
         bb_flasher::sd::Flasher::with_file_dest(
             || Ok((mock_img(), MOCK_IMG_LEN as u64)),
+            bb_flasher::sd::NONE_BOOTFS,
             None::<Box<dyn FnOnce() -> std::io::Result<Box<str>> + Send>>,
             sd.path().to_path_buf(),
             FlashingSdLinuxConfig::none(),
@@ -95,6 +97,7 @@ fn flash_cancel() {
 
     let res = bb_flasher::sd::Flasher::with_file_dest(
         || Ok((mock_img(), MOCK_IMG_LEN as u64)),
+        bb_flasher::sd::NONE_BOOTFS,
         None::<Box<dyn FnOnce() -> std::io::Result<Box<str>> + Send>>,
         sd.path().to_path_buf(),
         FlashingSdLinuxConfig::none(),
@@ -117,6 +120,7 @@ fn flash_with_wifi(mock: &MockSd) {
             let size = std::fs::metadata(&img_path)?.len();
             Ok((OsImage::from_path(&img_path)?, size))
         },
+        bb_flasher::sd::NONE_BOOTFS,
         None::<Box<dyn FnOnce() -> std::io::Result<Box<str>> + Send>>,
         mock.path().to_path_buf(),
         FlashingSdLinuxConfig::sysconfig(

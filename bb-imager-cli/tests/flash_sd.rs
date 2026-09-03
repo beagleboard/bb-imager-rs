@@ -339,23 +339,219 @@ fn flash_sd_unreadable_bmap_fails() {
     ]);
 }
 
-/// Build a tar archive containing `entries`, as consumed by `sd-boot-update`.
-fn tar_archive(entries: &[(&str, &str)]) -> NamedTempFile {
+/// Build a tar archive containing `entries`, as consumed by `sd-boot-update`
+/// and `flash sd --bootfs`. `None` contents make a directory entry, written
+/// with the trailing slash real tarballs carry.
+fn tar_archive_with_dirs(entries: &[(&str, Option<&str>)]) -> NamedTempFile {
     let file = NamedTempFile::new().unwrap();
     {
         let mut builder = tar::Builder::new(file.reopen().unwrap());
         for (name, contents) in entries {
             let mut header = tar::Header::new_gnu();
-            header.set_size(contents.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder
-                .append_data(&mut header, name, contents.as_bytes())
-                .unwrap();
+            match contents {
+                Some(contents) => {
+                    header.set_entry_type(tar::EntryType::Regular);
+                    header.set_size(contents.len() as u64);
+                    header.set_mode(0o644);
+                    header.set_cksum();
+                    builder
+                        .append_data(&mut header, name, contents.as_bytes())
+                        .unwrap();
+                }
+                None => {
+                    header.set_entry_type(tar::EntryType::Directory);
+                    header.set_size(0);
+                    header.set_mode(0o755);
+                    header.set_cksum();
+                    builder
+                        .append_data(&mut header, format!("{name}/"), std::io::empty())
+                        .unwrap();
+                }
+            }
         }
         builder.finish().unwrap();
     }
     file
+}
+
+fn tar_archive(entries: &[(&str, &str)]) -> NamedTempFile {
+    let entries: Vec<_> = entries.iter().map(|(n, c)| (*n, Some(*c))).collect();
+    tar_archive_with_dirs(&entries)
+}
+
+/// Put a file into the boot partition of `mock` before it is copied into an OS
+/// image, so `--bootfs` has something to overwrite.
+fn write_boot_file(mock: &mut MockSd, path: &str, contents: &str) {
+    let fs = mock.open_boot();
+    {
+        let mut f = fs.root_dir().create_file(path).unwrap();
+        f.write_all(contents.as_bytes()).unwrap();
+    }
+    fs.unmount().unwrap();
+}
+
+/// `--bootfs` unpacks a tarball into the BOOT partition of the image that was
+/// just written, including directories the image does not already have.
+#[test]
+fn flash_sd_bootfs_writes_archive_into_boot_partition() {
+    let mut mock = MockSd::new();
+    let image = mock.image_copy();
+    let bootfs = tar_archive_with_dirs(&[
+        ("uEnv.txt", Some("console=ttyS2\n")),
+        ("extlinux", None),
+        ("extlinux/extlinux.conf", Some("LABEL Fedora\n")),
+    ]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        bootfs.path().to_str().unwrap(),
+    ]);
+
+    assert_eq!(mock.boot_file("uEnv.txt").unwrap(), "console=ttyS2\n");
+    assert_eq!(
+        mock.boot_file("extlinux/extlinux.conf").unwrap(),
+        "LABEL Fedora\n"
+    );
+}
+
+/// The image is written first, so a `--bootfs` entry replaces the file the
+/// image shipped. Overwriting with *shorter* contents is the case that catches
+/// a missing truncate: the tail of the old file would otherwise survive.
+#[test]
+fn flash_sd_bootfs_overwrites_file_from_image() {
+    let mut mock = MockSd::new();
+    write_boot_file(
+        &mut mock,
+        "uEnv.txt",
+        "console=ttyS2 this line is much longer\n",
+    );
+    let image = mock.image_copy();
+
+    let bootfs = tar_archive(&[("uEnv.txt", "console=ttyS0\n")]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        bootfs.path().to_str().unwrap(),
+    ]);
+
+    assert_eq!(mock.boot_file("uEnv.txt").unwrap(), "console=ttyS0\n");
+}
+
+/// `--bootfs` is applied after the image and before the customization, so a
+/// sysconfig flag appends to the `sysconf.txt` the tarball supplied instead of
+/// replacing it.
+#[test]
+fn flash_sd_bootfs_is_applied_before_customization() {
+    let mut mock = MockSd::new();
+    let image = mock.image_copy();
+    let bootfs = tar_archive(&[("sysconf.txt", "# shipped by the bootfs tarball\n")]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        bootfs.path().to_str().unwrap(),
+        "--sysconfig",
+        "--hostname",
+        "beagle",
+    ]);
+
+    assert_eq!(
+        mock.boot_file("sysconf.txt").unwrap(),
+        "# shipped by the bootfs tarball\nhostname=beagle\n"
+    );
+}
+
+/// Without `--bootfs` the boot partition is whatever the image carried: the
+/// flag is what pulls an archive in. This is also the counterpart of
+/// `flash_sd_bootfs_overwrites_file_from_image`, showing the seeded file
+/// survives the flash when nothing overwrites it.
+#[test]
+fn flash_sd_without_bootfs_flag_leaves_boot_partition_alone() {
+    let mut mock = MockSd::new();
+    write_boot_file(&mut mock, "uEnv.txt", "console=ttyS2 from the image\n");
+    let image = mock.image_copy();
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+    ]);
+
+    assert_eq!(
+        mock.boot_file("uEnv.txt").unwrap(),
+        "console=ttyS2 from the image\n"
+    );
+    assert!(
+        mock.boot_file("extlinux/extlinux.conf").is_err(),
+        "no bootfs archive should add files to the boot partition"
+    );
+}
+
+/// The archive is resolved lazily, after the image has been written; an
+/// unreadable path must fail the flash rather than be skipped.
+#[test]
+#[should_panic(expected = "Failed to flash")]
+fn flash_sd_missing_bootfs_fails() {
+    let mock = MockSd::new();
+    let image = mock.image_copy();
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        "/nonexistent/boot.tar",
+    ]);
+}
+
+/// A `--bootfs` tarball needs a boot partition to unpack into, so it cannot be
+/// combined with a partitionless image.
+#[test]
+#[should_panic(expected = "Failed to flash")]
+fn flash_sd_bootfs_on_partitionless_image_fails() {
+    let img = pattern_file(64 * 1024);
+    let dst = NamedTempFile::new().unwrap();
+    let bootfs = tar_archive(&[("uEnv.txt", "console=ttyS2\n")]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        img.path().to_str().unwrap(),
+        dst.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        bootfs.path().to_str().unwrap(),
+    ]);
 }
 
 #[test]

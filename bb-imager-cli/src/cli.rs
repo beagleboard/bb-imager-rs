@@ -134,6 +134,11 @@ pub enum TargetCommands {
         /// The destination is a file instead of SD Card
         #[arg(long)]
         file_destination: bool,
+
+        /// Bootfs tarball which will be copied after flashing the image. Useful for easier bootable
+        /// SD Card creation for Fedora and other distro images.
+        #[arg(long)]
+        bootfs: Option<Box<Path>>,
     },
     /// Update boot partition with contents from archive
     SdBootUpdate {
@@ -275,6 +280,50 @@ mod tests {
             },
             other => panic!("expected Flash, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn flash_sd_bootfs_parses() {
+        let opt = Opt::try_parse_from([
+            "bb-imager-cli",
+            "flash",
+            "sd",
+            "img.xz",
+            "/dev/sdX",
+            "--bootfs",
+            "boot.tar",
+        ])
+        .expect("valid sd flash with bootfs");
+        match opt.command {
+            Commands::Flash { target, .. } => match *target {
+                TargetCommands::Sd { bootfs, .. } => {
+                    assert_eq!(bootfs.as_deref(), Some(Path::new("boot.tar")));
+                }
+                other => panic!("expected Sd, got {other:?}"),
+            },
+            other => panic!("expected Flash, got {other:?}"),
+        }
+    }
+
+    /// `--bootfs` is optional: leaving it off must not default to a path.
+    #[test]
+    fn flash_sd_without_bootfs_parses_to_none() {
+        let opt = Opt::try_parse_from(["bb-imager-cli", "flash", "sd", "img.xz", "/dev/sdX"])
+            .expect("valid sd flash invocation");
+        match opt.command {
+            Commands::Flash { target, .. } => match *target {
+                TargetCommands::Sd { bootfs, .. } => assert!(bootfs.is_none()),
+                other => panic!("expected Sd, got {other:?}"),
+            },
+            other => panic!("expected Flash, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bootfs_requires_a_value() {
+        assert!(
+            Opt::try_parse_from(["bb-imager-cli", "flash", "sd", "i", "/d", "--bootfs"]).is_err()
+        );
     }
 
     #[test]
