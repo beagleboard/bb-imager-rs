@@ -261,6 +261,15 @@ impl BBImager {
         let customization = ctx.customization.clone();
         let img = ctx.selected_image.1.clone();
         let dst = ctx.selected_dest.clone();
+        let bootfs = ctx.selected_board.bootfs.as_ref().map(|x| {
+            helpers::RemoteImage::new(
+                "Bootfs".into(),
+                Box::new(x.url.clone()),
+                x.image_download_sha256,
+                x.extract_size,
+                common.downloader.clone(),
+            )
+        });
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", ctx.selected_board);
@@ -275,7 +284,7 @@ impl BBImager {
 
             let cancel_child = cancel.clone();
             let flash_task = tokio::spawn(async move {
-                helpers::flash(img, customization, dst, tx, cancel_child).await
+                helpers::flash(img, customization, dst, bootfs, tx, cancel_child).await
             });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {

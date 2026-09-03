@@ -168,12 +168,9 @@ impl BoardImage {
                 _ => &[],
             },
             BoardImage::Image {
-                init_format,
-                flasher,
+                flasher: config::Flasher::SdCard | config::Flasher::SdCardNoBootloader,
                 ..
-            } if *flasher == config::Flasher::SdCard => {
-                &[config::InitFormat::Sysconf, config::InitFormat::CloudInit]
-            }
+            } => &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
             BoardImage::Image { .. } => &[],
         }
     }
@@ -418,13 +415,20 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
     }
 }
 
+/// `bootfs` is the selected board's bootfs archive, if it has one.
 pub(crate) async fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
+    bootfs: Option<RemoteImage>,
     chan: mpsc::SyncSender<DownloadFlashingStatus>,
     cancel_sync: bb_helper::cancel::CancellationToken,
 ) -> anyhow::Result<()> {
+    // Every SD flash is handed the board's archive; only images that carry no bootloader of
+    // their own may have it written over their boot partition.
+    #[cfg(feature = "sd")]
+    let bootfs = bootfs.filter(|_| img.flasher() == config::Flasher::SdCardNoBootloader);
+
     match (img, customization, dst) {
         #[cfg(feature = "sd")]
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
@@ -439,18 +443,24 @@ pub(crate) async fn flash(
             },
             customization,
             Destination::LocalFile(f),
-        ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
-            bb_flasher::sd::Flasher::with_file_dest(
-                img.into_image_fn(),
-                bb_flasher::sd::NONE_BOOTFS,
-                bmap.map(|x| x.into_fn()),
-                f,
-                customization.sd_customization(),
-            )
-            .flash(Some(chan), Some(cancel_sync))
-        })
-        .await
-        .unwrap(),
+        ) if matches!(
+            flasher,
+            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
+        ) =>
+        {
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::Flasher::with_file_dest(
+                    img.into_image_fn(),
+                    bootfs.map(|x| x.into_archive_fn(None)),
+                    bmap.map(|x| x.into_fn()),
+                    f,
+                    customization.sd_customization(),
+                )
+                .flash(Some(chan), Some(cancel_sync))
+            })
+            .await
+            .unwrap()
+        }
         #[cfg(feature = "sd")]
         (
             BoardImage::Image {
@@ -458,18 +468,24 @@ pub(crate) async fn flash(
             },
             customization,
             Destination::SdCard(t),
-        ) if flasher == config::Flasher::SdCard => tokio::task::spawn_blocking(move || {
-            bb_flasher::sd::Flasher::new(
-                img.into_image_fn(),
-                bb_flasher::sd::NONE_BOOTFS,
-                bmap.map(|x| x.into_fn()),
-                t,
-                customization.sd_customization(),
-            )
-            .flash(Some(chan), Some(cancel_sync))
-        })
-        .await
-        .unwrap(),
+        ) if matches!(
+            flasher,
+            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
+        ) =>
+        {
+            tokio::task::spawn_blocking(move || {
+                bb_flasher::sd::Flasher::new(
+                    img.into_image_fn(),
+                    bootfs.map(|x| x.into_archive_fn(None)),
+                    bmap.map(|x| x.into_fn()),
+                    t,
+                    customization.sd_customization(),
+                )
+                .flash(Some(chan), Some(cancel_sync))
+            })
+            .await
+            .unwrap()
+        }
         #[cfg(feature = "sd")]
         (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
             if flasher == config::Flasher::SdCardBootfs =>
@@ -617,12 +633,12 @@ pub(crate) fn destinations(
 
     match flasher {
         #[cfg(feature = "sd")]
-        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
-            bb_flasher::sd::Target::destinations(filter)
-                .map(Destination::SdCard)
-                .filter(filter_func)
-                .collect()
-        }
+        config::Flasher::SdCard
+        | config::Flasher::SdCardBootfs
+        | config::Flasher::SdCardNoBootloader => bb_flasher::sd::Target::destinations(filter)
+            .map(Destination::SdCard)
+            .filter(filter_func)
+            .collect(),
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => {
             bb_flasher::bcf::cc1352p7::Target::destinations(filter)
@@ -647,9 +663,9 @@ pub(crate) fn destinations(
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
     match flasher {
         #[cfg(feature = "sd")]
-        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
-            bb_flasher::sd::Target::FILE_TYPES
-        }
+        config::Flasher::SdCard
+        | config::Flasher::SdCardBootfs
+        | config::Flasher::SdCardNoBootloader => bb_flasher::sd::Target::FILE_TYPES,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => bb_flasher::bcf::cc1352p7::Target::FILE_TYPES,
         #[cfg(feature = "bcf_msp430")]
@@ -663,7 +679,9 @@ pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
 pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
     match flasher {
         #[cfg(feature = "sd")]
-        config::Flasher::SdCard | config::Flasher::SdCardBootfs => true,
+        config::Flasher::SdCard
+        | config::Flasher::SdCardBootfs
+        | config::Flasher::SdCardNoBootloader => true,
         #[cfg(feature = "bcf_cc1352p7")]
         config::Flasher::BeagleConnectFreedom => true,
         #[cfg(feature = "bcf_msp430")]
@@ -691,7 +709,9 @@ impl FlashingCustomization {
         app_config: &crate::persistance::GuiConfiguration,
     ) -> Self {
         match flasher {
-            config::Flasher::SdCard if img.init_format() == config::InitFormat::Sysconf => {
+            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
+                if img.init_format() == config::InitFormat::Sysconf =>
+            {
                 Self::LinuxSdSysconfig(
                     app_config
                         .sd_customization
@@ -700,7 +720,9 @@ impl FlashingCustomization {
                         .unwrap_or_default(),
                 )
             }
-            config::Flasher::SdCard if img.init_format() == config::InitFormat::CloudInit => {
+            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
+                if img.init_format() == config::InitFormat::CloudInit =>
+            {
                 Self::LinuxSdCloudInit(
                     app_config
                         .sd_customization
@@ -709,7 +731,9 @@ impl FlashingCustomization {
                         .unwrap_or_default(),
                 )
             }
-            config::Flasher::SdCard | config::Flasher::SdCardBootfs => Self::NoneSd,
+            config::Flasher::SdCard
+            | config::Flasher::SdCardBootfs
+            | config::Flasher::SdCardNoBootloader => Self::NoneSd,
             config::Flasher::BeagleConnectFreedom => Self::Bcf,
             config::Flasher::Msp430Usb => Self::Msp430,
             config::Flasher::Mspm0 => Self::Zepto,
@@ -850,15 +874,15 @@ pub(crate) fn no_customization(
     img: &BoardImage,
 ) -> Option<FlashingCustomization> {
     match flasher {
-        config::Flasher::SdCard
+        config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
             if img.init_format() == config::InitFormat::Sysconf
                 || img.init_format() == config::InitFormat::CloudInit =>
         {
             None
         }
-        config::Flasher::SdCard | config::Flasher::SdCardBootfs => {
-            Some(FlashingCustomization::NoneSd)
-        }
+        config::Flasher::SdCard
+        | config::Flasher::SdCardBootfs
+        | config::Flasher::SdCardNoBootloader => Some(FlashingCustomization::NoneSd),
         config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
         config::Flasher::BeagleConnectFreedom => Some(FlashingCustomization::Bcf),
         config::Flasher::Mspm0 => Some(FlashingCustomization::Zepto),
@@ -1130,6 +1154,10 @@ mod tests {
             cfg!(feature = "sd")
         );
         assert_eq!(
+            flasher_supported(config::Flasher::SdCardNoBootloader),
+            cfg!(feature = "sd")
+        );
+        assert_eq!(
             flasher_supported(config::Flasher::BeagleConnectFreedom),
             cfg!(feature = "bcf_cc1352p7")
         );
@@ -1195,7 +1223,7 @@ mod tests {
     ///
     /// Remote specifically: a local image always reports `InitFormat::None`, so
     /// it cannot exercise format detection.
-    fn remote_sd_image(init_format: config::InitFormat) -> BoardImage {
+    fn remote_sd_image(flasher: config::Flasher, init_format: config::InitFormat) -> BoardImage {
         let cache = tempfile::tempdir().unwrap();
         let downloader = bb_downloader::Downloader::new(cache.path()).unwrap();
 
@@ -1215,10 +1243,15 @@ mod tests {
                 info_text: None,
                 support: None,
             },
-            config::Flasher::SdCard,
+            flasher,
             downloader,
         )
     }
+
+    /// Both SD flashers are the same as far as customization goes; only the
+    /// bootfs archive differs.
+    const SD_FLASHERS: [config::Flasher; 2] =
+        [config::Flasher::SdCard, config::Flasher::SdCardNoBootloader];
 
     /// Returning `Some` for a customizable image skips the Customize page and
     /// writes an empty config, so the user silently loses hostname, user, wifi
@@ -1228,12 +1261,14 @@ mod tests {
     /// or break one without touching the other.
     #[test]
     fn customizable_init_formats_reach_the_customization_page() {
-        for format in [config::InitFormat::Sysconf, config::InitFormat::CloudInit] {
-            let img = remote_sd_image(format);
-            assert!(
-                no_customization(config::Flasher::SdCard, &img).is_none(),
-                "{format:?} images must be customizable"
-            );
+        for flasher in SD_FLASHERS {
+            for format in [config::InitFormat::Sysconf, config::InitFormat::CloudInit] {
+                let img = remote_sd_image(flasher, format);
+                assert!(
+                    no_customization(flasher, &img).is_none(),
+                    "{format:?} images must be customizable on {flasher:?}"
+                );
+            }
         }
     }
 
@@ -1241,15 +1276,17 @@ mod tests {
     /// showing one that would do nothing.
     #[test]
     fn unwritable_init_formats_skip_the_customization_page() {
-        for format in [config::InitFormat::None, config::InitFormat::Armbian] {
-            let img = remote_sd_image(format);
-            assert!(
-                matches!(
-                    no_customization(config::Flasher::SdCard, &img),
-                    Some(FlashingCustomization::NoneSd)
-                ),
-                "{format:?} images have no customization we can apply"
-            );
+        for flasher in SD_FLASHERS {
+            for format in [config::InitFormat::None, config::InitFormat::Armbian] {
+                let img = remote_sd_image(flasher, format);
+                assert!(
+                    matches!(
+                        no_customization(flasher, &img),
+                        Some(FlashingCustomization::NoneSd)
+                    ),
+                    "{format:?} images have no customization we can apply on {flasher:?}"
+                );
+            }
         }
     }
 
@@ -1262,6 +1299,10 @@ mod tests {
         ));
         assert!(matches!(
             no_customization(config::Flasher::SdCardBootfs, &img),
+            Some(FlashingCustomization::NoneSd)
+        ));
+        assert!(matches!(
+            no_customization(config::Flasher::SdCardNoBootloader, &img),
             Some(FlashingCustomization::NoneSd)
         ));
         assert!(matches!(
@@ -1287,6 +1328,10 @@ mod tests {
 
         assert!(matches!(
             FlashingCustomization::new(config::Flasher::SdCard, &img, &cfg),
+            FlashingCustomization::NoneSd
+        ));
+        assert!(matches!(
+            FlashingCustomization::new(config::Flasher::SdCardNoBootloader, &img, &cfg),
             FlashingCustomization::NoneSd
         ));
         assert!(matches!(
@@ -1485,5 +1530,88 @@ mod tests {
     fn system_keymap_is_never_empty() {
         // Falls back to "us" when the locale cannot be resolved.
         assert!(!system_keymap().is_empty());
+    }
+
+    /// `SdCardNoBootloader` is an SD flasher in every respect except the bootfs
+    /// archive, so it must offer the same destinations and file types. These
+    /// matches end in a catch-all, so a missed variant panics at runtime rather
+    /// than failing to compile.
+    #[cfg(feature = "sd")]
+    #[test]
+    fn no_bootloader_flasher_behaves_like_sd_card() {
+        assert_eq!(
+            file_filter(config::Flasher::SdCardNoBootloader),
+            file_filter(config::Flasher::SdCard)
+        );
+        // Enumeration hits the same catch-all; the call itself is the assertion.
+        let _ = destinations(config::Flasher::SdCardNoBootloader, false, "".into());
+
+        for format in [
+            config::InitFormat::Sysconf,
+            config::InitFormat::CloudInit,
+            config::InitFormat::None,
+        ] {
+            let img = remote_sd_image(config::Flasher::SdCardNoBootloader, format);
+            assert_eq!(
+                img.supported_init_formats(),
+                remote_sd_image(config::Flasher::SdCard, format).supported_init_formats(),
+                "{format:?} should offer the same init formats on both SD flashers"
+            );
+        }
+    }
+
+    /// The board's bootfs archive, as `start_flashing` builds it.
+    #[cfg(feature = "sd")]
+    fn board_bootfs() -> RemoteImage {
+        let cache = tempfile::tempdir().unwrap();
+
+        RemoteImage::new(
+            "Bootfs".into(),
+            Box::new(url::Url::parse("https://example.com/bootfs.tar.xz").unwrap()),
+            [7u8; 32],
+            4096,
+            bb_downloader::Downloader::new(cache.path()).unwrap(),
+        )
+    }
+
+    /// A local image flashed to a file, so the flash needs no SD card and no
+    /// elevated permissions.
+    #[cfg(feature = "sd")]
+    async fn flash_local_image(
+        flasher: config::Flasher,
+        bootfs: Option<RemoteImage>,
+    ) -> (anyhow::Result<()>, tempfile::NamedTempFile, Vec<u8>) {
+        use std::io::Write;
+
+        let data: Vec<u8> = (0..4096u32).map(|x| (x % 251) as u8).collect();
+        let mut src = tempfile::NamedTempFile::new().unwrap();
+        src.write_all(&data).unwrap();
+        src.flush().unwrap();
+
+        let dst = tempfile::NamedTempFile::new().unwrap();
+        let res = flash(
+            BoardImage::local(src.path().to_path_buf(), flasher),
+            FlashingCustomization::NoneSd,
+            Destination::LocalFile(dst.path().to_path_buf()),
+            bootfs,
+            mpsc::sync_channel(8).0,
+            bb_helper::cancel::CancellationToken::default(),
+        )
+        .await;
+
+        (res, dst, data)
+    }
+
+    /// The board's archive is handed to every SD flash, so only the flasher type
+    /// decides who writes it. The archive here points at a host that does not
+    /// resolve, so applying it to a plain SD image would fail the flash.
+    #[cfg(feature = "sd")]
+    #[tokio::test]
+    async fn plain_sd_image_ignores_the_boards_bootfs() {
+        let (res, dst, data) =
+            flash_local_image(config::Flasher::SdCard, Some(board_bootfs())).await;
+
+        res.expect("a plain SD image must not pick up the board's bootfs");
+        assert_eq!(std::fs::read(dst.path()).unwrap(), data);
     }
 }
