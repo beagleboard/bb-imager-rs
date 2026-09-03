@@ -134,6 +134,11 @@ pub enum TargetCommands {
         /// The destination is a file instead of SD Card
         #[arg(long)]
         file_destination: bool,
+
+        /// Bootfs tarball which will be copied after flashing the image. Useful for easier bootable
+        /// SD Card creation for Fedora and other distro images.
+        #[arg(long)]
+        bootfs: Option<Box<Path>>,
     },
     /// Update boot partition with contents from archive
     SdBootUpdate {
