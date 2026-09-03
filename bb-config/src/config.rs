@@ -60,6 +60,20 @@ pub struct Device {
     pub specification: Vec<(String, String)>,
     /// OSHW details for the device.
     pub oshw: Option<String>,
+    /// Url to tarball of bootfs. Should ideally only contain the minimal files that need to be
+    /// present in bootfs to load something like grub.
+    pub bootfs: Option<Bootfs>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct Bootfs {
+    /// Os Image download URL
+    pub url: Url,
+    /// Os Image size after extraction
+    pub extract_size: u64,
+    /// Os Image sha256 (before extraction)
+    #[serde(with = "const_hex")]
+    pub image_download_sha256: [u8; 32],
 }
 
 /// Types of customization Initialization formats
@@ -220,6 +234,9 @@ pub enum Flasher {
     Pb2Mspm0,
     /// MSPM0 flasher
     Mspm0,
+    /// The image does not contain first stage bootloader (eg: uboot), which needs to be added based
+    /// on board.
+    SdCardNoBootloader,
 }
 
 impl rusqlite::ToSql for Flasher {
@@ -231,6 +248,7 @@ impl rusqlite::ToSql for Flasher {
             Flasher::Msp430Usb => 4,
             Flasher::Pb2Mspm0 => 5,
             Flasher::Mspm0 => 6,
+            Flasher::SdCardNoBootloader => 7,
         };
 
         Ok(rusqlite::types::ToSqlOutput::from(val))
@@ -246,6 +264,7 @@ impl rusqlite::types::FromSql for Flasher {
             4 => Ok(Flasher::Msp430Usb),
             5 => Ok(Flasher::Pb2Mspm0),
             6 => Ok(Flasher::Mspm0),
+            7 => Ok(Flasher::SdCardNoBootloader),
             _ => Err(rusqlite::types::FromSqlError::Other(
                 format!("Invalid Flasher discriminant: {}", val).into(),
             )),
