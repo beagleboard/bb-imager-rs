@@ -15,7 +15,7 @@ pub enum ParitionType {
 impl ParitionType {
     pub(crate) fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
     where
-        T: Write + Seek + Read + std::fmt::Debug,
+        T: Write + Seek + Read,
     {
         match self {
             Self::Boot => Self::boot_partition(dst),
@@ -24,7 +24,7 @@ impl ParitionType {
 
     fn boot_partition<T>(mut dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
     where
-        T: Write + Seek + Read + std::fmt::Debug,
+        T: Write + Seek + Read,
     {
         let part_table = PartitionTable::detect_partition_table(&mut dst)?;
         dst.rewind()?;
@@ -131,7 +131,7 @@ where
 {
     pub(crate) fn customize(
         self,
-        dst: impl Write + Seek + Read + std::fmt::Debug,
+        dst: impl Write + Seek + Read,
         cancel: Option<CancellationToken>,
     ) -> Result<()> {
         let partition = self.partition.open(dst)?;
