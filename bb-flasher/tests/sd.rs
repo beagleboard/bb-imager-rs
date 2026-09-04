@@ -183,6 +183,22 @@ fn flash_wifi_reuses_existing_services_dir() {
     );
 }
 
+/// The GPT counterpart to [`flash_wifi_writes_psk_into_boot_partition`]: the
+/// same sysconf customization has to land when the boot partition is found
+/// through the GPT table instead of the MBR one.
+#[test]
+fn flash_wifi_writes_psk_into_gpt_boot_partition() {
+    let mut mock = MockSd::new_gpt();
+
+    flash_with_wifi(&mock);
+
+    assert_eq!(
+        mock.boot_file("sysconf.txt").unwrap(),
+        "iwd_psk_file=mynet.psk\n"
+    );
+    assert_eq!(mock.boot_file("services/mynet.psk").unwrap(), WIFI_PSK);
+}
+
 #[test]
 fn destinations() {
     let temp = bb_flasher::sd::Target::destinations(false);
