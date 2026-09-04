@@ -52,7 +52,12 @@ impl ParitionType {
                 let mbr = mbrman::MBRHeader::read_from(&mut dst)
                     .map_err(|_| Error::InvalidPartitionTable)?;
 
-                let boot_part = mbr.get(1).ok_or(Error::InvalidPartitionTable)?;
+                // Find the first bootable partition
+                let (_, boot_part) = mbr
+                    .iter()
+                    .find(|(_, part)| part.is_used() && part.is_active())
+                    .ok_or(Error::InvalidPartitionTable)?;
+
                 let start_offset: u64 = (boot_part.starting_lba * 512).into();
                 let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
 
