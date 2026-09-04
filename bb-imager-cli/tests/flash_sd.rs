@@ -6,8 +6,8 @@
 //!
 //! `--file-destination` makes the destination a plain file, so no SD card (and
 //! no elevated privileges) are needed. Where boot-partition contents matter,
-//! the destination is a [`MockSd`] (MBR + FAT32) and the OS image is its
-//! `image_copy`, so `MockSd::boot_file` can inspect the result.
+//! the destination is a [`MockSd`] (MBR or GPT, both FAT32) and the OS image is
+//! its `image_copy`, so `MockSd::boot_file` can inspect the result.
 
 use std::io::Write;
 
@@ -179,6 +179,42 @@ fn flash_sd_sysconfig_omits_unset_keys() {
     ]);
 
     assert_eq!(mock.boot_file("sysconf.txt").unwrap(), "hostname=beagle\n");
+}
+
+/// The same flag -> `sysconf.txt` mapping against a GPT image. The boot
+/// partition is then located through the GPT table rather than the MBR one, and
+/// Wi-Fi is included so the `services/` directory the customization has to
+/// create is covered on GPT too.
+#[test]
+fn flash_sd_sysconfig_writes_keys_on_gpt_image() {
+    let mut mock = MockSd::new_gpt();
+    let image = mock.image_copy();
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--sysconfig",
+        "--hostname",
+        "beagle",
+        "--wifi-ssid",
+        "mynet",
+        "--wifi-password",
+        "hunter2",
+    ]);
+
+    assert_eq!(
+        mock.boot_file("sysconf.txt").unwrap(),
+        "hostname=beagle\niwd_psk_file=mynet.psk\n"
+    );
+    assert_eq!(
+        mock.boot_file("services/mynet.psk").unwrap(),
+        "[Security]\nPassphrase=hunter2\n\n[Settings]\nAutoConnect=true"
+    );
 }
 
 /// `--usb-enable-dhcp` is a bool, so it is only meaningful as a positive
@@ -421,6 +457,44 @@ fn flash_sd_bootfs_writes_archive_into_boot_partition() {
     );
 }
 
+/// `--bootfs` against a GPT image, with a sysconfig flag on top: both the
+/// archive and the customization have to reach the GPT boot partition, in that
+/// order.
+#[test]
+fn flash_sd_bootfs_writes_archive_into_gpt_boot_partition() {
+    let mut mock = MockSd::new_gpt();
+    let image = mock.image_copy();
+    let bootfs = tar_archive_with_dirs(&[
+        ("sysconf.txt", Some("# shipped by the bootfs tarball\n")),
+        ("extlinux", None),
+        ("extlinux/extlinux.conf", Some("LABEL Fedora\n")),
+    ]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd",
+        image.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+        "--file-destination",
+        "--bootfs",
+        bootfs.path().to_str().unwrap(),
+        "--sysconfig",
+        "--hostname",
+        "beagle",
+    ]);
+
+    assert_eq!(
+        mock.boot_file("extlinux/extlinux.conf").unwrap(),
+        "LABEL Fedora\n"
+    );
+    assert_eq!(
+        mock.boot_file("sysconf.txt").unwrap(),
+        "# shipped by the bootfs tarball\nhostname=beagle\n"
+    );
+}
+
 /// The image is written first, so a `--bootfs` entry replaces the file the
 /// image shipped. Overwriting with *shorter* contents is the case that catches
 /// a missing truncate: the tail of the old file would otherwise survive.
@@ -557,6 +631,26 @@ fn flash_sd_bootfs_on_partitionless_image_fails() {
 #[test]
 fn sd_boot_update_writes_archive_into_boot_partition() {
     let mut mock = MockSd::new();
+    let archive = tar_archive(&[("extlinux.conf", "LABEL Linux\n")]);
+
+    run_cli([
+        "bb-imager-cli",
+        "flash",
+        "--quiet",
+        "sd-boot-update",
+        archive.path().to_str().unwrap(),
+        mock.path().to_str().unwrap(),
+    ]);
+
+    assert_eq!(mock.boot_file("extlinux.conf").unwrap(), "LABEL Linux\n");
+}
+
+/// `sd-boot-update` writes into an already flashed card, so this is the one
+/// path where the GPT table comes from the destination itself rather than from
+/// an image that was just written over it.
+#[test]
+fn sd_boot_update_writes_archive_into_gpt_boot_partition() {
+    let mut mock = MockSd::new_gpt();
     let archive = tar_archive(&[("extlinux.conf", "LABEL Linux\n")]);
 
     run_cli([
