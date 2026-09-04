@@ -78,9 +78,9 @@ fn archive_fn(f: &NamedTempFile) -> impl FnOnce() -> std::io::Result<bb_flasher:
     LocalImage::new(f.path().into()).into_archive_fn(None)
 }
 
-/// A freshly created [`MockSd`] is a valid 128 MiB MBR + FAT32 card, so its own
-/// bytes make a usable OS image: flashing them onto another `MockSd` leaves a
-/// destination whose BOOT partition `open_boot` can inspect.
+/// A freshly created [`MockSd`] is a valid 128 MiB partitioned FAT32 card (MBR
+/// or GPT), so its own bytes make a usable OS image: flashing them onto another
+/// `MockSd` leaves a destination whose BOOT partition `open_boot` can inspect.
 fn image_fn(src: &MockSd) -> impl FnOnce() -> std::io::Result<(bb_flasher::img::OsImage, u64)> {
     LocalImage::new(src.path().into()).into_image_fn()
 }
@@ -164,6 +164,40 @@ fn flash_applies_bootfs_before_customization() {
     .flash(None, None)
     .expect("flashing with a bootfs archive and customization should succeed");
 
+    assert_eq!(
+        read_boot_file(&mut dst, SYSCONF),
+        format!("{SYSCONF_CONTENTS}hostname=beagle\n"),
+        "customization should append to the file the bootfs archive wrote"
+    );
+}
+
+/// The GPT counterpart to [`flash_writes_bootfs_entries_to_boot_partition`] and
+/// [`flash_applies_bootfs_before_customization`]: with the image carrying a GPT
+/// table, both the archive and the customization have to reach the BOOT
+/// partition found through `gptman`, in that order.
+#[test]
+fn flash_applies_bootfs_and_customization_to_gpt_boot_partition() {
+    let src = MockSd::new_gpt();
+    let mut dst = MockSd::new_gpt();
+    let archive = bootfs_tar();
+
+    bb_flasher::sd::Flasher::with_file_dest(
+        image_fn(&src),
+        Some(archive_fn(&archive)),
+        no_bmap(),
+        dst.path().to_path_buf(),
+        FlashingSdLinuxConfig::sysconfig(Some("beagle".into()), None, None, None, None, None, None),
+    )
+    .flash(None, None)
+    .expect("flashing a GPT image with a bootfs archive and customization should succeed");
+
+    dst.rewind().unwrap();
+    dst.open_boot()
+        .root_dir()
+        .open_dir(DIR)
+        .expect("bootfs directory should exist in GPT BOOT partition");
+
+    assert_eq!(read_boot_file(&mut dst, FILE), FILE_CONTENTS);
     assert_eq!(
         read_boot_file(&mut dst, SYSCONF),
         format!("{SYSCONF_CONTENTS}hostname=beagle\n"),
