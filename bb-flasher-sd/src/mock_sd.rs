@@ -11,6 +11,18 @@ const DISK_SIZE: u64 = 128 * 1024 * 1024; // 128 MiB
 const SECTOR_SIZE: u32 = 512;
 const FIRST_LBA: u32 = 2048;
 
+/// EFI System Partition type GUID (C12A7328-F81F-11D2-BA4B-00A0C93EC93B),
+/// in the mixed-endian byte order gptman expects.
+const EFI_SYSTEM_PARTITION_GUID: [u8; 16] = [
+    0x28, 0x73, 0x2a, 0xc1, 0x1f, 0xf8, 0xd2, 0x11, 0xba, 0x4b, 0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b,
+];
+const DISK_GUID: [u8; 16] = [
+    0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+];
+const PARTITION_GUID: [u8; 16] = [
+    0x87, 0x65, 0x43, 0x21, 0xcb, 0xa9, 0x0f, 0xed, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+];
+
 #[derive(Debug)]
 pub struct MockSd {
     file: tempfile::NamedTempFile,
@@ -26,7 +38,6 @@ impl Default for MockSd {
 impl MockSd {
     pub fn new() -> Self {
         let mut img = tempfile::NamedTempFile::new().unwrap();
-
         img.as_file().set_len(DISK_SIZE).unwrap();
 
         let mut mbr = MBR::new_from(&mut img, SECTOR_SIZE, [0x12, 0x34, 0x56, 0x78]).unwrap();
@@ -47,26 +58,47 @@ impl MockSd {
 
         let partition_offset = FIRST_LBA as u64 * SECTOR_SIZE as u64;
         let partition_size = num_sectors as u64 * SECTOR_SIZE as u64;
-
-        {
-            let mut partition = img.reopen().unwrap();
-
-            partition.seek(SeekFrom::Start(partition_offset)).unwrap();
-
-            let mut partition =
-                StreamSlice::new(partition, partition_offset, partition_size).unwrap();
-
-            fatfs::format_volume(
-                &mut partition,
-                fatfs::FormatVolumeOptions::new()
-                    .fat_type(fatfs::FatType::Fat32)
-                    .volume_label(*b"BOOT       "),
-            )
-            .unwrap();
-        }
+        format_fat32(&img, partition_offset, partition_size);
 
         img.rewind().unwrap();
+        Self {
+            file: img,
+            fail: CancellationToken::default(),
+        }
+    }
 
+    pub fn new_gpt() -> Self {
+        let mut img = tempfile::NamedTempFile::new().unwrap();
+        img.as_file().set_len(DISK_SIZE).unwrap();
+
+        // Protective MBR, so tools that only understand MBR see one big
+        // "GPT protective" partition rather than unpartitioned media.
+        gptman::GPT::write_protective_mbr_into(&mut img, SECTOR_SIZE as u64).unwrap();
+
+        let mut gpt = gptman::GPT::new_from(&mut img, SECTOR_SIZE as u64, DISK_GUID).unwrap();
+
+        // Reuse FIRST_LBA for alignment parity with the MBR image; it must sit
+        // past the primary header + entry array.
+        let starting_lba = FIRST_LBA as u64;
+        assert!(starting_lba >= gpt.header.first_usable_lba);
+        // Leave room for the backup header/entries at the end of the disk.
+        let ending_lba = gpt.header.last_usable_lba;
+
+        gpt[1] = gptman::GPTPartitionEntry {
+            partition_type_guid: EFI_SYSTEM_PARTITION_GUID,
+            unique_partition_guid: PARTITION_GUID,
+            starting_lba,
+            ending_lba,
+            attribute_bits: 1 << 2,
+            partition_name: "BOOT".into(),
+        };
+        gpt.write_into(&mut img).unwrap();
+
+        let partition_offset = starting_lba * SECTOR_SIZE as u64;
+        let partition_size = (ending_lba - starting_lba + 1) * SECTOR_SIZE as u64;
+        format_fat32(&img, partition_offset, partition_size);
+
+        img.rewind().unwrap();
         Self {
             file: img,
             fail: CancellationToken::default(),
@@ -211,4 +243,17 @@ impl<'a> IntoIterator for &'a mut MockArchive {
     fn into_iter(self) -> Self::IntoIter {
         (&*self).into_iter()
     }
+}
+
+fn format_fat32(img: &tempfile::NamedTempFile, offset: u64, size: u64) {
+    let mut partition = img.reopen().unwrap();
+    partition.seek(SeekFrom::Start(offset)).unwrap();
+    let mut partition = StreamSlice::new(partition, offset, offset + size).unwrap();
+    fatfs::format_volume(
+        &mut partition,
+        fatfs::FormatVolumeOptions::new()
+            .fat_type(fatfs::FatType::Fat32)
+            .volume_label(*b"BOOT       "),
+    )
+    .unwrap();
 }
