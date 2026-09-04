@@ -4,6 +4,9 @@ use fatfs::FileSystem;
 use fscommon::{BufStream, StreamSlice};
 use std::io::{Read, Seek, SeekFrom, Write};
 
+const GPT_EFI_ATTR: u64 = 1;
+const GPT_BIOS_ATTR: u64 = 1 << 2;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ParitionType {
     Boot,
@@ -27,17 +30,21 @@ impl ParitionType {
         dst.rewind()?;
         let (start_offset, end_offset) = match part_table {
             PartitionTable::Gpt => {
-                let disk = gpt::GptConfig::new()
-                    .writable(false)
-                    .open_from_device(&mut dst)
+                let disk = gptman::GPT::find_from(&mut dst)
                     .map_err(|_| crate::Error::InvalidPartitionTable)?;
 
-                let partition_2 = disk.partitions().get(&2).unwrap();
+                // Find the first bootable partition
+                let (_, boot_partition) = disk
+                    .iter()
+                    .find(|(_, part)| {
+                        part.is_used()
+                            && (part.attribute_bits & (GPT_EFI_ATTR | GPT_BIOS_ATTR) != 0)
+                    })
+                    .ok_or(crate::Error::InvalidPartitionTable)?;
+                tracing::info!("Found GPT boot partition: {:#?}", boot_partition);
 
-                let start_offset: u64 =
-                    partition_2.first_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
-                let end_offset: u64 =
-                    partition_2.last_lba * gpt::disk::DEFAULT_SECTOR_SIZE.as_u64();
+                let start_offset = boot_partition.starting_lba * disk.sector_size;
+                let end_offset = boot_partition.ending_lba * disk.sector_size;
 
                 (start_offset, end_offset)
             }

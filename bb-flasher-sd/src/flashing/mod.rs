@@ -51,6 +51,8 @@ fn writer_task_bmap(
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
 ) -> Result<()> {
+    tracing::info!("Writing with bmap file.");
+
     let mut pos = 0;
     let (mut buf, mut count) = buf_rx.recv().unwrap();
     let img_size = bmap.total_mapped_size();
@@ -97,6 +99,8 @@ fn writer_task(
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
 ) -> Result<()> {
+    tracing::info!("Writing without bmap file. Will be slow.");
+
     let mut pos = 0u64;
 
     while let Ok((buf, count)) = buf_rx.recv() {
