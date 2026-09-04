@@ -4,7 +4,7 @@ use fatfs::FileSystem;
 use fscommon::{BufStream, StreamSlice};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-const GPT_EFI_ATTR: u64 = 1;
+const GPT_EFI_ATTR: u64 = 1 << 1;
 const GPT_BIOS_ATTR: u64 = 1 << 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -44,7 +44,8 @@ impl ParitionType {
                 tracing::info!("Found GPT boot partition: {:#?}", boot_partition);
 
                 let start_offset = boot_partition.starting_lba * disk.sector_size;
-                let end_offset = boot_partition.ending_lba * disk.sector_size;
+                // `ending_lba` is inclusive.
+                let end_offset = (boot_partition.ending_lba + 1) * disk.sector_size;
 
                 (start_offset, end_offset)
             }
