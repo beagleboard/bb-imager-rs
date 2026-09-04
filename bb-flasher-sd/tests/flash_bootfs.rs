@@ -55,7 +55,7 @@ fn flash_applies_bootfs_through_public_api() {
     let mut mock = MockSd::new();
     let mut img = mock.image_copy();
     img.rewind().unwrap();
-    let img_size = mock.len();
+    let img_size = mock.size();
 
     const FILE_CONTENTS: &str = "contents pulled in from a path";
     let mut temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -107,7 +107,7 @@ fn flash_applies_bootfs_before_customizations() {
     let mut mock = MockSd::new();
     let mut img = mock.image_copy();
     img.rewind().unwrap();
-    let img_size = mock.len();
+    let img_size = mock.size();
 
     let archive = archive(None);
 
@@ -153,7 +153,7 @@ fn flash_applies_bootfs_before_customizations() {
 fn flash_propagates_bootfs_resolver_error() {
     let mock = MockSd::new();
     let img = mock.image_copy();
-    let img_size = mock.len();
+    let img_size = mock.size();
 
     let bootfs = || -> io::Result<MockArchive> {
         Err(io::Error::new(

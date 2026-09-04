@@ -73,7 +73,7 @@ impl MockSd {
         }
     }
 
-    pub fn len(&self) -> u64 {
+    pub fn size(&self) -> u64 {
         DISK_SIZE
     }
 
