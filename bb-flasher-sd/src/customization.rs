@@ -183,7 +183,27 @@ pub(crate) fn resize_last_partition(dst: impl Read + Write + Seek, total_size: u
     dst.rewind()?;
 
     match part_table {
-        PartitionTable::Gpt => todo!(),
+        PartitionTable::Gpt => {
+            let mut gpt =
+                gptman::GPT::find_from(&mut dst).map_err(|_| Error::InvalidPartitionTable)?;
+            // The image just grew: last_usable_lba/backup_lba in the on-disk header are stale.
+            gpt.header
+                .update_from(&mut dst, gpt.sector_size)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+
+            let last_usable_lba = gpt.header.last_usable_lba;
+            let (_, last_part) = gpt
+                .iter_mut()
+                .filter(|(_, x)| x.is_used())
+                .max_by_key(|(_, x)| x.starting_lba)
+                .ok_or(Error::InvalidPartitionTable)?;
+
+            last_part.ending_lba = last_usable_lba;
+
+            dst.rewind()?;
+            gpt.write_into(&mut dst)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+        }
         PartitionTable::Mbr => {
             let mut mbr = mbrman::MBR::read_from(&mut dst, SECTOR_SIZE)
                 .map_err(|_| Error::InvalidPartitionTable)?;
