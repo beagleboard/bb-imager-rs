@@ -358,6 +358,164 @@ mod tests {
         );
     }
 
+    /// Read back the GPT `resize_last_partition` just wrote.
+    fn read_gpt(sd: &mut MockSd) -> gptman::GPT {
+        sd.rewind().unwrap();
+        gptman::GPT::find_from(sd).unwrap()
+    }
+
+    /// Replace the mock's GPT entries with `parts`, given as `(starting_lba,
+    /// ending_lba)` (both inclusive). The FAT32 filesystem the mock formatted is
+    /// left where it is; these tests only care about the table.
+    fn write_gpt_table(sd: &mut MockSd, parts: &[(u64, u64)]) {
+        let mut gpt = read_gpt(sd);
+
+        for i in 1..=gpt.header.number_of_partition_entries {
+            gpt[i] = gptman::GPTPartitionEntry::empty();
+        }
+        for (i, (starting_lba, ending_lba)) in parts.iter().enumerate() {
+            let n = i as u32 + 1;
+            gpt[n] = gptman::GPTPartitionEntry {
+                // Any non-zero type marks the entry as used.
+                partition_type_guid: [0xaf; 16],
+                // The GUIDs have to differ or `write_into` rejects the table.
+                unique_partition_guid: [n as u8; 16],
+                starting_lba: *starting_lba,
+                ending_lba: *ending_lba,
+                attribute_bits: 0,
+                partition_name: "".into(),
+            };
+        }
+
+        sd.rewind().unwrap();
+        gpt.write_into(sd).unwrap();
+    }
+
+    /// GPT counterpart of [`resize_grows_last_partition_to_fill_the_disk`]: the
+    /// card is bigger than the image it was flashed with, so the last partition
+    /// grows into the space behind it.
+    #[test]
+    fn resize_grows_last_gpt_partition_to_fill_the_disk() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size() * 2;
+        let before = read_gpt(&mut sd)[1].ending_lba;
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let gpt = read_gpt(&mut sd);
+        assert!(
+            gpt[1].ending_lba > before,
+            "partition should have grown, ended at LBA {before}"
+        );
+        assert_eq!(
+            gpt[1].ending_lba, gpt.header.last_usable_lba,
+            "partition should reach the end of the usable area"
+        );
+
+        // Only the table is resized, so the filesystem is still readable.
+        sd.rewind().unwrap();
+        ParitionType::Boot.open(&mut sd).unwrap();
+    }
+
+    /// The usable area is bounded by the backup header, which sits in the last
+    /// sector of the card. Unless `resize_last_partition` moves it there from the
+    /// end of the (smaller) image, the partition cannot grow past the old end.
+    #[test]
+    fn resize_moves_the_backup_gpt_to_the_end_of_the_disk() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size() * 2;
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let gpt = read_gpt(&mut sd);
+        assert_eq!(
+            (gpt.header.backup_lba + 1) * gpt.sector_size,
+            total_size,
+            "the backup header should be in the last sector of the card"
+        );
+
+        // ... and it should actually be there, not just be pointed at.
+        let mut signature = [0u8; 8];
+        sd.seek(SeekFrom::Start(gpt.header.backup_lba * gpt.sector_size))
+            .unwrap();
+        sd.read_exact(&mut signature).unwrap();
+        assert_eq!(&signature, b"EFI PART");
+    }
+
+    /// Flashed onto a card exactly as big as the image: there is nothing to grow
+    /// into, so the table comes out untouched.
+    #[test]
+    fn resize_is_noop_when_gpt_partition_already_fills_the_disk() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size();
+        let before = read_gpt(&mut sd)[1].clone();
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        assert_eq!(read_gpt(&mut sd)[1], before);
+    }
+
+    /// Only the last partition is resized; the ones before it keep their size.
+    #[test]
+    fn resize_grows_only_the_last_gpt_partition() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size();
+        write_gpt_table(&mut sd, &[(2048, 4095), (4096, 6143)]);
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let gpt = read_gpt(&mut sd);
+        assert_eq!(
+            gpt[1].ending_lba, 4095,
+            "the boot partition should be left as is"
+        );
+        assert_eq!(
+            gpt[2].ending_lba, gpt.header.last_usable_lba,
+            "the last partition should reach the end of the usable area"
+        );
+    }
+
+    /// "Last" means furthest into the disk, not last in the entry array: GPT
+    /// entries are free to be stored out of order.
+    #[test]
+    fn resize_grows_the_furthest_gpt_partition_not_the_last_entry() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size();
+        write_gpt_table(&mut sd, &[(4096, 6143), (2048, 4095)]);
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let gpt = read_gpt(&mut sd);
+        assert_eq!(
+            gpt[1].ending_lba, gpt.header.last_usable_lba,
+            "the partition furthest into the disk should have grown"
+        );
+        assert_eq!(
+            gpt[2].ending_lba, 4095,
+            "the first partition on disk should be left as is"
+        );
+    }
+
+    #[test]
+    fn resize_rejects_a_gpt_without_any_partition() {
+        let mut sd = MockSd::new_gpt();
+        let total_size = sd.size();
+        write_gpt_table(&mut sd, &[]);
+
+        sd.rewind().unwrap();
+        let err = resize_last_partition(&mut sd, total_size).unwrap_err();
+
+        assert!(
+            matches!(err, Error::InvalidPartitionTable),
+            "expected InvalidPartitionTable, got: {err:?}"
+        );
+    }
+
     #[test]
     fn resize_rejects_an_image_without_a_partition_table() {
         let mut img = std::io::Cursor::new(vec![0u8; 1024]);
