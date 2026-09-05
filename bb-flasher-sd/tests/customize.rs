@@ -42,15 +42,15 @@ fn flash_applies_customization_through_public_api() {
 
     // Progress-to-completion is covered by tests/flashing.rs; this test focuses
     // on the customization loop, so it flashes without a progress channel.
-    bb_flasher_sd::flash(
+    bb_flasher_sd::flashing::Flasher::new(
         img_resolver,
         NO_BOOTFS,
         bmap,
-        Destination::File(mock.path().into()),
-        None,
         std::iter::once(customization),
         None,
+        None,
     )
+    .flash(Destination::File(mock.path().into()))
     .expect("flash with customization should succeed");
 
     // The customization file should now exist in the boot partition.
@@ -85,15 +85,15 @@ fn flash_applies_customization_to_gpt_image() {
     };
 
     let bmap: Option<fn() -> std::io::Result<Box<str>>> = None;
-    bb_flasher_sd::flash(
+    bb_flasher_sd::flashing::Flasher::new(
         move || Ok((img, img_size)),
         NO_BOOTFS,
         bmap,
-        Destination::File(mock.path().into()),
-        None,
         std::iter::once(customization),
         None,
+        None,
     )
+    .flash(Destination::File(mock.path().into()))
     .expect("flash with customization should succeed on a GPT image");
 
     assert_eq!(mock.boot_file(FILE_NAME).unwrap().as_bytes(), FILE_DATA);

@@ -64,15 +64,15 @@ fn flash_applies_bootfs_through_public_api() {
 
     let archive = archive(Some(temp_file.path().into()));
 
-    bb_flasher_sd::flash(
+    bb_flasher_sd::flashing::Flasher::new(
         move || Ok((img, img_size)),
         Some(move || Ok(archive)),
         no_bmap(),
-        Destination::File(mock.path().into()),
-        None,
         no_customizations(),
         None,
+        None,
     )
+    .flash(Destination::File(mock.path().into()))
     .expect("flash with a bootfs archive should succeed");
 
     let fs = mock.open_boot();
@@ -120,18 +120,18 @@ fn flash_applies_bootfs_before_customizations() {
     .into_iter()
     .map(|(name, data): (Box<str>, Box<[u8]>)| (name, ContentType::DataAppend(data)));
 
-    bb_flasher_sd::flash(
+    bb_flasher_sd::flashing::Flasher::new(
         move || Ok((img, img_size)),
         Some(move || Ok(archive)),
         no_bmap(),
-        Destination::File(mock.path().into()),
-        None,
         std::iter::once(Customization {
             partition: ParitionType::Boot,
             content,
         }),
         None,
+        None,
     )
+    .flash(Destination::File(mock.path().into()))
     .expect("flash with bootfs and customization should succeed");
 
     let fs = mock.open_boot();
@@ -162,15 +162,15 @@ fn flash_propagates_bootfs_resolver_error() {
         ))
     };
 
-    let result = bb_flasher_sd::flash(
+    let result = bb_flasher_sd::flashing::Flasher::new(
         move || Ok((img, img_size)),
         Some(bootfs),
         no_bmap(),
-        Destination::File(mock.path().into()),
-        None,
         no_customizations(),
         None,
-    );
+        None,
+    )
+    .flash(Destination::File(mock.path().into()));
 
     assert!(
         matches!(

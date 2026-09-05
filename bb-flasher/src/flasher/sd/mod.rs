@@ -287,15 +287,15 @@ where
             None => None,
         };
 
-        bb_flasher_sd::flash(
+        bb_flasher_sd::flashing::Flasher::new(
             self.img,
             self.bootfs,
             self.bmap,
-            self.dst,
-            tx,
             customization,
+            tx,
             cancel,
         )
+        .flash(self.dst)
         .map_err(Into::into)
     }
 }

@@ -31,7 +31,6 @@ pub mod mock_sd;
 pub(crate) mod pal;
 
 pub use customization::{ContentType, Customization, ParitionType};
-pub use flashing::flash;
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
