@@ -43,15 +43,15 @@ fn test_public_flash_with_temp_file() {
         std::iter::empty::<Customization<std::iter::Empty<(Box<str>, ContentType)>>>();
 
     // 6. Execute the public flash function
-    let result = bb_flasher_sd::flash(
+    let result = bb_flasher_sd::flashing::Flasher::new(
         img_resolver,
         NO_BOOTFS,
         bmap_resolver,
-        dst,
-        Some(tx),
         customizations,
+        Some(tx),
         None,
-    );
+    )
+    .flash(dst);
 
     assert!(result.is_ok(), "Public flash failed: {:?}", result.err());
 
@@ -95,15 +95,15 @@ fn flash_aborts_with_cancelled_token() {
     drop(token.drop_guard());
     assert!(token.is_cancelled());
 
-    let result = bb_flasher_sd::flash(
+    let result = bb_flasher_sd::flashing::Flasher::new(
         img_resolver,
         NO_BOOTFS,
         bmap_resolver,
-        dst,
-        None,
         customizations,
+        None,
         Some(token),
-    );
+    )
+    .flash(dst);
 
     assert!(
         matches!(result, Err(bb_flasher_sd::Error::Aborted)),

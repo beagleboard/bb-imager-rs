@@ -195,113 +195,101 @@ impl<'b> IntoIterator for &'b mut NoBootfs {
 /// no extra files written after the image.
 pub const NO_BOOTFS: Option<fn() -> std::io::Result<NoBootfs>> = None;
 
-/// Flash OS image to SD card.
-///
-/// # Customization
-///
-/// Support post flashing customization. Currently only sysconf is supported, which is used by
-/// [BeagleBoard.org].
-///
-/// # Image
-///
-/// Using a resolver function for image and image size. This is to allow downloading the image, or
-/// some kind of lazy loading after SD card permissions have be acquired. This is useful in GUIs
-/// since the user would expect a password prompt at the start of flashing.
-///
-/// Many users might switch task after starting the flashing process, which would make it
-/// frustrating if the prompt occured after downloading.
-///
-/// # Bootfs
-///
-/// Optionally writes extra files to the BOOT partition once the image has been
-/// written, before customizations are applied. Pass [`NO_BOOTFS`] to skip it.
-///
-/// # Progress
-///
-/// Progress lies between 0 and 1.
-pub fn flash<'a, R, B, C, I, T>(
-    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send,
-    bootfs: Option<T>,
-    bmap: Option<B>,
-    dst: crate::Destination,
+pub struct Flasher<I, B, M, C> {
+    img: I,
+    bootfs: Option<B>,
+    bmap: Option<M>,
+    customizations: C,
     chan: Option<mpsc::SyncSender<f32>>,
-    customizations: impl Iterator<Item = Customization<C>> + Send,
     cancel: Option<CancellationToken>,
-) -> Result<()>
-where
-    R: Read + Send,
-    C: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
-    B: FnOnce() -> std::io::Result<Box<str>> + Send,
-    T: FnOnce() -> std::io::Result<I>,
-    for<'b> &'b mut I: IntoIterator<Item = (Box<str>, ContentType<'b>)>,
-{
-    tracing::info!("Opening Destination");
-
-    match dst {
-        crate::Destination::File(path) => {
-            let sd = std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(path)?;
-            flash_internal(img, bootfs, bmap, sd, chan, customizations, cancel)
-        }
-        crate::Destination::SdCard(path) => {
-            let sd = crate::pal::open(&path)?;
-            let sd = crate::helpers::SdCardWrapper::new(sd);
-            flash_internal(img, bootfs, bmap, sd, chan, customizations, cancel)
-        }
-    }
 }
 
-fn flash_internal<'a, R, B, Sd, C, I, T>(
-    img: impl FnOnce() -> std::io::Result<(R, u64)> + Send,
-    bootfs: Option<T>,
-    bmap: Option<B>,
-    mut sd: Sd,
-    mut chan: Option<mpsc::SyncSender<f32>>,
-    customizations: impl Iterator<Item = Customization<C>> + Send,
-    cancel: Option<CancellationToken>,
-) -> Result<()>
+impl<'a, I, B, M, C, R, Be, Cu> Flasher<I, B, M, C>
 where
+    I: FnOnce() -> std::io::Result<(R, u64)> + Send,
+    B: FnOnce() -> std::io::Result<Be>,
+    M: FnOnce() -> std::io::Result<Box<str>> + Send,
+    C: Iterator<Item = Customization<Cu>> + Send,
     R: Read + Send,
-    Sd: Read + Write + Seek + Eject + std::fmt::Debug,
-    C: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
-    B: FnOnce() -> std::io::Result<Box<str>> + Send,
-    T: FnOnce() -> std::io::Result<I>,
-    for<'b> &'b mut I: IntoIterator<Item = (Box<str>, ContentType<'b>)>,
+    for<'b> &'b mut Be: IntoIterator<Item = (Box<str>, ContentType<'b>)>,
+    Cu: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
 {
-    tracing::info!("Resolving Bmap");
-    let bmap = match bmap {
-        Some(x) => {
-            Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
+    pub fn new(
+        img: I,
+        bootfs: Option<B>,
+        bmap: Option<M>,
+        customizations: C,
+        chan: Option<mpsc::SyncSender<f32>>,
+        cancel: Option<CancellationToken>,
+    ) -> Self {
+        Self {
+            img,
+            bootfs,
+            bmap,
+            customizations,
+            chan,
+            cancel,
         }
-        None => None,
-    };
-    tracing::info!("Resolving Image");
-    let (img, img_size) = img()?;
-
-    chan_send(chan.as_mut(), 0.0);
-
-    tracing::info!("Writing to SD Card");
-    write_sd(img, img_size, bmap, &mut sd, chan, cancel.clone())?;
-
-    if let Some(boot_cb) = bootfs {
-        tracing::info!("Applying bootfs updates");
-        let mut bootfs_img = boot_cb()?;
-        crate::bootfs_update::internal((&mut bootfs_img).into_iter(), &mut sd, cancel.clone())?;
     }
 
-    tracing::info!("Applying customization");
-    let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-    for c in customizations {
-        check_cancel(cancel.as_ref())?;
-        c.customize(&mut sd, None)?;
+    pub fn flash(self, dst: crate::Destination) -> Result<()> {
+        tracing::info!("Opening Destination");
+
+        match dst {
+            crate::Destination::File(path) => {
+                let sd = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(path)?;
+                self.flash_internal(sd)
+            }
+            crate::Destination::SdCard(path) => {
+                let sd = crate::pal::open(&path)?;
+                let sd = crate::helpers::SdCardWrapper::new(sd);
+
+                self.flash_internal(sd)
+            }
+        }
     }
 
-    tracing::info!("Ejecting SD Card");
-    let _ = sd.into_inner().eject();
+    fn flash_internal(mut self, mut sd: impl Read + Write + Seek + Eject) -> Result<()> {
+        tracing::info!("Resolving Bmap");
+        let bmap = match self.bmap {
+            Some(x) => {
+                Some(bb_bmap_parser::Bmap::from_xml(&x()?).map_err(|_| crate::Error::InvalidBmap)?)
+            }
+            None => None,
+        };
+        tracing::info!("Resolving Image");
+        let (img, img_size) = (self.img)()?;
 
-    Ok(())
+        chan_send(self.chan.as_mut(), 0.0);
+
+        tracing::info!("Writing to SD Card");
+        write_sd(img, img_size, bmap, &mut sd, self.chan, self.cancel.clone())?;
+
+        if let Some(boot_cb) = self.bootfs {
+            tracing::info!("Applying bootfs updates");
+            let mut bootfs_img = boot_cb()?;
+            crate::bootfs_update::internal(
+                (&mut bootfs_img).into_iter(),
+                &mut sd,
+                self.cancel.clone(),
+            )?;
+        }
+
+        tracing::info!("Applying customization");
+        let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
+        for c in self.customizations {
+            check_cancel(self.cancel.as_ref())?;
+            c.customize(&mut sd, None)?;
+        }
+
+        tracing::info!("Ejecting SD Card");
+        let _ = sd.into_inner().eject();
+
+        Ok(())
+    }
 }
