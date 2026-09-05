@@ -48,7 +48,7 @@ where
 
 pub(crate) fn internal<'a, I, S>(imgs: I, sd: S, cancel: Option<CancellationToken>) -> Result<()>
 where
-    S: Read + Write + Seek + std::fmt::Debug,
+    S: Read + Write + Seek,
     I: Iterator<Item = (Box<str>, ContentType<'a>)>,
 {
     tracing::info!("Starting bootfs update");
