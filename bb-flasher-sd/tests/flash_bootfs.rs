@@ -72,7 +72,7 @@ fn flash_applies_bootfs_through_public_api() {
         None,
         None,
     )
-    .flash(Destination::File(mock.path().into()))
+    .flash(Destination::File(mock.path().into()), false)
     .expect("flash with a bootfs archive should succeed");
 
     let fs = mock.open_boot();
@@ -131,7 +131,7 @@ fn flash_applies_bootfs_before_customizations() {
         None,
         None,
     )
-    .flash(Destination::File(mock.path().into()))
+    .flash(Destination::File(mock.path().into()), false)
     .expect("flash with bootfs and customization should succeed");
 
     let fs = mock.open_boot();
@@ -170,7 +170,7 @@ fn flash_propagates_bootfs_resolver_error() {
         None,
         None,
     )
-    .flash(Destination::File(mock.path().into()));
+    .flash(Destination::File(mock.path().into()), false);
 
     assert!(
         matches!(

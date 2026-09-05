@@ -51,7 +51,7 @@ fn test_public_flash_with_temp_file() {
         Some(tx),
         None,
     )
-    .flash(dst);
+    .flash(dst, false);
 
     assert!(result.is_ok(), "Public flash failed: {:?}", result.err());
 
@@ -103,7 +103,7 @@ fn flash_aborts_with_cancelled_token() {
         None,
         Some(token),
     )
-    .flash(dst);
+    .flash(dst, false);
 
     assert!(
         matches!(result, Err(bb_flasher_sd::Error::Aborted)),

@@ -50,7 +50,7 @@ fn flash_applies_customization_through_public_api() {
         None,
         None,
     )
-    .flash(Destination::File(mock.path().into()))
+    .flash(Destination::File(mock.path().into()), false)
     .expect("flash with customization should succeed");
 
     // The customization file should now exist in the boot partition.
@@ -93,7 +93,7 @@ fn flash_applies_customization_to_gpt_image() {
         None,
         None,
     )
-    .flash(Destination::File(mock.path().into()))
+    .flash(Destination::File(mock.path().into()), false)
     .expect("flash with customization should succeed on a GPT image");
 
     assert_eq!(mock.boot_file(FILE_NAME).unwrap().as_bytes(), FILE_DATA);

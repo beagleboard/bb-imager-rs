@@ -196,6 +196,7 @@ pub struct Flasher<I, B, T> {
     bmap: Option<B>,
     dst: bb_flasher_sd::Destination,
     customization: FlashingSdLinuxConfig,
+    resize: bool,
 }
 
 impl<I, B, T> Flasher<I, B, T> {
@@ -205,6 +206,7 @@ impl<I, B, T> Flasher<I, B, T> {
         bmap: Option<B>,
         dst: Target,
         customization: FlashingSdLinuxConfig,
+        resize: bool,
     ) -> Self {
         Self {
             img,
@@ -212,6 +214,7 @@ impl<I, B, T> Flasher<I, B, T> {
             bmap,
             dst: bb_flasher_sd::Destination::SdCard(dst.0.path.into_boxed_path()),
             customization,
+            resize,
         }
     }
 
@@ -228,6 +231,7 @@ impl<I, B, T> Flasher<I, B, T> {
             bmap,
             dst: bb_flasher_sd::Destination::File(dst.into_boxed_path()),
             customization,
+            resize: false,
         }
     }
 
@@ -295,7 +299,7 @@ where
             tx,
             cancel,
         )
-        .flash(self.dst)
+        .flash(self.dst, self.resize)
         .map_err(Into::into)
     }
 }

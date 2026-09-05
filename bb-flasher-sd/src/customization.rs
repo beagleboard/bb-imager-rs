@@ -175,3 +175,39 @@ where
         Ok(())
     }
 }
+
+pub(crate) fn resize_last_partition(dst: impl Read + Write + Seek, total_size: u64) -> Result<()> {
+    let mut dst = StreamSlice::new(dst, 0, total_size)?;
+
+    let part_table = PartitionTable::detect_partition_table(&mut dst)?;
+    dst.rewind()?;
+
+    match part_table {
+        PartitionTable::Gpt => todo!(),
+        PartitionTable::Mbr => {
+            let mut mbr = mbrman::MBR::read_from(&mut dst, SECTOR_SIZE)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+
+            let (id, _) = mbr
+                .iter()
+                .filter(|(_, x)| x.is_used() && !x.is_extended())
+                .max_by_key(|(_, x)| x.starting_lba)
+                .ok_or(Error::InvalidPartitionTable)?;
+
+            let new_sectors = mbr
+                .get_maximum_partition_size_for(id)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+            mbr[id].sectors = new_sectors;
+
+            // Rewind is not really needed since write_into internally does it. But well, 2 rewinds
+            // won't cause any problem.
+            dst.rewind()?;
+            mbr.write_into(&mut dst)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+        }
+    }
+
+    dst.flush()?;
+
+    Ok(())
+}

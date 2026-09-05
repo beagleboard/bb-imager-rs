@@ -72,6 +72,8 @@ pub enum Error {
     InvalidBmap,
     #[error("Writer thread has been closed.")]
     WriterClosed,
+    #[error("Destination is not valid")]
+    InvalidDestionation,
 
     #[cfg(windows)]
     #[error("Failed to clear SD Card.")]

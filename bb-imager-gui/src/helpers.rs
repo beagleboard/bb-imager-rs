@@ -480,6 +480,8 @@ pub(crate) async fn flash(
                     bmap.map(|x| x.into_fn()),
                     t,
                     customization.sd_customization(),
+                    // TODO: Impl proerly
+                    false,
                 )
                 .flash(Some(chan), Some(cancel_sync))
             })

@@ -139,6 +139,10 @@ pub enum TargetCommands {
         /// SD Card creation for Fedora and other distro images.
         #[arg(long)]
         bootfs: Option<Box<Path>>,
+
+        /// Resize the last partition to occupy the whole SD Card.
+        #[arg(long)]
+        resizefs: bool,
     },
     /// Update boot partition with contents from archive
     SdBootUpdate {
