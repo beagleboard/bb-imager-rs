@@ -7,6 +7,8 @@ use std::io::{Read, Seek, SeekFrom, Write};
 const GPT_EFI_ATTR: u64 = 1 << 1;
 const GPT_BIOS_ATTR: u64 = 1 << 2;
 
+const SECTOR_SIZE: u32 = 512;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ParitionType {
     Boot,
@@ -59,8 +61,8 @@ impl ParitionType {
                     .find(|(_, part)| part.is_used() && part.is_active())
                     .ok_or(Error::InvalidPartitionTable)?;
 
-                let start_offset: u64 = (boot_part.starting_lba * 512).into();
-                let end_offset: u64 = start_offset + u64::from(boot_part.sectors) * 512;
+                let start_offset: u64 = (boot_part.starting_lba * SECTOR_SIZE).into();
+                let end_offset: u64 = start_offset + u64::from(boot_part.sectors * SECTOR_SIZE);
 
                 (start_offset, end_offset)
             }
