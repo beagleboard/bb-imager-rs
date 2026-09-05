@@ -175,3 +175,178 @@ where
         Ok(())
     }
 }
+
+pub(crate) fn resize_last_partition(dst: impl Read + Write + Seek, total_size: u64) -> Result<()> {
+    let mut dst = StreamSlice::new(dst, 0, total_size)?;
+
+    let part_table = PartitionTable::detect_partition_table(&mut dst)?;
+    dst.rewind()?;
+
+    match part_table {
+        PartitionTable::Gpt => todo!(),
+        PartitionTable::Mbr => {
+            let mut mbr = mbrman::MBR::read_from(&mut dst, SECTOR_SIZE)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+
+            let (id, _) = mbr
+                .iter()
+                .filter(|(_, x)| x.is_used() && !x.is_extended())
+                .max_by_key(|(_, x)| x.starting_lba)
+                .ok_or(Error::InvalidPartitionTable)?;
+
+            let new_sectors = mbr
+                .get_maximum_partition_size_for(id)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+            mbr[id].sectors = new_sectors;
+
+            // Rewind is not really needed since write_into internally does it. But well, 2 rewinds
+            // won't cause any problem.
+            dst.rewind()?;
+            mbr.write_into(&mut dst)
+                .map_err(|_| Error::InvalidPartitionTable)?;
+        }
+    }
+
+    dst.flush()?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::mock_sd::MockSd;
+
+    use super::*;
+
+    /// Read back the partition table `reseize_last_partition` just wrote.
+    fn read_mbr(sd: &mut MockSd) -> mbrman::MBR {
+        sd.rewind().unwrap();
+        mbrman::MBR::read_from(sd, SECTOR_SIZE).unwrap()
+    }
+
+    /// Replace the mock's table with `parts`, given as `(sys, starting_lba,
+    /// sectors)`. The FAT32 filesystem the mock formatted is left where it is;
+    /// these tests only care about the table.
+    fn write_table(sd: &mut MockSd, parts: &[(u8, u32, u32)]) {
+        let mut mbr = read_mbr(sd);
+
+        for i in 1..=4 {
+            mbr[i] = mbrman::MBRPartitionEntry::empty();
+        }
+        for (i, (sys, starting_lba, sectors)) in parts.iter().enumerate() {
+            mbr[i + 1] = mbrman::MBRPartitionEntry {
+                boot: mbrman::BOOT_INACTIVE,
+                first_chs: mbrman::CHS::empty(),
+                sys: *sys,
+                last_chs: mbrman::CHS::empty(),
+                starting_lba: *starting_lba,
+                sectors: *sectors,
+            };
+        }
+
+        sd.rewind().unwrap();
+        mbr.write_into(sd).unwrap();
+    }
+
+    /// The card is bigger than the image it was flashed with, which is the case
+    /// the resize exists for: the last partition grows to the end of the card.
+    ///
+    /// `total_size` is what makes the disk look bigger; only LBA0 is rewritten,
+    /// so the mock's file does not have to grow with it.
+    #[test]
+    fn resize_grows_last_partition_to_fill_the_disk() {
+        let mut sd = MockSd::new();
+        let total_size = sd.size() * 2;
+        let before = read_mbr(&mut sd)[1].sectors;
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let part = read_mbr(&mut sd)[1].clone();
+        assert!(
+            part.sectors > before,
+            "partition should have grown, was {before} sectors"
+        );
+        assert_eq!(
+            u64::from(part.starting_lba + part.sectors) * u64::from(SECTOR_SIZE),
+            total_size,
+            "partition should reach the end of the card"
+        );
+
+        // Only the table is resized, so the filesystem is still readable.
+        sd.rewind().unwrap();
+        ParitionType::Boot.open(&mut sd).unwrap();
+    }
+
+    /// Flashed onto a card exactly as big as the image: there is nothing to grow
+    /// into, so the table comes out untouched.
+    #[test]
+    fn resize_is_noop_when_partition_already_fills_the_disk() {
+        let mut sd = MockSd::new();
+        let total_size = sd.size();
+        let before = read_mbr(&mut sd)[1].clone();
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        assert_eq!(read_mbr(&mut sd)[1], before);
+    }
+
+    /// Only the last partition is resized; the ones before it keep their size.
+    ///
+    /// Both partitions start at a multiple of 2048: `MBR::read_from` derives the
+    /// alignment from the starting LBAs, and a partition whose end is not
+    /// aligned would silently fail to match the free space behind it.
+    #[test]
+    fn resize_grows_only_the_last_partition() {
+        let mut sd = MockSd::new();
+        let total_size = sd.size();
+        write_table(&mut sd, &[(0x0C, 2048, 2048), (0x83, 4096, 2048)]);
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let mbr = read_mbr(&mut sd);
+        assert_eq!(
+            mbr[1].sectors, 2048,
+            "the boot partition should be left as is"
+        );
+        assert_eq!(
+            u64::from(mbr[2].starting_lba + mbr[2].sectors) * u64::from(SECTOR_SIZE),
+            total_size,
+            "the last partition should reach the end of the card"
+        );
+    }
+
+    /// An extended partition is a container for logical ones, not something to
+    /// grow, so the last *real* partition is picked instead. Here that one is
+    /// boxed in by the container, which leaves the whole table unchanged.
+    #[test]
+    fn resize_skips_extended_partitions() {
+        let mut sd = MockSd::new();
+        let total_size = sd.size();
+        write_table(&mut sd, &[(0x0C, 2048, 2048), (0x05, 4096, 2048)]);
+
+        sd.rewind().unwrap();
+        resize_last_partition(&mut sd, total_size).unwrap();
+
+        let mbr = read_mbr(&mut sd);
+        assert_eq!(mbr[1].sectors, 2048);
+        assert_eq!(
+            mbr[2].sectors, 2048,
+            "an extended partition should not be resized"
+        );
+    }
+
+    #[test]
+    fn resize_rejects_an_image_without_a_partition_table() {
+        let mut img = std::io::Cursor::new(vec![0u8; 1024]);
+
+        let err = resize_last_partition(&mut img, 1024).unwrap_err();
+
+        assert!(
+            matches!(err, Error::InvalidPartitionTable),
+            "expected InvalidPartitionTable, got: {err:?}"
+        );
+    }
+}

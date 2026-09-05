@@ -232,7 +232,7 @@ where
         }
     }
 
-    pub fn flash(self, dst: crate::Destination) -> Result<()> {
+    pub fn flash(self, dst: crate::Destination, resize: bool) -> Result<()> {
         tracing::info!("Opening Destination");
 
         match dst {
@@ -243,18 +243,34 @@ where
                     .create(true)
                     .truncate(true)
                     .open(path)?;
-                self.flash_internal(sd)
+                self.flash_internal(sd, None)
             }
             crate::Destination::SdCard(path) => {
                 let sd = crate::pal::open(&path)?;
                 let sd = crate::helpers::SdCardWrapper::new(sd);
+                let resize_size = if resize {
+                    let temp = bb_drivelist::drive_list()
+                        .unwrap()
+                        .into_iter()
+                        .find(|x| *x.raw == *path)
+                        .and_then(|x| x.size)
+                        .ok_or(crate::Error::InvalidDestionation)?;
 
-                self.flash_internal(sd)
+                    Some(temp)
+                } else {
+                    None
+                };
+
+                self.flash_internal(sd, resize_size)
             }
         }
     }
 
-    fn flash_internal(mut self, mut sd: impl Read + Write + Seek + Eject) -> Result<()> {
+    fn flash_internal(
+        mut self,
+        mut sd: impl Read + Write + Seek + Eject,
+        sd_size_for_resize: Option<u64>,
+    ) -> Result<()> {
         tracing::info!("Resolving Bmap");
         let bmap = match self.bmap {
             Some(x) => {
@@ -285,6 +301,11 @@ where
         for c in self.customizations {
             check_cancel(self.cancel.as_ref())?;
             c.customize(&mut sd, None)?;
+        }
+
+        if let Some(x) = sd_size_for_resize {
+            tracing::info!("Resize last partition");
+            crate::customization::resize_last_partition(&mut sd, x)?;
         }
 
         tracing::info!("Ejecting SD Card");

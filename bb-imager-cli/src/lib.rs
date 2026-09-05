@@ -126,6 +126,7 @@ fn flash_internal(
             cloud_init,
             file_destination,
             bootfs,
+            resizefs,
         } => {
             // TODO: Remove fallback in the future.
             if !sysconfig && !cloud_init {
@@ -183,6 +184,7 @@ fn flash_internal(
                     bmap.map(LocalStringFile::new).map(|x| x.into_fn()),
                     dst.try_into().unwrap(),
                     customization,
+                    resizefs,
                 )
             }
             .flash(chan, None)
