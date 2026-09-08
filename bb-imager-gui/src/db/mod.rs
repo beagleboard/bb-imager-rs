@@ -46,26 +46,10 @@ pub(crate) struct Board {
     pub(crate) bootfs: Option<config::Bootfs>,
 }
 
-/// Read the `bootfs_*` columns back into a [`config::Bootfs`].
-///
-/// The three columns are always written together, so the URL alone decides whether the board
-/// has a tarball.
-fn bootfs_from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Option<config::Bootfs>> {
-    let Some(url) = value.get::<_, Option<Url>>("bootfs_url")? else {
-        return Ok(None);
-    };
-    let extract_size: i64 = value.get("bootfs_extract_size")?;
-
-    Ok(Some(config::Bootfs {
-        url,
-        extract_size: extract_size as u64,
-        image_download_sha256: value.get("bootfs_sha256")?,
-    }))
-}
-
 impl Board {
     fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         let spec: Vec<u8> = value.get("specification")?;
+        let bootfs: Option<Vec<u8>> = value.get("bootfs")?;
 
         Ok(Self {
             id: value.get("id")?,
@@ -77,7 +61,7 @@ impl Board {
             oshw: value.get("oshw")?,
             flasher: value.get("flasher")?,
             instructions: value.get("instructions")?,
-            bootfs: bootfs_from_row(value)?,
+            bootfs: bootfs.map(|x| serde_json::from_slice(&x).unwrap()),
         })
     }
 }
@@ -404,15 +388,11 @@ impl Db {
             oshw,
             specification,
             documentation,
-            bootfs_url,
-            bootfs_extract_size,
-            bootfs_sha256
+            bootfs
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT(name) DO UPDATE SET
-            bootfs_url = excluded.bootfs_url,
-            bootfs_extract_size = excluded.bootfs_extract_size,
-            bootfs_sha256 = excluded.bootfs_sha256
+            bootfs = excluded.bootfs
         RETURNING id
         "#,
         )?;
@@ -426,12 +406,10 @@ impl Db {
                 board.oshw,
                 spec,
                 board.documentation,
-                board.bootfs.as_ref().map(|x| &x.url),
                 board
                     .bootfs
                     .as_ref()
-                    .map(|x| i64::try_from(x.extract_size).unwrap()),
-                board.bootfs.as_ref().map(|x| x.image_download_sha256)
+                    .map(|x| serde_json::to_vec(x).unwrap()),
             ],
             |r| r.get(0),
         )?;
@@ -566,7 +544,7 @@ impl Db {
         let mut stmt = db.prepare_cached(
             r#"
         SELECT id, name, icon, description, documentation, specification, oshw, 
-            flasher, instructions, bootfs_url, bootfs_extract_size, bootfs_sha256
+            flasher, instructions, bootfs
         FROM boards
         WHERE id = $1"#,
         )?;
@@ -646,7 +624,7 @@ impl Db {
                  OR s.parent_id = $2
               )
               -- Images without a bootloader are only flashable on boards that supply one
-              AND (s.flasher != $3 OR b.bootfs_url IS NOT NULL)
+              AND (s.flasher != $3 OR b.bootfs IS NOT NULL)
             ORDER BY s.remote_config_id NULLS LAST"#,
         )?;
         let res = stmt
@@ -679,7 +657,7 @@ impl Db {
                     OR s.parent_id = $2
                 )
                 -- Skip fetching subitems for sublists that are not shown. See `os_sublists`.
-                AND (s.flasher != $3 OR b.bootfs_url IS NOT NULL)"#,
+                AND (s.flasher != $3 OR b.bootfs IS NOT NULL)"#,
         )?;
         let res = stmt
             .query_map(
@@ -807,11 +785,12 @@ impl Db {
         let mut stmt = db.prepare(
             r#"
             SELECT name, description, icon, flasher, instructions, oshw, specification, documentation,
-                bootfs_url, bootfs_extract_size, bootfs_sha256
+                bootfs
             FROM boards WHERE id = $1"#)?;
 
         stmt.query_one([id], |value| {
             let spec: Vec<u8> = value.get("specification")?;
+            let bootfs: Option<Vec<u8>> = value.get("bootfs")?;
 
             Ok(config::Device {
                 name: value.get("name")?,
@@ -822,7 +801,7 @@ impl Db {
                 specification: serde_json::from_slice(&spec).unwrap(),
                 documentation: value.get("documentation")?,
                 oshw: value.get("oshw")?,
-                bootfs: bootfs_from_row(value)?,
+                bootfs: bootfs.map(|x| serde_json::from_slice(&x).unwrap()),
                 tags,
             })
         })
