@@ -410,13 +410,6 @@ impl Db {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT(name) DO UPDATE SET
-            description = excluded.description,
-            icon = excluded.icon,
-            flasher = excluded.flasher,
-            instructions = excluded.instructions,
-            oshw = excluded.oshw,
-            specification = excluded.specification,
-            documentation = excluded.documentation,
             bootfs_url = excluded.bootfs_url,
             bootfs_extract_size = excluded.bootfs_extract_size,
             bootfs_sha256 = excluded.bootfs_sha256
@@ -441,15 +434,6 @@ impl Db {
                 board.bootfs.as_ref().map(|x| x.image_download_sha256)
             ],
             |r| r.get(0),
-        )?;
-
-        // Remove old tags
-        exec.execute(
-            r#"
-        DELETE FROM board_tags
-        WHERE board_id = $1
-        "#,
-            [id],
         )?;
 
         // Insert new tags

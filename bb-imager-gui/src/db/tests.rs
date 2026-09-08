@@ -230,7 +230,7 @@ fn add_config_inserts_device_into_board_list() {
     );
 }
 
-/// This test verifies that add_config() updates an existing device
+/// This test verifies that add_config() updates only tags and bootfs
 /// when a device with the same name is inserted again.
 ///
 /// What this test checks:
@@ -238,7 +238,7 @@ fn add_config_inserts_device_into_board_list() {
 /// 2. A new device is inserted using add_config().
 /// 3. Same device name is inserted again with different fields.
 /// 4. board_list() still contains only one device entry.
-/// 5. board_by_id() returns updated device details.
+/// 5. board_by_id() returns old device details other than tags and bootfs.
 ///
 /// Why this matters:
 /// - Device name acts as unique identity
@@ -266,7 +266,7 @@ fn add_config_updates_existing_device_with_same_name() {
     };
 
     let mut imager = bb_config::config::Imager::default();
-    imager.devices.push(device_v1);
+    imager.devices.push(device_v1.clone());
 
     db.add_config(
         Config {
@@ -332,14 +332,14 @@ fn add_config_updates_existing_device_with_same_name() {
         .board_by_id(board_id)
         .expect("Fetching board by id should succeed");
 
-    assert_eq!(updated_board.description, device_v2.description);
-    assert_eq!(updated_board.flasher, device_v2.flasher);
+    assert_eq!(updated_board.description, device_v1.description);
+    assert_eq!(updated_board.flasher, device_v1.flasher);
     assert_eq!(
         updated_board.instructions.as_deref(),
-        device_v2.instructions.as_deref()
+        device_v1.instructions.as_deref()
     );
-    assert_eq!(updated_board.oshw, device_v2.oshw);
-    assert_eq!(updated_board.specification, device_v2.specification);
+    assert_eq!(updated_board.oshw, device_v1.oshw);
+    assert_eq!(updated_board.specification, device_v1.specification);
 }
 
 /// This test verifies that add_config() correctly inserts an OS image
@@ -1235,7 +1235,7 @@ fn os_board_json_by_id_reflects_updated_board() {
         tags: ["old-tag".into()].into(),
     };
 
-    let id = insert_board_helper(&db, board_v1);
+    let id = insert_board_helper(&db, board_v1.clone());
 
     let board_v2 = bb_config::config::Device {
         name: "Test Board".to_string(),
@@ -1256,11 +1256,16 @@ fn os_board_json_by_id_reflects_updated_board() {
         "Re-inserting the same board name should update the same row"
     );
 
+    let board_final = bb_config::config::Device {
+        tags: ["new-tag".into(), "old-tag".into()].into(),
+        ..board_v1
+    };
+
     let res = db
         .os_board_json_by_id(id)
         .expect("Fetching board json should succeed");
 
-    assert_eq!(res, board_v2);
+    assert_eq!(res, board_final);
 }
 
 /// Insert a board along with an OS image and return the id of the inserted image.
