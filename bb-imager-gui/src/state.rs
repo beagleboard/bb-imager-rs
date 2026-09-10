@@ -22,6 +22,8 @@ pub(crate) struct BBImagerCommon {
     pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
 
     pub(crate) scroll_id: widget::Id,
+    pub(crate) search_id: widget::Id,
+    pub(crate) list_selection_id: widget::Id,
     pub(crate) db: db::Db,
 }
 
@@ -79,6 +81,22 @@ impl ChooseBoardState {
     pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
         self.search_text = search;
         self.refresh_board_list()
+    }
+
+    pub(crate) fn list_select_relative(&self, delta: i32) -> Option<BBImagerMessage> {
+        if self.boards.is_empty() {
+            return None;
+        }
+
+        let next = list_relative_index(
+            self.selected_board
+                .as_ref()
+                .and_then(|b| self.boards.iter().position(|x| x.id == b.id)),
+            self.boards.len(),
+            delta,
+        );
+
+        Some(BBImagerMessage::SelectBoardById(self.boards[next].id))
     }
 }
 
@@ -192,6 +210,22 @@ impl ChooseOsState {
         self.flasher = flasher;
         self.refresh_image_list()
     }
+
+    pub(crate) fn list_select_relative(&self, delta: i32) -> Option<BBImagerMessage> {
+        if self.images.is_empty() {
+            return None;
+        }
+
+        let next = list_relative_index(
+            self.selected_image
+                .as_ref()
+                .and_then(|(id, _)| self.images.iter().position(|x| x.id == *id)),
+            self.images.len(),
+            delta,
+        );
+
+        Some(BBImagerMessage::SelectOs(self.images[next].id))
+    }
 }
 
 impl From<ChooseDestState> for ChooseOsState {
@@ -240,6 +274,21 @@ impl ChooseDestState {
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
         self.search_text = search;
+    }
+
+    pub(crate) fn list_select_relative(&self, delta: i32) -> Option<BBImagerMessage> {
+        let items: Vec<BBImagerMessage> = self.destinations().map(|d| d.msg()).collect();
+        if items.is_empty() {
+            return None;
+        }
+
+        let current = self
+            .selected_dest
+            .as_ref()
+            .and_then(|sel| self.destinations().position(|d| d.is_selected(sel)));
+
+        let next = list_relative_index(current, items.len(), delta);
+        Some(items[next].clone())
     }
 }
 
@@ -517,9 +566,16 @@ impl OverlayState {
     }
 }
 
+fn list_relative_index(current: Option<usize>, len: usize, delta: i32) -> usize {
+    debug_assert!(len > 0);
+
+    let current = current.unwrap_or(if delta >= 0 { len.saturating_sub(1) } else { 0 });
+    ((current as i32 + delta).rem_euclid(len as i32)) as usize
+}
+
 #[cfg(test)]
 mod tests {
-    use super::time_remaining_from;
+    use super::{list_relative_index, time_remaining_from};
     use bb_flasher::DownloadFlashingStatus;
     use std::time::Duration;
 
@@ -564,6 +620,17 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn list_relative_index_wraps_forward() {
+        assert_eq!(list_relative_index(Some(2), 5, 1), 3);
+        assert_eq!(list_relative_index(Some(4), 5, 1), 0);
+    }
+
+    #[test]
+    fn list_relative_index_wraps_backward() {
+        assert_eq!(list_relative_index(Some(0), 5, -1), 4);
     }
 
     #[test]

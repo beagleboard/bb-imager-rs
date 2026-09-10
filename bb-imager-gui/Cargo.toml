@@ -47,7 +47,7 @@ ashpd = { version = "0.13", features = ["notification"] }
 bb-flasher = { path = "../bb-flasher", features = ["sd_macos_authopen"] }
 
 [features]
-default = ["static"]
+default = ["static", "sd"]
 sd = ["bb-flasher/sd"]
 bcf_cc1352p7 = ["bb-flasher/bcf"]
 # GUI requires the base board support for any sub soc firmware

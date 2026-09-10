@@ -5,9 +5,15 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+fn skip_false(v: &bool) -> bool {
+    !*v
+}
+
 /// Configuration for GUI that should be presisted
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
+    #[serde(default, skip_serializing_if = "skip_false")]
+    pub(crate) high_contrast: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) sd_customization: Option<SdCustomization>,
 }
@@ -323,6 +329,15 @@ mod tests {
         gui.update_sd_customization(SdCustomization::default());
 
         assert!(gui.sd_customization.is_some());
+    }
+
+    #[test]
+    fn high_contrast_defaults_false_and_omits_from_json() {
+        let json = serde_json::to_string(&GuiConfiguration::default()).unwrap();
+        assert_eq!(json, "{}");
+
+        let back: GuiConfiguration = serde_json::from_str(r#"{"high_contrast":true}"#).unwrap();
+        assert!(back.high_contrast);
     }
 
     #[test]

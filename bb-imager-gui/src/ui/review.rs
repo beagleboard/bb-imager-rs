@@ -7,7 +7,7 @@ use crate::{
     constants,
     message::BBImagerMessage,
     state::CustomizeState,
-    ui::helpers::{detail_pane, page_type2},
+    ui::helpers::{action_button, detail_pane, page_type2},
 };
 
 const HEADING_SIZE: u32 = 26;
@@ -22,10 +22,10 @@ pub(crate) fn view<'a>(state: &'a CustomizeState) -> Element<'a, BBImagerMessage
     page_type2(
         review_view(state),
         [
-            widget::button("BACK")
+            action_button("BACK")
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
-            widget::button(btn_label).on_press(BBImagerMessage::FlashStart),
+            action_button(btn_label).on_press(BBImagerMessage::FlashStart),
         ],
     )
 }

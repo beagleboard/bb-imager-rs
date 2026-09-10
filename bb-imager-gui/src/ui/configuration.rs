@@ -7,7 +7,10 @@ use crate::{
     BBImagerMessage,
     helpers::{self, FlashingCustomization},
     persistance,
-    ui::helpers::{detail_pane, element_with_element, element_with_label, page_type2},
+    ui::helpers::{
+        action_button, detail_pane, element_with_element, element_with_label, focusable_toggler,
+        page_type2,
+    },
 };
 
 const INPUT_WIDTH: u32 = 200;
@@ -16,13 +19,13 @@ pub(crate) fn view<'a>(state: &'a crate::state::CustomizeState) -> Element<'a, B
     page_type2(
         customization_pane(state),
         [
-            widget::button("RESET")
+            action_button("RESET")
                 .style(widget::button::danger)
                 .on_press(BBImagerMessage::ResetFlashingConfig),
-            widget::button("BACK")
+            action_button("BACK")
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
-            widget::button("NEXT").on_press_maybe(if state.ctx.customization.validate() {
+            action_button("NEXT").on_press_maybe(if state.ctx.customization.validate() {
                 Some(BBImagerMessage::Next)
             } else {
                 None
@@ -47,14 +50,14 @@ fn linux_sd_card_common<'a>(
     let mut col = widget::column([]);
 
     // Username and Password
-    col = col.push(
-        widget::toggler(config.user.is_some())
-            .label("Configure Username and Password")
-            .on_toggle(move |t| {
-                let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_user(c)))
-            }),
-    );
+    col = col.push(focusable_toggler(
+        config.user.is_some(),
+        "Configure Username and Password",
+        move |t| {
+            let c = if t { Some(Default::default()) } else { None };
+            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_user(c)))
+        },
+    ));
     if let Some(usr) = config.user.as_ref() {
         col = col.extend([
             input_with_label(
@@ -91,14 +94,14 @@ fn linux_sd_card_common<'a>(
     col = col.push(widget::rule::horizontal(2));
 
     // Wifi
-    col = col.push(
-        widget::toggler(config.wifi.is_some())
-            .label("Configure Wireless LAN")
-            .on_toggle(move |t| {
-                let c = if t { Some(Default::default()) } else { None };
-                BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_wifi(c)))
-            }),
-    );
+    col = col.push(focusable_toggler(
+        config.wifi.is_some(),
+        "Configure Wireless LAN",
+        move |t| {
+            let c = if t { Some(Default::default()) } else { None };
+            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_wifi(c)))
+        },
+    ));
     if let Some(wifi) = config.wifi.as_ref() {
         col = col.extend([
             input_with_label(
@@ -135,19 +138,17 @@ fn linux_sd_card_common<'a>(
     col = col.push(widget::rule::horizontal(2));
 
     // Timezone
-    let toggle = widget::toggler(config.timezone.is_some())
-        .label("Set Timezone")
-        .on_toggle(move |t| {
-            let tz = if t { helpers::system_timezone() } else { None };
-            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_timezone(tz)))
-        });
+    let toggle = focusable_toggler(config.timezone.is_some(), "Set Timezone", move |t| {
+        let tz = if t { helpers::system_timezone() } else { None };
+        BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_timezone(tz)))
+    });
     col = match config.timezone.as_ref() {
         Some(tz) => {
             let xc = config.clone();
             // The configuration stores the zone as a string, so it has to be resolved
             // back to a `Tz` for the combo box to show it as the current selection.
             col.push(element_with_element(
-                toggle.into(),
+                toggle,
                 widget::combo_box(&state.common.timezones, "Timezone", Some(tz), move |t| {
                     BBImagerMessage::UpdateFlashConfig(wrap(xc.clone().update_timezone(Some(t))))
                 })
@@ -161,15 +162,13 @@ fn linux_sd_card_common<'a>(
     col = col.push(widget::rule::horizontal(2));
 
     // Hostname
-    let toggle = widget::toggler(config.hostname.is_some())
-        .label("Set Hostname")
-        .on_toggle(move |t| {
-            let hostname = if t { Some(String::new()) } else { None };
-            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_hostname(hostname)))
-        });
+    let toggle = focusable_toggler(config.hostname.is_some(), "Set Hostname", move |t| {
+        let hostname = if t { Some(String::new()) } else { None };
+        BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_hostname(hostname)))
+    });
     col = match config.hostname.as_ref() {
         Some(hostname) => col.push(element_with_element(
-            toggle.into(),
+            toggle,
             widget::text_input("beagle", hostname)
                 .on_input(move |inp| {
                     BBImagerMessage::UpdateFlashConfig(wrap(
@@ -185,16 +184,14 @@ fn linux_sd_card_common<'a>(
     col = col.push(widget::rule::horizontal(2));
 
     // Keymap
-    let toggle = widget::toggler(config.keymap.is_some())
-        .label("Set Keymap")
-        .on_toggle(move |t| {
-            let keymap = if t {
-                Some(helpers::system_keymap().to_string())
-            } else {
-                None
-            };
-            BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_keymap(keymap)))
-        });
+    let toggle = focusable_toggler(config.keymap.is_some(), "Set Keymap", move |t| {
+        let keymap = if t {
+            Some(helpers::system_keymap().to_string())
+        } else {
+            None
+        };
+        BBImagerMessage::UpdateFlashConfig(wrap(config.clone().update_keymap(keymap)))
+    });
     col = match config.keymap.as_ref() {
         Some(keymap) => {
             let xc = config.clone();
@@ -204,7 +201,7 @@ fn linux_sd_card_common<'a>(
             let selection = crate::constants::keymap_layout(keymap);
 
             col.push(element_with_element(
-                toggle.into(),
+                toggle,
                 widget::combo_box(
                     &state.common.keymaps,
                     "Keymap",
@@ -259,15 +256,15 @@ fn linux_sd_card_sysconfig<'a>(
 
     col = col.push(widget::rule::horizontal(2));
     // Enable USB DHCP
-    col = col.push(
-        widget::toggler(config.usb_enable_dhcp == Some(true))
-            .label("Enable USB DHCP")
-            .on_toggle(|x| {
-                BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
-                    config.clone().update_usb_enable_dhcp(Some(x)),
-                ))
-            }),
-    );
+    col = col.push(focusable_toggler(
+        config.usb_enable_dhcp == Some(true),
+        "Enable USB DHCP",
+        |x| {
+            BBImagerMessage::UpdateFlashConfig(FlashingCustomization::LinuxSdSysconfig(
+                config.clone().update_usb_enable_dhcp(Some(x)),
+            ))
+        },
+    ));
 
     detail_pane(col, &state.common.scroll_id)
 }

@@ -17,55 +17,58 @@ pub(crate) fn view<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessag
         dest_list_pane(state),
         dest_view_pane(state),
         [
-            widget::button("BACK")
+            helpers::action_button("BACK")
                 .on_press(BBImagerMessage::Back)
                 .style(widget::button::secondary),
-            widget::button("NEXT")
+            helpers::action_button("NEXT")
                 .on_press_maybe(state.selected_dest.as_ref().map(|_| BBImagerMessage::Next)),
         ],
     )
 }
 
 fn dest_list_pane<'a>(state: &'a ChooseDestState) -> Element<'a, BBImagerMessage> {
-    let items = state
-        .destinations()
-        .map(|dest| {
-            let is_selected = state
-                .selected_dest
-                .as_ref()
-                .map(|x| dest.is_selected(x))
-                .unwrap_or(false);
+    let items = state.destinations().map(|dest| {
+        let is_selected = state
+            .selected_dest
+            .as_ref()
+            .map(|x| dest.is_selected(x))
+            .unwrap_or(false);
 
-            let icon: Element<BBImagerMessage> = match dest {
-                DestinationItem::SaveToFile(_) => widget::svg(helpers::FILE_SAVE_ICON.clone()),
-                DestinationItem::Destination(_) => widget::svg(helpers::USB_ICON.clone()),
-            }
-            .height(ICON_WIDTH)
-            .width(ICON_WIDTH)
-            .style(svg_icon_style)
-            .into();
+        let icon: Element<BBImagerMessage> = match dest {
+            DestinationItem::SaveToFile(_) => widget::svg(helpers::FILE_SAVE_ICON.clone()),
+            DestinationItem::Destination(_) => widget::svg(helpers::USB_ICON.clone()),
+        }
+        .height(ICON_WIDTH)
+        .width(ICON_WIDTH)
+        .style(svg_icon_style)
+        .into();
 
-            let label: Element<'_, _> = match dest.subtitle() {
-                Some(x) => widget::column![text(dest.to_string()).size(18), text(x)]
-                    .width(iced::Length::Fill)
-                    .into(),
-                None => helpers::list_label(dest.to_string()).into(),
-            };
+        let label: Element<'_, _> = match dest.subtitle() {
+            Some(x) => widget::column![text(dest.to_string()).size(18), text(x)]
+                .width(iced::Length::Fill)
+                .into(),
+            None => helpers::list_label(dest.to_string()).into(),
+        };
 
-            helpers::list_item([icon, label], is_selected, dest.msg())
-        })
-        .map(Into::into);
+        helpers::list_item(
+            [icon, label],
+            is_selected,
+            dest.msg(),
+            &state.common.list_selection_id,
+        )
+    });
 
-    let filter_toggle = widget::container(
-        widget::toggler(!state.filter_destination)
-            .label("Show all destinations")
-            .on_toggle(|x| BBImagerMessage::DestinationFilter(!x)),
-    )
+    let filter_toggle = widget::container(helpers::focusable_toggler(
+        !state.filter_destination,
+        "Show all destinations",
+        |x| BBImagerMessage::DestinationFilter(!x),
+    ))
     .padding(16);
 
     helpers::list_pane(
         &state.search_text,
         &state.common.scroll_id,
+        &state.common.search_id,
         [filter_toggle.into(), helpers::list_separator()],
         items,
     )

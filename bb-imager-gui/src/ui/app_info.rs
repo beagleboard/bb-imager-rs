@@ -3,7 +3,9 @@ use iced::{Element, widget};
 use crate::{
     message::BBImagerMessage,
     state::OverlayState,
-    ui::helpers::{VIEW_COL_PADDING, WINDOW_ICON, element_with_label, page_type3, selectable_text},
+    ui::helpers::{
+        self, VIEW_COL_PADDING, WINDOW_ICON, element_with_label, page_type3, selectable_text,
+    },
 };
 
 const INP_BOX_WIDTH: u32 = 420;
@@ -11,18 +13,26 @@ const INP_BOX_WIDTH: u32 = 420;
 pub(crate) fn view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> {
     page_type3(
         review_view(state),
-        [widget::button("BACK")
+        [helpers::action_button("BACK")
             .on_press(BBImagerMessage::Back)
             .style(widget::button::secondary)],
     )
 }
 
 fn review_view<'a>(state: &'a OverlayState) -> Element<'a, BBImagerMessage> {
+    let high_contrast = state.common().app_config.high_contrast;
+
     let col = widget::column![
         widget::image(WINDOW_ICON.clone()),
         crate::constants::APP_NAME,
         crate::constants::APP_RELEASE,
         crate::constants::APP_DESC,
+        widget::rule::horizontal(2),
+        helpers::focusable_toggler(
+            high_contrast,
+            "High contrast theme",
+            BBImagerMessage::SetHighContrast,
+        ),
         widget::rule::horizontal(2),
         element_with_label(
             "Cache Directory",

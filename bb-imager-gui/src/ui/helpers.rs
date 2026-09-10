@@ -33,9 +33,13 @@ pub(crate) static SEARCH_ICON: LazyLock<svg::Handle> =
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
 pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
+    top: 4.0,
     right: 16.0,
-    ..iced::Padding::ZERO
+    bottom: 8.0,
+    left: 4.0,
 };
+pub(crate) const LIST_ITEM_INSET: f32 = 4.0;
+pub(crate) const CARD_INSET: u16 = 4;
 
 pub(crate) fn card_btn_style(
     theme: &iced::Theme,
@@ -47,7 +51,12 @@ pub(crate) fn card_btn_style(
         ..Default::default()
     };
 
-    if is_selected || matches!(status, widget::button::Status::Hovered) {
+    if is_selected
+        || matches!(
+            status,
+            widget::button::Status::Hovered | widget::button::Status::Pressed
+        )
+    {
         style.border = iced::Border::default()
             .color(theme.palette().primary)
             .width(3)
@@ -73,7 +82,7 @@ pub(crate) fn svg_icon_style(theme: &iced::Theme, _: svg::Status) -> svg::Style 
 pub(crate) fn page_type1<'a>(
     col1: Element<'a, BBImagerMessage>,
     col2: Element<'a, BBImagerMessage>,
-    btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
+    btns: impl IntoIterator<Item = impl Into<Element<'a, BBImagerMessage>>>,
 ) -> Element<'a, BBImagerMessage> {
     let row2 = widget::row(
         [
@@ -116,7 +125,7 @@ pub(crate) fn page_type1<'a>(
 /// |--------|
 pub(crate) fn page_type2<'a>(
     row1: Element<'a, BBImagerMessage>,
-    btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
+    btns: impl IntoIterator<Item = impl Into<Element<'a, BBImagerMessage>>>,
 ) -> Element<'a, BBImagerMessage> {
     let row2 = widget::row(
         [
@@ -145,7 +154,7 @@ pub(crate) fn page_type2<'a>(
 /// |--------|
 pub(crate) fn page_type3<'a>(
     row1: Element<'a, BBImagerMessage>,
-    btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
+    btns: impl IntoIterator<Item = impl Into<Element<'a, BBImagerMessage>>>,
 ) -> Element<'a, BBImagerMessage> {
     let row2 = widget::row(
         [widget::space::horizontal().into()]
@@ -174,7 +183,9 @@ pub(crate) fn board_view_pane<'a>(
         iced::Shrink,
     );
 
-    let copy_btn = copy_btn(COPY_ICON.clone()).on_press(BBImagerMessage::CopyBoardConfig(dev.id));
+    let copy_btn = super::focusable::button(svg(COPY_ICON.clone()))
+        .style(widget::button::secondary)
+        .on_press(BBImagerMessage::CopyBoardConfig(dev.id));
 
     let cols = widget::column![
         img,
@@ -199,7 +210,7 @@ pub(crate) fn board_view_pane<'a>(
 
     if let Some(x) = &dev.documentation {
         btns.push(
-            widget::button(widget::text("DOCUMENTATION"))
+            super::focusable::button(widget::text("DOCUMENTATION"))
                 .on_press(BBImagerMessage::OpenUrl(x.clone()))
                 .into(),
         );
@@ -209,7 +220,7 @@ pub(crate) fn board_view_pane<'a>(
         && let Ok(u) = url::Url::parse(&format!("{}/{}.html", constants::OSHW_BASE_URL, x))
     {
         btns.push(
-            widget::button(widget::text("OSHW"))
+            super::focusable::button(widget::text("OSHW"))
                 .on_press(BBImagerMessage::OpenUrl(u))
                 .into(),
         );
@@ -257,24 +268,60 @@ pub(crate) fn selectable_text(
 fn card_box<'a>(
     content: impl Into<Element<'a, BBImagerMessage>>,
 ) -> widget::Container<'a, BBImagerMessage> {
-    widget::container(content).style(|_| {
-        widget::container::Style::default()
-            .background(constants::CARD)
-            .border(iced::border::rounded(8))
-    })
+    widget::container(content)
+        .padding(CARD_INSET)
+        .style(|theme: &iced::Theme| {
+            if constants::is_high_contrast_palette(&theme.palette()) {
+                widget::container::Style::default()
+                    .background(theme.palette().background)
+                    .border(
+                        iced::Border::default()
+                            .color(theme.palette().text)
+                            .width(2)
+                            .rounded(8),
+                    )
+            } else {
+                widget::container::Style::default()
+                    .background(constants::CARD)
+                    .border(iced::border::rounded(8))
+            }
+        })
 }
 
-fn info_btn(handle: svg::Handle) -> widget::Button<'static, BBImagerMessage> {
-    widget::button(svg(handle))
-        .on_press(BBImagerMessage::AppInfo)
+fn info_btn(handle: svg::Handle) -> super::focusable::FocusableButtonBuilder<'static> {
+    super::focusable::button(svg(handle))
         .width(iced::Shrink)
         .height(iced::Shrink)
+        .on_press(BBImagerMessage::AppInfo)
 }
 
-pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> widget::Button<'a, BBImagerMessage> {
-    widget::button(svg(handle))
+pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> super::focusable::FocusableButtonBuilder<'a> {
+    super::focusable::button(svg(handle))
         .width(iced::Shrink)
         .style(widget::button::secondary)
+}
+
+pub(crate) fn action_button<'a>(
+    label: &'static str,
+) -> super::focusable::FocusableButtonBuilder<'a> {
+    super::focusable::button(label)
+}
+
+/// A toggler that is in Tab order and flips on Enter or Space.
+pub(crate) fn focusable_toggler<'a, F>(
+    is_toggled: bool,
+    label: &'static str,
+    on_toggle: F,
+) -> Element<'a, BBImagerMessage>
+where
+    F: Fn(bool) -> BBImagerMessage + Clone + 'a,
+{
+    super::focusable::activate(
+        widget::toggler(is_toggled)
+            .label(label)
+            .on_toggle(on_toggle.clone()),
+        on_toggle(!is_toggled),
+    )
 }
 
 /// Horizontal separator between rows of a list pane.
@@ -289,10 +336,11 @@ pub(crate) fn list_separator<'a>() -> Element<'a, BBImagerMessage> {
 pub(crate) fn list_pane<'a>(
     search_text: &'a str,
     scroll_id: &widget::Id,
+    search_id: &widget::Id,
     header: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
     items: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
 ) -> Element<'a, BBImagerMessage> {
-    let top = [search_box(search_text).into(), list_separator()];
+    let top = [search_box(search_text, search_id).into(), list_separator()];
 
     widget::scrollable(
         widget::column(top.into_iter().chain(header).chain(items)).padding(LIST_COL_PADDING),
@@ -303,19 +351,34 @@ pub(crate) fn list_pane<'a>(
 
 /// A selectable row of a [`list_pane`], laid out as a horizontal run of
 /// `contents` (typically a leading icon followed by a label).
+///
+/// The selected row is tagged with `selection_id` so arrow-key movement can
+/// scroll it into view.
 pub(crate) fn list_item<'a>(
     contents: impl IntoIterator<Item = Element<'a, BBImagerMessage>>,
     is_selected: bool,
     msg: BBImagerMessage,
-) -> widget::Button<'a, BBImagerMessage> {
-    widget::button(
+    selection_id: &widget::Id,
+) -> Element<'a, BBImagerMessage> {
+    let btn = widget::button(
         widget::row(contents)
             .spacing(12)
             .padding(8)
             .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(msg)
-    .style(move |theme, status| card_btn_style(theme, status, is_selected))
+    .width(iced::Length::Fill)
+    .style(move |theme, status| card_btn_style(theme, status, is_selected));
+
+    let row = widget::container(btn)
+        .padding(LIST_ITEM_INSET)
+        .width(iced::Length::Fill);
+
+    if is_selected {
+        row.id(selection_id.clone()).into()
+    } else {
+        row.into()
+    }
 }
 
 /// The primary label of a [`list_item`].
@@ -349,7 +412,7 @@ pub(crate) fn placeholder_pane<'a>(label: &'a str) -> Element<'a, BBImagerMessag
         .into()
 }
 
-fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
+fn search_box<'a>(inp: &'a str, search_id: &widget::Id) -> widget::Container<'a, BBImagerMessage> {
     widget::container(
         widget::row![
             widget::svg(SEARCH_ICON.clone())
@@ -357,6 +420,7 @@ fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
                 .width(iced::Length::Shrink)
                 .height(18),
             widget::text_input("SEARCH", inp)
+                .id(search_id.clone())
                 .style(|theme, status| {
                     let mut temp = widget::text_input::default(theme, status);
                     temp.border.width = 0.0;
