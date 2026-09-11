@@ -26,7 +26,7 @@ pub struct Config {
 pub struct Imager {
     /// A list of remote config files
     #[serde(default)]
-    pub remote_configs: Vec<Url>,
+    pub remote_configs: Box<[Url]>,
     #[serde_as(as = "VecSkipError<_>")]
     #[serde(default)]
     /// List of BeagleBoard.org boards

@@ -74,12 +74,13 @@ fn add_config_inserts_new_remote_configs() {
     // Create a minimal config with only remote_configs
     let new_config = Config {
         imager: bb_config::config::Imager {
-            remote_configs: vec![
+            remote_configs: [
                 "https://example.com/test-os-list.json".try_into().unwrap(),
                 "https://example.com/another-os-list.json"
                     .try_into()
                     .unwrap(),
-            ],
+            ]
+            .into(),
             devices: vec![],
         },
         os_list: vec![],
@@ -143,7 +144,9 @@ fn add_config_does_not_duplicate_remote_configs() {
 
     // Create config with already existing remote config
     let mut imager = bb_config::config::Imager::default();
-    imager.remote_configs.push(existing_url);
+    let mut temp = imager.remote_configs.to_vec();
+    temp.push(existing_url);
+    imager.remote_configs = temp.into();
 
     let new_config = Config {
         imager,
@@ -408,7 +411,11 @@ fn add_config_inserts_os_image_for_board() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| b.name == board.name.as_ref()).unwrap().id;
+    let board_id = boards
+        .iter()
+        .find(|b| b.name == board.name.as_ref())
+        .unwrap()
+        .id;
 
     let items = db
         .os_image_items(board_id, None)
