@@ -705,6 +705,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-os-list-generator"
+version = "1.0.15"
+dependencies = [
+ "anyhow",
+ "bb-config",
+ "chrono",
+ "const-hex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "bin_file"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

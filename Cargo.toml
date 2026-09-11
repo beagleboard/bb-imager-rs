@@ -16,7 +16,7 @@ members = [
         "bb-flasher-mspm0",
         "bb-bmap-parser",
         "bb-iced-widgets"
-]
+, "bb-os-list-generator"]
 
 [profile.release]
 lto = true
