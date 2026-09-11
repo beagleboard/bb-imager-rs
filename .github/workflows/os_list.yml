@@ -1,0 +1,33 @@
+name: Create Armbian OS List
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  # Build everyday
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  build:
+    name: Build OS List File
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Use caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate OS List
+        run: cargo run -p bb-os-list-generator
+
+      - name: Pre-Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name != 'pull_request'
+        with:
+          prerelease: true
+          name: Continuous Release
+          tag_name: continuous-release
+          files: bb-os-list-generator/dist/os_list.json
