@@ -40,26 +40,26 @@ pub struct Imager {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Device {
     /// Board Name
-    pub name: String,
+    pub name: Box<str>,
     /// Board tags are used to match OS images with boards
     pub tags: Box<[Box<str>]>,
     /// Board image URL
     pub icon: Option<Url>,
     /// Board description
-    pub description: String,
+    pub description: Box<str>,
     /// The default [`Flasher`] for the board. This will be used when flasher type is not present
     /// in the OS image.
     pub flasher: Flasher,
     /// Link to board documentation
     pub documentation: Option<Url>,
     /// Special Instructions for flashing board.
-    pub instructions: Option<String>,
+    pub instructions: Option<Box<str>>,
     #[serde(default)]
     #[serde_as(as = "Map<_, _>")]
     /// Board Specification. With order preserved
-    pub specification: Vec<(String, String)>,
+    pub specification: Vec<(Box<str>, Box<str>)>,
     /// OSHW details for the device.
-    pub oshw: Option<String>,
+    pub oshw: Option<Box<str>>,
     /// Url to tarball of bootfs. Should ideally only contain the minimal files that need to be
     /// present in bootfs to load something like grub.
     pub bootfs: Option<Bootfs>,
@@ -154,9 +154,9 @@ pub enum OsListItem {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct OsSubList {
     /// Sublist name
-    pub name: String,
+    pub name: Box<str>,
     /// Sublist description
-    pub description: String,
+    pub description: Box<str>,
     /// Sublist icon URL
     pub icon: Url,
     /// Flasher type for all top level Os Images in the sublist
@@ -171,9 +171,9 @@ pub struct OsSubList {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct OsRemoteSubList {
     /// Remote Sublist name
-    pub name: String,
+    pub name: Box<str>,
     /// Remote Sublist description
-    pub description: String,
+    pub description: Box<str>,
     /// Remote Sublist icon URL
     pub icon: Url,
     /// Flasher type for all top level Os Images in the sublist
@@ -189,9 +189,9 @@ pub struct OsRemoteSubList {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct OsImage {
     /// Os Image name
-    pub name: String,
+    pub name: Box<str>,
     /// Os Image description
-    pub description: String,
+    pub description: Box<str>,
     /// Os Image icon
     pub icon: Url,
     /// Os Image download URL
@@ -213,7 +213,7 @@ pub struct OsImage {
     /// Bmap file for the image
     pub bmap: Option<Url>,
     /// Special Instructions for flashing board.
-    pub info_text: Option<String>,
+    pub info_text: Option<Box<str>>,
     /// URL to support page for image. This is where issues should be reported.
     pub support: Option<Url>,
 }

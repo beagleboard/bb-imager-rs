@@ -191,7 +191,9 @@ pub(crate) fn board_view_pane<'a>(
     let cols = cols.extend(
         dev.specification
             .iter()
-            .map(|(k, v)| -> widget::text::Rich<'a, (), BBImagerMessage> { detail_entry(k, v) })
+            .map(|(k, v)| -> widget::text::Rich<'a, (), BBImagerMessage> {
+                detail_entry(k, v.as_ref())
+            })
             .map(Into::into),
     );
 

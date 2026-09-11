@@ -83,8 +83,8 @@ fn full_config_round_trip() {
     assert_eq!(
         device.specification,
         vec![
-            ("ram".to_string(), "4GB".to_string()),
-            ("cpu".to_string(), "arm".to_string()),
+            ("ram".into(), "4GB".into()),
+            ("cpu".into(), "arm".into()),
         ]
     );
 }
@@ -94,7 +94,7 @@ fn os_list_item_untagged_disambiguation() {
     // The untagged enum must pick the right variant purely from field shape.
     match &config_with_os_list(&format!("[{OS_IMAGE_JSON}]")).os_list[0] {
         OsListItem::Image(img) => {
-            assert_eq!(img.name, "Test Image");
+            assert_eq!(img.name.as_ref(), "Test Image");
             assert_eq!(img.extract_size, 8192);
             assert_eq!(img.init_format, InitFormat::Sysconf);
         }
@@ -102,12 +102,12 @@ fn os_list_item_untagged_disambiguation() {
     }
 
     match &config_with_os_list(&format!("[{OS_SUBLIST_JSON}]")).os_list[0] {
-        OsListItem::SubList(sub) => assert_eq!(sub.name, "Testing"),
+        OsListItem::SubList(sub) => assert_eq!(sub.name.as_ref(), "Testing"),
         other => panic!("expected SubList, got {other:?}"),
     }
 
     match &config_with_os_list(&format!("[{OS_REMOTE_SUBLIST_JSON}]")).os_list[0] {
-        OsListItem::RemoteSubList(remote) => assert_eq!(remote.name, "Remote"),
+        OsListItem::RemoteSubList(remote) => assert_eq!(remote.name.as_ref(), "Remote"),
         other => panic!("expected RemoteSubList, got {other:?}"),
     }
 }

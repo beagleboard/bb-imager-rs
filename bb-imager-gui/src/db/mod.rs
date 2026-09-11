@@ -39,7 +39,7 @@ pub(crate) struct Board {
     pub(crate) icon: Option<Arc<Url>>,
     pub(crate) description: String,
     pub(crate) documentation: Option<Url>,
-    pub(crate) specification: Vec<(String, String)>,
+    pub(crate) specification: Vec<(Box<str>, Box<str>)>,
     pub(crate) oshw: Option<String>,
     pub(crate) flasher: config::Flasher,
     pub(crate) instructions: Option<Box<str>>,

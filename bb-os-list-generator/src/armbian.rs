@@ -73,7 +73,7 @@ impl ArbianImage {
 
     /// The only text shown in the image list, so it has to carry every token that separates
     /// one build of a board from another.
-    fn name(&self) -> String {
+    fn name(&self) -> Box<str> {
         let label = self.application_name().unwrap_or(self.variant_name());
 
         format!(
@@ -83,9 +83,10 @@ impl ArbianImage {
             self.kernel_version,
             label
         )
+        .into()
     }
 
-    fn description(&self) -> String {
+    fn description(&self) -> Box<str> {
         let distro = self.distro_name().unwrap();
 
         // Release date and sizes already get their own rows in the GUI, so leave them out.
@@ -95,16 +96,17 @@ impl ArbianImage {
         );
 
         match self.application_name() {
-            Some(app) => format!("{} on {} {}", app, distro, built),
+            Some(app) => format!("{} on {} {}", app, distro, built).into(),
             None if self.is_headless() => {
-                format!("{distro} with no desktop environment {built}")
+                format!("{distro} with no desktop environment {built}").into()
             }
             None => format!(
                 "{} with the {} desktop {}",
                 distro,
                 self.variant_name(),
                 built
-            ),
+            )
+            .into(),
         }
     }
 

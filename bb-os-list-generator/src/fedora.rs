@@ -41,7 +41,7 @@ impl FedoraItem {
             .unwrap();
 
         OsImage {
-            name: format!("Fedora {} {}", self.version, self.subvariant),
+            name: format!("Fedora {} {}", self.version, self.subvariant).into(),
             description: self.description().unwrap().into(),
             icon: Url::parse(ICON).unwrap(),
             url: self.link,
