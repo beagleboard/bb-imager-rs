@@ -1,6 +1,9 @@
 use std::path::Path;
 
+use tokio::task::JoinSet;
+
 mod armbian;
+mod fedora;
 mod helpers;
 
 #[tokio::main]
@@ -18,8 +21,15 @@ async fn main() {
         .build()
         .unwrap();
 
+    let mut tasks = JoinSet::new();
+
+    tasks.spawn(armbian::os_list_items(downloader.clone()));
+    tasks.spawn(fedora::os_list_items(downloader));
+
+    let res = tasks.join_all().await;
+
     let os_list = bb_config::Config {
-        os_list: armbian::os_list_items(downloader).await,
+        os_list: res.into_iter().flatten().collect(),
         ..Default::default()
     };
 

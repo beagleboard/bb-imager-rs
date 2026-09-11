@@ -39,7 +39,11 @@ async fn fetch_range(
     // A 200 here means the server ignored Range and is about to hand us the
     // whole multi-GB image; bail rather than stream it.
     if resp.status() != StatusCode::PARTIAL_CONTENT {
-        anyhow::bail!("Server cannot do partitial content")
+        anyhow::bail!(
+            "Server cannot do partitial content. status: {}, url: {}",
+            resp.status(),
+            url.as_str()
+        )
     }
 
     Ok(resp.bytes().await?.to_vec())
