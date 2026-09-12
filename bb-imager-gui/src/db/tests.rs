@@ -74,12 +74,13 @@ fn add_config_inserts_new_remote_configs() {
     // Create a minimal config with only remote_configs
     let new_config = Config {
         imager: bb_config::config::Imager {
-            remote_configs: vec![
+            remote_configs: [
                 "https://example.com/test-os-list.json".try_into().unwrap(),
                 "https://example.com/another-os-list.json"
                     .try_into()
                     .unwrap(),
-            ],
+            ]
+            .into(),
             devices: vec![],
         },
         os_list: vec![],
@@ -143,7 +144,9 @@ fn add_config_does_not_duplicate_remote_configs() {
 
     // Create config with already existing remote config
     let mut imager = bb_config::config::Imager::default();
-    imager.remote_configs.push(existing_url);
+    let mut temp = imager.remote_configs.to_vec();
+    temp.push(existing_url);
+    imager.remote_configs = temp.into();
 
     let new_config = Config {
         imager,
@@ -191,10 +194,10 @@ fn add_config_inserts_device_into_board_list() {
 
     // Create minimal device
     let device = bb_config::config::Device {
-        name: "Test Board".to_string(),
+        name: "Test Board".into(),
         tags: Box::new(["test-board".into()]),
         icon: None,
-        description: "Test device".to_string(),
+        description: "Test device".into(),
         flasher: bb_config::config::Flasher::SdCard,
         documentation: None,
         instructions: None,
@@ -253,10 +256,10 @@ fn add_config_updates_existing_device_with_same_name() {
 
     // Insert initial device
     let device_v1 = bb_config::config::Device {
-        name: "Test Board".to_string(),
+        name: "Test Board".into(),
         tags: Box::new(["test-board".into()]),
         icon: None,
-        description: "Old description".to_string(),
+        description: "Old description".into(),
         flasher: bb_config::config::Flasher::SdCard,
         documentation: None,
         instructions: None,
@@ -292,15 +295,15 @@ fn add_config_updates_existing_device_with_same_name() {
 
     // Insert updated device with same name
     let device_v2 = bb_config::config::Device {
-        name: "Test Board".to_string(),
+        name: "Test Board".into(),
         tags: Box::new(["updated-tag".into()]),
         icon: None,
-        description: "Updated description".to_string(),
+        description: "Updated description".into(),
         flasher: bb_config::config::Flasher::SdCard,
         documentation: None,
-        instructions: Some("New instructions".to_string()),
-        specification: vec![("CPU".to_string(), "Test CPU".to_string())],
-        oshw: Some("us000000".to_string()),
+        instructions: Some("New instructions".into()),
+        specification: vec![("CPU".into(), "Test CPU".into())],
+        oshw: Some("us000000".into()),
         bootfs: None,
     };
 
@@ -332,13 +335,13 @@ fn add_config_updates_existing_device_with_same_name() {
         .board_by_id(board_id)
         .expect("Fetching board by id should succeed");
 
-    assert_eq!(updated_board.description, device_v1.description);
+    assert_eq!(updated_board.description, device_v1.description.as_ref());
     assert_eq!(updated_board.flasher, device_v1.flasher);
     assert_eq!(
         updated_board.instructions.as_deref(),
         device_v1.instructions.as_deref()
     );
-    assert_eq!(updated_board.oshw, device_v1.oshw);
+    assert_eq!(updated_board.oshw.as_deref(), device_v1.oshw.as_deref());
     assert_eq!(updated_board.specification, device_v1.specification);
 }
 
@@ -368,8 +371,8 @@ fn add_config_inserts_os_image_for_board() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -381,8 +384,8 @@ fn add_config_inserts_os_image_for_board() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Test OS".to_string(),
-        description: "Test OS description".to_string(),
+        name: "Test OS".into(),
+        description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -408,13 +411,17 @@ fn add_config_inserts_os_image_for_board() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| b.name == board.name).unwrap().id;
+    let board_id = boards
+        .iter()
+        .find(|b| b.name == board.name.as_ref())
+        .unwrap()
+        .id;
 
     let items = db
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    assert!(items.iter().any(|x| x.label() == image.name));
+    assert!(items.iter().any(|x| x.label() == image.name.as_ref()));
 }
 
 /// This test verifies that os_image_by_id() returns the full OS image
@@ -446,8 +453,8 @@ fn os_image_by_id_returns_correct_data() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -459,8 +466,8 @@ fn os_image_by_id_returns_correct_data() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Test OS".to_string(),
-        description: "Test OS description".to_string(),
+        name: "Test OS".into(),
+        description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -470,7 +477,7 @@ fn os_image_by_id_returns_correct_data() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
-        info_text: Some("Test info".to_string()),
+        info_text: Some("Test info".into()),
         support: Some(
             "https://github.com/beagleboard/bb-imager-rs"
                 .try_into()
@@ -505,8 +512,8 @@ fn os_image_by_id_returns_correct_data() {
         .os_image_by_id(image_id)
         .expect("os_image_by_id should succeed");
 
-    assert_eq!(stored.name.as_ref(), image.name.as_str());
-    assert_eq!(stored.description, image.description);
+    assert_eq!(stored.name, image.name);
+    assert_eq!(stored.description, image.description.as_ref());
     assert_eq!(stored.url.as_str(), image.url.as_str());
     assert_eq!(stored.icon.as_str(), image.icon.as_str());
     assert_eq!(stored.image_download_size, Some(1024));
@@ -547,8 +554,8 @@ fn add_config_inserts_os_sublist_for_board() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -560,8 +567,8 @@ fn add_config_inserts_os_sublist_for_board() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Test OS".to_string(),
-        description: "Test OS description".to_string(),
+        name: "Test OS".into(),
+        description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -576,8 +583,8 @@ fn add_config_inserts_os_sublist_for_board() {
     };
 
     let sublist = bb_config::config::OsSubList {
-        name: "Test SubList".to_string(),
-        description: "SubList description".to_string(),
+        name: "Test SubList".into(),
+        description: "SubList description".into(),
         icon: "https://example.com/sublist.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems: vec![bb_config::config::OsListItem::Image(image)],
@@ -632,8 +639,8 @@ fn nested_os_sublists_propagate_board_support() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -645,8 +652,8 @@ fn nested_os_sublists_propagate_board_support() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Nested OS".to_string(),
-        description: "Nested OS description".to_string(),
+        name: "Nested OS".into(),
+        description: "Nested OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -661,16 +668,16 @@ fn nested_os_sublists_propagate_board_support() {
     };
 
     let child_sublist = bb_config::config::OsSubList {
-        name: "Child SubList".to_string(),
-        description: "Child description".to_string(),
+        name: "Child SubList".into(),
+        description: "Child description".into(),
         icon: "https://example.com/child.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems: vec![bb_config::config::OsListItem::Image(image)],
     };
 
     let parent_sublist = bb_config::config::OsSubList {
-        name: "Parent SubList".to_string(),
-        description: "Parent description".to_string(),
+        name: "Parent SubList".into(),
+        description: "Parent description".into(),
         icon: "https://example.com/parent.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems: vec![bb_config::config::OsListItem::SubList(child_sublist)],
@@ -732,8 +739,8 @@ fn remote_os_sublist_is_returned_for_board() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -745,8 +752,8 @@ fn remote_os_sublist_is_returned_for_board() {
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
-        name: "Remote OS List".to_string(),
-        description: "Remote description".to_string(),
+        name: "Remote OS List".into(),
+        description: "Remote description".into(),
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
@@ -818,8 +825,8 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -831,8 +838,8 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
-        name: "Remote OS List".to_string(),
-        description: "Remote description".to_string(),
+        name: "Remote OS List".into(),
+        description: "Remote description".into(),
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
@@ -865,8 +872,8 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
     let sublist_id = remote_lists[0].0;
 
     let child_image = bb_config::config::OsImage {
-        name: "Fetched OS".to_string(),
-        description: "Fetched OS description".to_string(),
+        name: "Fetched OS".into(),
+        description: "Fetched OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -924,8 +931,8 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -937,8 +944,8 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     };
 
     let remote_sublist = bb_config::config::OsRemoteSubList {
-        name: "Remote OS List".to_string(),
-        description: "Remote description".to_string(),
+        name: "Remote OS List".into(),
+        description: "Remote description".into(),
         icon: "https://example.com/remote.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCard,
         subitems_url: "https://example.com/os-list.json".try_into().unwrap(),
@@ -971,8 +978,8 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     let sublist_id = remote_lists[0].0;
 
     let child_image = bb_config::config::OsImage {
-        name: "Fetched OS".to_string(),
-        description: "Fetched OS description".to_string(),
+        name: "Fetched OS".into(),
+        description: "Fetched OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -1035,8 +1042,8 @@ fn board_list_search_filters_boards_case_insensitive() {
     db.init().expect("DB init should succeed");
 
     let board1 = bb_config::config::Device {
-        name: "Test Board 1".to_string(),
-        description: "Board 1".to_string(),
+        name: "Test Board 1".into(),
+        description: "Board 1".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1048,8 +1055,8 @@ fn board_list_search_filters_boards_case_insensitive() {
     };
 
     let board2 = bb_config::config::Device {
-        name: "Test Board 2".to_string(),
-        description: "Board 2".to_string(),
+        name: "Test Board 2".into(),
+        description: "Board 2".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1061,8 +1068,8 @@ fn board_list_search_filters_boards_case_insensitive() {
     };
 
     let board3 = bb_config::config::Device {
-        name: "Test Board 3".to_string(),
-        description: "Board 3".to_string(),
+        name: "Test Board 3".into(),
+        description: "Board 3".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1116,7 +1123,7 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
     db.board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| b.name == name)
+        .find(|b| b.name == name.as_ref())
         .expect("Inserted board should exist")
         .id
 }
@@ -1141,16 +1148,16 @@ fn os_board_json_by_id_round_trips_device() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test description".to_string(),
+        name: "Test Board".into(),
+        description: "Test description".into(),
         icon: Some("https://example.com/icon.png".try_into().unwrap()),
         flasher: bb_config::config::Flasher::SdCard,
-        instructions: Some("Hold the boot button".to_string()),
-        oshw: Some("us000000".to_string()),
+        instructions: Some("Hold the boot button".into()),
+        oshw: Some("us000000".into()),
         bootfs: None,
         specification: vec![
-            ("CPU".to_string(), "Test CPU".to_string()),
-            ("RAM".to_string(), "1GB".to_string()),
+            ("CPU".into(), "Test CPU".into()),
+            ("RAM".into(), "1GB".into()),
         ],
         documentation: Some("https://example.com/docs".try_into().unwrap()),
         tags: ["test-board".into(), "test-board-alt".into()].into(),
@@ -1184,8 +1191,8 @@ fn os_board_json_by_id_handles_board_without_optional_fields() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Minimal Board".to_string(),
-        description: "Minimal".to_string(),
+        name: "Minimal Board".into(),
+        description: "Minimal".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1223,8 +1230,8 @@ fn os_board_json_by_id_reflects_updated_board() {
     db.init().expect("DB init should succeed");
 
     let board_v1 = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Old description".to_string(),
+        name: "Test Board".into(),
+        description: "Old description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1238,14 +1245,14 @@ fn os_board_json_by_id_reflects_updated_board() {
     let id = insert_board_helper(&db, board_v1.clone());
 
     let board_v2 = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "New description".to_string(),
+        name: "Test Board".into(),
+        description: "New description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
-        instructions: Some("New instructions".to_string()),
-        oshw: Some("us000000".to_string()),
+        instructions: Some("New instructions".into()),
+        oshw: Some("us000000".into()),
         bootfs: None,
-        specification: vec![("CPU".to_string(), "Test CPU".to_string())],
+        specification: vec![("CPU".into(), "Test CPU".into())],
         documentation: None,
         tags: ["new-tag".into()].into(),
     };
@@ -1292,7 +1299,7 @@ fn insert_image_helper(
         .board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| b.name == board.name)
+        .find(|b| b.name == board.name.as_ref())
         .expect("Inserted board should exist")
         .id;
 
@@ -1302,7 +1309,7 @@ fn insert_image_helper(
 
     let crate::helpers::OsImageId::OsImage(image_id) = items
         .iter()
-        .find(|x| x.label.as_ref() == name.as_str())
+        .find(|x| x.label == name.as_ref())
         .expect("Inserted image should exist")
         .id
     else {
@@ -1331,8 +1338,8 @@ fn os_image_json_by_id_round_trips_image() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1344,8 +1351,8 @@ fn os_image_json_by_id_round_trips_image() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Test OS".to_string(),
-        description: "Test OS description".to_string(),
+        name: "Test OS".into(),
+        description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: Some(1024),
@@ -1355,7 +1362,7 @@ fn os_image_json_by_id_round_trips_image() {
         devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::Sysconf,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
-        info_text: Some("Test info".to_string()),
+        info_text: Some("Test info".into()),
         support: Some(
             "https://github.com/beagleboard/bb-imager-rs"
                 .try_into()
@@ -1388,8 +1395,8 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1401,8 +1408,8 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Minimal OS".to_string(),
-        description: "Minimal OS description".to_string(),
+        name: "Minimal OS".into(),
+        description: "Minimal OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: None,
@@ -1443,8 +1450,8 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
-        name: "Test Board".to_string(),
-        description: "Test Board description".to_string(),
+        name: "Test Board".into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1456,8 +1463,8 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
     };
 
     let image = bb_config::config::OsImage {
-        name: "Test OS".to_string(),
-        description: "Test OS description".to_string(),
+        name: "Test OS".into(),
+        description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
         image_download_size: None,
@@ -1544,8 +1551,8 @@ fn board_with_bootfs(
     bootfs: Option<bb_config::config::Bootfs>,
 ) -> bb_config::config::Device {
     bb_config::config::Device {
-        name: name.to_string(),
-        description: "Test Board description".to_string(),
+        name: name.into(),
+        description: "Test Board description".into(),
         icon: None,
         flasher: bb_config::config::Flasher::SdCard,
         instructions: None,
@@ -1560,14 +1567,14 @@ fn board_with_bootfs(
 /// A sublist of images that carry no bootloader, plus one image inside it.
 fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
     bb_config::config::OsSubList {
-        name: "Fedora Images".to_string(),
-        description: "Images without a bootloader".to_string(),
+        name: "Fedora Images".into(),
+        description: "Images without a bootloader".into(),
         icon: "https://example.com/sublist.png".try_into().unwrap(),
         flasher: bb_config::config::Flasher::SdCardNoBootloader,
         subitems: vec![bb_config::config::OsListItem::Image(
             bb_config::config::OsImage {
-                name: "Fedora Minimal".to_string(),
-                description: "Test OS description".to_string(),
+                name: "Fedora Minimal".into(),
+                description: "Test OS description".into(),
                 icon: "https://example.com/icon.png".try_into().unwrap(),
                 url: "https://example.com/os.raw.xz".try_into().unwrap(),
                 image_download_size: Some(1024),
