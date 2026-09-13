@@ -109,7 +109,7 @@ pub(crate) struct OsImage {
     pub(crate) description: String,
     pub(crate) icon: Arc<Url>,
     pub(crate) url: Box<Url>,
-    pub(crate) image_download_size: Option<i64>,
+    pub(crate) image_download_size: i64,
     pub(crate) image_download_sha256: [u8; 32],
     pub(crate) extract_size: i64,
     pub(crate) release_date: chrono::NaiveDate,
@@ -448,7 +448,7 @@ impl Db {
             img.description,
             img.icon,
             img.url,
-            img.image_download_size.map(|x| i64::try_from(x).unwrap()),
+            img.image_download_size as i64,
             img.image_download_sha256,
             i64::try_from(img.extract_size).unwrap(),
             img.release_date,
@@ -836,7 +836,7 @@ impl Db {
         )?;
 
         stmt.query_one([id], |value| {
-            let image_download_size: Option<i64> = value.get("image_download_size")?;
+            let image_download_size: i64 = value.get("image_download_size")?;
             let extract_size: i64 = value.get("extract_size")?;
 
             Ok(config::OsImage {
@@ -844,7 +844,7 @@ impl Db {
                 description: value.get("description")?,
                 icon: value.get("icon")?,
                 url: value.get("url")?,
-                image_download_size: image_download_size.map(|x| x as u64),
+                image_download_size: image_download_size as u64,
                 image_download_sha256: value.get("image_download_sha256")?,
                 extract_size: extract_size as u64,
                 release_date: value.get("release_date")?,

@@ -45,7 +45,7 @@ impl FedoraItem {
             description: self.description().unwrap().into(),
             icon: Url::parse(ICON).unwrap(),
             url: self.link,
-            image_download_size: Some(self.size),
+            image_download_size: self.size,
             image_download_sha256: self.sha256,
             extract_size,
             release_date: release_date.date_naive(),

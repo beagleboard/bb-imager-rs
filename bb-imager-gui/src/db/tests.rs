@@ -388,7 +388,7 @@ fn add_config_inserts_os_image_for_board() {
         description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
@@ -470,7 +470,7 @@ fn os_image_by_id_returns_correct_data() {
         description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [7; 32],
         extract_size: 4096,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
@@ -516,7 +516,7 @@ fn os_image_by_id_returns_correct_data() {
     assert_eq!(stored.description, image.description.as_ref());
     assert_eq!(stored.url.as_str(), image.url.as_str());
     assert_eq!(stored.icon.as_str(), image.icon.as_str());
-    assert_eq!(stored.image_download_size, Some(1024));
+    assert_eq!(stored.image_download_size, 1024);
     assert_eq!(stored.image_download_sha256, [7; 32]);
     assert_eq!(stored.extract_size, 4096);
     assert_eq!(stored.release_date, image.release_date);
@@ -571,7 +571,7 @@ fn add_config_inserts_os_sublist_for_board() {
         description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
@@ -656,7 +656,7 @@ fn nested_os_sublists_propagate_board_support() {
         description: "Nested OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
@@ -876,7 +876,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         description: "Fetched OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
@@ -982,7 +982,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         description: "Fetched OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [1; 32],
         extract_size: 2048,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
@@ -1355,7 +1355,7 @@ fn os_image_json_by_id_round_trips_image() {
         description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: Some(1024),
+        image_download_size: 1024,
         image_download_sha256: [7; 32],
         extract_size: 4096,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
@@ -1412,7 +1412,7 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
         description: "Minimal OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: None,
+        image_download_size: 1,
         image_download_sha256: [0; 32],
         extract_size: 1,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
@@ -1467,7 +1467,7 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
         description: "Test OS description".into(),
         icon: "https://example.com/icon.png".try_into().unwrap(),
         url: "https://example.com/os.img.xz".try_into().unwrap(),
-        image_download_size: None,
+        image_download_size: 1,
         image_download_sha256: [1; 32],
         extract_size: 1,
         release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
@@ -1577,7 +1577,7 @@ fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
                 description: "Test OS description".into(),
                 icon: "https://example.com/icon.png".try_into().unwrap(),
                 url: "https://example.com/os.raw.xz".try_into().unwrap(),
-                image_download_size: Some(1024),
+                image_download_size: 1024,
                 image_download_sha256: [1; 32],
                 extract_size: 2048,
                 release_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),

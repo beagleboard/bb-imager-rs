@@ -197,7 +197,7 @@ pub struct OsImage {
     /// Os Image download URL
     pub url: Url,
     /// Os Image size before download
-    pub image_download_size: Option<u64>,
+    pub image_download_size: u64,
     /// Os Image sha256 (before extraction)
     #[serde(with = "const_hex")]
     pub image_download_sha256: [u8; 32],

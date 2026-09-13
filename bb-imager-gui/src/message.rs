@@ -530,15 +530,16 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 let configs = db.remote_configs().unwrap();
                 let tasks = configs.into_iter().map(move |(i, u)| {
                     let dc = downloader.clone();
+                    let u_clone = u.clone();
                     Task::perform(
                         async move {
-                            let res = dc.download_json_no_cache(u).await?;
+                            let res = dc.download_json_no_cache(u_clone).await?;
                             Ok((i, res))
                         },
-                        |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
+                        move |x: std::io::Result<(i64, bb_config::config::Config)>| match x {
                             Ok(y) => BBImagerMessage::ExtendConfig(y),
                             Err(e) => {
-                                tracing::error!("Failed to fetch config: {e}");
+                                tracing::error!("Failed to fetch config: {e} {u}");
                                 BBImagerMessage::Null
                             }
                         },
