@@ -59,7 +59,7 @@ impl ArbianImage {
             description: self.description(),
             icon: Url::parse(ARMBIAN_ICON).unwrap(),
             url: self.file_url,
-            image_download_size: Some(self.file_size),
+            image_download_size: self.file_size,
             image_download_sha256: const_hex::decode(sha256).unwrap().try_into().unwrap(),
             extract_size,
             release_date: self.file_date.date_naive(),

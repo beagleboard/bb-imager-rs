@@ -74,9 +74,10 @@ impl BoardImage {
             ("Image Size", pretty_bytes(image.extract_size as u64)),
         ];
 
-        if let Some(x) = image.image_download_size {
-            details.push(("Download Size", pretty_bytes(x as u64)))
-        }
+        details.push((
+            "Download Size",
+            pretty_bytes(image.image_download_size as u64),
+        ));
 
         Self::Image {
             img: RemoteImage::new(
@@ -1236,7 +1237,7 @@ mod tests {
                 description: "test".to_string(),
                 icon: std::sync::Arc::new(url::Url::parse("https://example.com/icon.png").unwrap()),
                 url: Box::new(url::Url::parse("https://example.com/os.img.xz").unwrap()),
-                image_download_size: None,
+                image_download_size: 0,
                 image_download_sha256: [0u8; 32],
                 extract_size: 0,
                 release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),

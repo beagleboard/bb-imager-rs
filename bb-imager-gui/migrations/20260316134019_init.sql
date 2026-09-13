@@ -65,7 +65,7 @@ CREATE TABLE os_images(
 	description TEXT NOT NULL,
 	icon TEXT NOT NULL,
 	url TEXT NOT NULL,
-	image_download_size INTEGER,
+	image_download_size INTEGER NOT NULL,
 	image_download_sha256 BLOB NOT NULL,
 	extract_size INTEGER NOT NULL,
 	release_date TEXT NOT NULL,
