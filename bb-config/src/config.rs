@@ -12,7 +12,6 @@ use url::Url;
 pub struct Config {
     #[serde(default)]
     pub imager: Imager,
-    #[serde_as(as = "VecSkipError<_>")]
     /// List of OS images for the boards
     pub os_list: Vec<OsListItem>,
 }

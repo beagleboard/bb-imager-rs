@@ -113,16 +113,9 @@ fn os_list_item_untagged_disambiguation() {
 }
 
 #[test]
-fn vec_skip_error_drops_malformed_items() {
-    // `os_list` is wrapped in VecSkipError: a malformed entry is silently
-    // dropped rather than failing the whole parse.
-    let config = config_with_os_list(&format!(r#"[{OS_IMAGE_JSON}, {{"garbage": true}}]"#));
-    assert_eq!(
-        config.os_list.len(),
-        1,
-        "the malformed entry should be skipped, leaving only the valid image"
-    );
-    assert!(matches!(config.os_list[0], OsListItem::Image(_)));
+#[should_panic]
+fn vec_panic_error_drops_malformed_items() {
+    config_with_os_list(&format!(r#"[{OS_IMAGE_JSON}, {{"garbage": true}}]"#));
 }
 
 #[test]
