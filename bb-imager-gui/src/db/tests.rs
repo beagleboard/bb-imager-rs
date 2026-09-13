@@ -83,7 +83,7 @@ fn add_config_inserts_new_remote_configs() {
             .into(),
             devices: vec![],
         },
-        os_list: vec![],
+        os_list: [].into(),
     };
 
     // Add new config
@@ -150,7 +150,7 @@ fn add_config_does_not_duplicate_remote_configs() {
 
     let new_config = Config {
         imager,
-        os_list: vec![],
+        os_list: [].into(),
     };
 
     db.add_config(new_config, None)
@@ -211,7 +211,7 @@ fn add_config_inserts_device_into_board_list() {
 
     let new_config = Config {
         imager,
-        os_list: vec![],
+        os_list: [].into(),
     };
 
     db.add_config(new_config, None)
@@ -274,7 +274,7 @@ fn add_config_updates_existing_device_with_same_name() {
     db.add_config(
         Config {
             imager,
-            os_list: vec![],
+            os_list: [].into(),
         },
         None,
     )
@@ -313,7 +313,7 @@ fn add_config_updates_existing_device_with_same_name() {
     db.add_config(
         Config {
             imager,
-            os_list: vec![],
+            os_list: [].into(),
         },
         None,
     )
@@ -404,7 +404,7 @@ fn add_config_inserts_os_image_for_board() {
             remote_configs: Default::default(),
             devices: vec![board.clone()],
         },
-        os_list: vec![bb_config::config::OsListItem::Image(image.clone())],
+        os_list: [bb_config::config::OsListItem::Image(image.clone())].into(),
     };
 
     db.add_config(config, None)
@@ -490,7 +490,7 @@ fn os_image_by_id_returns_correct_data() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::Image(image.clone())],
+        os_list: [bb_config::config::OsListItem::Image(image.clone())].into(),
     };
 
     db.add_config(config, None)
@@ -595,7 +595,7 @@ fn add_config_inserts_os_sublist_for_board() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::SubList(sublist)],
+        os_list: [bb_config::config::OsListItem::SubList(sublist)].into(),
     };
 
     db.add_config(config, None)
@@ -688,7 +688,7 @@ fn nested_os_sublists_propagate_board_support() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::SubList(parent_sublist)],
+        os_list: [bb_config::config::OsListItem::SubList(parent_sublist)].into(),
     };
 
     db.add_config(config, None)
@@ -765,7 +765,7 @@ fn remote_os_sublist_is_returned_for_board() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
+        os_list: [bb_config::config::OsListItem::RemoteSubList(remote_sublist)].into(),
     };
 
     db.add_config(config, None)
@@ -851,7 +851,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
+        os_list: [bb_config::config::OsListItem::RemoteSubList(remote_sublist)].into(),
     };
 
     db.add_config(config, None)
@@ -957,7 +957,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
             remote_configs: Default::default(),
             devices: vec![board],
         },
-        os_list: vec![bb_config::config::OsListItem::RemoteSubList(remote_sublist)],
+        os_list: [bb_config::config::OsListItem::RemoteSubList(remote_sublist)].into(),
     };
 
     db.add_config(config, None)
@@ -1085,7 +1085,7 @@ fn board_list_search_filters_boards_case_insensitive() {
             remote_configs: Default::default(),
             devices: vec![board1, board2, board3],
         },
-        os_list: vec![],
+        os_list: [].into(),
     };
 
     db.add_config(config, None)
@@ -1114,7 +1114,7 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
                 remote_configs: Default::default(),
                 devices: vec![board],
             },
-            os_list: vec![],
+            os_list: [].into(),
         },
         None,
     )
@@ -1289,7 +1289,7 @@ fn insert_image_helper(
                 remote_configs: Default::default(),
                 devices: vec![board.clone()],
             },
-            os_list: vec![bb_config::config::OsListItem::Image(image)],
+            os_list: [bb_config::config::OsListItem::Image(image)].into(),
         },
         None,
     )
@@ -1668,9 +1668,10 @@ fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
                     board_with_bootfs("Without Bootfs", "shared_tag", None),
                 ],
             },
-            os_list: vec![bb_config::config::OsListItem::SubList(
+            os_list: [bb_config::config::OsListItem::SubList(
                 no_bootloader_sublist("shared_tag"),
-            )],
+            )]
+            .into(),
         },
         None,
     )

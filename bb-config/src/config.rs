@@ -13,7 +13,7 @@ pub struct Config {
     #[serde(default)]
     pub imager: Imager,
     /// List of OS images for the boards
-    pub os_list: Vec<OsListItem>,
+    pub os_list: Box<[OsListItem]>,
 }
 
 /// Contains information regarding BeagleBoard Images version and a list of [BeagleBoard.org]
