@@ -24,6 +24,15 @@ pub(crate) static COPY_ICON: LazyLock<svg::Handle> =
 pub(crate) static BEAGLEBOARD_LOGO: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!("../assets/icons/beagleboard-logo.svg"))
 });
+pub(crate) static CYCLE_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(include_bytes!("../assets/icons/cycle.svg")));
+pub(crate) static REPORT_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(include_bytes!("../assets/icons/report.svg")));
+pub(crate) static SETTINGS_ICON: LazyLock<svg::Handle> =
+    LazyLock::new(|| svg::Handle::from_memory(include_bytes!("../assets/icons/settings.svg")));
+pub(crate) static QUICK_REFERENCE_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
+    svg::Handle::from_memory(include_bytes!("../assets/icons/quick_reference.svg"))
+});
 
 // Theme
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);

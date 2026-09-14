@@ -21,6 +21,8 @@ pub enum Message<D> {
     GotoReviewPage,
     GotoFlashingPage,
     GotoAppOptions,
+    GotoUsageGuide,
+    GotoFormatPage,
 
     // Select board. Only valid in DevicePage
     SelectBoardById(i64),

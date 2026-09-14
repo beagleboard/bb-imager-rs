@@ -3,7 +3,10 @@ use iced::{Element, widget};
 
 use crate::{
     Message,
-    constants::{BEAGLEBOARD_LOGO, BOARD_ICON, FONT_BOLD, ISSUE_TRACKER, SEARCH_ICON},
+    constants::{
+        BEAGLEBOARD_LOGO, BOARD_ICON, CYCLE_ICON, FONT_BOLD, ISSUE_TRACKER, QUICK_REFERENCE_ICON,
+        REPORT_ICON, SEARCH_ICON, SETTINGS_ICON,
+    },
 };
 
 pub(crate) fn card_btn_style(t: &iced::Theme, s: widget::button::Status) -> widget::button::Style {
@@ -63,59 +66,6 @@ pub(crate) fn network_image_or_default<'a, M: 'a>(
     }
 }
 
-fn sidebar<'a, D: Clone + 'a>(
-    top_items: impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
-    bottom_items: impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
-) -> Element<'a, Message<D>> {
-    let cb = |(label, is_active, msg)| {
-        if is_active {
-            widget::container(label)
-                .width(iced::Fill)
-                .height(iced::Shrink)
-                .padding(8)
-                .style(|t| {
-                    let mut s = widget::container::primary(t);
-                    s.border = s.border.rounded(6);
-                    s
-                })
-                .into()
-        } else {
-            widget::button(label)
-                .on_press_maybe(msg)
-                .width(iced::Fill)
-                .height(iced::Shrink)
-                .padding(8)
-                .style(widget::button::subtle)
-                .into()
-        }
-    };
-
-    widget::column![
-        widget::column(top_items.into_iter().map(cb))
-            .height(iced::Fill)
-            .spacing(8)
-            .padding(8),
-        widget::rule::horizontal(2),
-        widget::column(
-            bottom_items.into_iter().map(cb).chain([
-                widget::button("Issue Tracker")
-                    .on_press(Message::OpenUrl(ISSUE_TRACKER.clone()))
-                    .width(iced::Fill)
-                    .height(iced::Shrink)
-                    .padding(8)
-                    .style(widget::button::subtle)
-                    .into(),
-                widget::svg(BEAGLEBOARD_LOGO.clone()).into()
-            ])
-        )
-        .padding(8)
-        .spacing(8)
-    ]
-    .width(150)
-    .spacing(8)
-    .into()
-}
-
 pub(crate) fn page_layout<'a, D: Clone + 'a>(
     sidebar_items: (
         impl IntoIterator<Item = (&'static str, bool, Option<Message<D>>)>,
@@ -123,14 +73,10 @@ pub(crate) fn page_layout<'a, D: Clone + 'a>(
     ),
     main: impl Into<Element<'a, Message<D>>>,
 ) -> Element<'a, Message<D>> {
-    widget::row![
-        sidebar(sidebar_items.0, sidebar_items.1),
-        widget::rule::vertical(2),
-        main.into()
-    ]
-    .width(iced::Fill)
-    .height(iced::Fill)
-    .into()
+    widget::row![sidebar(), main.into()]
+        .width(iced::Fill)
+        .height(iced::Fill)
+        .into()
 }
 
 pub(crate) fn layout_with_search<'a, D: Clone + 'a>(
@@ -203,4 +149,85 @@ pub(crate) fn pretty_bytes(bytes: u64) -> String {
 
 pub(crate) fn svg<'a, M>(h: widget::svg::Handle) -> iced::Element<'a, M> {
     widget::svg(h).width(iced::Fill).height(iced::Fill).into()
+}
+
+fn sidebar_item<'a, D: 'a>(
+    icon: impl Into<iced::Element<'a, Message<D>>>,
+    label: &'static str,
+    cb: Option<Message<D>>,
+    style: impl Fn(&iced::Theme, widget::button::Status) -> widget::button::Style + 'a,
+) -> widget::Button<'a, Message<D>> {
+    widget::button(
+        widget::row![icon.into(), widget::text(label).font(FONT_BOLD)]
+            .spacing(4)
+            .height(iced::Fill)
+            .align_y(iced::Center),
+    )
+    .width(iced::Fill)
+    .height(iced::Fill)
+    .on_press_maybe(cb)
+    .style(style)
+}
+
+pub(crate) fn sidebar<'a, D: 'a + Clone>() -> iced::Element<'a, Message<D>> {
+    widget::container(widget::column![
+        sidebar_item(circle(1, 10), "Hardware", None, widget::button::primary),
+        widget::rule::horizontal(2),
+        sidebar_item(circle(2, 10), "Software", None, widget::button::text),
+        widget::rule::horizontal(2),
+        sidebar_item(circle(3, 10), "Modify", None, widget::button::text),
+        widget::rule::horizontal(2),
+        sidebar_item(circle(4, 10), "Storage", None, widget::button::text),
+        widget::rule::horizontal(2),
+        sidebar_item(circle(5, 10), "Write", None, widget::button::text),
+        widget::rule::horizontal(2),
+        sidebar_item(
+            widget::svg(CYCLE_ICON.clone()).width(20),
+            "Format Media",
+            Some(Message::GotoFormatPage),
+            widget::button::warning
+        ),
+        widget::rule::horizontal(2),
+        sidebar_item(
+            widget::svg(SETTINGS_ICON.clone()).width(20),
+            "App Options",
+            Some(Message::GotoAppOptions),
+            widget::button::warning
+        ),
+        widget::rule::horizontal(2),
+        sidebar_item(
+            widget::svg(QUICK_REFERENCE_ICON.clone()).width(20),
+            "Usage Guide",
+            Some(Message::GotoUsageGuide),
+            widget::button::warning
+        ),
+        widget::rule::horizontal(2),
+        sidebar_item(
+            widget::svg(REPORT_ICON.clone()).width(20),
+            "Issue Tracker",
+            Some(Message::OpenUrl(ISSUE_TRACKER.clone())),
+            widget::button::warning
+        ),
+        widget::rule::horizontal(2),
+        widget::center(widget::svg(BEAGLEBOARD_LOGO.clone())).padding(8)
+    ])
+    .width(150)
+    .style(|t| {
+        let mut temp = widget::container::bordered_box(t);
+        temp.border = temp.border.width(3);
+        temp
+    })
+    .into()
+}
+
+fn circle<'a, M>(count: u8, radius: u8) -> widget::Container<'a, M> {
+    let width = radius as u32 * 2;
+    widget::center(widget::text(count).font(FONT_BOLD))
+        .width(width)
+        .height(width)
+        .style(move |t: &iced::Theme| {
+            let mut temp = widget::container::background(t.palette().background);
+            temp.border = temp.border.rounded(radius);
+            temp
+        })
 }
