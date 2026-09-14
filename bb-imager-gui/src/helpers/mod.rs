@@ -1,15 +1,14 @@
 use std::io;
 use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration};
 
+use crate::img::RemoteImage;
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 #[cfg(feature = "sd")]
 use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
-use bb_helper::file_stream::ReaderFileStream;
 use std::sync::{Arc, mpsc};
-use tokio_util::task::AbortOnDropHandle;
 use url::Url;
 
 #[cfg(test)]
@@ -35,7 +34,7 @@ pub(crate) enum BoardImage {
         // Only the SD flasher consumes a bmap; without that backend the field,
         // `Bmap` and its downloader are dead weight.
         #[cfg(feature = "sd")]
-        bmap: Option<Bmap>,
+        bmap: Option<crate::img::Bmap>,
         info_text: Option<Arc<str>>,
         description: Option<String>,
         icon: BoardImageIcon,
@@ -92,7 +91,7 @@ impl BoardImage {
             )
             .into(),
             #[cfg(feature = "sd")]
-            bmap: image.bmap.map(|url| Bmap { url, downloader }),
+            bmap: image.bmap.map(|url| crate::img::Bmap { url, downloader }),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
@@ -249,119 +248,6 @@ pub(crate) fn default_user() -> &'static str {
     match &*USER {
         Some(x) => x,
         None => "beagle",
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct RemoteImage {
-    name: Box<str>,
-    url: Box<url::Url>,
-    extract_sha256: [u8; 32],
-    extract_size: u64,
-    downloader: bb_downloader::Downloader,
-}
-
-impl RemoteImage {
-    pub(crate) fn new(
-        name: Box<str>,
-        url: Box<url::Url>,
-        extract_sha256: [u8; 32],
-        extract_size: u64,
-        downloader: bb_downloader::Downloader,
-    ) -> Self {
-        Self {
-            name,
-            url,
-            extract_sha256,
-            extract_size,
-            downloader,
-        }
-    }
-
-    fn file_name(&self) -> &str {
-        self.url.path_segments().unwrap().next_back().unwrap()
-    }
-
-    fn open<C, P, R>(self, f_cache: C, f_pipe: P) -> impl FnOnce() -> io::Result<R>
-    where
-        C: FnOnce(&std::path::Path) -> io::Result<R>,
-        P: FnOnce(ReaderFileStream, AbortOnDropHandle<io::Result<()>>, u64) -> io::Result<R>,
-    {
-        let rt = tokio::runtime::Handle::current();
-        move || {
-            let cache = self.downloader.check_cache_from_sha(self.extract_sha256);
-
-            if let Some(path) = cache {
-                tracing::info!("Found the remote image in cache");
-                return f_cache(&path);
-            }
-
-            tracing::info!("Remote image not found in cache. Downloading");
-            let (tx_stream, rx) = bb_helper::file_stream::file_stream()?;
-            let sha = self.extract_sha256;
-
-            let t: tokio::task::JoinHandle<io::Result<()>> = rt.spawn(async move {
-                self.downloader
-                    .download_to_stream(*self.url, sha, tx_stream)
-                    .await
-                    .map_err(|e| {
-                        let msg = format!("Error while downloading Os Image: {e}");
-                        tracing::error!("{}", &msg);
-                        io::Error::other(msg)
-                    })?;
-                tracing::info!("Image download finished");
-                Ok(())
-            });
-
-            f_pipe(rx, AbortOnDropHandle::new(t), self.extract_size)
-        }
-    }
-
-    #[cfg(feature = "sd")]
-    fn into_archive_fn(
-        self,
-        tx: Option<mpsc::SyncSender<f32>>,
-    ) -> impl FnOnce() -> io::Result<OsArchive> {
-        let tx_clone = tx.clone();
-        self.open(
-            move |p| OsArchive::from_path(p, tx_clone),
-            move |rx, abort, es| OsArchive::from_piped(rx, abort, es, tx),
-        )
-    }
-
-    fn into_image_fn(self) -> impl FnOnce() -> io::Result<(OsImage, u64)> {
-        let extract_size = self.extract_size;
-        self.open(
-            move |p| Ok((OsImage::from_path(p)?, extract_size)),
-            move |rx, abort, es| {
-                let img = OsImage::from_piped(rx, abort, es)?;
-                Ok((img, es))
-            },
-        )
-    }
-}
-
-impl std::fmt::Display for RemoteImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-#[cfg(feature = "sd")]
-#[derive(Debug, Clone)]
-pub(crate) struct Bmap {
-    url: Box<Url>,
-    downloader: bb_downloader::Downloader,
-}
-
-#[cfg(feature = "sd")]
-impl Bmap {
-    fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
-        let rt = tokio::runtime::Handle::current();
-        move || {
-            let res = rt.block_on(async move { self.downloader.download(*self.url).await })?;
-            std::fs::read_to_string(res).map(Into::into)
-        }
     }
 }
 
