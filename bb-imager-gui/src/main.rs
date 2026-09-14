@@ -14,6 +14,7 @@ use crate::{helpers::blocking_future, state::BBImagerCommon};
 mod constants;
 mod db;
 mod helpers;
+mod img;
 mod message;
 mod persistance;
 mod state;
@@ -262,7 +263,7 @@ impl BBImager {
         let img = ctx.selected_image.1.clone();
         let dst = ctx.selected_dest.clone();
         let bootfs = ctx.selected_board.bootfs.as_ref().map(|x| {
-            helpers::RemoteImage::new(
+            img::RemoteImage::new(
                 "Bootfs".into(),
                 Box::new(x.url.clone()),
                 x.image_download_sha256,
