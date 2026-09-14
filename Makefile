@@ -529,3 +529,51 @@ debug-gui:
 profile-gui:
 	$(RUST_BUILD) --profile profiling -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 	heaptrack target/${TARGET}/profiling/bb-imager-gui
+
+## preview: preview-board-selection: Preview Board selection page.
+preview-board-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board_selection --features debug
+
+## preview: preview-image-selection: Preview Image selection page.
+preview-img-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example img_selection --features debug
+
+## preview: preview-dest-selection: Preview Destination selection page.
+preview-dest-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example dest_selection --features debug
+
+## preview: preview-customization-sysconfig: Preview Sysconfig Customization page.
+preview-customization-sysconfig:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-sysconfig --features debug
+
+## preview: preview-customization-cloudinit: Preview Cloudinit Customization page.
+preview-customization-cloudinit:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-cloudinit --features debug
+
+## preview: preview-customization-selectable-sd: Preview Selectable Sd Customization page.
+preview-customization-selectable-sd:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example customization-selectable-sd --features debug
+
+## preview: preview-review: Preview Review page.
+preview-review:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example review --features debug
+
+## preview: preview-flashing: Preview Flashing page.
+preview-flashing:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flashing --features debug
+
+## preview: preview-flash-success: Preview Flash Success page.
+preview-flash-success:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
+
+## preview: preview-flash-fail: Preview Flash Fail page.
+preview-flash-fail:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
+
+## preview: preview-flash-cancel: Preview Flash Cancel page.
+preview-flash-cancel:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-cancel --features debug
+
+## preview: preview-app-options: Preview App options page.
+preview-app-options:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-options --features debug
