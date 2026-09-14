@@ -1,7 +1,7 @@
 use std::io;
 use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration};
 
-use crate::img::RemoteImage;
+use crate::img::{RemoteImage, RemoteItem};
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 #[cfg(feature = "sd")]
@@ -82,14 +82,7 @@ impl BoardImage {
         ));
 
         Self::Image {
-            img: RemoteImage::new(
-                image.name,
-                image.url,
-                image.image_download_sha256,
-                image.extract_size as u64,
-                downloader.clone(),
-            )
-            .into(),
+            img: RemoteImage::new(&image, downloader.clone(), flasher).into(),
             #[cfg(feature = "sd")]
             bmap: image.bmap.map(|url| crate::img::Bmap { url, downloader }),
             flasher,
@@ -310,7 +303,7 @@ pub(crate) async fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
-    bootfs: Option<RemoteImage>,
+    bootfs: Option<RemoteItem>,
     chan: mpsc::SyncSender<DownloadFlashingStatus>,
     cancel_sync: bb_helper::cancel::CancellationToken,
 ) -> anyhow::Result<()> {

@@ -263,8 +263,7 @@ impl BBImager {
         let img = ctx.selected_image.1.clone();
         let dst = ctx.selected_dest.clone();
         let bootfs = ctx.selected_board.bootfs.as_ref().map(|x| {
-            img::RemoteImage::new(
-                "Bootfs".into(),
+            img::RemoteItem::new(
                 Box::new(x.url.clone()),
                 x.image_download_sha256,
                 x.image_download_size,

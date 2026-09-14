@@ -446,11 +446,10 @@ fn no_bootloader_flasher_behaves_like_sd_card() {
 
 /// The board's bootfs archive, as `start_flashing` builds it.
 #[cfg(feature = "sd")]
-fn board_bootfs() -> RemoteImage {
+fn board_bootfs() -> RemoteItem {
     let cache = tempfile::tempdir().unwrap();
 
-    RemoteImage::new(
-        "Bootfs".into(),
+    RemoteItem::new(
         Box::new(url::Url::parse("https://example.com/bootfs.tar.xz").unwrap()),
         [7u8; 32],
         4096,
@@ -463,7 +462,7 @@ fn board_bootfs() -> RemoteImage {
 #[cfg(feature = "sd")]
 async fn flash_local_image(
     flasher: config::Flasher,
-    bootfs: Option<RemoteImage>,
+    bootfs: Option<RemoteItem>,
 ) -> (anyhow::Result<()>, tempfile::NamedTempFile, Vec<u8>) {
     use std::io::Write;
 
