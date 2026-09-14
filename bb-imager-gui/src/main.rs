@@ -266,7 +266,7 @@ impl BBImager {
                 "Bootfs".into(),
                 Box::new(x.url.clone()),
                 x.image_download_sha256,
-                x.extract_size,
+                x.image_download_size,
                 common.downloader.clone(),
             )
         });

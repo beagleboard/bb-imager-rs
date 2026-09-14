@@ -68,8 +68,8 @@ pub struct Device {
 pub struct Bootfs {
     /// Os Image download URL
     pub url: Url,
-    /// Os Image size after extraction
-    pub extract_size: u64,
+    /// Os Image size before download
+    pub image_download_size: u64,
     /// Os Image sha256 (before extraction)
     #[serde(with = "const_hex")]
     pub image_download_sha256: [u8; 32],

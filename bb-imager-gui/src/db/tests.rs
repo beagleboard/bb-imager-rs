@@ -1540,7 +1540,7 @@ fn os_board_json_by_id_unknown_id_returns_no_rows() {
 fn test_bootfs() -> bb_config::config::Bootfs {
     bb_config::config::Bootfs {
         url: "https://example.com/bootfs.tar.xz".try_into().unwrap(),
-        extract_size: 4096,
+        image_download_size: 4096,
         image_download_sha256: [7; 32],
     }
 }
