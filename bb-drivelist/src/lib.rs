@@ -21,6 +21,12 @@ pub enum Error {
         #[source]
         source: Option<std::io::Error>,
     },
+    #[cfg(target_os = "linux")]
+    #[error("Failed to parse lsblk output.")]
+    LsblkParseError {
+        #[source]
+        source: serde_json::Error,
+    },
     #[cfg(target_os = "windows")]
     #[error("Failed to get drive list.")]
     WindowsError {
