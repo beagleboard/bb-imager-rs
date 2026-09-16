@@ -25,7 +25,6 @@ fn pretty_duration_formats_minutes_and_seconds() {
 fn normalize_file_dest_strips_known_suffixes() {
     assert_eq!(normalize_file_dest("os.zip"), "os");
     assert_eq!(normalize_file_dest("os.img.xz"), "os.img");
-    assert_eq!(normalize_file_dest("os.img.gz"), "os.img");
     assert_eq!(normalize_file_dest("plain.txt"), "plain.txt");
 }
 

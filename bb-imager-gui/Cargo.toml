@@ -26,7 +26,7 @@ serde_json = { version = "1.0.150" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
-bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
+bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel", "reader_progress"] }
 semver = "1.0.28"
 anyhow = "1.0"
 tempfile = "3.26"
