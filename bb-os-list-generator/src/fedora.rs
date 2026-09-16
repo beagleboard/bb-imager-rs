@@ -24,22 +24,17 @@ struct FedoraItem {
 }
 
 impl FedoraItem {
-    async fn into_os_image(self, client: reqwest::Client) -> OsImage {
+    async fn into_os_image(self, client: reqwest::Client) -> Option<OsImage> {
         let header = client.head(self.link.clone()).send().await.unwrap();
 
-        let release_date = header
-            .headers()
-            .get(LAST_MODIFIED)
-            .unwrap()
-            .to_str()
-            .unwrap();
+        let release_date = header.headers().get(LAST_MODIFIED)?.to_str().unwrap();
         let release_date = DateTime::parse_from_rfc2822(release_date).unwrap();
 
         let extract_size = crate::helpers::xz_extract_size(&client, &self.link, self.size)
             .await
-            .unwrap();
+            .ok()?;
 
-        OsImage {
+        Some(OsImage {
             name: format!("Fedora {} {}", self.version, self.subvariant).into(),
             description: self.description().unwrap().into(),
             icon: Url::parse(ICON).unwrap(),
@@ -53,7 +48,7 @@ impl FedoraItem {
             bmap: None,
             info_text: None,
             support: None,
-        }
+        })
     }
 
     fn description(&self) -> Option<&'static str> {
@@ -85,6 +80,7 @@ pub(crate) async fn os_list_items(client: reqwest::Client) -> Vec<OsListItem> {
         .join_all()
         .await
         .into_iter()
+        .flatten()
         .map(OsListItem::Image)
         .collect();
 

@@ -36,6 +36,7 @@ async fn fetch_range(
         .send()
         .await?;
 
+
     // A 200 here means the server ignored Range and is about to hand us the
     // whole multi-GB image; bail rather than stream it.
     if resp.status() != StatusCode::PARTIAL_CONTENT {
