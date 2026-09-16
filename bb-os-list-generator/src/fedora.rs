@@ -12,8 +12,7 @@ const RELEASE_JSON: &str = "https://fedoraproject.org/releases.json";
 #[serde_as]
 #[derive(Deserialize, Debug)]
 struct FedoraItem {
-    #[serde_as(as = "DisplayFromStr")]
-    version: u8,
+    version: Box<str>,
     arch: Box<str>,
     link: Url,
     variant: Box<str>,
@@ -25,22 +24,17 @@ struct FedoraItem {
 }
 
 impl FedoraItem {
-    async fn into_os_image(self, client: reqwest::Client) -> OsImage {
+    async fn into_os_image(self, client: reqwest::Client) -> Option<OsImage> {
         let header = client.head(self.link.clone()).send().await.unwrap();
 
-        let release_date = header
-            .headers()
-            .get(LAST_MODIFIED)
-            .unwrap()
-            .to_str()
-            .unwrap();
+        let release_date = header.headers().get(LAST_MODIFIED)?.to_str().unwrap();
         let release_date = DateTime::parse_from_rfc2822(release_date).unwrap();
 
         let extract_size = crate::helpers::xz_extract_size(&client, &self.link, self.size)
             .await
-            .unwrap();
+            .ok()?;
 
-        OsImage {
+        Some(OsImage {
             name: format!("Fedora {} {}", self.version, self.subvariant).into(),
             description: self.description().unwrap().into(),
             icon: Url::parse(ICON).unwrap(),
@@ -54,7 +48,7 @@ impl FedoraItem {
             bmap: None,
             info_text: None,
             support: None,
-        }
+        })
     }
 
     fn description(&self) -> Option<&'static str> {
@@ -75,12 +69,8 @@ pub(crate) async fn os_list_items(client: reqwest::Client) -> Vec<OsListItem> {
         .await
         .unwrap();
 
-    let latest_version = data.iter().map(|x| x.version).max().unwrap();
-
     let tasks: JoinSet<_> = data
         .into_iter()
-        // Only get the latest 2 versions.
-        .filter(|x| x.version >= latest_version - 1)
         .filter(|x| x.arch.as_ref() == "aarch64")
         .filter(|x| x.variant.as_ref() == "Spins" && x.subvariant.as_ref() == "Minimal")
         .map(|x| x.into_os_image(client.clone()))
@@ -90,6 +80,7 @@ pub(crate) async fn os_list_items(client: reqwest::Client) -> Vec<OsListItem> {
         .join_all()
         .await
         .into_iter()
+        .flatten()
         .map(OsListItem::Image)
         .collect();
 
