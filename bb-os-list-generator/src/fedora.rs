@@ -12,8 +12,7 @@ const RELEASE_JSON: &str = "https://fedoraproject.org/releases.json";
 #[serde_as]
 #[derive(Deserialize, Debug)]
 struct FedoraItem {
-    #[serde_as(as = "DisplayFromStr")]
-    version: u8,
+    version: Box<str>,
     arch: Box<str>,
     link: Url,
     variant: Box<str>,
@@ -75,12 +74,8 @@ pub(crate) async fn os_list_items(client: reqwest::Client) -> Vec<OsListItem> {
         .await
         .unwrap();
 
-    let latest_version = data.iter().map(|x| x.version).max().unwrap();
-
     let tasks: JoinSet<_> = data
         .into_iter()
-        // Only get the latest 2 versions.
-        .filter(|x| x.version >= latest_version - 1)
         .filter(|x| x.arch.as_ref() == "aarch64")
         .filter(|x| x.variant.as_ref() == "Spins" && x.subvariant.as_ref() == "Minimal")
         .map(|x| x.into_os_image(client.clone()))
