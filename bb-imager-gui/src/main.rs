@@ -68,7 +68,7 @@ enum BBImager {
     ChooseOs(state::ChooseOsState),
     ChooseDest(state::ChooseDestState),
     Customize(state::CustomizeState),
-    Review(state::CustomizeState),
+    Review(state::ReviewState),
     Flashing(state::FlashingState),
     FlashingCancel(state::FlashingFinishState),
     FlashingFail(state::FlashingFailState),
@@ -167,7 +167,8 @@ impl BBImager {
         *self = match std::mem::take(self) {
             BBImager::ChooseOs(x) => BBImager::choose_board(x.common),
             BBImager::ChooseDest(x) => BBImager::choose_board(x.common),
-            BBImager::Customize(x) | BBImager::Review(x) => BBImager::choose_board(x.common),
+            BBImager::Customize(x) => BBImager::choose_board(x.common),
+            BBImager::Review(x) => BBImager::choose_board(x.common),
             BBImager::Flashing(x) => BBImager::choose_board(x.common),
             BBImager::FlashingCancel(x) | BBImager::FlashingSuccess(x) => {
                 BBImager::choose_board(x.common)
@@ -294,14 +295,6 @@ impl BBImager {
         t
     }
 
-    fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
-        let db = self.common().db.clone();
-        Task::perform(
-            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
-            BBImagerMessage::FilterResolveImages,
-        )
-    }
-
     fn scroll_reset(&self) -> Task<BBImagerMessage> {
         widget::operation::snap_to(
             self.common().scroll_id.clone(),
@@ -316,7 +309,7 @@ impl BBImager {
             Self::Customize(inner) => Self::ChooseDest(inner.ctx.choose_dest(inner.common)),
             Self::Review(inner) => {
                 if inner.ctx.has_customization {
-                    Self::Customize(inner)
+                    Self::Customize(inner.into())
                 } else {
                     Self::ChooseDest(inner.ctx.choose_dest(inner.common))
                 }
@@ -338,7 +331,7 @@ impl BBImager {
                 let board_id = inner.selected_board.id;
                 Task::batch([
                     inner.refresh_image_list(),
-                    self.refresh_image_icons(board_id),
+                    self.common().refresh_image_icons(board_id),
                     self.scroll_reset(),
                 ])
             }
@@ -347,12 +340,14 @@ impl BBImager {
     }
 
     fn next(&mut self) -> Task<BBImagerMessage> {
-        *self = match std::mem::take(self) {
+        let (state, task) = match std::mem::take(self) {
             Self::ChooseBoard(inner) => {
                 let selected_board = inner
                     .selected_board
                     .expect("Board should alread have been selected");
-                Self::ChooseOs(state::ChooseOsState {
+                let board_id = selected_board.id;
+
+                let temp = state::ChooseOsState {
                     common: inner.common,
                     flasher: selected_board.flasher,
                     selected_board,
@@ -360,22 +355,33 @@ impl BBImager {
                     selected_image: None,
                     images: Vec::new(),
                     search_text: "".into(),
-                })
+                };
+
+                let tasks = Task::batch([
+                    temp.resolve_all_remote_sublists(board_id),
+                    temp.refresh_image_list(),
+                    temp.common.refresh_image_icons(board_id),
+                ]);
+
+                (Self::ChooseOs(temp), tasks)
             }
             Self::ChooseOs(inner) => {
                 let selected_image = inner
                     .selected_image
                     .expect("Image should already be selected");
 
-                Self::ChooseDest(state::ChooseDestState {
-                    common: inner.common,
-                    selected_board: inner.selected_board,
-                    selected_image,
-                    selected_dest: None,
-                    destinations: Box::default(),
-                    filter_destination: true,
-                    search_text: "".into(),
-                })
+                (
+                    Self::ChooseDest(state::ChooseDestState {
+                        common: inner.common,
+                        selected_board: inner.selected_board,
+                        selected_image,
+                        selected_dest: None,
+                        destinations: Box::default(),
+                        filter_destination: true,
+                        search_text: "".into(),
+                    }),
+                    Task::none(),
+                )
             }
             Self::ChooseDest(inner) => {
                 let selected_dest = inner
@@ -398,24 +404,48 @@ impl BBImager {
                         ),
                     };
 
-                let page = state::CustomizeState {
-                    common: inner.common,
-                    ctx: state::FlashingContext {
-                        selected_board: inner.selected_board,
-                        selected_image: inner.selected_image,
-                        selected_dest,
-                        customization,
-                        has_customization,
-                    },
+                let ctx = state::FlashingContext {
+                    selected_board: inner.selected_board,
+                    selected_image: inner.selected_image,
+                    selected_dest,
+                    customization,
+                    has_customization,
                 };
 
-                if has_customization {
-                    Self::Customize(page)
+                let temp = if has_customization {
+                    Self::Customize(state::CustomizeState {
+                        common: inner.common,
+                        ctx,
+                    })
                 } else {
-                    Self::Review(page)
-                }
+                    Self::Review(state::ReviewState::new(inner.common, ctx))
+                };
+
+                (temp, Task::none())
             }
-            Self::Customize(inner) => Self::Review(inner),
+            Self::Customize(mut inner) => {
+                let temp = match &inner.ctx.customization {
+                    helpers::FlashingCustomization::LinuxSdSysconfig(c)
+                    | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
+                        let mut temp = inner
+                            .common
+                            .app_config
+                            .sd_customization
+                            .clone()
+                            .unwrap_or_default();
+                        temp.update_sysconfig(c.clone());
+                        inner.common.app_config.update_sd_customization(temp);
+
+                        inner.save_app_config()
+                    }
+                    _ => Task::none(),
+                };
+
+                (
+                    Self::Review(state::ReviewState::new(inner.common, inner.ctx)),
+                    temp,
+                )
+            }
             Self::Dummy
             | Self::Review(_)
             | Self::Flashing(_)
@@ -427,35 +457,8 @@ impl BBImager {
             }
         };
 
-        match self {
-            Self::ChooseOs(inner) => {
-                let board_id = inner.selected_board.id;
-                Task::batch([
-                    inner.resolve_all_remote_sublists(board_id),
-                    inner.refresh_image_list(),
-                    self.refresh_image_icons(board_id),
-                    self.scroll_reset(),
-                ])
-            }
-            Self::Review(inner) => match &inner.ctx.customization {
-                // Both variants are backed by the same `sysconf` slot, matching how
-                // `FlashingCustomization::new` loads them.
-                helpers::FlashingCustomization::LinuxSdSysconfig(c)
-                | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
-                    let mut temp = inner
-                        .common
-                        .app_config
-                        .sd_customization
-                        .clone()
-                        .unwrap_or_default();
-                    temp.update_sysconfig(c.clone());
-                    inner.common.app_config.update_sd_customization(temp);
+        *self = state;
 
-                    Task::batch([inner.save_app_config(), self.scroll_reset()])
-                }
-                _ => self.scroll_reset(),
-            },
-            _ => self.scroll_reset(),
-        }
+        Task::batch([task, self.scroll_reset()])
     }
 }
