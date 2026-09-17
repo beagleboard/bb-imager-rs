@@ -8,7 +8,6 @@ pub(crate) const LATEST_RELEASE_URL: &str =
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
 pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
-pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
 pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
     "pre-release"
@@ -19,7 +18,8 @@ pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 // Icons
-pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
+pub(crate) const WINDOW_ICON_BYTES: &[u8] =
+    include_bytes!("../../bb-imager-ui/assets/icons/icon.png");
 pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
 pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
@@ -41,15 +41,9 @@ pub(crate) const FONT_BOLD: iced::Font = {
     font
 };
 
-// Base Fonts
-pub(crate) const FONT_NORMAL_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Regular-subset.ttf");
-pub(crate) const FONT_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Nunito-Bold-subset.ttf");
-
 // Theme
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
 pub(crate) const CHECK_MARK_GREEN: iced::Color = color!(142, 201, 105);
-pub(crate) const HAIR_LIGHT_BROWN: iced::Color = color!(171, 131, 60);
-pub(crate) const BACKGROUND: iced::Color = color!(30, 30, 30);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
 pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 
