@@ -485,9 +485,7 @@ impl From<OverlayData> for BBImager {
 
 pub(crate) struct OverlayState {
     pub(crate) page: OverlayData,
-    pub(crate) log_path: String,
-    pub(crate) license: widget::text_editor::Content,
-    pub(crate) cache_dir: String,
+    pub(crate) state: bb_imager_ui::app_info::State,
 }
 
 impl OverlayState {
@@ -502,9 +500,16 @@ impl OverlayState {
 
         Self {
             page,
-            log_path,
-            license,
-            cache_dir,
+            state: bb_imager_ui::app_info::State {
+                app_name: constants::APP_NAME,
+                app_release: constants::APP_RELEASE,
+                app_desc: constants::APP_DESC,
+                license,
+                // TODO: Make Arc
+                cache_dir: cache_dir.into(),
+                // TODO: Make Arc
+                log_path: log_path.into(),
+            },
         }
     }
 

@@ -1,6 +1,5 @@
 use crate::{BBImager, message::BBImagerMessage};
 
-mod app_info;
 mod board_selection;
 mod configuration;
 mod destination_selection;
@@ -21,7 +20,10 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::FlashingCancel(inner) => flash_finish::cancel(inner),
         BBImager::FlashingFail(inner) => flash_finish::fail(inner),
         BBImager::FlashingSuccess(inner) => flash_finish::success(inner),
-        BBImager::AppInfo(inner) => app_info::view(inner),
+        BBImager::AppInfo(inner) => {
+            bb_imager_ui::app_info::view(&inner.state, inner.common().scroll_id.clone())
+                .map(BBImagerMessage::UiState)
+        }
         _ => panic!("Unexpected message"),
     }
 }

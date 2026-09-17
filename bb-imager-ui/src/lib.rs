@@ -1,4 +1,13 @@
+pub mod app_info;
 mod constants;
+mod helpers;
+
+#[derive(Clone, Debug)]
+pub enum Message {
+    Null,
+    Back,
+    EditorEvent(iced::widget::text_editor::Action),
+}
 
 pub fn application<A>(
     app: iced::Application<A>,
