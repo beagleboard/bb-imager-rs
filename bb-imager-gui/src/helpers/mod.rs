@@ -441,6 +441,29 @@ pub(crate) async fn flash(
             .await
             .unwrap()
         }
+        (BoardImage::Image { img, .. }, _, Destination::LocalFile(t)) => {
+            let cb = img.into_image_fn();
+            blocking_future(move || {
+                let (img, size) = cb()?;
+                let mut dest = std::fs::File::create(t)?;
+
+                let (tx, rx) = mpsc::sync_channel(4);
+                std::thread::spawn(move || {
+                    while let Ok(msg) = rx.recv() {
+                        let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(msg));
+                    }
+                });
+
+                let mut img_reader =
+                    bb_helper::reader_progress::ReaderWithProgress::new(img, size, Some(tx));
+
+                std::io::copy(&mut img_reader, &mut dest)?;
+
+                dest.sync_all()
+            })
+            .await
+            .map_err(Into::into)
+        }
         _ => unimplemented!(),
     }
 }
@@ -872,12 +895,12 @@ impl<'a> std::fmt::Display for DestinationItem<'a> {
 }
 
 fn normalize_file_dest(name: &str) -> String {
-    if let Some(stripped) = name.strip_suffix(".zip") {
-        return stripped.to_string();
-    }
+    const SUFFIX: [&str; 2] = [".zip", ".xz"];
 
-    if let Some(pos) = name.rfind(".img.") {
-        return name[..pos + 4].to_string();
+    for s in SUFFIX {
+        if let Some(stripped) = name.strip_suffix(s) {
+            return stripped.to_string();
+        }
     }
 
     name.to_string()
