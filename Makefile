@@ -534,6 +534,10 @@ profile-gui:
 preview-review:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example review --features debug
 
+## preview: preview-flash-fail: Preview Flash Fail page.
+preview-flash-fail:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
+
 ## preview: preview-app-info: Preview App options page.
 preview-app-info:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
