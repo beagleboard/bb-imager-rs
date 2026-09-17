@@ -1,12 +1,17 @@
 pub mod app_info;
 mod constants;
 mod helpers;
+pub mod review;
 
 #[derive(Clone, Debug)]
 pub enum Message {
+    GotoAppInfo,
+
     Null,
     Back,
     EditorEvent(iced::widget::text_editor::Action),
+
+    FlashStart,
 }
 
 pub fn application<A>(

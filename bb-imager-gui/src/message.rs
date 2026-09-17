@@ -50,9 +50,6 @@ pub(crate) enum BBImagerMessage {
     UpdateFlashConfig(crate::helpers::FlashingCustomization),
     ResetFlashingConfig,
 
-    // Review Page
-    FlashStart,
-
     // Flashing Page
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
@@ -287,7 +284,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     // Fetch all children remote subitems.
                     inner.resolve_remote_sublists(inner.selected_board.id, Some(target)),
                     inner.refresh_image_list(),
-                    state.refresh_image_icons(inner.selected_board.id),
+                    inner.common.refresh_image_icons(inner.selected_board.id),
                 ]),
                 _ => Task::none(),
             };
@@ -446,7 +443,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // Debug build can be slow.
             _ => {}
         },
-        BBImagerMessage::FlashStart | BBImagerMessage::Retry => {
+        BBImagerMessage::Retry | BBImagerMessage::UiState(Message::FlashStart) => {
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess => {
@@ -487,7 +484,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             }
         }
-        BBImagerMessage::AppInfo => {
+        BBImagerMessage::AppInfo | BBImagerMessage::UiState(Message::GotoAppInfo) => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
                 std::mem::take(state).try_into().expect("Unexpected page"),
             ));

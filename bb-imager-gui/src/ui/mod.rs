@@ -7,7 +7,6 @@ mod flash;
 mod flash_finish;
 mod helpers;
 mod image_selection;
-mod review;
 
 pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
     match state {
@@ -15,7 +14,10 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::ChooseOs(inner) => image_selection::view(inner),
         BBImager::ChooseDest(inner) => destination_selection::view(inner),
         BBImager::Customize(inner) => configuration::view(inner),
-        BBImager::Review(inner) => review::view(inner),
+        BBImager::Review(inner) => {
+            bb_imager_ui::review::view(&inner.state, inner.common.scroll_id.clone())
+                .map(BBImagerMessage::UiState)
+        }
         BBImager::Flashing(inner) => flash::view(inner),
         BBImager::FlashingCancel(inner) => flash_finish::cancel(inner),
         BBImager::FlashingFail(inner) => flash_finish::fail(inner),

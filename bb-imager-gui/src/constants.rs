@@ -26,7 +26,8 @@ pub(crate) const BOARD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/board
 pub(crate) const ARROW_FORWARD_IOS_ICON_BYTES: &[u8] =
     include_bytes!("../assets/icons/arrow-forward-ios.svg");
 pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
-pub(crate) const INFO_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/info.svg");
+pub(crate) const INFO_ICON_BYTES: &[u8] =
+    include_bytes!("../../bb-imager-ui/assets/icons/info.svg");
 pub(crate) const COPY_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/content-copy.svg");
 pub(crate) const SEARCH_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/search.svg");
 

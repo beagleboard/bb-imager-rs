@@ -55,6 +55,14 @@ impl BBImagerCommon {
             BBImagerMessage::FilterResolveImages,
         )
     }
+
+    pub(crate) fn refresh_image_icons(&self, board_id: i64) -> Task<BBImagerMessage> {
+        let db = self.db.clone();
+        Task::perform(
+            blocking_future(move || db.os_image_icons_by_board_id(board_id).unwrap()),
+            BBImagerMessage::FilterResolveImages,
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -305,6 +313,38 @@ impl CustomizeState {
     }
 }
 
+impl From<ReviewState> for CustomizeState {
+    fn from(value: ReviewState) -> Self {
+        Self {
+            common: value.common,
+            ctx: value.ctx,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ReviewState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) ctx: FlashingContext,
+    pub(crate) state: bb_imager_ui::review::State,
+}
+
+impl ReviewState {
+    pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
+        Self {
+            common,
+            state: bb_imager_ui::review::State {
+                is_download: ctx.is_download(),
+                board: ctx.selected_board.name.clone(),
+                image: ctx.selected_image.1.to_string().into(),
+                destination: ctx.selected_destination().into(),
+                modifications: ctx.customization.modifications(),
+            },
+            ctx,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct FlashingState {
     pub(crate) common: BBImagerCommon,
@@ -411,7 +451,7 @@ pub(crate) enum OverlayData {
     ChooseOs(ChooseOsState),
     ChooseDest(ChooseDestState),
     Customize(CustomizeState),
-    Review(CustomizeState),
+    Review(ReviewState),
     Flashing(FlashingState),
     FlashingCancel(FlashingFinishState),
     FlashingFail(FlashingFailState),
