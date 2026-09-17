@@ -2,7 +2,6 @@ use std::sync::LazyLock;
 
 use bb_iced_widgets::circle_bar;
 use iced::Element;
-use iced::advanced::text::highlighter::PlainText;
 use iced::widget::{self, svg};
 
 use crate::{constants, message::BBImagerMessage};
@@ -219,12 +218,6 @@ pub(crate) fn element_with_element<'a>(
     widget::row![el1, widget::space::horizontal(), el2]
         .align_y(iced::Alignment::Center)
         .padding(iced::Padding::ZERO.right(16))
-}
-
-pub(crate) fn selectable_text(
-    content: &widget::text_editor::Content,
-) -> widget::text_editor::TextEditor<'_, PlainText, BBImagerMessage> {
-    widget::text_editor(content).on_action(BBImagerMessage::EditorEvent)
 }
 
 fn card_box<'a>(

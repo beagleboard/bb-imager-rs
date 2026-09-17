@@ -58,8 +58,6 @@ pub(crate) enum BBImagerMessage {
 
     // Reset to start from beginning.
     Restart,
-    // Retry flashing
-    Retry,
 
     /// Open URL in browser
     OpenUrl(url::Url),
@@ -76,9 +74,6 @@ pub(crate) enum BBImagerMessage {
 
     /// Update destinations
     Destinations(Box<[helpers::Destination]>),
-
-    /// Read-only editor
-    EditorEvent(iced::widget::text_editor::Action),
 
     /// Show application information
     AppInfo,
@@ -392,7 +387,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return show_notification(msg.to_string());
         }
-        BBImagerMessage::Restart => {
+        BBImagerMessage::Restart | BBImagerMessage::UiState(Message::Restart) => {
             return state.restart();
         }
         BBImagerMessage::FlashFail(err) => {
@@ -443,7 +438,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // Debug build can be slow.
             _ => {}
         },
-        BBImagerMessage::Retry | BBImagerMessage::UiState(Message::FlashStart) => {
+        BBImagerMessage::UiState(Message::FlashStart)
+        | BBImagerMessage::UiState(Message::Retry) => {
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess => {
@@ -474,16 +470,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return show_notification(msg.to_string());
         }
-        BBImagerMessage::EditorEvent(evt) | BBImagerMessage::UiState(Message::EditorEvent(evt)) => {
-            match evt {
-                iced::widget::text_editor::Action::Edit(_) => {}
-                _ => match state {
-                    BBImager::FlashingFail(x) => x.logs.perform(evt),
-                    BBImager::AppInfo(x) => x.state.license.perform(evt),
-                    _ => panic!("Unexpected message"),
-                },
-            }
-        }
+        BBImagerMessage::UiState(Message::EditorEvent(evt)) => match evt {
+            iced::widget::text_editor::Action::Edit(_) => {}
+            _ => match state {
+                BBImager::FlashingFail(x) => x.state.logs.perform(evt),
+                BBImager::AppInfo(x) => x.state.license.perform(evt),
+                _ => panic!("Unexpected message"),
+            },
+        },
         BBImagerMessage::AppInfo | BBImagerMessage::UiState(Message::GotoAppInfo) => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
                 std::mem::take(state).try_into().expect("Unexpected page"),

@@ -425,8 +425,7 @@ impl From<FlashingState> for FlashingFinishState {
 pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) err: String,
-    pub(crate) logs: widget::text_editor::Content,
+    pub(crate) state: bb_imager_ui::flash_fail::State,
 }
 
 impl FlashingFailState {
@@ -438,8 +437,10 @@ impl FlashingFailState {
         Self {
             common: state.common,
             ctx: state.ctx,
-            err,
-            logs,
+            state: bb_imager_ui::flash_fail::State {
+                reason: err.into(),
+                logs,
+            },
         }
     }
 }

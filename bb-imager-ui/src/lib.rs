@@ -1,5 +1,6 @@
 pub mod app_info;
 mod constants;
+pub mod flash_fail;
 mod helpers;
 pub mod review;
 
@@ -9,9 +10,13 @@ pub enum Message {
 
     Null,
     Back,
+    Restart,
+
     EditorEvent(iced::widget::text_editor::Action),
 
     FlashStart,
+    // Retry flashing
+    Retry,
 }
 
 pub fn application<A>(
