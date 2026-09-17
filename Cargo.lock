@@ -686,6 +686,7 @@ dependencies = [
  "bb-flasher",
  "bb-helper",
  "bb-iced-widgets",
+ "bb-imager-ui",
  "chrono",
  "chrono-tz",
  "directories",
@@ -708,6 +709,13 @@ dependencies = [
  "url",
  "webbrowser",
  "whoami",
+]
+
+[[package]]
+name = "bb-imager-ui"
+version = "1.0.16"
+dependencies = [
+ "iced",
 ]
 
 [[package]]

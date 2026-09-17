@@ -48,32 +48,14 @@ fn main() -> iced::Result {
     // Force using the low power gpu since this is not a GPU intensive application
     unsafe { std::env::set_var("WGPU_POWER_PREF", "low") };
 
-    let icon = iced::window::icon::from_file_data(
-        constants::WINDOW_ICON_BYTES,
-        Some(image::ImageFormat::Png),
-    )
-    .ok();
-    assert!(icon.is_some());
-
     #[cfg(target_os = "macos")]
     // HACK: mac_notification_sys set application name (not an option in notify-rust)
     let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
-    let settings = iced::window::Settings {
-        min_size: Some(constants::WINDOW_SIZE),
-        size: constants::WINDOW_SIZE,
-        icon,
-        ..Default::default()
-    };
-
-    iced::application(BBImager::new, message::update, ui::view)
+    let app = iced::application(BBImager::new, message::update, ui::view);
+    bb_imager_ui::application(app)
         .title(helpers::app_title)
         .subscription(BBImager::subscription)
-        .theme(BBImager::theme)
-        .window(settings)
-        .font(constants::FONT_NORMAL_BYTES)
-        .font(constants::FONT_BOLD_BYTES)
-        .default_font(constants::FONT_REGULAR)
         .run()
 }
 
@@ -142,20 +124,6 @@ impl BBImager {
         (
             Self::choose_board(common),
             Task::batch([db_task, updater_task]),
-        )
-    }
-
-    fn theme(&self) -> iced::Theme {
-        iced::Theme::custom(
-            "Beagle",
-            iced::theme::Palette {
-                background: constants::BACKGROUND,
-                text: iced::Color::WHITE,
-                primary: constants::TONGUE_ORANGE,
-                success: constants::CHECK_MARK_GREEN,
-                warning: constants::HAIR_LIGHT_BROWN,
-                danger: constants::DANGER,
-            },
         )
     }
 

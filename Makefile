@@ -374,7 +374,7 @@ package-bundle-pc-windows-msvc:
 	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
 	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
 	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
-	winapp manifest update-assets bb-imager-gui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
+	winapp manifest update-assets bb-imager-ui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
 	winapp pack --manifest bb-imager-gui/Package.appxmanifest bb-imager-gui/dist/windows-temp/aarch64/ bb-imager-gui/dist/windows-temp/x64/
 	rm -rf bb-imager-gui/dist/windows-temp
 	mv *.msixbundle bb-imager-gui/dist/
@@ -466,7 +466,7 @@ _install_gui:
 	install -Dm755 $(_GUI_BIN) $(DESTDIR)$(BINDIR)/bb-imager-gui
 	install -Dm644 bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
 	desktop-file-edit --set-icon=$(GUI_NAME) $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
-	install -Dm644 bb-imager-gui/assets/icons/icon.png $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	install -Dm644 bb-imager-ui/assets/icons/icon.png $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
 	install -Dm644 bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml $(DESTDIR)$(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
 
 ## install: install-gui: Install GUI. Intended for use in Linux.

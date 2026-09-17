@@ -15,8 +15,10 @@ members = [
         "bb-drivelist", 
         "bb-flasher-mspm0",
         "bb-bmap-parser",
-        "bb-iced-widgets"
-, "bb-os-list-generator"]
+        "bb-iced-widgets",
+        "bb-os-list-generator",
+        "bb-imager-ui"
+]
 
 [profile.release]
 lto = true
