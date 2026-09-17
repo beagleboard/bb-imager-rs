@@ -529,3 +529,7 @@ debug-gui:
 profile-gui:
 	$(RUST_BUILD) --profile profiling -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 	heaptrack target/${TARGET}/profiling/bb-imager-gui
+
+## preview: preview-app-info: Preview App options page.
+preview-app-info:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
