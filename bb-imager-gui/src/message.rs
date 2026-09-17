@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use bb_imager_ui::Message;
 use iced::Task;
 
 use crate::{
@@ -12,6 +13,8 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
+    UiState(bb_imager_ui::Message),
+
     /// Messages to ignore
     Null,
 
@@ -225,7 +228,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
         }
         BBImagerMessage::Next => return state.next(),
-        BBImagerMessage::Back => return state.back(),
+        BBImagerMessage::Back | BBImagerMessage::UiState(Message::Back) => return state.back(),
         BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
@@ -474,14 +477,16 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return show_notification(msg.to_string());
         }
-        BBImagerMessage::EditorEvent(evt) => match evt {
-            iced::widget::text_editor::Action::Edit(_) => {}
-            _ => match state {
-                BBImager::FlashingFail(x) => x.logs.perform(evt),
-                BBImager::AppInfo(x) => x.license.perform(evt),
-                _ => panic!("Unexpected message"),
-            },
-        },
+        BBImagerMessage::EditorEvent(evt) | BBImagerMessage::UiState(Message::EditorEvent(evt)) => {
+            match evt {
+                iced::widget::text_editor::Action::Edit(_) => {}
+                _ => match state {
+                    BBImager::FlashingFail(x) => x.logs.perform(evt),
+                    BBImager::AppInfo(x) => x.state.license.perform(evt),
+                    _ => panic!("Unexpected message"),
+                },
+            }
+        }
         BBImagerMessage::AppInfo => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
                 std::mem::take(state).try_into().expect("Unexpected page"),
@@ -571,7 +576,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 img.update_init_format(f);
             }
         }
-        BBImagerMessage::Null => {}
+        BBImagerMessage::Null | BBImagerMessage::UiState(Message::Null) => {}
     }
 
     Task::none()

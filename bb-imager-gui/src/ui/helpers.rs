@@ -7,9 +7,6 @@ use iced::widget::{self, svg};
 
 use crate::{constants, message::BBImagerMessage};
 
-pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
-    LazyLock::new(|| widget::image::Handle::from_bytes(constants::WINDOW_ICON_BYTES));
-
 pub(crate) static ARROW_BACK_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_BACK_ICON_BYTES));
 pub(crate) static FILE_ADD_ICON: LazyLock<svg::Handle> =
@@ -125,32 +122,6 @@ pub(crate) fn page_type2<'a>(
         ]
         .into_iter()
         .chain(btns.into_iter().map(Into::into)),
-    )
-    .align_y(iced::Center)
-    .width(iced::Length::Fill)
-    .spacing(24);
-
-    widget::column![card_box(row1).height(iced::Fill).width(iced::Fill), row2]
-        .padding(24)
-        .spacing(24)
-        .into()
-}
-
-/// |--------|
-/// |        |
-/// |  row1  |
-/// |        |
-/// |--------|
-/// |  btns  |
-/// |--------|
-pub(crate) fn page_type3<'a>(
-    row1: Element<'a, BBImagerMessage>,
-    btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
-) -> Element<'a, BBImagerMessage> {
-    let row2 = widget::row(
-        [widget::space::horizontal().into()]
-            .into_iter()
-            .chain(btns.into_iter().map(Into::into)),
     )
     .align_y(iced::Center)
     .width(iced::Length::Fill)
