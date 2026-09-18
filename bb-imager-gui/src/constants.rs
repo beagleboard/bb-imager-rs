@@ -45,7 +45,6 @@ pub(crate) const FONT_BOLD: iced::Font = {
 
 // Theme
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
-pub(crate) const CHECK_MARK_GREEN: iced::Color = color!(142, 201, 105);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
 pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 

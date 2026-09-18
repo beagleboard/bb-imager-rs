@@ -538,6 +538,10 @@ preview-review:
 preview-flash-fail:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
 
+## preview: preview-flash-success: Preview Flash Success page.
+preview-flash-success:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
+
 ## preview: preview-app-info: Preview App options page.
 preview-app-info:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug

@@ -262,6 +262,67 @@ pub(crate) fn network_image_or_default<'a>(
     }
 }
 
+/// The pane detailing one board: icon, name, description, specification table
+/// and its documentation/OSHW links.
+pub(crate) fn board_details_pane<'a>(
+    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
+    dev: &'a crate::board_selection::BoardDetails,
+    scroll_id: &widget::Id,
+) -> Element<'a, Message> {
+    let img = network_image_or_default(
+        cache,
+        dev.icon.as_ref(),
+        constants::BOARD_ICON.clone(),
+        iced::Fill,
+        iced::Shrink,
+    );
+
+    let copy_btn =
+        copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyBoardConfig(dev.id));
+
+    let cols = widget::column![
+        img,
+        widget::center(copy_btn),
+        widget::text(dev.name.as_ref())
+            .size(24)
+            .align_x(iced::alignment::Alignment::Center)
+            .width(iced::Length::Fill),
+        widget::text(dev.description.as_ref())
+            .align_x(iced::alignment::Alignment::Center)
+            .width(iced::Length::Fill),
+    ];
+
+    let cols = cols.extend(
+        dev.specification
+            .iter()
+            .map(|(k, v)| -> widget::text::Rich<'a, (), Message> { detail_entry(k, v.as_ref()) })
+            .map(Into::into),
+    );
+
+    let mut btns = Vec::with_capacity(2);
+
+    if let Some(x) = &dev.documentation {
+        btns.push(
+            widget::button(widget::text("DOCUMENTATION"))
+                .on_press(Message::OpenUrl(x.clone()))
+                .into(),
+        );
+    }
+
+    if let Some(x) = &dev.oshw {
+        btns.push(
+            widget::button(widget::text("OSHW"))
+                .on_press(Message::OpenUrl(x.clone()))
+                .into(),
+        );
+    }
+
+    detail_pane(
+        cols.push(widget::center(widget::row(btns).spacing(16))),
+        scroll_id,
+    )
+}
+
 fn search_box<'a>(inp: &'a str) -> widget::Container<'a, Message> {
     widget::container(
         widget::row![
