@@ -51,9 +51,6 @@ pub(crate) enum BBImagerMessage {
     FlashCancel,
     FlashFail(String),
 
-    // Reset to start from beginning.
-    Restart,
-
     /// Open URL in browser
     OpenUrl(url::Url),
 
@@ -388,7 +385,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return show_notification(msg.to_string());
         }
-        BBImagerMessage::Restart | BBImagerMessage::UiState(Message::Restart) => {
+        BBImagerMessage::UiState(Message::Restart) => {
             return state.restart();
         }
         BBImagerMessage::FlashFail(err) => {

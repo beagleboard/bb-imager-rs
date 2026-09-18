@@ -2,6 +2,7 @@ pub mod app_info;
 pub mod board_selection;
 pub mod configuration;
 mod constants;
+pub mod flash_cancel;
 pub mod flash_fail;
 pub mod flash_success;
 mod helpers;

@@ -46,7 +46,6 @@ pub(crate) const FONT_BOLD: iced::Font = {
 // Theme
 pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
-pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",
