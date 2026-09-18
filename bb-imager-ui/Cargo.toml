@@ -7,10 +7,16 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-iced = { version = "0.14", features = ["image", "svg"] }
+iced = { version = "0.14", features = ["image", "svg", "tokio"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 chrono-tz = "0.10"
 url = "2.5"
+
+[dev-dependencies]
+tempfile = "3.27"
+bb-config = { path = "../bb-config" }
+serde_json = "1.0.150"
+bb-downloader = { path = "../bb-downloader" }
 
 [features]
 debug = ["iced/hot"]
