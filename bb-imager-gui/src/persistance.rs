@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 /// Configuration for GUI that should be presisted
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GuiConfiguration {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) sd_customization: Option<SdCustomization>,
+    #[serde(default)]
+    pub(crate) sd_customization: SdCustomization,
 }
 
 impl GuiConfiguration {
@@ -44,10 +44,6 @@ impl GuiConfiguration {
     fn config_path() -> Option<PathBuf> {
         let dirs = crate::helpers::project_dirs()?;
         Some(dirs.config_local_dir().join("config.json").to_owned())
-    }
-
-    pub(crate) fn update_sd_customization(&mut self, t: SdCustomization) {
-        self.sd_customization = Some(t);
     }
 }
 
@@ -307,39 +303,24 @@ mod tests {
     }
 
     #[test]
-    fn gui_configuration_updates_sd_slot() {
-        let mut gui = GuiConfiguration::default();
-        assert!(gui.sd_customization.is_none());
-
-        gui.update_sd_customization(SdCustomization::default());
-
-        assert!(gui.sd_customization.is_some());
-    }
-
-    #[test]
-    fn empty_gui_configuration_serializes_to_empty_object() {
-        // All fields are `skip_serializing_if = "Option::is_none"`.
-        let json = serde_json::to_string(&GuiConfiguration::default()).unwrap();
-        assert_eq!(json, "{}");
-    }
-
-    #[test]
     fn gui_configuration_round_trips_through_json() {
-        let mut gui = GuiConfiguration::default();
-        gui.update_sd_customization({
-            let mut sd = SdCustomization::default();
-            sd.update_sysconfig(
-                SdSysconfCustomization::default().update_hostname(Some("host".into())),
-            );
-            sd
-        });
+        let gui = GuiConfiguration {
+            sd_customization: {
+                let mut sd = SdCustomization::default();
+                sd.update_sysconfig(
+                    SdSysconfCustomization::default().update_hostname(Some("host".into())),
+                );
+                sd
+            },
+        };
 
         let json = serde_json::to_string(&gui).unwrap();
         let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
 
         assert_eq!(
             back.sd_customization
-                .and_then(|s| s.sysconf_customization().and_then(|c| c.hostname.clone())),
+                .sysconf_customization()
+                .and_then(|c| c.hostname.clone()),
             Some("host".to_string())
         );
     }
