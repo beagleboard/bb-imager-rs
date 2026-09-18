@@ -541,3 +541,11 @@ preview-flash-fail:
 ## preview: preview-app-info: Preview App options page.
 preview-app-info:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
+
+## preview: preview-configuration-sysconfig: Preview Configuration page for sysconf images.
+preview-configuration-sysconfig:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-sysconfig --features debug
+
+## preview: preview-configuration-cloudinit: Preview Configuration page for cloud-init images.
+preview-configuration-cloudinit:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-cloudinit --features debug
