@@ -228,7 +228,7 @@ fn add_config_inserts_device_into_board_list() {
     );
 
     assert!(
-        updated_boards.iter().any(|b| b.name == "Test Board"),
+        updated_boards.iter().any(|b| &*b.name == "Test Board"),
         "Inserted device should appear in board_list"
     );
 }
@@ -287,7 +287,7 @@ fn add_config_updates_existing_device_with_same_name() {
 
     let board = boards
         .iter()
-        .find(|b| b.name == "Test Board")
+        .find(|b| &*b.name == "Test Board")
         .expect("Inserted board should exist");
 
     let board_id = board.id;
@@ -413,7 +413,7 @@ fn add_config_inserts_os_image_for_board() {
     let boards = db.board_list("").unwrap();
     let board_id = boards
         .iter()
-        .find(|b| b.name == board.name.as_ref())
+        .find(|b| &*b.name == board.name.as_ref())
         .unwrap()
         .id;
 
@@ -497,7 +497,7 @@ fn os_image_by_id_returns_correct_data() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
+    let board_id = boards.iter().find(|b| &*b.name == "Test Board").unwrap().id;
 
     let items = db
         .os_image_items(board_id, None)
@@ -602,7 +602,7 @@ fn add_config_inserts_os_sublist_for_board() {
         .expect("add_config should succeed");
 
     let boards = db.board_list("").unwrap();
-    let board_id = boards.iter().find(|b| b.name == "Test Board").unwrap().id;
+    let board_id = boards.iter().find(|b| &*b.name == "Test Board").unwrap().id;
 
     let items = db
         .os_image_items(board_id, None)
@@ -698,7 +698,7 @@ fn nested_os_sublists_propagate_board_support() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| b.name == "Test Board")
+        .find(|b| &*b.name == "Test Board")
         .unwrap()
         .id;
 
@@ -775,7 +775,7 @@ fn remote_os_sublist_is_returned_for_board() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| b.name == "Test Board")
+        .find(|b| &*b.name == "Test Board")
         .unwrap()
         .id;
 
@@ -861,7 +861,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| b.name == "Test Board")
+        .find(|b| &*b.name == "Test Board")
         .unwrap()
         .id;
 
@@ -967,7 +967,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         .board_list("")
         .unwrap()
         .into_iter()
-        .find(|b| b.name == "Test Board")
+        .find(|b| &*b.name == "Test Board")
         .unwrap()
         .id;
 
@@ -1099,9 +1099,9 @@ fn board_list_search_filters_boards_case_insensitive() {
         "Only boards containing 'test' should be returned"
     );
 
-    assert!(results.iter().any(|b| b.name == "Test Board 1"));
-    assert!(results.iter().any(|b| b.name == "Test Board 2"));
-    assert!(results.iter().any(|b| b.name == "Test Board 3"));
+    assert!(results.iter().any(|b| &*b.name == "Test Board 1"));
+    assert!(results.iter().any(|b| &*b.name == "Test Board 2"));
+    assert!(results.iter().any(|b| &*b.name == "Test Board 3"));
 }
 
 /// Insert a single board and return its id.
@@ -1123,7 +1123,7 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
     db.board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| b.name == name.as_ref())
+        .find(|b| &*b.name == name.as_ref())
         .expect("Inserted board should exist")
         .id
 }
@@ -1299,7 +1299,7 @@ fn insert_image_helper(
         .board_list("")
         .expect("Fetching board list should succeed")
         .iter()
-        .find(|b| b.name == board.name.as_ref())
+        .find(|b| &*b.name == board.name.as_ref())
         .expect("Inserted board should exist")
         .id;
 
@@ -1680,7 +1680,7 @@ fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
     let boards = db
         .board_list("")
         .expect("Fetching board list should succeed");
-    let id_of = |name: &str| boards.iter().find(|b| b.name == name).unwrap().id;
+    let id_of = |name: &str| boards.iter().find(|b| &*b.name == name).unwrap().id;
 
     let listed = |board: &str| {
         db.os_image_items(id_of(board), None)

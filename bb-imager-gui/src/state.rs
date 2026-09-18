@@ -66,15 +66,30 @@ impl BBImagerCommon {
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) boards: Box<[db::BoardListItem]>,
+    /// The full board, kept for the rest of the flow (`flasher`, `instructions`,
+    /// `bootfs`), none of which the page renders.
     pub(crate) selected_board: Option<Board>,
-    pub(crate) search_text: Arc<str>,
+    pub(crate) state: bb_imager_ui::board_selection::State,
 }
 
 impl ChooseBoardState {
+    pub(crate) fn new(common: BBImagerCommon) -> Self {
+        Self {
+            common,
+            selected_board: None,
+            state: Default::default(),
+        }
+    }
+
+    /// Record `board` as the selection, both for the flow and for the page.
+    pub(crate) fn select_board(&mut self, board: Board) {
+        self.state.selected = Some((&board).into());
+        self.selected_board = Some(board);
+    }
+
     pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
-        let search = self.search_text.clone();
+        let search = self.state.search.clone();
 
         Task::perform(
             blocking_future(move || db.board_list(&search).unwrap()),
@@ -83,18 +98,33 @@ impl ChooseBoardState {
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
-        self.search_text = search;
+        self.state.search = search;
         self.refresh_board_list()
     }
 }
 
 impl From<ChooseOsState> for ChooseBoardState {
     fn from(value: ChooseOsState) -> Self {
+        let mut res = Self::new(value.common);
+        res.select_board(value.selected_board);
+        res
+    }
+}
+
+impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
+    fn from(value: &Board) -> Self {
         Self {
-            common: value.common,
-            boards: Box::default(),
-            selected_board: Some(value.selected_board),
-            search_text: "".into(),
+            id: value.id,
+            name: value.name.clone(),
+            icon: value.icon.clone(),
+            description: value.description.clone().into(),
+            specification: value.specification.clone().into(),
+            documentation: value.documentation.clone(),
+            // The page renders a plain link, so the OSHWA id is resolved here
+            // where the parse can still fail quietly.
+            oshw: value.oshw.as_ref().and_then(|x| {
+                url::Url::parse(&format!("{}/{}.html", constants::OSHW_BASE_URL, x)).ok()
+            }),
         }
     }
 }

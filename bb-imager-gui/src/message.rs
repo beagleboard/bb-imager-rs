@@ -29,8 +29,7 @@ pub(crate) enum BBImagerMessage {
     UpdateAvailable(semver::Version),
 
     /// Select a board by index. Can only be used in Board selection page.
-    UpdateBoardList(Box<[crate::db::BoardListItem]>),
-    SelectBoardById(i64),
+    UpdateBoardList(Box<[bb_imager_ui::board_selection::Board]>),
     SelectBoard(crate::db::Board),
 
     /// ChooseOs Page
@@ -63,8 +62,6 @@ pub(crate) enum BBImagerMessage {
     /// Back button pressed
     Back,
 
-    /// Add image to cache
-    ResolveImage(Arc<url::Url>, std::path::PathBuf),
     // Download images which have not already been downloaded
     FilterResolveImages(Vec<Arc<url::Url>>),
 
@@ -90,7 +87,7 @@ pub(crate) enum BBImagerMessage {
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
     match message {
-        BBImagerMessage::SelectBoardById(id) => {
+        BBImagerMessage::UiState(Message::SelectBoardById(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
                 blocking_future(move || db.board_by_id(id).expect("Incorrect board id")),
@@ -101,23 +98,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // Update board list only if still on that page
             match state {
                 BBImager::ChooseBoard(x) => {
-                    x.boards = boards;
+                    x.state.boards = boards;
                 }
                 BBImager::AppInfo(overlay_state) => {
                     if let OverlayData::ChooseBoard(x) = &mut overlay_state.page {
-                        x.boards = boards
+                        x.state.boards = boards
                     }
                 }
                 _ => {}
             }
         }
         BBImagerMessage::SelectBoard(b) => match state {
-            BBImager::ChooseBoard(inner) => {
-                inner.selected_board = Some(b);
-            }
+            BBImager::ChooseBoard(inner) => inner.select_board(b),
             BBImager::AppInfo(overlay_state) => {
                 if let OverlayData::ChooseBoard(inner) = &mut overlay_state.page {
-                    inner.selected_board = Some(b)
+                    inner.select_board(b)
                 }
             }
             _ => {}
@@ -208,7 +203,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::OpenUrl(x) => {
+        BBImagerMessage::OpenUrl(x) | BBImagerMessage::UiState(Message::OpenUrl(x)) => {
             return Task::future(async move {
                 let res = webbrowser::open(x.as_str());
                 tracing::debug!("Open Url Resp {res:?}");
@@ -217,7 +212,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::Next | BBImagerMessage::UiState(Message::Next) => return state.next(),
         BBImagerMessage::Back | BBImagerMessage::UiState(Message::Back) => return state.back(),
-        BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
+        BBImagerMessage::UiState(Message::ResolveImage(k, v)) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
             let iter = x.into_iter().filter(|x| {
@@ -494,7 +489,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
         }
-        BBImagerMessage::CopyBoardConfig(id) => {
+        BBImagerMessage::CopyBoardConfig(id)
+        | BBImagerMessage::UiState(Message::CopyBoardConfig(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
                 blocking_future(move || db.os_board_json_by_id(id)),
@@ -560,7 +556,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return Task::batch([board_icon_task, config_fetch_task, board_refresh_task]);
         }
-        BBImagerMessage::UpdateSearchText(x) => match state {
+        BBImagerMessage::UpdateSearchText(x)
+        | BBImagerMessage::UiState(Message::UpdateSearchText(x)) => match state {
             BBImager::ChooseBoard(inner) => return inner.update_search(x),
             BBImager::ChooseOs(inner) => return inner.update_search(x),
             BBImager::ChooseDest(inner) => inner.update_search(x),

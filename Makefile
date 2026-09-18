@@ -549,3 +549,7 @@ preview-configuration-sysconfig:
 ## preview: preview-configuration-cloudinit: Preview Configuration page for cloud-init images.
 preview-configuration-cloudinit:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-cloudinit --features debug
+
+## preview: preview-board-selection: Preview Board selection page.
+preview-board-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board-selection --features debug

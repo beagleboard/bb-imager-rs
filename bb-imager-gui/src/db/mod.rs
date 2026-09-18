@@ -16,23 +16,6 @@ pub(crate) struct Db {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct BoardListItem {
-    pub(crate) id: i64,
-    pub(crate) icon: Option<Arc<Url>>,
-    pub(crate) name: String,
-}
-
-impl BoardListItem {
-    fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        Ok(Self {
-            id: value.get("id")?,
-            icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
-            name: value.get("name")?,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct Board {
     pub(crate) id: i64,
     pub(crate) name: Box<str>,
@@ -526,13 +509,22 @@ impl Db {
     }
 
     /// Get board list data. (ID, Icon, Name)
-    pub(crate) fn board_list(&self, search: &str) -> rusqlite::Result<Box<[BoardListItem]>> {
+    pub(crate) fn board_list(
+        &self,
+        search: &str,
+    ) -> rusqlite::Result<Box<[bb_imager_ui::board_selection::Board]>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             "SELECT id, icon, name FROM boards WHERE name LIKE $1 COLLATE NOCASE",
         )?;
         let res = stmt
-            .query_map([format!("%{}%", search)], BoardListItem::from_row)?
+            .query_map([format!("%{}%", search)], |value| {
+                Ok(bb_imager_ui::board_selection::Board {
+                    id: value.get("id")?,
+                    icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
+                    name: value.get("name")?,
+                })
+            })?
             .map(|x| x.unwrap())
             .collect();
 

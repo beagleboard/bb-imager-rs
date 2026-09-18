@@ -950,7 +950,7 @@ pub(crate) fn fetch_images(
         iced::Task::perform(
             async move { downloader.download(target).await },
             move |p| match p {
-                Ok(p) => BBImagerMessage::ResolveImage(key, p),
+                Ok(p) => BBImagerMessage::UiState(bb_imager_ui::Message::ResolveImage(key, p)),
                 Err(_) => {
                     tracing::warn!("Failed to fetch image {}", icon);
                     BBImagerMessage::Null
