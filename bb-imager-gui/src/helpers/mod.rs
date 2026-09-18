@@ -1,5 +1,5 @@
 use std::io;
-use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
+use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
 use crate::img::{RemoteImage, RemoteItem};
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
@@ -13,13 +13,6 @@ use url::Url;
 
 #[cfg(test)]
 mod tests;
-
-#[derive(Debug, Clone)]
-pub(crate) enum BoardImageIcon {
-    Remote(Arc<url::Url>),
-    Local,
-    Format,
-}
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -37,7 +30,7 @@ pub(crate) enum BoardImage {
         bmap: Option<crate::img::Bmap>,
         info_text: Option<Arc<str>>,
         description: Option<String>,
-        icon: BoardImageIcon,
+        icon: bb_imager_ui::image_selection::ImageIcon,
         details: Vec<(&'static str, String)>,
         support: Option<Url>,
     },
@@ -60,7 +53,7 @@ impl BoardImage {
             init_format: config::InitFormat::None,
             info_text: None,
             description: None,
-            icon: BoardImageIcon::Local,
+            icon: bb_imager_ui::image_selection::ImageIcon::Local,
             details,
             support: None,
         }
@@ -89,7 +82,7 @@ impl BoardImage {
             init_format: image.init_format,
             info_text: image.info_text,
             description: Some(image.description),
-            icon: BoardImageIcon::Remote(image.icon),
+            icon: bb_imager_ui::image_selection::ImageIcon::Remote(image.icon),
             details,
             support: image.support,
         }
@@ -108,10 +101,10 @@ impl BoardImage {
         }
     }
 
-    pub(crate) fn icon(&self) -> &BoardImageIcon {
+    fn icon(&self) -> bb_imager_ui::image_selection::ImageIcon {
         match self {
-            BoardImage::SdFormat { .. } => &BoardImageIcon::Format,
-            BoardImage::Image { icon, .. } => icon,
+            BoardImage::SdFormat { .. } => bb_imager_ui::image_selection::ImageIcon::Format,
+            BoardImage::Image { icon, .. } => icon.clone(),
         }
     }
 
@@ -707,6 +700,31 @@ impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization 
     }
 }
 
+/// The renderable projection of a selected image.
+///
+/// `id` comes from the selection rather than the image itself: a remote image's
+/// catalog id is not recoverable from [`BoardImage`], which only carries the
+/// flasher machinery.
+pub(crate) fn image_details(
+    id: bb_imager_ui::image_selection::ImageId,
+    value: &BoardImage,
+) -> bb_imager_ui::image_selection::ImageDetails {
+    bb_imager_ui::image_selection::ImageDetails {
+        id,
+        icon: value.icon(),
+        title: value.to_string().into(),
+        description: value.description().map(Into::into),
+        details: value
+            .details()
+            .iter()
+            .map(|(k, v)| ((*k).into(), v.as_str().into()))
+            .collect(),
+        init_formats: value.supported_init_formats(),
+        init_format: value.init_format(),
+        support: value.support().cloned(),
+    }
+}
+
 #[cfg(target_os = "linux")]
 async fn show_notification_xdg_portal(body: &str) -> ashpd::Result<()> {
     let proxy = ashpd::desktop::notification::NotificationProxy::new().await?;
@@ -809,69 +827,6 @@ pub(crate) fn app_title(_: &crate::BBImager) -> String {
         format!("{} (pre-release)", constants::APP_NAME)
     } else {
         format!("{} v{}", constants::APP_NAME, env!("CARGO_PKG_VERSION"))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum OsImageId {
-    Format,
-    // points to parent
-    Local(config::Flasher),
-    // points to OsImage
-    OsImage(i64),
-    OsSublist((i64, config::Flasher)),
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct OsImageItem {
-    pub(crate) id: OsImageId,
-    pub(crate) icon: Option<Arc<url::Url>>,
-    pub(crate) label: Cow<'static, str>,
-}
-
-impl From<crate::db::OsImageListItem> for OsImageItem {
-    fn from(value: crate::db::OsImageListItem) -> Self {
-        Self {
-            id: OsImageId::OsImage(value.id),
-            icon: Some(value.icon),
-            label: Cow::Owned(value.name),
-        }
-    }
-}
-
-impl From<crate::db::OsSublistListItem> for OsImageItem {
-    fn from(value: crate::db::OsSublistListItem) -> Self {
-        Self {
-            id: OsImageId::OsSublist((value.id, value.flasher)),
-            icon: Some(value.icon),
-            label: Cow::Owned(value.name),
-        }
-    }
-}
-
-impl OsImageItem {
-    pub(crate) fn format(label: Cow<'static, str>) -> Self {
-        Self {
-            id: OsImageId::Format,
-            icon: None,
-            label,
-        }
-    }
-
-    pub(crate) fn local(flasher: config::Flasher) -> Self {
-        Self {
-            id: OsImageId::Local(flasher),
-            icon: None,
-            label: Cow::Borrowed("Select Local Image"),
-        }
-    }
-
-    pub(crate) const fn is_sublist(&self) -> bool {
-        matches!(self.id, OsImageId::OsSublist(_))
-    }
-
-    pub(crate) fn label(&self) -> &str {
-        &self.label
     }
 }
 

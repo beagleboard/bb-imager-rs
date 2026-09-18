@@ -2,7 +2,6 @@ use crate::{BBImager, message::BBImagerMessage};
 
 mod destination_selection;
 mod helpers;
-mod image_selection;
 
 pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
     match state {
@@ -12,7 +11,12 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
             inner.common.scroll_id.clone(),
         )
         .map(BBImagerMessage::UiState),
-        BBImager::ChooseOs(inner) => image_selection::view(inner),
+        BBImager::ChooseOs(inner) => bb_imager_ui::image_selection::view(
+            &inner.common.img_handle_cache,
+            &inner.state,
+            inner.common.scroll_id.clone(),
+        )
+        .map(BBImagerMessage::UiState),
         BBImager::ChooseDest(inner) => destination_selection::view(inner),
         BBImager::Customize(inner) => {
             bb_imager_ui::configuration::view(&inner.state, inner.common.scroll_id.clone())

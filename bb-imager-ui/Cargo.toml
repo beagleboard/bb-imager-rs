@@ -11,10 +11,11 @@ iced = { version = "0.14", features = ["image", "svg", "tokio"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 chrono-tz = "0.10"
 url = "2.5"
+bb-config = { path = "../bb-config" }
+iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
 
 [dev-dependencies]
 tempfile = "3.27"
-bb-config = { path = "../bb-config" }
 serde_json = "1.0.150"
 bb-downloader = { path = "../bb-downloader" }
 

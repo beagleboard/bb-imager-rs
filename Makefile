@@ -565,3 +565,7 @@ preview-configuration-cloudinit:
 ## preview: preview-board-selection: Preview Board selection page.
 preview-board-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board-selection --features debug
+
+## preview: preview-image-selection: Preview OS image selection page.
+preview-image-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example image-selection --features debug

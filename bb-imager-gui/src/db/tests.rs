@@ -421,7 +421,7 @@ fn add_config_inserts_os_image_for_board() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    assert!(items.iter().any(|x| x.label() == image.name.as_ref()));
+    assert!(items.iter().any(|x| x.label == image.name.as_ref()));
 }
 
 /// This test verifies that os_image_by_id() returns the full OS image
@@ -503,8 +503,8 @@ fn os_image_by_id_returns_correct_data() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let crate::helpers::OsImageId::OsImage(image_id) =
-        items.iter().find(|x| x.label() == "Test OS").unwrap().id
+    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) =
+        items.iter().find(|x| x.label == "Test OS").unwrap().id
     else {
         panic!("Incorrect ID");
     };
@@ -608,7 +608,7 @@ fn add_config_inserts_os_sublist_for_board() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    assert!(items.iter().any(|x| x.label() == "Test SubList"));
+    assert!(items.iter().any(|x| x.label == "Test SubList"));
 }
 
 /// This test verifies that board support propagates through multiple
@@ -707,7 +707,7 @@ fn nested_os_sublists_propagate_board_support() {
         .expect("os_image_items should succeed");
 
     assert!(
-        items.iter().any(|x| x.label() == "Parent SubList"),
+        items.iter().any(|x| x.label == "Parent SubList"),
         "Parent sublist should be visible through recursive propagation"
     );
 }
@@ -899,7 +899,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
 
     let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
 
-    assert!(items.iter().any(|x| x.label() == "Fetched OS"),);
+    assert!(items.iter().any(|x| x.label == "Fetched OS"),);
 }
 
 /// This test verifies that resolving a remote sublist multiple times
@@ -1008,7 +1008,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
     assert!(second.is_err());
 
     let items = db.os_image_items(board_id, Some(sublist_id)).unwrap();
-    let count = items.iter().filter(|x| x.label() == "Fetched OS").count();
+    let count = items.iter().filter(|x| x.label == "Fetched OS").count();
 
     assert_eq!(count, 1,);
 
@@ -1307,7 +1307,7 @@ fn insert_image_helper(
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let crate::helpers::OsImageId::OsImage(image_id) = items
+    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) = items
         .iter()
         .find(|x| x.label == name.as_ref())
         .expect("Inserted image should exist")
@@ -1686,7 +1686,7 @@ fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
         db.os_image_items(id_of(board), None)
             .expect("os_image_items should succeed")
             .iter()
-            .any(|x| x.label() == "Fedora Images")
+            .any(|x| x.label == "Fedora Images")
     };
 
     assert!(

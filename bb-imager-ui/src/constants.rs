@@ -8,6 +8,11 @@ pub(crate) const INFO_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/info.s
 pub(crate) const BOARD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/board.svg");
 pub(crate) const COPY_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/content-copy.svg");
 pub(crate) const SEARCH_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/search.svg");
+pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
+pub(crate) const ARROW_FORWARD_IOS_ICON_BYTES: &[u8] =
+    include_bytes!("../assets/icons/arrow-forward-ios.svg");
+pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
+pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
 
 // Icon Handles
 pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
@@ -20,6 +25,14 @@ pub(crate) static COPY_ICON: LazyLock<widget::svg::Handle> =
     LazyLock::new(|| widget::svg::Handle::from_memory(COPY_ICON_BYTES));
 pub(crate) static SEARCH_ICON: LazyLock<widget::svg::Handle> =
     LazyLock::new(|| widget::svg::Handle::from_memory(SEARCH_ICON_BYTES));
+pub(crate) static ARROW_BACK_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(ARROW_BACK_ICON_BYTES));
+pub(crate) static ARROW_FORWARD_IOS_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(ARROW_FORWARD_IOS_ICON_BYTES));
+pub(crate) static FILE_ADD_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(FILE_ADD_ICON_BYTES));
+pub(crate) static FORMAT_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(FORMAT_ICON_BYTES));
 
 // Fonts
 pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");

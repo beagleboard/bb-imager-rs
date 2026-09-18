@@ -18,17 +18,10 @@ pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 // Icons
-pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/arrow-back.svg");
-pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
-pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
-pub(crate) const ARROW_FORWARD_IOS_ICON_BYTES: &[u8] =
-    include_bytes!("../assets/icons/arrow-forward-ios.svg");
 pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
 pub(crate) const INFO_ICON_BYTES: &[u8] =
     include_bytes!("../../bb-imager-ui/assets/icons/info.svg");
-pub(crate) const COPY_ICON_BYTES: &[u8] =
-    include_bytes!("../../bb-imager-ui/assets/icons/content-copy.svg");
 pub(crate) const SEARCH_ICON_BYTES: &[u8] =
     include_bytes!("../../bb-imager-ui/assets/icons/search.svg");
 

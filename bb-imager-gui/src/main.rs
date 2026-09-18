@@ -347,10 +347,8 @@ impl BBImager {
                     common: inner.common,
                     flasher: selected_board.flasher,
                     selected_board,
-                    pos: None,
                     selected_image: None,
-                    images: Vec::new(),
-                    search_text: "".into(),
+                    state: Default::default(),
                 };
 
                 let tasks = Task::batch([
