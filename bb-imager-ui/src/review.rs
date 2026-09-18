@@ -1,7 +1,4 @@
-use iced::{
-    Element,
-    widget::{self, text},
-};
+use iced::{Element, widget};
 
 use crate::helpers::{detail_pane, page_type2};
 use crate::{Message, constants};
@@ -37,21 +34,21 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
 
 fn review_view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
     let mut col = widget::column![
-        text("Write Image")
+        widget::text("Write Image")
             .font(constants::FONT_BOLD)
             .size(HEADING_SIZE),
-        text("Review your choices before flashing").style(widget::text::primary),
+        widget::text("Review your choices before flashing").style(widget::text::primary),
         widget::rule::horizontal(2),
-        text("Summary")
+        widget::text("Summary")
             .font(constants::FONT_BOLD)
             .size(HEADING_SIZE),
         widget::grid![
-            text("Device"),
-            text(state.board.as_ref()),
-            text("Operating System"),
-            text(state.image.as_ref()),
-            text("Storage"),
-            text(state.destination.as_ref())
+            widget::text("Device"),
+            widget::text(state.board.as_ref()),
+            widget::text("Operating System"),
+            widget::text(state.image.as_ref()),
+            widget::text("Storage"),
+            widget::text(state.destination.as_ref())
         ]
         .height(iced::Length::Shrink)
         .spacing(8)
@@ -61,7 +58,7 @@ fn review_view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Messa
     if !state.modifications.is_empty() {
         col = col.extend([
             widget::rule::horizontal(2).into(),
-            text("Modifications to apply")
+            widget::text("Modifications to apply")
                 .font(constants::FONT_BOLD)
                 .size(HEADING_SIZE)
                 .into(),

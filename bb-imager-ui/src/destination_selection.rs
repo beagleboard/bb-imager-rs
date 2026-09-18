@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use iced::{
-    Element,
-    widget::{self, text},
-};
+use iced::Element;
+use iced::widget::{self, text};
 
 use crate::helpers::{
     detail_entry, detail_pane, list_item, list_label, list_pane, list_separator, page_type1,

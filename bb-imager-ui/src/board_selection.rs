@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bb_iced_widgets::cached_icon::Cache;
 use iced::{Element, widget};
 
 use crate::helpers::{
@@ -14,13 +15,10 @@ const ICON_WIDTH: u32 = 100;
 #[derive(Default, Debug, Clone)]
 pub struct Board {
     pub id: i64,
-    /// `Arc` so that cloning into the icon cache is a refcount bump rather than
-    /// a `Url` clone, and so the row stays small.
     pub icon: Option<Arc<url::Url>>,
     pub name: Box<str>,
 }
 
-/// The selected board, as the detail pane renders it.
 #[derive(Debug, Clone)]
 pub struct BoardDetails {
     pub id: i64,
@@ -29,7 +27,6 @@ pub struct BoardDetails {
     pub description: Box<str>,
     pub specification: Box<[(Box<str>, Box<str>)]>,
     pub documentation: Option<url::Url>,
-    /// Already resolved to a full URL by the host.
     pub oshw: Option<url::Url>,
 }
 
@@ -37,15 +34,11 @@ pub struct BoardDetails {
 pub struct State {
     pub boards: Box<[Board]>,
     pub selected: Option<BoardDetails>,
-    /// Only here so the search box can show what was typed; the host does the
-    /// filtering and hands back a new [`State::boards`].
     pub search: Arc<str>,
 }
 
-/// The icon cache is shared with the image selection page and filled
-/// asynchronously by the host, so it is borrowed rather than owned by [`State`].
 pub fn view<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
+    cache: &'a Cache<Arc<url::Url>>,
     state: &'a State,
     scroll_id: widget::Id,
 ) -> Element<'a, Message> {
@@ -57,7 +50,7 @@ pub fn view<'a>(
 }
 
 fn board_list_pane<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
+    cache: &'a Cache<Arc<url::Url>>,
     state: &'a State,
     scroll_id: &widget::Id,
 ) -> Element<'a, Message> {
@@ -89,7 +82,7 @@ fn board_list_pane<'a>(
 }
 
 fn board_view_pane<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
+    cache: &'a Cache<Arc<url::Url>>,
     state: &'a State,
     scroll_id: &widget::Id,
 ) -> Element<'a, Message> {

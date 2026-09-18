@@ -2,10 +2,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bb_config::config;
-use iced::{
-    Element,
-    widget::{self, button, text},
-};
+use iced::Element;
+use iced::widget::{self, button, text};
 
 use crate::helpers::{
     copy_btn, detail_entry, detail_pane, list_item, list_label, list_pane, page_type1,
