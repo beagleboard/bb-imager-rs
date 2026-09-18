@@ -3,8 +3,8 @@ use std::sync::Arc;
 use iced::{Element, widget};
 
 use crate::helpers::{
-    copy_btn, detail_entry, detail_pane, list_item, list_label, list_pane,
-    network_image_or_default, page_type1, placeholder_pane,
+    board_details_pane, list_item, list_label, list_pane, network_image_or_default, page_type1,
+    placeholder_pane,
 };
 use crate::{Message, constants};
 
@@ -93,60 +93,8 @@ fn board_view_pane<'a>(
     state: &'a State,
     scroll_id: &widget::Id,
 ) -> Element<'a, Message> {
-    let Some(dev) = state.selected.as_ref() else {
-        return placeholder_pane("Please Select a Board");
-    };
-
-    let img = network_image_or_default(
-        cache,
-        dev.icon.as_ref(),
-        constants::BOARD_ICON.clone(),
-        iced::Fill,
-        iced::Shrink,
-    );
-
-    let copy_btn =
-        copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyBoardConfig(dev.id));
-
-    let cols = widget::column![
-        img,
-        widget::center(copy_btn),
-        widget::text(dev.name.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-        widget::text(dev.description.as_ref())
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-    ];
-
-    let cols = cols.extend(
-        dev.specification
-            .iter()
-            .map(|(k, v)| -> widget::text::Rich<'a, (), Message> { detail_entry(k, v.as_ref()) })
-            .map(Into::into),
-    );
-
-    let mut btns = Vec::with_capacity(2);
-
-    if let Some(x) = &dev.documentation {
-        btns.push(
-            widget::button(widget::text("DOCUMENTATION"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
+    match state.selected.as_ref() {
+        Some(dev) => board_details_pane(cache, dev, scroll_id),
+        None => placeholder_pane("Please Select a Board"),
     }
-
-    if let Some(x) = &dev.oshw {
-        btns.push(
-            widget::button(widget::text("OSHW"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
-
-    detail_pane(
-        cols.push(widget::center(widget::row(btns).spacing(16))),
-        scroll_id,
-    )
 }

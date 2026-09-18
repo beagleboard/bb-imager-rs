@@ -29,7 +29,12 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::FlashingFail(inner) => {
             bb_imager_ui::flash_fail::view(&inner.state).map(BBImagerMessage::UiState)
         }
-        BBImager::FlashingSuccess(inner) => flash_finish::success(inner),
+        BBImager::FlashingSuccess(inner) => bb_imager_ui::flash_success::view(
+            &inner.common.img_handle_cache,
+            &inner.state,
+            inner.common.scroll_id.clone(),
+        )
+        .map(BBImagerMessage::UiState),
         BBImager::AppInfo(inner) => {
             bb_imager_ui::app_info::view(&inner.state, inner.common().scroll_id.clone())
                 .map(BBImagerMessage::UiState)

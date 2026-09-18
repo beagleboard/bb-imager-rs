@@ -70,9 +70,9 @@ enum BBImager {
     Customize(state::CustomizeState),
     Review(state::ReviewState),
     Flashing(state::FlashingState),
-    FlashingCancel(state::FlashingFinishState),
+    FlashingCancel(state::FlashingCancelState),
     FlashingFail(state::FlashingFailState),
-    FlashingSuccess(state::FlashingFinishState),
+    FlashingSuccess(state::FlashingSuccessState),
     AppInfo(state::OverlayState),
 }
 
@@ -163,9 +163,8 @@ impl BBImager {
             BBImager::Customize(x) => BBImager::choose_board(x.common),
             BBImager::Review(x) => BBImager::choose_board(x.common),
             BBImager::Flashing(x) => BBImager::choose_board(x.common),
-            BBImager::FlashingCancel(x) | BBImager::FlashingSuccess(x) => {
-                BBImager::choose_board(x.common)
-            }
+            BBImager::FlashingCancel(x) => BBImager::choose_board(x.common),
+            BBImager::FlashingSuccess(x) => BBImager::choose_board(x.common),
             BBImager::FlashingFail(x) => BBImager::choose_board(x.common),
             BBImager::Dummy | BBImager::AppInfo(_) | BBImager::ChooseBoard(_) => {
                 panic!("Unexpected screen")

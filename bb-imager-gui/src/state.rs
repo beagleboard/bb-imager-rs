@@ -447,16 +447,32 @@ fn time_remaining_from(
 }
 
 #[derive(Debug)]
-pub(crate) struct FlashingFinishState {
+pub(crate) struct FlashingSuccessState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
-    pub(crate) is_download: bool,
+    pub(crate) state: bb_imager_ui::flash_success::State,
 }
 
-impl From<FlashingState> for FlashingFinishState {
+impl From<FlashingState> for FlashingSuccessState {
     fn from(value: FlashingState) -> Self {
         Self {
-            is_download: value.ctx.is_download(),
+            state: bb_imager_ui::flash_success::State {
+                is_download: value.ctx.is_download(),
+                board: (&value.ctx.selected_board).into(),
+            },
+            common: value.common,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct FlashingCancelState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) selected_board: Board,
+}
+
+impl From<FlashingState> for FlashingCancelState {
+    fn from(value: FlashingState) -> Self {
+        Self {
             common: value.common,
             selected_board: value.ctx.selected_board,
         }
@@ -495,9 +511,9 @@ pub(crate) enum OverlayData {
     Customize(CustomizeState),
     Review(ReviewState),
     Flashing(FlashingState),
-    FlashingCancel(FlashingFinishState),
+    FlashingCancel(FlashingCancelState),
     FlashingFail(FlashingFailState),
-    FlashingSuccess(FlashingFinishState),
+    FlashingSuccess(FlashingSuccessState),
 }
 
 impl OverlayData {
