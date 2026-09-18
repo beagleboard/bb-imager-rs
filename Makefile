@@ -542,6 +542,10 @@ preview-flash-fail:
 preview-flash-success:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
 
+## preview: preview-flash-cancel: Preview Flash Cancel page.
+preview-flash-cancel:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-cancel --features debug
+
 ## preview: preview-app-info: Preview App options page.
 preview-app-info:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
