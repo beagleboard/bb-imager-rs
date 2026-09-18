@@ -46,10 +46,6 @@ pub(crate) enum BBImagerMessage {
     SelectFileDest(String),
     DestinationFilter(bool),
 
-    // Customization Page
-    UpdateFlashConfig(crate::helpers::FlashingCustomization),
-    ResetFlashingConfig,
-
     // Flashing Page
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
@@ -219,7 +215,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImagerMessage::Null
             });
         }
-        BBImagerMessage::Next => return state.next(),
+        BBImagerMessage::Next | BBImagerMessage::UiState(Message::Next) => return state.next(),
         BBImagerMessage::Back | BBImagerMessage::UiState(Message::Back) => return state.back(),
         BBImagerMessage::ResolveImage(k, v) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
@@ -343,15 +339,25 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::UpdateFlashConfig(x) => match state {
+        BBImagerMessage::UiState(Message::UpdateCustomization(x)) => match state {
             BBImager::Customize(inner) => {
-                inner.ctx.customization = x;
+                inner.state.customization = x;
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::ResetFlashingConfig => match state {
+        BBImagerMessage::UiState(Message::Reset) => match state {
             BBImager::Customize(inner) => {
-                inner.ctx.customization.reset();
+                // Reset through the persisted defaults, so platform-specific
+                // ones (USB DHCP on macOS) survive.
+                let default = crate::persistance::SdSysconfCustomization::default();
+                inner.state.customization = match inner.state.customization {
+                    bb_imager_ui::configuration::Customization::SysConfig(_) => {
+                        bb_imager_ui::configuration::Customization::SysConfig(default.into())
+                    }
+                    bb_imager_ui::configuration::Customization::CloudInit(_) => {
+                        bb_imager_ui::configuration::Customization::CloudInit(default.into())
+                    }
+                };
             }
             _ => panic!("Unexpected message"),
         },

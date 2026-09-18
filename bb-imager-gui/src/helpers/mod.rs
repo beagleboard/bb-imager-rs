@@ -649,18 +649,6 @@ impl FlashingCustomization {
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-        match self {
-            Self::LinuxSdSysconfig(_) => {
-                *self = Self::LinuxSdSysconfig(Default::default());
-            }
-            Self::LinuxSdCloudInit(_) => {
-                *self = Self::LinuxSdCloudInit(Default::default());
-            }
-            _ => {}
-        }
-    }
-
     /// What this customization will change on the flashed image.
     pub(crate) fn modifications(&self) -> Box<[&'static str]> {
         match self {
@@ -678,16 +666,6 @@ impl FlashingCustomization {
         }
     }
 
-    pub(crate) fn validate(&self) -> bool {
-        match self {
-            FlashingCustomization::LinuxSdSysconfig(sd_customization)
-            | FlashingCustomization::LinuxSdCloudInit(sd_customization) => {
-                sd_customization.validate_user()
-            }
-            _ => true,
-        }
-    }
-
     #[cfg(feature = "sd")]
     fn sd_customization(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         match self {
@@ -697,6 +675,34 @@ impl FlashingCustomization {
             FlashingCustomization::Bcf
             | FlashingCustomization::Msp430
             | FlashingCustomization::Zepto => unreachable!(),
+        }
+    }
+}
+
+impl From<&bb_imager_ui::configuration::Customization> for FlashingCustomization {
+    fn from(value: &bb_imager_ui::configuration::Customization) -> Self {
+        match value {
+            bb_imager_ui::configuration::Customization::SysConfig(x) => {
+                Self::LinuxSdSysconfig(x.into())
+            }
+            bb_imager_ui::configuration::Customization::CloudInit(x) => {
+                Self::LinuxSdCloudInit(x.into())
+            }
+        }
+    }
+}
+
+impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization {
+    fn from(value: FlashingCustomization) -> Self {
+        match value {
+            FlashingCustomization::LinuxSdSysconfig(x) => Self::SysConfig(x.into()),
+            FlashingCustomization::LinuxSdCloudInit(x) => Self::CloudInit(x.into()),
+            // [`no_customization`] answers `Some` for these, so the Customize
+            // page is skipped entirely and never has to render them.
+            FlashingCustomization::NoneSd
+            | FlashingCustomization::Bcf
+            | FlashingCustomization::Msp430
+            | FlashingCustomization::Zepto => panic!("No customization"),
         }
     }
 }

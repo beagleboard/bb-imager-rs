@@ -85,6 +85,66 @@ pub(crate) struct SdSysconfCustomization {
     pub(crate) usb_enable_dhcp: Option<bool>,
 }
 
+impl From<SdSysconfCustomization> for bb_imager_ui::configuration::CloudInit {
+    fn from(value: SdSysconfCustomization) -> Self {
+        Self {
+            hostname: value.hostname.map(Into::into),
+            timezone: value.timezone,
+            // The stored keymap is a `String`; the page works in the
+            // `&'static str`s from `KEYMAP_LAYOUTS`, so it has to be resolved
+            // back through the table.
+            keymap: value
+                .keymap
+                .as_deref()
+                .and_then(crate::constants::keymap_layout),
+            user: value.user.map(|u| (u.username.into(), u.password.into())),
+            wifi: value.wifi.map(|w| (w.ssid.into(), w.password.into())),
+            ssh: value.ssh.map(Into::into).unwrap_or_default(),
+        }
+    }
+}
+
+impl From<SdSysconfCustomization> for bb_imager_ui::configuration::SysConfig {
+    fn from(value: SdSysconfCustomization) -> Self {
+        Self {
+            usb_enable_dhcp: value.usb_enable_dhcp.unwrap_or_default(),
+            common: value.into(),
+        }
+    }
+}
+
+impl From<&bb_imager_ui::configuration::CloudInit> for SdSysconfCustomization {
+    fn from(value: &bb_imager_ui::configuration::CloudInit) -> Self {
+        // Cloud-init has no USB DHCP toggle to report, so that field keeps
+        // whatever the platform defaults to.
+        Self::default()
+            .update_hostname(value.hostname.as_ref().map(ToString::to_string))
+            .update_timezone(value.timezone)
+            .update_keymap(value.keymap.map(Into::into))
+            .update_user(value.user.as_ref().map(|(username, password)| {
+                SdCustomizationUser::new(username.to_string(), password.to_string())
+            }))
+            .update_wifi(
+                value
+                    .wifi
+                    .as_ref()
+                    .map(|(ssid, password)| SdCustomizationWifi {
+                        ssid: ssid.to_string(),
+                        password: password.to_string(),
+                    }),
+            )
+            // An unset SSH key is the empty string in the page, but absent here.
+            .update_ssh((!value.ssh.is_empty()).then(|| value.ssh.to_string()))
+    }
+}
+
+impl From<&bb_imager_ui::configuration::SysConfig> for SdSysconfCustomization {
+    fn from(value: &bb_imager_ui::configuration::SysConfig) -> Self {
+        SdSysconfCustomization::from(&value.common)
+            .update_usb_enable_dhcp(Some(value.usb_enable_dhcp))
+    }
+}
+
 impl Default for SdSysconfCustomization {
     fn default() -> Self {
         Self {
@@ -139,13 +199,6 @@ impl SdSysconfCustomization {
         self
     }
 
-    pub(crate) fn validate_user(&self) -> bool {
-        match &self.user {
-            Some(x) => x.validate_username(),
-            None => true,
-        }
-    }
-
     #[cfg(feature = "sd")]
     pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
@@ -182,20 +235,6 @@ impl SdCustomizationUser {
     pub(crate) const fn new(username: String, password: String) -> Self {
         Self { username, password }
     }
-
-    pub(crate) fn update_username(mut self, t: String) -> Self {
-        self.username = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-
-    pub(crate) fn validate_username(&self) -> bool {
-        self.username != "root"
-    }
 }
 
 impl Default for SdCustomizationUser {
@@ -210,62 +249,13 @@ pub(crate) struct SdCustomizationWifi {
     pub(crate) password: String,
 }
 
-impl SdCustomizationWifi {
-    pub(crate) fn update_ssid(mut self, t: String) -> Self {
-        self.ssid = t;
-        self
-    }
-
-    pub(crate) fn update_password(mut self, t: String) -> Self {
-        self.password = t;
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn sd_user_validate_rejects_root() {
-        assert!(!SdCustomizationUser::new("root".into(), "pw".into()).validate_username());
-        assert!(SdCustomizationUser::new("beagle".into(), "pw".into()).validate_username());
-    }
-
-    #[test]
     fn sd_user_default_has_empty_password() {
         assert!(SdCustomizationUser::default().password.is_empty());
-    }
-
-    #[test]
-    fn sd_user_builders_set_fields() {
-        let user = SdCustomizationUser::default()
-            .update_username("alice".into())
-            .update_password("secret".into());
-        assert_eq!(user.username, "alice");
-        assert_eq!(user.password, "secret");
-    }
-
-    #[test]
-    fn sd_wifi_builders_set_fields() {
-        let wifi = SdCustomizationWifi::default()
-            .update_ssid("net".into())
-            .update_password("pw".into());
-        assert_eq!(wifi.ssid, "net");
-        assert_eq!(wifi.password, "pw");
-    }
-
-    #[test]
-    fn sysconf_validate_user_follows_inner_user() {
-        // No user configured is always valid.
-        assert!(SdSysconfCustomization::default().validate_user());
-        // A configured non-root user is valid; root is not.
-        let ok = SdSysconfCustomization::default()
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
-        assert!(ok.validate_user());
-        let bad = SdSysconfCustomization::default()
-            .update_user(Some(SdCustomizationUser::new("root".into(), "pw".into())));
-        assert!(!bad.validate_user());
     }
 
     #[test]
@@ -276,9 +266,10 @@ mod tests {
             .update_keymap(Some("us".into()))
             .update_ssh(Some("ssh-key".into()))
             .update_usb_enable_dhcp(Some(true))
-            .update_wifi(Some(
-                SdCustomizationWifi::default().update_ssid("net".into()),
-            ))
+            .update_wifi(Some(SdCustomizationWifi {
+                ssid: "net".into(),
+                password: String::new(),
+            }))
             .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
 
         assert_eq!(cfg.hostname.as_deref(), Some("beagle"));
@@ -360,11 +351,10 @@ mod tests {
         let base = SdSysconfCustomization::default()
             .update_hostname(Some("beagle".into()))
             .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
-            .update_wifi(Some(
-                SdCustomizationWifi::default()
-                    .update_ssid("net".into())
-                    .update_password("pw".into()),
-            ));
+            .update_wifi(Some(SdCustomizationWifi {
+                ssid: "net".into(),
+                password: "pw".into(),
+            }));
         let _ = base.clone().sysconfig();
         let _ = base.cloudinit();
     }

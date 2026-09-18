@@ -103,35 +103,6 @@ pub(crate) fn page_type1<'a>(
     .into()
 }
 
-/// |--------|
-/// |        |
-/// |  row1  |
-/// |        |
-/// |--------|
-/// |  btns  |
-/// |--------|
-pub(crate) fn page_type2<'a>(
-    row1: Element<'a, BBImagerMessage>,
-    btns: impl IntoIterator<Item = widget::Button<'a, BBImagerMessage>>,
-) -> Element<'a, BBImagerMessage> {
-    let row2 = widget::row(
-        [
-            info_btn(INFO_ICON.clone()).into(),
-            widget::space::horizontal().into(),
-        ]
-        .into_iter()
-        .chain(btns.into_iter().map(Into::into)),
-    )
-    .align_y(iced::Center)
-    .width(iced::Length::Fill)
-    .spacing(24);
-
-    widget::column![card_box(row1).height(iced::Fill).width(iced::Fill), row2]
-        .padding(24)
-        .spacing(24)
-        .into()
-}
-
 pub(crate) fn board_view_pane<'a>(
     dev: &'a crate::db::Board,
     state: &'a crate::BBImagerCommon,
@@ -202,22 +173,6 @@ pub(crate) fn detail_entry<'a>(
         widget::span(" "),
         widget::span(val),
     ]
-}
-
-pub(crate) fn element_with_label<'a>(
-    label: &'static str,
-    el: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    element_with_element(label.into(), el).padding(iced::Padding::ZERO.horizontal(16))
-}
-
-pub(crate) fn element_with_element<'a>(
-    el1: Element<'a, BBImagerMessage>,
-    el2: Element<'a, BBImagerMessage>,
-) -> widget::Row<'a, BBImagerMessage> {
-    widget::row![el1, widget::space::horizontal(), el2]
-        .align_y(iced::Alignment::Center)
-        .padding(iced::Padding::ZERO.right(16))
 }
 
 fn card_box<'a>(

@@ -106,8 +106,6 @@ impl BBImager {
         let common = BBImagerCommon {
             app_config,
             downloader: downloader.clone(),
-            timezones: widget::combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
-            keymaps: widget::combo_box::State::new(constants::KEYMAP_LAYOUTS.to_vec()),
 
             img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
 
@@ -413,10 +411,7 @@ impl BBImager {
                 };
 
                 let temp = if has_customization {
-                    Self::Customize(state::CustomizeState {
-                        common: inner.common,
-                        ctx,
-                    })
+                    Self::Customize(state::CustomizeState::new(inner.common, ctx))
                 } else {
                     Self::Review(state::ReviewState::new(inner.common, ctx))
                 };
@@ -424,6 +419,10 @@ impl BBImager {
                 (temp, Task::none())
             }
             Self::Customize(mut inner) => {
+                // The page edits its own state, so the context only catches up
+                // here, on the way to Review.
+                inner.ctx.customization = (&inner.state.customization).into();
+
                 let temp = match &inner.ctx.customization {
                     helpers::FlashingCustomization::LinuxSdSysconfig(c)
                     | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {

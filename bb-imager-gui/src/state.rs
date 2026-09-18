@@ -16,8 +16,6 @@ use crate::{
 pub(crate) struct BBImagerCommon {
     pub(crate) app_config: persistance::GuiConfiguration,
     pub(crate) downloader: bb_downloader::Downloader,
-    pub(crate) timezones: widget::combo_box::State<chrono_tz::Tz>,
-    pub(crate) keymaps: widget::combo_box::State<&'static str>,
 
     pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
 
@@ -299,9 +297,25 @@ impl FlashingContext {
 pub(crate) struct CustomizeState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
+    pub(crate) state: Box<bb_imager_ui::configuration::State>,
 }
 
 impl CustomizeState {
+    pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
+        Self {
+            common,
+            state: Box::new(bb_imager_ui::configuration::State {
+                customization: ctx.customization.clone().into(),
+                default_username: helpers::default_user(),
+                default_timezone: helpers::system_timezone(),
+                default_keymap: helpers::system_keymap(),
+                timezones: widget::combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
+                keymaps: widget::combo_box::State::new(constants::KEYMAP_LAYOUTS.to_vec()),
+            }),
+            ctx,
+        }
+    }
+
     pub(crate) fn save_app_config(&self) -> Task<BBImagerMessage> {
         let config = self.common.app_config.clone();
         Task::future(blocking_future(move || {
@@ -315,10 +329,7 @@ impl CustomizeState {
 
 impl From<ReviewState> for CustomizeState {
     fn from(value: ReviewState) -> Self {
-        Self {
-            common: value.common,
-            ctx: value.ctx,
-        }
+        Self::new(value.common, value.ctx)
     }
 }
 
