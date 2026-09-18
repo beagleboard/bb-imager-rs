@@ -108,27 +108,12 @@ impl From<Device> for DeviceDescriptor {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
-/// Sometimes fssize and fsavail are strings. So need to handle that.
-enum FsSize {
-    String(String),
-    U64(u64),
-}
-
-impl From<FsSize> for u64 {
-    fn from(value: FsSize) -> Self {
-        match value {
-            FsSize::String(x) => x.parse().unwrap(),
-            FsSize::U64(x) => x,
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
 struct Child {
     mountpoint: Option<String>,
-    fssize: Option<FsSize>,
-    fsavail: Option<FsSize>,
+    #[serde(default, deserialize_with = "deserialize_fssize")]
+    fssize: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_fssize")]
+    fsavail: Option<u64>,
     label: Option<String>,
     partlabel: Option<String>,
 }
@@ -142,9 +127,30 @@ impl From<Child> for MountPoint {
             } else {
                 value.partlabel
             },
-            total_bytes: value.fssize.map(Into::into),
-            available_bytes: value.fsavail.map(Into::into),
+            total_bytes: value.fssize,
+            available_bytes: value.fsavail,
         }
+    }
+}
+
+/// Deserialize an `Option<u64>` that `lsblk` may emit either as a JSON number
+/// or as a numeric string. A non-numeric string is a parse error rather than a
+/// silent fallback.
+fn deserialize_fssize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum U64OrString {
+        U64(u64),
+        String(String),
+    }
+
+    match Option::<U64OrString>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(U64OrString::U64(n)) => Ok(Some(n)),
+        Some(U64OrString::String(s)) => s.parse().map(Some).map_err(serde::de::Error::custom),
     }
 }
 
@@ -156,9 +162,15 @@ impl From<Child> for MountPoint {
 /// it because the GUI re-runs this once a second while the destination page is
 /// open.
 ///
-/// Keep in sync with the two structs: an absent column leaves an `Option` field
-/// as `None`, but the non-optional ones (`ro`, `rm`, `hotplug`, `phy-sec`,
-/// `log-sec`) would fail to deserialize.
+/// Keep in sync with the two structs: an absent column leaves an `Option`
+/// field as `None`, while the scalar fields (`ro`, `rm`, `hotplug`, `phy-sec`,
+/// `log-sec`) are required and fail the parse if `lsblk` emits `null` for them
+/// — which it does for a device that disappears mid-scan. That is a deliberate
+/// error, not a defaulted value: `lsblk()` propagates it as
+/// [`Error::LsblkParseError`](crate::Error) and callers already handle drive
+/// listing failures. The pre-fix code instead `.unwrap()`ed the parse and
+/// panicked, killing the GUI whenever a drive was unplugged during the
+/// once-a-second refresh.
 const COLUMNS: &str = "NAME,KNAME,SIZE,TRAN,SUBSYSTEMS,RO,RM,HOTPLUG,PHY-SEC,LOG-SEC,\
                        PTTYPE,LABEL,VENDOR,MODEL,MOUNTPOINT,FSSIZE,FSAVAIL,PARTLABEL";
 
@@ -172,7 +184,8 @@ pub(crate) fn lsblk() -> crate::Result<Vec<DeviceDescriptor>> {
         return Err(crate::Error::LsblkExecuteError { source: None });
     }
 
-    let res: Devices = serde_json::from_slice(&output.stdout).unwrap();
+    let res: Devices = serde_json::from_slice(&output.stdout)
+        .map_err(|source| crate::Error::LsblkParseError { source })?;
 
     Ok(res.blockdevices.into_iter().map(Into::into).collect())
 }
@@ -366,8 +379,9 @@ mod tests {
     }
 
     /// Children map to mountpoints: `fssize`/`fsavail` accept either JSON strings
-    /// or numbers (the `FsSize` untagged enum), the mount label falls back to
-    /// `partlabel` when `label` is null, and a null `mountpoint` becomes "".
+    /// or numbers (via the `deserialize_fssize` helper), the mount label falls
+    /// back to `partlabel` when `label` is null, and a null `mountpoint` becomes
+    /// "".
     #[test]
     fn children_map_to_mountpoints_with_fssize_variants() {
         let d = &descriptors(
@@ -501,5 +515,58 @@ mod tests {
         assert!(!d.is_virtual);
         assert!(!d.is_scsi);
         assert!(!d.is_usb);
+    }
+
+    /// A device that vanishes mid-scan can have `null` (not missing) values for
+    /// the fields that are normally required -- `ro`, `rm`, `hotplug`,
+    /// `phy-sec`, `log-sec`. lsblk's output for such a torn device is
+    /// malformed, so the parse must fail with an error -- never a panic (the
+    /// pre-fix behavior panicked on `.unwrap()` of the parse result, killing
+    /// the GUI whenever a drive was unplugged during the once-a-second
+    /// refresh). Callers handle `lsblk()`'s `Err` without crashing.
+    #[test]
+    fn torn_device_with_null_scalar_fields_is_an_error() {
+        let data = r#"{"blockdevices":[{
+                "name":"/dev/sdz","kname":"/dev/sdz",
+                "size":null,"tran":null,
+                "subsystems":null,"ro":null,
+                "phy-sec":null,"log-sec":null,"rm":null,"hotplug":null,
+                "pttype":null,"label":null,"vendor":null,"model":null
+            }]}"#;
+
+        let res: Result<super::Devices, _> = serde_json::from_str(data);
+        assert!(res.is_err());
+    }
+
+    /// Same as above but with the keys entirely absent rather than null; the
+    /// fields are required so the parse fails identically.
+    #[test]
+    fn torn_device_with_missing_scalar_fields_is_an_error() {
+        let data = r#"{"blockdevices":[{
+                "name":"/dev/sda","kname":"/dev/sda"
+            }]}"#;
+
+        let res: Result<super::Devices, _> = serde_json::from_str(data);
+        assert!(res.is_err());
+    }
+
+    /// `fssize`/`fsavail` may come through as numeric strings; a non-numeric
+    /// string is malformed input and must fail the parse rather than silently
+    /// become a default.
+    #[test]
+    fn non_numeric_fssize_string_is_a_parse_error() {
+        let data = r#"{"blockdevices":[{
+                "name":"/dev/sdd","kname":"/dev/sdd",
+                "size":null,"tran":null,
+                "subsystems":null,"ro":false,
+                "phy-sec":512,"log-sec":512,"rm":false,"hotplug":false,
+                "pttype":null,"label":null,"vendor":null,"model":null,
+                "children":[
+                    {"mountpoint":"/boot","fssize":"not-a-number","fsavail":524288,"label":null,"partlabel":null}
+                ]
+            }]}"#;
+
+        let res: Result<super::Devices, _> = serde_json::from_str(data);
+        assert!(res.is_err());
     }
 }
