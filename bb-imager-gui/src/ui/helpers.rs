@@ -5,22 +5,12 @@ use iced::widget::{self, svg};
 
 use crate::{constants, message::BBImagerMessage};
 
-pub(crate) static ARROW_BACK_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_BACK_ICON_BYTES));
-pub(crate) static FILE_ADD_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::FILE_ADD_ICON_BYTES));
 pub(crate) static USB_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::USB_ICON_BYTES));
-pub(crate) static FORMAT_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::FORMAT_ICON_BYTES));
-pub(crate) static ARROW_FORWARD_IOS_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_FORWARD_IOS_ICON_BYTES));
 pub(crate) static FILE_SAVE_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::FILE_SAVE_ICON_BYTES));
 pub(crate) static INFO_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::INFO_ICON_BYTES));
-pub(crate) static COPY_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::COPY_ICON_BYTES));
 pub(crate) static SEARCH_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::SEARCH_ICON_BYTES));
 
@@ -128,12 +118,6 @@ fn info_btn(handle: svg::Handle) -> widget::Button<'static, BBImagerMessage> {
         .height(iced::Shrink)
 }
 
-pub(crate) fn copy_btn<'a>(handle: svg::Handle) -> widget::Button<'a, BBImagerMessage> {
-    widget::button(svg(handle))
-        .width(iced::Shrink)
-        .style(widget::button::secondary)
-}
-
 /// Horizontal separator between rows of a list pane.
 pub(crate) fn list_separator<'a>() -> Element<'a, BBImagerMessage> {
     widget::center(widget::rule::horizontal(2))
@@ -197,13 +181,6 @@ pub(crate) fn placeholder_heading<'a>(label: &'a str) -> widget::Text<'a> {
         .width(iced::Fill)
         .align_x(iced::Center)
         .font(constants::FONT_BOLD)
-}
-
-/// A [`detail_pane`] with nothing selected yet.
-pub(crate) fn placeholder_pane<'a>(label: &'a str) -> Element<'a, BBImagerMessage> {
-    widget::center(placeholder_heading(label))
-        .padding(VIEW_COL_PADDING)
-        .into()
 }
 
 fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {

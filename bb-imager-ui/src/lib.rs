@@ -7,6 +7,7 @@ pub mod flash_fail;
 pub mod flash_success;
 pub mod flashing;
 mod helpers;
+pub mod image_selection;
 pub mod review;
 
 #[derive(Clone, Debug)]
@@ -26,6 +27,14 @@ pub enum Message {
     SelectBoardById(i64),
     /// Copy a board's config entry, looked up by id, to the clipboard.
     CopyBoardConfig(i64),
+    /// Copy an OS image's config entry, looked up by id, to the clipboard.
+    CopyImageConfig(i64),
+    /// Select an OS image, or open a sublist. Only valid on the image page.
+    SelectOs(image_selection::ImageId),
+    /// Leave the current OS sublist for its parent.
+    GotoOsListParent,
+    /// Pick which init format the selected image is customized with.
+    UpdateInitFormat(bb_config::config::InitFormat),
     /// Text typed into a list pane's search box.
     UpdateSearchText(std::sync::Arc<str>),
     /// Open a URL in the browser.

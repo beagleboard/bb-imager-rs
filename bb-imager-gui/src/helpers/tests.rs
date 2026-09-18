@@ -2,6 +2,7 @@ use super::*;
 use crate::persistance::{
     GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
 };
+use bb_imager_ui::image_selection::{ImageIcon, ImageId};
 
 #[test]
 fn pretty_bytes_scales_units() {
@@ -287,7 +288,10 @@ fn board_image_format_accessors() {
     assert_eq!(img.details(), &[("Format", "FAT32".to_string())]);
     assert!(img.supported_init_formats().is_empty());
     assert!(img.support().is_none());
-    assert!(matches!(img.icon(), BoardImageIcon::Format));
+    assert!(matches!(
+        crate::helpers::image_details(ImageId::Format, &img).icon,
+        ImageIcon::Format
+    ));
     assert_eq!(img.to_string(), "Format SD Card");
 }
 
@@ -302,7 +306,10 @@ fn board_image_local_reads_file_metadata() {
     );
     assert_eq!(img.flasher(), config::Flasher::BeagleConnectFreedom);
     assert_eq!(img.init_format(), config::InitFormat::None);
-    assert!(matches!(img.icon(), BoardImageIcon::Local));
+    assert!(matches!(
+        crate::helpers::image_details(ImageId::Local(img.flasher()), &img).icon,
+        ImageIcon::Local
+    ));
     assert!(img.description().is_none());
     assert!(img.file_name().is_some_and(|n| !n.is_empty()));
 
@@ -356,47 +363,6 @@ fn destination_item_wraps_destination() {
     assert!(!item.is_selected(&other));
     // LocalFile has no size, so no subtitle.
     assert!(item.subtitle().is_none());
-}
-
-#[test]
-fn os_image_item_constructors_and_predicates() {
-    let local = OsImageItem::local(config::Flasher::SdCard);
-    assert_eq!(local.id, OsImageId::Local(config::Flasher::SdCard));
-    assert!(!local.is_sublist());
-    assert_eq!(local.label(), "Select Local Image");
-
-    let format = OsImageItem::format("Format".into());
-    assert_eq!(format.id, OsImageId::Format);
-    assert!(!format.is_sublist());
-    assert_eq!(format.label(), "Format");
-}
-
-#[test]
-fn os_image_item_from_db_items() {
-    let icon = std::sync::Arc::new(Url::parse("https://example.com/icon.png").unwrap());
-
-    let image: OsImageItem = crate::db::OsImageListItem {
-        id: 5,
-        icon: icon.clone(),
-        name: "Debian".to_string(),
-    }
-    .into();
-    assert_eq!(image.id, OsImageId::OsImage(5));
-    assert!(!image.is_sublist());
-    assert_eq!(image.label(), "Debian");
-
-    let sublist: OsImageItem = crate::db::OsSublistListItem {
-        id: 7,
-        icon,
-        name: "More".to_string(),
-        flasher: config::Flasher::SdCard,
-    }
-    .into();
-    assert_eq!(
-        sublist.id,
-        OsImageId::OsSublist((7, config::Flasher::SdCard))
-    );
-    assert!(sublist.is_sublist());
 }
 
 #[test]

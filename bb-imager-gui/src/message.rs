@@ -5,6 +5,8 @@ use std::sync::Arc;
 use bb_imager_ui::Message;
 use iced::Task;
 
+use bb_imager_ui::image_selection::ImageId;
+
 use crate::{
     BBImager,
     helpers::{self, blocking_future},
@@ -33,12 +35,9 @@ pub(crate) enum BBImagerMessage {
     SelectBoard(crate::db::Board),
 
     /// ChooseOs Page
-    UpdateOsList((Vec<helpers::OsImageItem>, Option<i64>)),
-    SelectOs(helpers::OsImageId),
+    UpdateOsList((Vec<bb_imager_ui::image_selection::ImageItem>, Option<i64>)),
     SelectLocalOs(helpers::BoardImage),
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
-    GotoOsListParent,
-    UpdateInitFormat(bb_config::config::InitFormat),
 
     /// Choose Destination page
     SelectDest(helpers::Destination),
@@ -49,9 +48,6 @@ pub(crate) enum BBImagerMessage {
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
     FlashFail(String),
-
-    /// Open URL in browser
-    OpenUrl(url::Url),
 
     /// Next button pressed
     Next,
@@ -69,8 +65,6 @@ pub(crate) enum BBImagerMessage {
 
     /// Copy text to clipboard.
     CopyToClipboard(String),
-    /// Copy an OS image's config entry, looked up by id, to the clipboard.
-    CopyImageConfig(i64),
 
     /// DB Ops
     DbInitSuccess,
@@ -122,12 +116,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => {}
             };
         }
-        BBImagerMessage::SelectOs(id) => match state {
+        BBImagerMessage::UiState(Message::SelectOs(id)) => match state {
             BBImager::ChooseOs(inner) => match id {
-                helpers::OsImageId::Format => {
-                    inner.selected_image = Some((id, helpers::BoardImage::format()))
-                }
-                helpers::OsImageId::Local(flasher) => {
+                ImageId::Format => inner.select_image(id, helpers::BoardImage::format()),
+                ImageId::Local(flasher) => {
                     let extensions = helpers::file_filter(flasher);
 
                     return Task::perform(
@@ -146,7 +138,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         },
                     );
                 }
-                helpers::OsImageId::OsImage(id) => {
+                ImageId::OsImage(id) => {
                     let db = inner.common.db.clone();
                     let flasher = inner.flasher;
                     return Task::perform(
@@ -160,7 +152,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         },
                     );
                 }
-                helpers::OsImageId::OsSublist(id) => {
+                ImageId::OsSublist(id) => {
                     let board_id = inner.selected_board.id;
                     return Task::batch([
                         inner.resolve_remote_sublists(board_id, Some(id.0)),
@@ -172,32 +164,29 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         },
         BBImagerMessage::SelectRemoteOs((image, flasher)) => match state {
             BBImager::ChooseOs(inner) => {
-                inner.selected_image = Some((
-                    helpers::OsImageId::OsImage(image.id),
-                    helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone()),
-                ));
+                let id = ImageId::OsImage(image.id);
+                let img =
+                    helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone());
+                inner.select_image(id, img);
             }
             BBImager::AppInfo(overlay_state) => {
                 if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
-                    inner.selected_image = Some((
-                        helpers::OsImageId::OsImage(image.id),
-                        helpers::BoardImage::remote(
-                            image,
-                            flasher,
-                            inner.common.downloader.clone(),
-                        ),
-                    ));
+                    let id = ImageId::OsImage(image.id);
+                    let img = helpers::BoardImage::remote(
+                        image,
+                        flasher,
+                        inner.common.downloader.clone(),
+                    );
+                    inner.select_image(id, img);
                 }
             }
             _ => {}
         },
         BBImagerMessage::SelectLocalOs(image) => match state {
-            BBImager::ChooseOs(inner) => {
-                inner.selected_image = Some((helpers::OsImageId::Local(image.flasher()), image))
-            }
+            BBImager::ChooseOs(inner) => inner.select_image(ImageId::Local(image.flasher()), image),
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::OpenUrl(x) | BBImagerMessage::UiState(Message::OpenUrl(x)) => {
+        BBImagerMessage::UiState(Message::OpenUrl(x)) => {
             return Task::future(async move {
                 let res = webbrowser::open(x.as_str());
                 tracing::debug!("Open Url Resp {res:?}");
@@ -278,10 +267,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UpdateAvailable(x) => {
             return show_notification(format!("A new version of application is available {}", x));
         }
-        BBImagerMessage::GotoOsListParent => match state {
+        BBImagerMessage::UiState(Message::GotoOsListParent) => match state {
             BBImager::ChooseOs(inner) => {
                 let db = inner.common.db.clone();
-                let curpos = inner.pos.unwrap();
+                let curpos = inner.state.pos.unwrap();
                 let board_id = inner.selected_board.id;
                 return Task::perform(
                     blocking_future(move || {
@@ -498,7 +487,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             );
         }
-        BBImagerMessage::CopyImageConfig(id) => {
+        BBImagerMessage::UiState(Message::CopyImageConfig(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
                 blocking_future(move || db.os_image_json_by_id(id)),
@@ -556,7 +545,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseDest(inner) => inner.update_search(x),
             _ => {}
         },
-        BBImagerMessage::UpdateInitFormat(f) => {
+        BBImagerMessage::UiState(Message::UpdateInitFormat(f)) => {
             if let BBImager::ChooseOs(inner) = state
                 && let Some((_, img)) = &mut inner.selected_image
             {

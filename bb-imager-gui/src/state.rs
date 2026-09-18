@@ -4,10 +4,12 @@ use std::time::Instant;
 use bb_config::config;
 use iced::{Task, widget};
 
+use bb_imager_ui::image_selection::ImageId;
+
 use crate::{
     BBImager, constants,
     db::{self, Board},
-    helpers::{self, DestinationItem, OsImageId, OsImageItem, blocking_future},
+    helpers::{self, DestinationItem, blocking_future},
     message::BBImagerMessage,
     persistance, updater,
 };
@@ -133,36 +135,41 @@ impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
 pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
-    pub(crate) images: Vec<OsImageItem>,
-    pub(crate) pos: Option<i64>,
     pub(crate) flasher: config::Flasher,
-    pub(crate) selected_image: Option<(OsImageId, helpers::BoardImage)>,
-    pub(crate) search_text: Arc<str>,
+    /// Carries the flasher machinery the page cannot render; the page keeps its
+    /// own renderable projection in `state.selected`.
+    pub(crate) selected_image: Option<(ImageId, helpers::BoardImage)>,
+    pub(crate) state: bb_imager_ui::image_selection::State,
 }
 
 impl ChooseOsState {
-    pub(crate) fn update_images(&mut self, mut imgs: Vec<OsImageItem>, pos: Option<i64>) {
-        match self.flasher {
-            config::Flasher::SdCard => imgs.extend([
-                OsImageItem::format("Format SD Card".into()),
-                OsImageItem::local(config::Flasher::SdCard),
-            ]),
-            _ => imgs.push(OsImageItem::local(self.flasher)),
+    pub(crate) fn update_images(
+        &mut self,
+        mut imgs: Vec<bb_imager_ui::image_selection::ImageItem>,
+        pos: Option<i64>,
+    ) {
+        if self.flasher == config::Flasher::SdCard {
+            imgs.push(bb_imager_ui::image_selection::ImageItem {
+                id: ImageId::Format,
+                icon: None,
+                label: "Format SD Card".into(),
+            });
         }
 
-        self.images = imgs;
-        self.pos = pos;
+        imgs.push(bb_imager_ui::image_selection::ImageItem {
+            id: ImageId::Local(self.flasher),
+            icon: None,
+            label: "Select Local Image".into(),
+        });
+
+        self.state.images = imgs.into();
+        self.state.pos = pos;
     }
 
-    /// Id of the selected image's config entry, if it has one.
-    ///
-    /// Local images and the SD format action are not in the config, so there is
-    /// nothing to copy for them.
-    pub(crate) fn selected_image_config_id(&self) -> Option<i64> {
-        match self.selected_image.as_ref()?.0 {
-            helpers::OsImageId::OsImage(id) => Some(id),
-            _ => None,
-        }
+    /// Record `img` as the selection, both for the flow and for the page.
+    pub(crate) fn select_image(&mut self, id: ImageId, img: helpers::BoardImage) {
+        self.state.selected = Some(helpers::image_details(id, &img));
+        self.selected_image = Some((id, img));
     }
 
     pub(crate) fn resolve_remote_sublists(
@@ -191,10 +198,10 @@ impl ChooseOsState {
 
     pub(crate) fn refresh_image_list(&self) -> Task<BBImagerMessage> {
         let db = self.common.db.clone();
-        let pos = self.pos;
+        let pos = self.state.pos;
         let board_id = self.selected_board.id;
 
-        if self.search_text.is_empty() {
+        if self.state.search.is_empty() {
             Task::perform(
                 blocking_future(move || {
                     let imgs = db.os_image_items(board_id, pos).unwrap();
@@ -203,7 +210,7 @@ impl ChooseOsState {
                 BBImagerMessage::UpdateOsList,
             )
         } else {
-            let search = self.search_text.clone();
+            let search = self.state.search.clone();
             Task::perform(
                 blocking_future(move || {
                     let imgs = db.os_images_by_name(board_id, &search).unwrap();
@@ -215,7 +222,7 @@ impl ChooseOsState {
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
-        self.search_text = search;
+        self.state.search = search;
         self.refresh_image_list()
     }
 
@@ -224,7 +231,7 @@ impl ChooseOsState {
         pos: Option<i64>,
         flasher: config::Flasher,
     ) -> Task<BBImagerMessage> {
-        self.pos = pos;
+        self.state.pos = pos;
         self.flasher = flasher;
         self.refresh_image_list()
     }
@@ -232,15 +239,16 @@ impl ChooseOsState {
 
 impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
-        Self {
+        let mut res = Self {
             common: value.common,
-            images: Vec::new(),
             flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
-            pos: None,
-            selected_image: Some(value.selected_image),
-            search_text: "".into(),
-        }
+            selected_image: None,
+            state: Default::default(),
+        };
+        let (id, img) = value.selected_image;
+        res.select_image(id, img);
+        res
     }
 }
 
@@ -248,7 +256,7 @@ impl From<ChooseDestState> for ChooseOsState {
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
-    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_image: (ImageId, helpers::BoardImage),
     pub(crate) selected_dest: Option<helpers::Destination>,
     pub(crate) destinations: Box<[helpers::Destination]>,
     pub(crate) filter_destination: bool,
@@ -286,7 +294,7 @@ impl ChooseDestState {
 #[derive(Debug)]
 pub(crate) struct FlashingContext {
     pub(crate) selected_board: Board,
-    pub(crate) selected_image: (OsImageId, helpers::BoardImage),
+    pub(crate) selected_image: (ImageId, helpers::BoardImage),
     pub(crate) selected_dest: helpers::Destination,
     pub(crate) customization: helpers::FlashingCustomization,
     /// Whether the Customize page is part of this flow.
