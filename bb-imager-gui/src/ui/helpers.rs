@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-use bb_iced_widgets::circle_bar;
 use iced::Element;
 use iced::widget::{self, svg};
 
@@ -294,20 +293,6 @@ fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
         bottom: 8.0,
         ..Default::default()
     })
-}
-
-pub(crate) fn progress_finish_view<'a>(
-    label: &'static str,
-    color: iced::Color,
-    details: impl widget::text::IntoFragment<'a>,
-) -> Element<'a, BBImagerMessage> {
-    widget::column![
-        circle_bar(label, 10.0f32, color, constants::FONT_BOLD),
-        widget::text(details)
-    ]
-    .align_x(iced::Center)
-    .padding(VIEW_COL_PADDING)
-    .into()
 }
 
 pub(crate) fn network_image_or_default<'a>(

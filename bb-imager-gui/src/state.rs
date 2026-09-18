@@ -467,14 +467,16 @@ impl From<FlashingState> for FlashingSuccessState {
 #[derive(Debug)]
 pub(crate) struct FlashingCancelState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
+    pub(crate) state: bb_imager_ui::flash_cancel::State,
 }
 
 impl From<FlashingState> for FlashingCancelState {
     fn from(value: FlashingState) -> Self {
         Self {
+            state: bb_imager_ui::flash_cancel::State {
+                board: (&value.ctx.selected_board).into(),
+            },
             common: value.common,
-            selected_board: value.ctx.selected_board,
         }
     }
 }

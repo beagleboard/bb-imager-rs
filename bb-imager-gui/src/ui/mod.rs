@@ -2,7 +2,6 @@ use crate::{BBImager, message::BBImagerMessage};
 
 mod destination_selection;
 mod flash;
-mod flash_finish;
 mod helpers;
 mod image_selection;
 
@@ -25,7 +24,12 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
                 .map(BBImagerMessage::UiState)
         }
         BBImager::Flashing(inner) => flash::view(inner),
-        BBImager::FlashingCancel(inner) => flash_finish::cancel(inner),
+        BBImager::FlashingCancel(inner) => bb_imager_ui::flash_cancel::view(
+            &inner.common.img_handle_cache,
+            &inner.state,
+            inner.common.scroll_id.clone(),
+        )
+        .map(BBImagerMessage::UiState),
         BBImager::FlashingFail(inner) => {
             bb_imager_ui::flash_fail::view(&inner.state).map(BBImagerMessage::UiState)
         }
