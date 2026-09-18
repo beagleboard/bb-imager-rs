@@ -2,6 +2,7 @@ use super::*;
 use crate::persistance::{
     GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
 };
+use bb_imager_ui::destination_selection::DestId;
 use bb_imager_ui::image_selection::{ImageIcon, ImageId};
 
 #[test]
@@ -339,30 +340,54 @@ fn destination_local_file_behaviour() {
 }
 
 #[test]
-fn destination_item_save_to_file() {
-    let item = DestinationItem::SaveToFile("os.img.xz".to_string());
-    let other = Destination::LocalFile(PathBuf::from("/tmp/x"));
+fn dest_item_projects_a_row() {
+    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+    let item = dest_item(&dst);
 
-    assert_eq!(item.to_string(), "Save To File");
-    assert!(!item.is_selected(&other));
-    assert!(item.subtitle().is_none());
-    match item.msg() {
-        BBImagerMessage::SelectFileDest(name) => assert_eq!(name, "os.img"),
-        other => panic!("expected SelectFileDest, got {other:?}"),
-    }
+    assert_eq!(item.label.as_ref(), "Save To File");
+    // LocalFile has no size, so no subtitle line.
+    assert!(item.subtitle.is_none());
+    assert_eq!(
+        item.id.as_ref(),
+        "/tmp/os.img",
+        "a row is keyed by the destination's identifier"
+    );
 }
 
 #[test]
-fn destination_item_wraps_destination() {
+fn dest_details_projects_the_detail_pane() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
-    let other = Destination::LocalFile(PathBuf::from("/tmp/other.img"));
-    let item = DestinationItem::Destination(&dst);
+    let details = dest_details(&dst);
 
-    assert_eq!(item.to_string(), "Save To File");
-    assert!(item.is_selected(&dst));
-    assert!(!item.is_selected(&other));
-    // LocalFile has no size, so no subtitle.
-    assert!(item.subtitle().is_none());
+    assert_eq!(details.id, DestId::SaveToFile);
+    assert_eq!(details.title.as_ref(), "Save To File");
+    assert_eq!(
+        details.details.as_ref(),
+        [("Path".into(), "/tmp/os.img".into())]
+    );
+}
+
+/// A row's id and the selection's id must name the same device, or a click
+/// would never highlight the row it came from.
+#[test]
+fn dest_item_and_details_agree_on_identity() {
+    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+
+    // A `LocalFile` only ever reaches the detail pane, never the device list,
+    // so its details carry the file identity while a row carries the raw id.
+    assert_eq!(dest_details(&dst).id, DestId::SaveToFile);
+    assert_eq!(dest_item(&dst).id, dst.identifier().as_ref().into());
+}
+
+/// Picking the right disk depends on this: the identifier is what a click
+/// carries, and the list it indexes is re-enumerated every second.
+#[test]
+fn destination_identifiers_are_stable_and_distinct() {
+    let a = Destination::LocalFile(PathBuf::from("/tmp/a.img"));
+    let b = Destination::LocalFile(PathBuf::from("/tmp/b.img"));
+
+    assert_eq!(a.identifier(), a.identifier());
+    assert_ne!(a.identifier(), b.identifier());
 }
 
 #[test]

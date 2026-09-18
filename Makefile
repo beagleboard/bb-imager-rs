@@ -569,3 +569,7 @@ preview-board-selection:
 ## preview: preview-image-selection: Preview OS image selection page.
 preview-image-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example image-selection --features debug
+
+## preview: preview-destination-selection: Preview Destination selection page.
+preview-destination-selection:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example destination-selection --features debug

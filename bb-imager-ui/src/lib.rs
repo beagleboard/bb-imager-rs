@@ -2,6 +2,7 @@ pub mod app_info;
 pub mod board_selection;
 pub mod configuration;
 mod constants;
+pub mod destination_selection;
 pub mod flash_cancel;
 pub mod flash_fail;
 pub mod flash_success;
@@ -33,6 +34,12 @@ pub enum Message {
     SelectOs(image_selection::ImageId),
     /// Leave the current OS sublist for its parent.
     GotoOsListParent,
+    /// Select an enumerated destination, by its device identifier.
+    SelectDest(Box<str>),
+    /// Open a save dialog for the image, with this suggested file name.
+    SelectFileDest(std::sync::Arc<str>),
+    /// Whether to hide destinations that are probably not removable media.
+    DestinationFilter(bool),
     /// Pick which init format the selected image is customized with.
     UpdateInitFormat(bb_config::config::InitFormat),
     /// Text typed into a list pane's search box.

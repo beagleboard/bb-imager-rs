@@ -185,8 +185,8 @@ impl BBImager {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
                     x.selected_image.1.flasher(),
-                    x.filter_destination,
-                    Arc::<str>::from(x.search_text.to_lowercase()),
+                    x.state.filter_destination,
+                    Arc::<str>::from(x.state.search.to_lowercase()),
                 ),
                 |(flasher, filter, search_text)| {
                     let mut interval = interval(INTERVAL);
@@ -365,15 +365,11 @@ impl BBImager {
                     .expect("Image should already be selected");
 
                 (
-                    Self::ChooseDest(state::ChooseDestState {
-                        common: inner.common,
-                        selected_board: inner.selected_board,
+                    Self::ChooseDest(state::ChooseDestState::new(
+                        inner.common,
+                        inner.selected_board,
                         selected_image,
-                        selected_dest: None,
-                        destinations: Box::default(),
-                        filter_destination: true,
-                        search_text: "".into(),
-                    }),
+                    )),
                     Task::none(),
                 )
             }
