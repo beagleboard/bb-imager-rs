@@ -1,5 +1,3 @@
-use iced::color;
-
 pub(crate) const OSHW_BASE_URL: &str = "https://certification.oshwa.org";
 
 pub(crate) const LATEST_RELEASE_URL: &str =
@@ -16,26 +14,6 @@ pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
 };
 pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
-
-// Icons
-pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
-pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
-pub(crate) const INFO_ICON_BYTES: &[u8] =
-    include_bytes!("../../bb-imager-ui/assets/icons/info.svg");
-pub(crate) const SEARCH_ICON_BYTES: &[u8] =
-    include_bytes!("../../bb-imager-ui/assets/icons/search.svg");
-
-// Font
-pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");
-pub(crate) const FONT_BOLD: iced::Font = {
-    let mut font = FONT_REGULAR;
-    font.weight = iced::font::Weight::Bold;
-
-    font
-};
-
-// Theme
-pub(crate) const CARD: iced::Color = color!(45, 45, 45);
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",

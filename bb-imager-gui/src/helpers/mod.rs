@@ -505,6 +505,22 @@ impl Destination {
         matches!(self, Self::LocalFile(_))
     }
 
+    /// Stable identity of this destination, used to match a click back to a
+    /// device after the list has been re-enumerated.
+    pub(crate) fn identifier(&self) -> std::borrow::Cow<'_, str> {
+        match self {
+            Self::LocalFile(p) => p.to_string_lossy(),
+            #[cfg(feature = "sd")]
+            Self::SdCard(t) => t.identifier(),
+            #[cfg(feature = "bcf_cc1352p7")]
+            Self::BeagleConnectFreedom(t) => t.identifier(),
+            #[cfg(feature = "bcf_msp430")]
+            Self::Msp430(t) => t.identifier(),
+            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
+            Self::Mspm0(t) => t.identifier(),
+        }
+    }
+
     pub(crate) fn details(&self) -> Vec<(&'static str, String)> {
         match self {
             Self::LocalFile(p) => vec![("Path", p.to_string_lossy().to_string())],
@@ -700,6 +716,35 @@ impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization 
     }
 }
 
+/// One row of the destination list, as the page renders it.
+pub(crate) fn dest_item(
+    value: &Destination,
+) -> bb_imager_ui::destination_selection::DestinationItem {
+    bb_imager_ui::destination_selection::DestinationItem {
+        id: value.identifier().into(),
+        label: value.to_string().into(),
+        subtitle: value.size().map(|x| pretty_bytes(x).into()),
+    }
+}
+
+/// The renderable projection of a selected destination.
+pub(crate) fn dest_details(
+    value: &Destination,
+) -> bb_imager_ui::destination_selection::DestinationDetails {
+    bb_imager_ui::destination_selection::DestinationDetails {
+        id: match value {
+            Destination::LocalFile(_) => bb_imager_ui::destination_selection::DestId::SaveToFile,
+            _ => bb_imager_ui::destination_selection::DestId::Device(value.identifier().into()),
+        },
+        title: value.to_string().into(),
+        details: value
+            .details()
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into_boxed_str()))
+            .collect(),
+    }
+}
+
 /// The renderable projection of a selected image.
 ///
 /// `id` comes from the selection rather than the image itself: a remote image's
@@ -830,22 +875,7 @@ pub(crate) fn app_title(_: &crate::BBImager) -> String {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum DestinationItem<'a> {
-    SaveToFile(String),
-    Destination(&'a Destination),
-}
-
-impl<'a> std::fmt::Display for DestinationItem<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DestinationItem::SaveToFile(_) => write!(f, "Save To File"),
-            DestinationItem::Destination(d) => d.fmt(f),
-        }
-    }
-}
-
-fn normalize_file_dest(name: &str) -> String {
+pub(crate) fn normalize_file_dest(name: &str) -> String {
     const SUFFIX: [&str; 2] = [".zip", ".xz"];
 
     for s in SUFFIX {
@@ -855,31 +885,6 @@ fn normalize_file_dest(name: &str) -> String {
     }
 
     name.to_string()
-}
-
-impl<'a> DestinationItem<'a> {
-    pub(crate) fn msg(&'a self) -> BBImagerMessage {
-        match self {
-            DestinationItem::SaveToFile(x) => {
-                BBImagerMessage::SelectFileDest(normalize_file_dest(x))
-            }
-            DestinationItem::Destination(d) => BBImagerMessage::SelectDest((*d).clone()),
-        }
-    }
-
-    pub(crate) fn is_selected(&'a self, dst: &'a Destination) -> bool {
-        match self {
-            DestinationItem::SaveToFile(_) => false,
-            DestinationItem::Destination(d) => dst.eq(d),
-        }
-    }
-
-    pub(crate) fn subtitle(&self) -> Option<String> {
-        match self {
-            DestinationItem::SaveToFile(_) => None,
-            DestinationItem::Destination(d) => d.size().map(crate::helpers::pretty_bytes),
-        }
-    }
 }
 
 pub(crate) fn fetch_images(

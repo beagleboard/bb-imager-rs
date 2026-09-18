@@ -41,18 +41,11 @@ pub(crate) enum BBImagerMessage {
 
     /// Choose Destination page
     SelectDest(helpers::Destination),
-    SelectFileDest(String),
-    DestinationFilter(bool),
 
     // Flashing Page
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
     FlashFail(String),
-
-    /// Next button pressed
-    Next,
-    /// Back button pressed
-    Back,
 
     // Download images which have not already been downloaded
     FilterResolveImages(Vec<Arc<url::Url>>),
@@ -60,17 +53,11 @@ pub(crate) enum BBImagerMessage {
     /// Update destinations
     Destinations(Box<[helpers::Destination]>),
 
-    /// Show application information
-    AppInfo,
-
     /// Copy text to clipboard.
     CopyToClipboard(String),
 
     /// DB Ops
     DbInitSuccess,
-
-    /// Search
-    UpdateSearchText(Arc<str>),
 }
 
 pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBImagerMessage> {
@@ -193,8 +180,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImagerMessage::Null
             });
         }
-        BBImagerMessage::Next | BBImagerMessage::UiState(Message::Next) => return state.next(),
-        BBImagerMessage::Back | BBImagerMessage::UiState(Message::Back) => return state.back(),
+        BBImagerMessage::UiState(Message::Next) => return state.next(),
+        BBImagerMessage::UiState(Message::Back) => return state.back(),
         BBImagerMessage::UiState(Message::ResolveImage(k, v)) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
@@ -287,20 +274,37 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             if let BBImager::ChooseDest(inner) = state
                 && x != inner.destinations
             {
-                inner.destinations = x;
+                inner.update_destinations(x);
             }
         }
         BBImagerMessage::SelectDest(x) => match state {
+            BBImager::ChooseDest(inner) => inner.select_dest(x),
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::UiState(Message::SelectDest(ident)) => match state {
+            // Resolved by identity rather than position: the list is
+            // re-enumerated every second, so a click landing after a refresh
+            // must not retarget to whatever now sits at that index.
             BBImager::ChooseDest(inner) => {
-                inner.selected_dest = Some(x);
+                match inner
+                    .destinations
+                    .iter()
+                    .find(|x| x.identifier().as_ref() == ident.as_ref())
+                    .cloned()
+                {
+                    Some(dest) => inner.select_dest(dest),
+                    None => tracing::warn!("Destination {ident} is gone; ignoring selection"),
+                }
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::SelectFileDest(x) => {
+        // The page derives this row and owns the suggested name, so there is
+        // nothing to re-derive here.
+        BBImagerMessage::UiState(Message::SelectFileDest(name)) => {
             return Task::perform(
                 async move {
                     rfd::AsyncFileDialog::new()
-                        .set_file_name(x)
+                        .set_file_name(name.as_ref())
                         .save_file()
                         .await
                         .map(|x| x.inner().to_path_buf())
@@ -311,9 +315,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
             );
         }
-        BBImagerMessage::DestinationFilter(x) => match state {
+        BBImagerMessage::UiState(Message::DestinationFilter(x)) => match state {
             BBImager::ChooseDest(inner) => {
-                inner.filter_destination = x;
+                inner.state.filter_destination = x;
             }
             _ => panic!("Unexpected message"),
         },
@@ -462,7 +466,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => panic!("Unexpected message"),
             },
         },
-        BBImagerMessage::AppInfo | BBImagerMessage::UiState(Message::GotoAppInfo) => {
+        BBImagerMessage::UiState(Message::GotoAppInfo) => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
                 std::mem::take(state).try_into().expect("Unexpected page"),
             ));
@@ -538,8 +542,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return Task::batch([board_icon_task, config_fetch_task, board_refresh_task]);
         }
-        BBImagerMessage::UpdateSearchText(x)
-        | BBImagerMessage::UiState(Message::UpdateSearchText(x)) => match state {
+        BBImagerMessage::UiState(Message::UpdateSearchText(x)) => match state {
             BBImager::ChooseBoard(inner) => return inner.update_search(x),
             BBImager::ChooseOs(inner) => return inner.update_search(x),
             BBImager::ChooseDest(inner) => inner.update_search(x),

@@ -9,7 +9,7 @@ use bb_imager_ui::image_selection::ImageId;
 use crate::{
     BBImager, constants,
     db::{self, Board},
-    helpers::{self, DestinationItem, blocking_future},
+    helpers::{self, blocking_future},
     message::BBImagerMessage,
     persistance, updater,
 };
@@ -257,33 +257,62 @@ pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
+    /// Carries the flasher machinery the page cannot render.
     pub(crate) selected_dest: Option<helpers::Destination>,
+    /// Kept so a [`DestId`] can be resolved back to a real destination, and so
+    /// the 1 Hz refresh can skip redraws when nothing changed.
     pub(crate) destinations: Box<[helpers::Destination]>,
-    pub(crate) filter_destination: bool,
-    pub(crate) search_text: Arc<str>,
+    pub(crate) state: bb_imager_ui::destination_selection::State,
 }
 
 impl ChooseDestState {
-    pub(crate) fn destinations<'a>(&'a self) -> impl Iterator<Item = DestinationItem<'a>> + 'a {
-        let iter = self.destinations.iter().map(DestinationItem::Destination);
-
-        let temp = match self.selected_image.1.file_name() {
-            Some(x) => vec![DestinationItem::SaveToFile(x)],
-            None => vec![],
+    pub(crate) fn new(
+        common: BBImagerCommon,
+        selected_board: Board,
+        selected_image: (ImageId, helpers::BoardImage),
+    ) -> Self {
+        // The image's own note wins over the board-wide one.
+        let instruction = match selected_image.1.info_text() {
+            Some(x) => Some(x.into()),
+            None => selected_board.instructions.clone(),
         };
 
-        iter.chain(temp)
-    }
+        // `Some` only for images with something to write out, which is what
+        // offers the "Save To File" row.
+        let image_file_name = selected_image
+            .1
+            .file_name()
+            .map(|x| helpers::normalize_file_dest(&x).into());
 
-    pub(crate) fn instruction(&self) -> Option<&str> {
-        match self.selected_image.1.info_text() {
-            Some(x) => Some(x),
-            None => self.selected_board.instructions.as_deref(),
+        Self {
+            common,
+            selected_board,
+            selected_image,
+            selected_dest: None,
+            destinations: Box::default(),
+            state: bb_imager_ui::destination_selection::State {
+                instruction,
+                image_file_name,
+                ..Default::default()
+            },
         }
     }
 
+    /// Rebuild the page's device rows. The "Save To File" row is derived by the
+    /// page from `image_file_name`, so it is unaffected by this.
+    pub(crate) fn update_destinations(&mut self, destinations: Box<[helpers::Destination]>) {
+        self.state.destinations = destinations.iter().map(helpers::dest_item).collect();
+        self.destinations = destinations;
+    }
+
+    /// Record `dest` as the selection, both for the flow and for the page.
+    pub(crate) fn select_dest(&mut self, dest: helpers::Destination) {
+        self.state.selected = Some(helpers::dest_details(&dest));
+        self.selected_dest = Some(dest);
+    }
+
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
-        self.search_text = search;
+        self.state.search = search;
     }
 }
 
@@ -319,15 +348,9 @@ impl FlashingContext {
 
     /// Rebuild the destination page this context was completed on.
     pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
-        ChooseDestState {
-            common,
-            selected_board: self.selected_board,
-            selected_image: self.selected_image,
-            selected_dest: Some(self.selected_dest),
-            destinations: Box::default(),
-            filter_destination: true,
-            search_text: "".into(),
-        }
+        let mut res = ChooseDestState::new(common, self.selected_board, self.selected_image);
+        res.select_dest(self.selected_dest);
+        res
     }
 }
 
