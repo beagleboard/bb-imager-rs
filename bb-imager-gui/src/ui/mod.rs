@@ -1,7 +1,6 @@
 use crate::{BBImager, message::BBImagerMessage};
 
 mod board_selection;
-mod configuration;
 mod destination_selection;
 mod flash;
 mod flash_finish;
@@ -13,7 +12,10 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::ChooseBoard(inner) => board_selection::view(inner),
         BBImager::ChooseOs(inner) => image_selection::view(inner),
         BBImager::ChooseDest(inner) => destination_selection::view(inner),
-        BBImager::Customize(inner) => configuration::view(inner),
+        BBImager::Customize(inner) => {
+            bb_imager_ui::configuration::view(&inner.state, inner.common.scroll_id.clone())
+                .map(BBImagerMessage::UiState)
+        }
         BBImager::Review(inner) => {
             bb_imager_ui::review::view(&inner.state, inner.common.scroll_id.clone())
                 .map(BBImagerMessage::UiState)

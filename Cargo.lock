@@ -716,6 +716,7 @@ name = "bb-imager-ui"
 version = "1.0.16"
 dependencies = [
  "bb-iced-widgets",
+ "chrono-tz",
  "iced",
 ]
 

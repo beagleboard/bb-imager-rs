@@ -1,4 +1,5 @@
 pub mod app_info;
+pub mod configuration;
 mod constants;
 pub mod flash_fail;
 mod helpers;
@@ -10,7 +11,12 @@ pub enum Message {
 
     Null,
     Back,
+    Next,
     Restart,
+    /// Reset the customization back to its defaults.
+    Reset,
+
+    UpdateCustomization(configuration::Customization),
 
     EditorEvent(iced::widget::text_editor::Action),
 

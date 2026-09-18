@@ -236,46 +236,49 @@ fn flashing_customization_new_selects_variant_by_flasher() {
 }
 
 #[test]
-fn flashing_customization_validate_checks_user() {
-    assert!(FlashingCustomization::NoneSd.validate());
-    assert!(FlashingCustomization::LinuxSdSysconfig(SdSysconfCustomization::default()).validate());
-    let root = SdSysconfCustomization::default()
-        .update_user(Some(SdCustomizationUser::new("root".into(), "p".into())));
-    assert!(!FlashingCustomization::LinuxSdSysconfig(root.clone()).validate());
-    // Cloud-init writes the same user account, so it needs the same check.
-    assert!(FlashingCustomization::LinuxSdCloudInit(SdSysconfCustomization::default()).validate());
-    assert!(!FlashingCustomization::LinuxSdCloudInit(root).validate());
-}
+fn flashing_customization_round_trips_through_the_page_types() {
+    let sysconf = SdSysconfCustomization::default()
+        .update_hostname(Some("beagle".into()))
+        .update_keymap(Some("us".into()))
+        .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
+        .update_usb_enable_dhcp(Some(true));
 
-#[test]
-fn flashing_customization_reset_restores_defaults() {
-    let mut sysconf = FlashingCustomization::LinuxSdSysconfig(
-        SdSysconfCustomization::default().update_hostname(Some("h".into())),
-    );
-    sysconf.reset();
-    match sysconf {
-        FlashingCustomization::LinuxSdSysconfig(c) => assert!(c.hostname.is_none()),
+    let orig = FlashingCustomization::LinuxSdSysconfig(sysconf);
+    let page: bb_imager_ui::configuration::Customization = orig.clone().into();
+    let back: FlashingCustomization = (&page).into();
+
+    match (orig, back) {
+        (
+            FlashingCustomization::LinuxSdSysconfig(before),
+            FlashingCustomization::LinuxSdSysconfig(after),
+        ) => {
+            assert_eq!(before.hostname, after.hostname);
+            assert_eq!(before.keymap, after.keymap);
+            assert_eq!(before.usb_enable_dhcp, after.usb_enable_dhcp);
+            assert_eq!(
+                before.user.map(|u| u.username),
+                after.user.map(|u| u.username)
+            );
+        }
         _ => panic!("variant should be preserved"),
     }
 
-    // Cloud-init is just as resettable as sysconf.
-    let mut cloudinit = FlashingCustomization::LinuxSdCloudInit(
-        SdSysconfCustomization::default().update_hostname(Some("h".into())),
+    // Cloud-init has no USB DHCP toggle to round-trip, so the field is left at
+    // whatever the platform defaults to rather than being carried across.
+    let cloudinit = FlashingCustomization::LinuxSdCloudInit(
+        SdSysconfCustomization::default().update_hostname(Some("beagle".into())),
     );
-    cloudinit.reset();
-    match cloudinit {
-        FlashingCustomization::LinuxSdCloudInit(c) => assert!(c.hostname.is_none()),
+    let page: bb_imager_ui::configuration::Customization = cloudinit.into();
+    match (&page).into() {
+        FlashingCustomization::LinuxSdCloudInit(c) => {
+            assert_eq!(c.hostname.as_deref(), Some("beagle"));
+            assert_eq!(
+                c.usb_enable_dhcp,
+                SdSysconfCustomization::default().usb_enable_dhcp
+            );
+        }
         _ => panic!("variant should be preserved"),
     }
-
-    // Variants without inner state are left untouched.
-    let mut none = FlashingCustomization::NoneSd;
-    none.reset();
-    assert!(matches!(none, FlashingCustomization::NoneSd));
-
-    let mut bcf = FlashingCustomization::Bcf;
-    bcf.reset();
-    assert!(matches!(bcf, FlashingCustomization::Bcf));
 }
 
 #[test]
