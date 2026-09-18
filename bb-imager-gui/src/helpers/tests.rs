@@ -14,14 +14,6 @@ fn pretty_bytes_scales_units() {
 }
 
 #[test]
-fn pretty_duration_formats_minutes_and_seconds() {
-    assert_eq!(pretty_duration(Duration::from_secs(0)), "0s");
-    assert_eq!(pretty_duration(Duration::from_secs(45)), "45s");
-    assert_eq!(pretty_duration(Duration::from_secs(60)), "1:00");
-    assert_eq!(pretty_duration(Duration::from_secs(125)), "2:05");
-}
-
-#[test]
 fn normalize_file_dest_strips_known_suffixes() {
     assert_eq!(normalize_file_dest("os.zip"), "os");
     assert_eq!(normalize_file_dest("os.img.xz"), "os.img");

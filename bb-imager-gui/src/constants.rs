@@ -22,8 +22,6 @@ pub(crate) const ARROW_BACK_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/
 pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-add.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
-pub(crate) const BOARD_ICON_BYTES: &[u8] =
-    include_bytes!("../../bb-imager-ui/assets/icons/board.svg");
 pub(crate) const ARROW_FORWARD_IOS_ICON_BYTES: &[u8] =
     include_bytes!("../assets/icons/arrow-forward-ios.svg");
 pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
@@ -44,7 +42,6 @@ pub(crate) const FONT_BOLD: iced::Font = {
 };
 
 // Theme
-pub(crate) const TONGUE_ORANGE: iced::Color = color!(242, 105, 53);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[

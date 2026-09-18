@@ -1,5 +1,5 @@
 use std::io;
-use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock, time::Duration};
+use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::LazyLock};
 
 use crate::img::{RemoteImage, RemoteItem};
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
@@ -801,16 +801,6 @@ pub(crate) fn no_customization(
         config::Flasher::BeagleConnectFreedom => Some(FlashingCustomization::Bcf),
         config::Flasher::Mspm0 => Some(FlashingCustomization::Zepto),
         _ => None,
-    }
-}
-
-pub(crate) fn pretty_duration(d: Duration) -> String {
-    let secs = d.as_secs();
-
-    if secs >= 60 {
-        format!("{}:{:02}", secs / 60, secs % 60)
-    } else {
-        format!("{}s", secs)
     }
 }
 

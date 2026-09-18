@@ -5,6 +5,7 @@ mod constants;
 pub mod flash_cancel;
 pub mod flash_fail;
 pub mod flash_success;
+pub mod flashing;
 mod helpers;
 pub mod review;
 
@@ -35,6 +36,8 @@ pub enum Message {
     EditorEvent(iced::widget::text_editor::Action),
 
     FlashStart,
+    /// Cancel an in-progress flash.
+    FlashCancel,
     // Retry flashing
     Retry,
 }

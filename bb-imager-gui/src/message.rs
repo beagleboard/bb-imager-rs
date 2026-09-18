@@ -48,7 +48,6 @@ pub(crate) enum BBImagerMessage {
     // Flashing Page
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
-    FlashCancel,
     FlashFail(String),
 
     /// Open URL in browser
@@ -70,8 +69,6 @@ pub(crate) enum BBImagerMessage {
 
     /// Copy text to clipboard.
     CopyToClipboard(String),
-    /// Copy a board's config entry, looked up by id, to the clipboard.
-    CopyBoardConfig(i64),
     /// Copy an OS image's config entry, looked up by id, to the clipboard.
     CopyImageConfig(i64),
 
@@ -353,7 +350,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::FlashCancel => {
+        BBImagerMessage::UiState(Message::FlashCancel) => {
             let mut msg = "Flashing cancelled by user";
 
             *state = match std::mem::take(state) {
@@ -486,8 +483,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
         }
-        BBImagerMessage::CopyBoardConfig(id)
-        | BBImagerMessage::UiState(Message::CopyBoardConfig(id)) => {
+        BBImagerMessage::UiState(Message::CopyBoardConfig(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
                 blocking_future(move || db.os_board_json_by_id(id)),

@@ -13,8 +13,6 @@ pub(crate) static USB_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::USB_ICON_BYTES));
 pub(crate) static FORMAT_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::FORMAT_ICON_BYTES));
-pub(crate) static BOARD_ICON: LazyLock<svg::Handle> =
-    LazyLock::new(|| svg::Handle::from_memory(constants::BOARD_ICON_BYTES));
 pub(crate) static ARROW_FORWARD_IOS_ICON: LazyLock<svg::Handle> =
     LazyLock::new(|| svg::Handle::from_memory(constants::ARROW_FORWARD_IOS_ICON_BYTES));
 pub(crate) static FILE_SAVE_ICON: LazyLock<svg::Handle> =
@@ -100,67 +98,6 @@ pub(crate) fn page_type1<'a>(
     .padding(24)
     .spacing(24)
     .into()
-}
-
-pub(crate) fn board_view_pane<'a>(
-    dev: &'a crate::db::Board,
-    state: &'a crate::BBImagerCommon,
-) -> Element<'a, BBImagerMessage> {
-    let img = network_image_or_default(
-        &state.img_handle_cache,
-        dev.icon.as_ref(),
-        BOARD_ICON.clone(),
-        iced::Fill,
-        iced::Shrink,
-    );
-
-    let copy_btn = copy_btn(COPY_ICON.clone()).on_press(BBImagerMessage::CopyBoardConfig(dev.id));
-
-    let cols = widget::column![
-        img,
-        widget::center(copy_btn),
-        widget::text(dev.name.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-        widget::text(&dev.description)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-    ];
-
-    let cols = cols.extend(
-        dev.specification
-            .iter()
-            .map(|(k, v)| -> widget::text::Rich<'a, (), BBImagerMessage> {
-                detail_entry(k, v.as_ref())
-            })
-            .map(Into::into),
-    );
-
-    let mut btns = Vec::with_capacity(2);
-
-    if let Some(x) = &dev.documentation {
-        btns.push(
-            widget::button(widget::text("DOCUMENTATION"))
-                .on_press(BBImagerMessage::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
-
-    if let Some(x) = &dev.oshw
-        && let Ok(u) = url::Url::parse(&format!("{}/{}.html", constants::OSHW_BASE_URL, x))
-    {
-        btns.push(
-            widget::button(widget::text("OSHW"))
-                .on_press(BBImagerMessage::OpenUrl(u))
-                .into(),
-        );
-    }
-
-    detail_pane(
-        cols.push(widget::center(widget::row(btns).spacing(16))),
-        &state.scroll_id,
-    )
 }
 
 pub(crate) fn detail_entry<'a>(
@@ -293,24 +230,4 @@ fn search_box<'a>(inp: &'a str) -> widget::Container<'a, BBImagerMessage> {
         bottom: 8.0,
         ..Default::default()
     })
-}
-
-pub(crate) fn network_image_or_default<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-    img: Option<&std::sync::Arc<url::Url>>,
-    def: svg::Handle,
-    width: impl Into<iced::Length>,
-    height: impl Into<iced::Length>,
-) -> Element<'a, BBImagerMessage> {
-    match img {
-        Some(u) => bb_iced_widgets::cached_icon(cache, u)
-            .width(width)
-            .height(height)
-            .into(),
-        None => widget::svg(def)
-            .width(width)
-            .height(height)
-            .style(svg_icon_style)
-            .into(),
-    }
 }

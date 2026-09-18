@@ -278,10 +278,14 @@ impl BBImager {
 
         *self = Self::Flashing(state::FlashingState {
             common,
-            ctx,
             cancel_flashing: h,
-            progress: bb_flasher::DownloadFlashingStatus::Preparing,
-            start_timestamp: None,
+            // Built before `ctx` is moved in below.
+            state: Box::new(bb_imager_ui::flashing::State {
+                board: (&ctx.selected_board).into(),
+                progress: Default::default(),
+                start_timestamp: None,
+            }),
+            ctx,
         });
 
         t
