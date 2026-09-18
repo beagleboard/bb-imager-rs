@@ -629,24 +629,12 @@ impl FlashingCustomization {
             config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
                 if img.init_format() == config::InitFormat::Sysconf =>
             {
-                Self::LinuxSdSysconfig(
-                    app_config
-                        .sd_customization
-                        .sysconf_customization()
-                        .cloned()
-                        .unwrap_or_default(),
-                )
+                Self::LinuxSdSysconfig(app_config.sd_customization.sysconf.clone())
             }
             config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
                 if img.init_format() == config::InitFormat::CloudInit =>
             {
-                Self::LinuxSdCloudInit(
-                    app_config
-                        .sd_customization
-                        .sysconf_customization()
-                        .cloned()
-                        .unwrap_or_default(),
-                )
+                Self::LinuxSdCloudInit(app_config.sd_customization.sysconf.clone())
             }
             config::Flasher::SdCard
             | config::Flasher::SdCardBootfs
