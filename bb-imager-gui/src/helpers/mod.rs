@@ -632,8 +632,8 @@ impl FlashingCustomization {
                 Self::LinuxSdSysconfig(
                     app_config
                         .sd_customization
-                        .as_ref()
-                        .map(|x| x.sysconf_customization().cloned().unwrap_or_default())
+                        .sysconf_customization()
+                        .cloned()
                         .unwrap_or_default(),
                 )
             }
@@ -643,8 +643,8 @@ impl FlashingCustomization {
                 Self::LinuxSdCloudInit(
                     app_config
                         .sd_customization
-                        .as_ref()
-                        .map(|x| x.sysconf_customization().cloned().unwrap_or_default())
+                        .sysconf_customization()
+                        .cloned()
                         .unwrap_or_default(),
                 )
             }

@@ -418,14 +418,9 @@ impl BBImager {
                 let temp = match &inner.ctx.customization {
                     helpers::FlashingCustomization::LinuxSdSysconfig(c)
                     | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
-                        let mut temp = inner
-                            .common
-                            .app_config
-                            .sd_customization
-                            .clone()
-                            .unwrap_or_default();
+                        let mut temp = inner.common.app_config.sd_customization.clone();
                         temp.update_sysconfig(c.clone());
-                        inner.common.app_config.update_sd_customization(temp);
+                        inner.common.app_config.sd_customization = temp;
 
                         inner.save_app_config()
                     }
