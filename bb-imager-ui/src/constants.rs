@@ -5,12 +5,21 @@ use iced::{color, widget};
 // Icons Bytes
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
 pub(crate) const INFO_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/info.svg");
+pub(crate) const BOARD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/board.svg");
+pub(crate) const COPY_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/content-copy.svg");
+pub(crate) const SEARCH_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/search.svg");
 
 // Icon Handles
 pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
     LazyLock::new(|| widget::image::Handle::from_bytes(WINDOW_ICON_BYTES));
 pub(crate) static INFO_ICON: LazyLock<widget::svg::Handle> =
     LazyLock::new(|| widget::svg::Handle::from_memory(INFO_ICON_BYTES));
+pub(crate) static BOARD_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(BOARD_ICON_BYTES));
+pub(crate) static COPY_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(COPY_ICON_BYTES));
+pub(crate) static SEARCH_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(SEARCH_ICON_BYTES));
 
 // Fonts
 pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");

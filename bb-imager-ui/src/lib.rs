@@ -1,4 +1,5 @@
 pub mod app_info;
+pub mod board_selection;
 pub mod configuration;
 mod constants;
 pub mod flash_fail;
@@ -17,6 +18,17 @@ pub enum Message {
     Reset,
 
     UpdateCustomization(configuration::Customization),
+
+    /// Select a board by its id. Only valid on the board selection page.
+    SelectBoardById(i64),
+    /// Copy a board's config entry, looked up by id, to the clipboard.
+    CopyBoardConfig(i64),
+    /// Text typed into a list pane's search box.
+    UpdateSearchText(std::sync::Arc<str>),
+    /// Open a URL in the browser.
+    OpenUrl(url::Url),
+    /// A remote icon finished downloading to the given path.
+    ResolveImage(std::sync::Arc<url::Url>, std::path::PathBuf),
 
     EditorEvent(iced::widget::text_editor::Action),
 

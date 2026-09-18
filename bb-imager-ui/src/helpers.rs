@@ -4,6 +4,10 @@ use iced::{Element, widget};
 use crate::{Message, constants};
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
+pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
+    right: 16.0,
+    ..iced::Padding::ZERO
+};
 
 /// |------|------|
 /// |      |      |
@@ -126,6 +130,162 @@ pub(crate) fn progress_finish_view<'a>(
     .align_x(iced::Center)
     .padding(VIEW_COL_PADDING)
     .into()
+}
+
+pub(crate) fn card_btn_style(
+    theme: &iced::Theme,
+    status: widget::button::Status,
+    is_selected: bool,
+) -> widget::button::Style {
+    let mut style = widget::button::Style {
+        text_color: theme.palette().text,
+        ..Default::default()
+    };
+
+    if is_selected || matches!(status, widget::button::Status::Hovered) {
+        style.border = iced::Border::default()
+            .color(theme.palette().primary)
+            .width(3)
+            .rounded(5);
+    }
+
+    style
+}
+
+pub(crate) fn svg_icon_style(theme: &iced::Theme, _: widget::svg::Status) -> widget::svg::Style {
+    widget::svg::Style {
+        color: Some(theme.palette().text),
+    }
+}
+
+/// Horizontal separator between rows of a list pane.
+pub(crate) fn list_separator<'a>() -> Element<'a, Message> {
+    widget::center(widget::rule::horizontal(2))
+        .padding(iced::Padding::ZERO.left(16))
+        .into()
+}
+
+/// Scrollable pane listing selectable items: a search box, a separator, any
+/// extra `header` rows, then the `items` themselves.
+pub(crate) fn list_pane<'a>(
+    search_text: &'a str,
+    scroll_id: &widget::Id,
+    header: impl IntoIterator<Item = Element<'a, Message>>,
+    items: impl IntoIterator<Item = Element<'a, Message>>,
+) -> Element<'a, Message> {
+    let top = [search_box(search_text).into(), list_separator()];
+
+    widget::scrollable(
+        widget::column(top.into_iter().chain(header).chain(items)).padding(LIST_COL_PADDING),
+    )
+    .id(scroll_id.clone())
+    .into()
+}
+
+/// A selectable row of a [`list_pane`], laid out as a horizontal run of
+/// `contents` (typically a leading icon followed by a label).
+pub(crate) fn list_item<'a>(
+    contents: impl IntoIterator<Item = Element<'a, Message>>,
+    is_selected: bool,
+    msg: Message,
+) -> widget::Button<'a, Message> {
+    widget::button(
+        widget::row(contents)
+            .spacing(12)
+            .padding(8)
+            .align_y(iced::alignment::Vertical::Center),
+    )
+    .on_press(msg)
+    .style(move |theme, status| card_btn_style(theme, status, is_selected))
+}
+
+/// The primary label of a [`list_item`].
+pub(crate) fn list_label<'a>(label: impl widget::text::IntoFragment<'a>) -> widget::Text<'a> {
+    widget::text(label).size(18).width(iced::Length::Fill)
+}
+
+/// Heading of a [`detail_pane`] with nothing selected yet.
+pub(crate) fn placeholder_heading<'a>(label: &'a str) -> widget::Text<'a> {
+    widget::text(label)
+        .size(28)
+        .width(iced::Fill)
+        .align_x(iced::Center)
+        .font(constants::FONT_BOLD)
+}
+
+/// A [`detail_pane`] with nothing selected yet.
+pub(crate) fn placeholder_pane<'a>(label: &'a str) -> Element<'a, Message> {
+    widget::center(placeholder_heading(label))
+        .padding(VIEW_COL_PADDING)
+        .into()
+}
+
+/// A `key: value` line of a [`detail_pane`].
+pub(crate) fn detail_entry<'a>(
+    key: &'a str,
+    val: impl widget::text::IntoFragment<'a>,
+) -> widget::text::Rich<'a, (), Message> {
+    widget::rich_text![
+        widget::span(format!("{key}:")).font(constants::FONT_BOLD),
+        widget::span(" "),
+        widget::span(val),
+    ]
+}
+
+pub(crate) fn copy_btn<'a>(handle: widget::svg::Handle) -> widget::Button<'a, Message> {
+    widget::button(widget::svg(handle))
+        .width(iced::Shrink)
+        .style(widget::button::secondary)
+}
+
+/// A remotely fetched icon, falling back to `def` for items that have none.
+///
+/// Entries still in flight render as a spinner; see
+/// [`bb_iced_widgets::cached_icon::Cache`].
+pub(crate) fn network_image_or_default<'a>(
+    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
+    img: Option<&std::sync::Arc<url::Url>>,
+    def: widget::svg::Handle,
+    width: impl Into<iced::Length>,
+    height: impl Into<iced::Length>,
+) -> Element<'a, Message> {
+    match img {
+        Some(u) => bb_iced_widgets::cached_icon(cache, u)
+            .width(width)
+            .height(height)
+            .into(),
+        None => widget::svg(def)
+            .width(width)
+            .height(height)
+            .style(svg_icon_style)
+            .into(),
+    }
+}
+
+fn search_box<'a>(inp: &'a str) -> widget::Container<'a, Message> {
+    widget::container(
+        widget::row![
+            widget::svg(constants::SEARCH_ICON.clone())
+                .style(svg_icon_style)
+                .width(iced::Length::Shrink)
+                .height(18),
+            widget::text_input("SEARCH", inp)
+                .style(|theme, status| {
+                    let mut temp = widget::text_input::default(theme, status);
+                    temp.border.width = 0.0;
+                    temp.background = iced::Background::Color(iced::Color::TRANSPARENT);
+                    temp
+                })
+                .on_input(|x| Message::UpdateSearchText(x.into())),
+        ]
+        .align_y(iced::Alignment::Center),
+    )
+    .padding(iced::Padding {
+        left: 16.0,
+        top: 16.0,
+        bottom: 8.0,
+        ..Default::default()
+    })
 }
 
 fn card_box<'a>(content: impl Into<Element<'a, Message>>) -> widget::Container<'a, Message> {

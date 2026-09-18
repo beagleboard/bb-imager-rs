@@ -78,12 +78,7 @@ enum BBImager {
 
 impl BBImager {
     fn choose_board(common: BBImagerCommon) -> Self {
-        Self::ChooseBoard(state::ChooseBoardState {
-            common,
-            boards: Box::default(),
-            selected_board: None,
-            search_text: "".into(),
-        })
+        Self::ChooseBoard(state::ChooseBoardState::new(common))
     }
 
     fn new() -> (Self, Task<BBImagerMessage>) {

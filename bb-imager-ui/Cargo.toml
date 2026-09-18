@@ -10,6 +10,7 @@ license.workspace = true
 iced = { version = "0.14", features = ["image", "svg"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 chrono-tz = "0.10"
+url = "2.5"
 
 [features]
 debug = ["iced/hot"]
