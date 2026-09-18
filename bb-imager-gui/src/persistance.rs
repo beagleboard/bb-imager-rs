@@ -49,18 +49,8 @@ impl GuiConfiguration {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomization {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sysconf: Option<SdSysconfCustomization>,
-}
-
-impl SdCustomization {
-    pub(crate) fn sysconf_customization(&self) -> Option<&SdSysconfCustomization> {
-        self.sysconf.as_ref()
-    }
-
-    pub(crate) fn update_sysconfig(&mut self, t: SdSysconfCustomization) {
-        self.sysconf = Some(t)
-    }
+    #[serde(default)]
+    pub(crate) sysconf: SdSysconfCustomization,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -291,26 +281,13 @@ mod tests {
     }
 
     #[test]
-    fn sd_customization_wraps_sysconf() {
-        let mut sd = SdCustomization::default();
-        assert!(sd.sysconf_customization().is_none());
-        sd.update_sysconfig(SdSysconfCustomization::default().update_hostname(Some("bb".into())));
-        assert_eq!(
-            sd.sysconf_customization()
-                .and_then(|s| s.hostname.as_deref()),
-            Some("bb")
-        );
-    }
-
-    #[test]
     fn gui_configuration_round_trips_through_json() {
         let gui = GuiConfiguration {
-            sd_customization: {
-                let mut sd = SdCustomization::default();
-                sd.update_sysconfig(
-                    SdSysconfCustomization::default().update_hostname(Some("host".into())),
-                );
-                sd
+            sd_customization: SdCustomization {
+                sysconf: SdSysconfCustomization {
+                    hostname: Some("host".into()),
+                    ..Default::default()
+                },
             },
         };
 
@@ -318,9 +295,7 @@ mod tests {
         let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
 
         assert_eq!(
-            back.sd_customization
-                .sysconf_customization()
-                .and_then(|c| c.hostname.clone()),
+            back.sd_customization.sysconf.hostname,
             Some("host".to_string())
         );
     }

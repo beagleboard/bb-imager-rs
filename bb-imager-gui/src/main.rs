@@ -419,7 +419,7 @@ impl BBImager {
                     helpers::FlashingCustomization::LinuxSdSysconfig(c)
                     | helpers::FlashingCustomization::LinuxSdCloudInit(c) => {
                         let mut temp = inner.common.app_config.sd_customization.clone();
-                        temp.update_sysconfig(c.clone());
+                        temp.sysconf = c.clone();
                         inner.common.app_config.sd_customization = temp;
 
                         inner.save_app_config()
