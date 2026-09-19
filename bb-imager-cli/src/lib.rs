@@ -158,7 +158,12 @@ fn flash_internal(
 
                 if cloud_init {
                     customization.extend([bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
-                        hostname, timezone, keymap, user, wifi, ssh_key,
+                        hostname.as_deref(),
+                        timezone.as_deref(),
+                        keymap.as_deref(),
+                        user.as_ref().map(|(u, p)| (u.as_ref(), p.as_ref())),
+                        wifi.as_ref().map(|(s, p)| (s.as_ref(), p.as_ref())),
+                        ssh_key.as_deref(),
                     )]);
                 }
 
