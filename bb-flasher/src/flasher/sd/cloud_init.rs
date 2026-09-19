@@ -3,29 +3,29 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 #[derive(Serialize, Default)]
-pub(crate) struct CloudInitConfig {
+pub(crate) struct CloudInitConfig<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    users: Vec<User>,
+    users: Vec<User<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    ssh_authorized_keys: Vec<Box<str>>,
+    ssh_authorized_keys: Vec<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    keyboard: Option<Keyboard>,
+    keyboard: Option<Keyboard<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    timezone: Option<Box<str>>,
+    timezone: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    hostname: Option<Box<str>>,
+    hostname: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    network: Option<Network>,
+    network: Option<Network<'a>>,
 }
 
-impl CloudInitConfig {
+impl<'a> CloudInitConfig<'a> {
     pub(crate) fn new(
-        hostname: Option<Box<str>>,
-        timezone: Option<Box<str>>,
-        keymap: Option<Box<str>>,
-        user: Option<(Box<str>, Box<str>)>,
-        wifi: Option<(Box<str>, Box<str>)>,
-        ssh: Option<Box<str>>,
+        hostname: Option<&'a str>,
+        timezone: Option<&'a str>,
+        keymap: Option<&'a str>,
+        user: Option<(&'a str, &'a str)>,
+        wifi: Option<(&'a str, &'a str)>,
+        ssh: Option<&'a str>,
     ) -> Self {
         Self {
             users: user
@@ -64,32 +64,32 @@ impl CloudInitConfig {
 }
 
 #[derive(Serialize)]
-struct Network {
+struct Network<'a> {
     version: u8,
     renderer: &'static str,
-    wifis: HashMap<&'static str, WifiInterface>,
+    wifis: HashMap<&'static str, WifiInterface<'a>>,
 }
 
 #[derive(Debug, Serialize)]
-struct WifiInterface {
+struct WifiInterface<'a> {
     #[serde(rename = "access-points")]
-    access_points: HashMap<Box<str>, AccessPoint>,
+    access_points: HashMap<&'a str, AccessPoint<'a>>,
 }
 
 #[derive(Debug, Serialize)]
-struct AccessPoint {
-    password: Box<str>,
+struct AccessPoint<'a> {
+    password: &'a str,
 }
 
 #[derive(Serialize)]
-struct User {
-    name: Box<str>,
-    plain_text_passwd: Box<str>,
+struct User<'a> {
+    name: &'a str,
+    plain_text_passwd: &'a str,
 }
 
 #[derive(Serialize)]
-struct Keyboard {
-    layout: Box<str>,
+struct Keyboard<'a> {
+    layout: &'a str,
 }
 
 #[cfg(test)]
@@ -100,8 +100,8 @@ mod tests {
     fn user() {
         let data = CloudInitConfig {
             users: vec![User {
-                name: "beagle".into(),
-                plain_text_passwd: "password".into(),
+                name: "beagle",
+                plain_text_passwd: "password",
             }],
             ..Default::default()
         };
@@ -119,9 +119,7 @@ users:
     #[test]
     fn keyboard() {
         let data = CloudInitConfig {
-            keyboard: Some(Keyboard {
-                layout: "us".into(),
-            }),
+            keyboard: Some(Keyboard { layout: "us" }),
             ..Default::default()
         };
         let expected = r#"
@@ -137,7 +135,7 @@ keyboard:
     #[test]
     fn timezone() {
         let data = CloudInitConfig {
-            timezone: Some("America/New_York".into()),
+            timezone: Some("America/New_York"),
             ..Default::default()
         };
         let expected = r#"
@@ -152,7 +150,7 @@ timezone: America/New_York"#;
     #[test]
     fn hostname() {
         let data = CloudInitConfig {
-            hostname: Some("myhost".into()),
+            hostname: Some("myhost"),
             ..Default::default()
         };
         let expected = r#"
@@ -174,9 +172,9 @@ hostname: myhost"#;
                     "wlp2s0b1",
                     WifiInterface {
                         access_points: HashMap::from([(
-                            "network_ssid_name".into(),
+                            "network_ssid_name",
                             AccessPoint {
-                                password: "password".into(),
+                                password: "password",
                             },
                         )]),
                     },

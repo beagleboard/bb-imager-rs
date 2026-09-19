@@ -137,18 +137,15 @@ impl FlashingSdLinuxConfig {
     }
 
     pub fn cloud_init(
-        hostname: Option<Box<str>>,
-        timezone: Option<Box<str>>,
-        keymap: Option<Box<str>>,
-        user: Option<(Box<str>, Box<str>)>,
-        wifi: Option<(Box<str>, Box<str>)>,
-        ssh: Option<Box<str>>,
+        hostname: Option<&str>,
+        timezone: Option<&str>,
+        keymap: Option<&str>,
+        user: Option<(&str, &str)>,
+        wifi: Option<(&str, &str)>,
+        ssh: Option<&str>,
     ) -> Self {
         let data = cloud_init::CloudInitConfig::new(hostname, timezone, keymap, user, wifi, ssh);
-        Self(vec![(
-            "cloud-init".into(),
-            Some(data.to_file_data()),
-        )])
+        Self(vec![("cloud-init".into(), Some(data.to_file_data()))])
     }
 
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
