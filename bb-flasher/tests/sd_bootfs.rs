@@ -159,7 +159,7 @@ fn flash_applies_bootfs_before_customization() {
         Some(archive_fn(&archive)),
         no_bmap(),
         dst.path().to_path_buf(),
-        FlashingSdLinuxConfig::sysconfig(Some("beagle".into()), None, None, None, None, None, None),
+        FlashingSdLinuxConfig::sysconfig(Some("beagle"), None, None, None, None, None, None),
     )
     .flash(None, None)
     .expect("flashing with a bootfs archive and customization should succeed");
@@ -186,7 +186,7 @@ fn flash_applies_bootfs_and_customization_to_gpt_boot_partition() {
         Some(archive_fn(&archive)),
         no_bmap(),
         dst.path().to_path_buf(),
-        FlashingSdLinuxConfig::sysconfig(Some("beagle".into()), None, None, None, None, None, None),
+        FlashingSdLinuxConfig::sysconfig(Some("beagle"), None, None, None, None, None, None),
     )
     .flash(None, None)
     .expect("flashing a GPT image with a bootfs archive and customization should succeed");

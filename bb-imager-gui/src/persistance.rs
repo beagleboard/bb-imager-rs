@@ -188,12 +188,16 @@ impl SdSysconfCustomization {
     #[cfg(feature = "sd")]
     pub(crate) fn sysconfig(self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
-            self.hostname.map(Into::into),
-            self.timezone.map(|x| x.to_string()).map(Into::into),
-            self.keymap.map(Into::into),
-            self.user.map(|x| (x.username.into(), x.password.into())),
-            self.wifi.map(|x| (x.ssid.into(), x.password.into())),
-            self.ssh.map(Into::into),
+            self.hostname.as_deref(),
+            self.timezone.map(|x| x.to_string()).as_deref(),
+            self.keymap.as_deref(),
+            self.user
+                .as_ref()
+                .map(|x| (x.username.as_ref(), x.password.as_ref())),
+            self.wifi
+                .as_ref()
+                .map(|x| (x.ssid.as_ref(), x.password.as_ref())),
+            self.ssh.as_deref(),
             self.usb_enable_dhcp,
         )
     }
