@@ -61,7 +61,10 @@ fn sd_modifications_common_lists_configured_fields() {
         timezone: Some("UTC".parse().unwrap()),
         keymap: Some("us".into()),
         ssh: Some("k".into()),
-        user: Some(SdCustomizationUser::new("u".into(), "p".into())),
+        user: Some(SdCustomizationUser {
+            username: "u".into(),
+            password: "p".into(),
+        }),
         wifi: Some(SdCustomizationWifi::default()),
         ..Default::default()
     };
@@ -242,7 +245,10 @@ fn flashing_customization_round_trips_through_the_page_types() {
     let sysconf = SdSysconfCustomization {
         hostname: Some("beagle".into()),
         keymap: Some("us".into()),
-        user: Some(SdCustomizationUser::new("beagle".into(), "pw".into())),
+        user: Some(SdCustomizationUser {
+            username: "beagle".into(),
+            password: "pw".into(),
+        }),
         usb_enable_dhcp: Some(true),
         ..Default::default()
     };

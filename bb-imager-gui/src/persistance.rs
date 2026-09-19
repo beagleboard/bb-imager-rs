@@ -2,6 +2,7 @@
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -56,17 +57,17 @@ pub(crate) struct SdCustomization {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SdSysconfCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) hostname: Option<String>,
+    pub(crate) hostname: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) timezone: Option<chrono_tz::Tz>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) keymap: Option<String>,
+    pub(crate) keymap: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) user: Option<SdCustomizationUser>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) wifi: Option<SdCustomizationWifi>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) ssh: Option<String>,
+    pub(crate) ssh: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) usb_enable_dhcp: Option<bool>,
 }
@@ -74,7 +75,7 @@ pub(crate) struct SdSysconfCustomization {
 impl From<SdSysconfCustomization> for bb_imager_ui::configuration::CloudInit {
     fn from(value: SdSysconfCustomization) -> Self {
         Self {
-            hostname: value.hostname.map(Into::into),
+            hostname: value.hostname,
             timezone: value.timezone,
             // The stored keymap is a `String`; the page works in the
             // `&'static str`s from `KEYMAP_LAYOUTS`, so it has to be resolved
@@ -83,9 +84,9 @@ impl From<SdSysconfCustomization> for bb_imager_ui::configuration::CloudInit {
                 .keymap
                 .as_deref()
                 .and_then(crate::constants::keymap_layout),
-            user: value.user.map(|u| (u.username.into(), u.password.into())),
-            wifi: value.wifi.map(|w| (w.ssid.into(), w.password.into())),
-            ssh: value.ssh.map(Into::into).unwrap_or_default(),
+            user: value.user.map(|u| (u.username, u.password)),
+            wifi: value.wifi.map(|w| (w.ssid, w.password)),
+            ssh: value.ssh.unwrap_or_default(),
         }
     }
 }
@@ -102,21 +103,19 @@ impl From<SdSysconfCustomization> for bb_imager_ui::configuration::SysConfig {
 impl From<&bb_imager_ui::configuration::CloudInit> for SdSysconfCustomization {
     fn from(value: &bb_imager_ui::configuration::CloudInit) -> Self {
         Self {
-            hostname: value.hostname.as_ref().map(ToString::to_string),
+            hostname: value.hostname.clone(),
             timezone: value.timezone,
             keymap: value.keymap.map(Into::into),
-            user: value.user.as_ref().map(|(username, password)| {
-                SdCustomizationUser::new(username.to_string(), password.to_string())
-            }),
+            user: value
+                .user
+                .clone()
+                .map(|(username, password)| SdCustomizationUser { username, password }),
             wifi: value
                 .wifi
-                .as_ref()
-                .map(|(ssid, password)| SdCustomizationWifi {
-                    ssid: ssid.to_string(),
-                    password: password.to_string(),
-                }),
+                .clone()
+                .map(|(ssid, password)| SdCustomizationWifi { ssid, password }),
             // An unset SSH key is the empty string in the page, but absent here.
-            ssh: (!value.ssh.is_empty()).then(|| value.ssh.to_string()),
+            ssh: (!value.ssh.is_empty()).then(|| value.ssh.clone()),
             // Cloud-init has no USB DHCP toggle to report, so that field keeps
             // whatever the platform defaults to.
             ..Default::default()
@@ -188,26 +187,23 @@ impl SdSysconfCustomization {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomizationUser {
-    pub(crate) username: String,
-    pub(crate) password: String,
-}
-
-impl SdCustomizationUser {
-    pub(crate) const fn new(username: String, password: String) -> Self {
-        Self { username, password }
-    }
+    pub(crate) username: Arc<str>,
+    pub(crate) password: Arc<str>,
 }
 
 impl Default for SdCustomizationUser {
     fn default() -> Self {
-        Self::new(crate::helpers::default_user().to_owned(), String::new())
+        Self {
+            username: crate::helpers::default_user().into(),
+            password: "".into(),
+        }
     }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SdCustomizationWifi {
-    pub(crate) ssid: String,
-    pub(crate) password: String,
+    pub(crate) ssid: Arc<str>,
+    pub(crate) password: Arc<str>,
 }
 
 #[cfg(test)]
@@ -244,8 +240,8 @@ mod tests {
         let back: GuiConfiguration = serde_json::from_str(&json).unwrap();
 
         assert_eq!(
-            back.sd_customization.sysconf.hostname,
-            Some("host".to_string())
+            back.sd_customization.sysconf.hostname.as_deref(),
+            Some("host")
         );
     }
 
@@ -255,7 +251,10 @@ mod tests {
         // Exercises the sysconfig/cloudinit bridges into bb_flasher.
         let base = SdSysconfCustomization {
             hostname: Some("beagle".into()),
-            user: Some(SdCustomizationUser::new("beagle".into(), "pw".into())),
+            user: Some(SdCustomizationUser {
+                username: "beagle".into(),
+                password: "pw".into(),
+            }),
             wifi: Some(SdCustomizationWifi {
                 ssid: "net".into(),
                 password: "pw".into(),
