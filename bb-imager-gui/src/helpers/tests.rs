@@ -56,13 +56,15 @@ fn flasher_supported_matches_enabled_features() {
 fn sd_modifications_common_lists_configured_fields() {
     assert!(sd_modifications_common(&SdSysconfCustomization::default()).is_empty());
 
-    let full = SdSysconfCustomization::default()
-        .update_hostname(Some("h".into()))
-        .update_timezone(Some("UTC".parse().unwrap()))
-        .update_keymap(Some("us".into()))
-        .update_ssh(Some("k".into()))
-        .update_user(Some(SdCustomizationUser::new("u".into(), "p".into())))
-        .update_wifi(Some(SdCustomizationWifi::default()));
+    let full = SdSysconfCustomization {
+        hostname: Some("h".into()),
+        timezone: Some("UTC".parse().unwrap()),
+        keymap: Some("us".into()),
+        ssh: Some("k".into()),
+        user: Some(SdCustomizationUser::new("u".into(), "p".into())),
+        wifi: Some(SdCustomizationWifi::default()),
+        ..Default::default()
+    };
     let mods = sd_modifications_common(&full);
     assert_eq!(mods.len(), 6);
     assert!(mods.contains(&"User account configured"));
@@ -82,14 +84,20 @@ fn modifications_reports_only_what_gets_written() {
         assert!(c.modifications().is_empty());
     }
 
-    let hostname = SdSysconfCustomization::default().update_hostname(Some("h".into()));
+    let hostname = SdSysconfCustomization {
+        hostname: Some("h".into()),
+        ..Default::default()
+    };
     assert_eq!(
         FlashingCustomization::LinuxSdCloudInit(hostname.clone()).modifications(),
         ["Hostname configured"].into()
     );
 
     // USB DHCP is sysconf-only: cloud-init has no such field to write.
-    let dhcp = hostname.update_usb_enable_dhcp(Some(true));
+    let dhcp = SdSysconfCustomization {
+        usb_enable_dhcp: Some(true),
+        ..hostname.clone()
+    };
     assert_eq!(
         FlashingCustomization::LinuxSdSysconfig(dhcp.clone()).modifications(),
         ["Hostname configured", "USB DHCP enabled"].into()
@@ -231,11 +239,13 @@ fn flashing_customization_new_selects_variant_by_flasher() {
 
 #[test]
 fn flashing_customization_round_trips_through_the_page_types() {
-    let sysconf = SdSysconfCustomization::default()
-        .update_hostname(Some("beagle".into()))
-        .update_keymap(Some("us".into()))
-        .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
-        .update_usb_enable_dhcp(Some(true));
+    let sysconf = SdSysconfCustomization {
+        hostname: Some("beagle".into()),
+        keymap: Some("us".into()),
+        user: Some(SdCustomizationUser::new("beagle".into(), "pw".into())),
+        usb_enable_dhcp: Some(true),
+        ..Default::default()
+    };
 
     let orig = FlashingCustomization::LinuxSdSysconfig(sysconf);
     let page: bb_imager_ui::configuration::Customization = orig.clone().into();
@@ -259,9 +269,10 @@ fn flashing_customization_round_trips_through_the_page_types() {
 
     // Cloud-init has no USB DHCP toggle to round-trip, so the field is left at
     // whatever the platform defaults to rather than being carried across.
-    let cloudinit = FlashingCustomization::LinuxSdCloudInit(
-        SdSysconfCustomization::default().update_hostname(Some("beagle".into())),
-    );
+    let cloudinit = FlashingCustomization::LinuxSdCloudInit(SdSysconfCustomization {
+        hostname: Some("beagle".into()),
+        ..Default::default()
+    });
     let page: bb_imager_ui::configuration::Customization = cloudinit.into();
     match (&page).into() {
         FlashingCustomization::LinuxSdCloudInit(c) => {

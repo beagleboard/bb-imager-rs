@@ -101,33 +101,35 @@ impl From<SdSysconfCustomization> for bb_imager_ui::configuration::SysConfig {
 
 impl From<&bb_imager_ui::configuration::CloudInit> for SdSysconfCustomization {
     fn from(value: &bb_imager_ui::configuration::CloudInit) -> Self {
-        // Cloud-init has no USB DHCP toggle to report, so that field keeps
-        // whatever the platform defaults to.
-        Self::default()
-            .update_hostname(value.hostname.as_ref().map(ToString::to_string))
-            .update_timezone(value.timezone)
-            .update_keymap(value.keymap.map(Into::into))
-            .update_user(value.user.as_ref().map(|(username, password)| {
+        Self {
+            hostname: value.hostname.as_ref().map(ToString::to_string),
+            timezone: value.timezone,
+            keymap: value.keymap.map(Into::into),
+            user: value.user.as_ref().map(|(username, password)| {
                 SdCustomizationUser::new(username.to_string(), password.to_string())
-            }))
-            .update_wifi(
-                value
-                    .wifi
-                    .as_ref()
-                    .map(|(ssid, password)| SdCustomizationWifi {
-                        ssid: ssid.to_string(),
-                        password: password.to_string(),
-                    }),
-            )
+            }),
+            wifi: value
+                .wifi
+                .as_ref()
+                .map(|(ssid, password)| SdCustomizationWifi {
+                    ssid: ssid.to_string(),
+                    password: password.to_string(),
+                }),
             // An unset SSH key is the empty string in the page, but absent here.
-            .update_ssh((!value.ssh.is_empty()).then(|| value.ssh.to_string()))
+            ssh: (!value.ssh.is_empty()).then(|| value.ssh.to_string()),
+            // Cloud-init has no USB DHCP toggle to report, so that field keeps
+            // whatever the platform defaults to.
+            ..Default::default()
+        }
     }
 }
 
 impl From<&bb_imager_ui::configuration::SysConfig> for SdSysconfCustomization {
     fn from(value: &bb_imager_ui::configuration::SysConfig) -> Self {
-        SdSysconfCustomization::from(&value.common)
-            .update_usb_enable_dhcp(Some(value.usb_enable_dhcp))
+        Self {
+            usb_enable_dhcp: Some(value.usb_enable_dhcp),
+            ..(&value.common).into()
+        }
     }
 }
 
@@ -150,41 +152,6 @@ impl Default for SdSysconfCustomization {
 }
 
 impl SdSysconfCustomization {
-    pub(crate) fn update_hostname(mut self, t: Option<String>) -> Self {
-        self.hostname = t;
-        self
-    }
-
-    pub(crate) fn update_timezone(mut self, t: Option<chrono_tz::Tz>) -> Self {
-        self.timezone = t;
-        self
-    }
-
-    pub(crate) fn update_keymap(mut self, t: Option<String>) -> Self {
-        self.keymap = t;
-        self
-    }
-
-    pub(crate) fn update_user(mut self, t: Option<SdCustomizationUser>) -> Self {
-        self.user = t;
-        self
-    }
-
-    pub(crate) fn update_wifi(mut self, t: Option<SdCustomizationWifi>) -> Self {
-        self.wifi = t;
-        self
-    }
-
-    pub(crate) fn update_ssh(mut self, t: Option<String>) -> Self {
-        self.ssh = t;
-        self
-    }
-
-    pub(crate) fn update_usb_enable_dhcp(mut self, t: Option<bool>) -> Self {
-        self.usb_enable_dhcp = t;
-        self
-    }
-
     #[cfg(feature = "sd")]
     pub(crate) fn sysconfig(&self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
@@ -253,32 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn sysconf_builders_populate_all_fields() {
-        let cfg = SdSysconfCustomization::default()
-            .update_hostname(Some("beagle".into()))
-            .update_timezone(Some("UTC".parse().unwrap()))
-            .update_keymap(Some("us".into()))
-            .update_ssh(Some("ssh-key".into()))
-            .update_usb_enable_dhcp(Some(true))
-            .update_wifi(Some(SdCustomizationWifi {
-                ssid: "net".into(),
-                password: String::new(),
-            }))
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())));
-
-        assert_eq!(cfg.hostname.as_deref(), Some("beagle"));
-        assert_eq!(cfg.timezone, Some(chrono_tz::Tz::UTC));
-        assert_eq!(cfg.keymap.as_deref(), Some("us"));
-        assert_eq!(cfg.ssh.as_deref(), Some("ssh-key"));
-        assert_eq!(cfg.usb_enable_dhcp, Some(true));
-        assert_eq!(cfg.wifi.as_ref().map(|w| w.ssid.as_str()), Some("net"));
-        assert_eq!(
-            cfg.user.as_ref().map(|u| u.username.as_str()),
-            Some("beagle")
-        );
-    }
-
-    #[test]
     fn sysconf_default_usb_dhcp_is_platform_specific() {
         let default = SdSysconfCustomization::default();
         if cfg!(target_os = "macos") {
@@ -312,14 +253,16 @@ mod tests {
     #[test]
     fn sysconf_converts_to_flasher_configs_without_panicking() {
         // Exercises the sysconfig/cloudinit bridges into bb_flasher.
-        let base = SdSysconfCustomization::default()
-            .update_hostname(Some("beagle".into()))
-            .update_user(Some(SdCustomizationUser::new("beagle".into(), "pw".into())))
-            .update_wifi(Some(SdCustomizationWifi {
+        let base = SdSysconfCustomization {
+            hostname: Some("beagle".into()),
+            user: Some(SdCustomizationUser::new("beagle".into(), "pw".into())),
+            wifi: Some(SdCustomizationWifi {
                 ssid: "net".into(),
                 password: "pw".into(),
-            }));
-        let _ = base.clone().sysconfig();
+            }),
+            ..Default::default()
+        };
+        let _ = base.sysconfig();
         let _ = base.cloudinit();
     }
 }
