@@ -147,12 +147,12 @@ fn flash_internal(
                 || usb_enable_dhcp
             {
                 let mut customization = bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
-                    hostname.clone(),
-                    timezone.clone(),
-                    keymap.clone(),
-                    user.clone(),
-                    wifi.clone(),
-                    ssh_key.clone(),
+                    hostname.as_deref(),
+                    timezone.as_deref(),
+                    keymap.as_deref(),
+                    user.as_ref().map(|(u, p)| (u.as_ref(), p.as_ref())),
+                    wifi.as_ref().map(|(s, p)| (s.as_ref(), p.as_ref())),
+                    ssh_key.as_deref(),
                     Some(usb_enable_dhcp),
                 );
 

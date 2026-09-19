@@ -83,31 +83,31 @@ fn sysconf_w(sysconf: &mut Vec<u8>, key: &str, value: &str) {
 
 impl FlashingSdLinuxConfig {
     pub fn sysconfig(
-        hostname: Option<Box<str>>,
-        timezone: Option<Box<str>>,
-        keymap: Option<Box<str>>,
-        user: Option<(Box<str>, Box<str>)>,
-        wifi: Option<(Box<str>, Box<str>)>,
-        ssh: Option<Box<str>>,
+        hostname: Option<&str>,
+        timezone: Option<&str>,
+        keymap: Option<&str>,
+        user: Option<(&str, &str)>,
+        wifi: Option<(&str, &str)>,
+        ssh: Option<&str>,
         usb_enable_dhcp: Option<bool>,
     ) -> Self {
         let mut content = Vec::<u8>::new();
 
         if let Some(h) = hostname {
-            sysconf_w(&mut content, "hostname", &h);
+            sysconf_w(&mut content, "hostname", h);
         }
         if let Some(tz) = timezone {
-            sysconf_w(&mut content, "timezone", &tz);
+            sysconf_w(&mut content, "timezone", tz);
         }
         if let Some(k) = keymap {
-            sysconf_w(&mut content, "keymap", &k);
+            sysconf_w(&mut content, "keymap", k);
         }
         if let Some((u, p)) = user {
-            sysconf_w(&mut content, "user_name", &u);
-            sysconf_w(&mut content, "user_password", &p);
+            sysconf_w(&mut content, "user_name", u);
+            sysconf_w(&mut content, "user_password", p);
         }
         if let Some(x) = ssh {
-            sysconf_w(&mut content, "user_authorized_key", &x);
+            sysconf_w(&mut content, "user_authorized_key", x);
         }
         if Some(true) == usb_enable_dhcp {
             sysconf_w(&mut content, "usb_enable_dhcp", "yes");
@@ -118,10 +118,10 @@ impl FlashingSdLinuxConfig {
                 sysconf_w(&mut content, "iwd_psk_file", &format!("{ssid}.psk"));
 
                 Self(vec![
-                    ("sysconf.txt".to_string().into(), Some(content.into())),
+                    ("sysconf.txt".into(), Some(content.into())),
                     // The psk file lives in `services/`, which images are not
                     // guaranteed to already have.
-                    ("services".to_string().into(), None),
+                    ("services".into(), None),
                     (
                         format!("services/{ssid}.psk").into(),
                         Some(
@@ -132,10 +132,7 @@ impl FlashingSdLinuxConfig {
                     ),
                 ])
             }
-            None => Self(vec![(
-                "sysconf.txt".to_string().into(),
-                Some(content.into()),
-            )]),
+            None => Self(vec![("sysconf.txt".into(), Some(content.into()))]),
         }
     }
 
@@ -149,7 +146,7 @@ impl FlashingSdLinuxConfig {
     ) -> Self {
         let data = cloud_init::CloudInitConfig::new(hostname, timezone, keymap, user, wifi, ssh);
         Self(vec![(
-            "cloud-init".to_string().into(),
+            "cloud-init".into(),
             Some(data.to_file_data()),
         )])
     }

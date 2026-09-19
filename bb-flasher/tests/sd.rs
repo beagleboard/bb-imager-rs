@@ -128,7 +128,7 @@ fn flash_with_wifi(mock: &MockSd) {
             None,
             None,
             None,
-            Some(("mynet".into(), "hunter2".into())),
+            Some(("mynet", "hunter2")),
             None,
             None,
         ),
