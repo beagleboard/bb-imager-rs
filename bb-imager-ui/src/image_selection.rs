@@ -67,6 +67,7 @@ pub struct ImageDetails {
     pub init_formats: &'static [config::InitFormat],
     pub init_format: config::InitFormat,
     pub support: Option<url::Url>,
+    pub sbom: Option<url::Url>,
 }
 
 #[derive(Default, Debug)]
@@ -250,6 +251,11 @@ fn os_view_pane<'a>(
 
     if let Some(x) = img.support.as_ref() {
         let row = widget::row![button("SUPPORT").on_press(Message::OpenUrl(x.clone()))].spacing(16);
+        col = col.push(widget::center(row));
+    }
+
+    if let Some(x) = img.sbom.as_ref() {
+        let row = widget::row![button("SBOM").on_press(Message::OpenUrl(x.clone()))].spacing(16);
         col = col.push(widget::center(row));
     }
 

@@ -46,6 +46,7 @@ impl FedoraItem {
             devices: ["beagle-am67".into()].into(),
             init_format: bb_config::config::InitFormat::None,
             bmap: None,
+            sbom: None,
             info_text: None,
             support: None,
         })

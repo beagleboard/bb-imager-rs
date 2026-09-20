@@ -66,6 +66,7 @@ impl ArbianImage {
             devices: Box::new([dev.into()]),
             init_format: bb_config::config::InitFormat::Armbian,
             bmap: None,
+            sbom: None,
             info_text: None,
             support: None,
         })

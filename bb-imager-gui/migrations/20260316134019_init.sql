@@ -71,6 +71,7 @@ CREATE TABLE os_images(
 	release_date TEXT NOT NULL,
 	init_format INTEGER NOT NULL,
 	bmap TEXT,
+	sbom TEXT,
 	info_text TEXT,
         support TEXT,
         remote_config_id INTEGER DEFAULT NULL,

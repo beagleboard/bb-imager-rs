@@ -162,6 +162,7 @@ impl State {
             init_formats: &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
             init_format: config::InitFormat::Sysconf,
             support: url::Url::parse("https://forum.beagleboard.org/").ok(),
+            sbom: None,
         })
     }
 }
