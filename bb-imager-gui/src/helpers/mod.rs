@@ -202,13 +202,6 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
-/// Whether this build runs inside a sandbox (Flatpak/snap), where the app
-/// cannot install udev rules of its own. This is set at build time by the
-/// sandbox packages; no runtime detection is needed.
-pub(crate) fn is_sandboxed() -> bool {
-    cfg!(feature = "sandboxed")
-}
-
 pub(crate) fn system_timezone() -> Option<chrono_tz::Tz> {
     static SYSTEM_TIMEZONE: LazyLock<Option<chrono_tz::Tz>> =
         LazyLock::new(|| iana_time_zone::get_timezone().ok()?.parse().ok());

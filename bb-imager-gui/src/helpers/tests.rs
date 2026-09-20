@@ -499,15 +499,3 @@ async fn plain_sd_image_ignores_the_boards_bootfs() {
     res.expect("a plain SD image must not pick up the board's bootfs");
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);
 }
-
-#[cfg(not(feature = "sandboxed"))]
-#[test]
-fn non_sandboxed_build_skips_the_udev_notice() {
-    assert!(!super::is_sandboxed());
-}
-
-#[cfg(feature = "sandboxed")]
-#[test]
-fn sandboxed_build_shows_the_udev_notice() {
-    assert!(super::is_sandboxed());
-}

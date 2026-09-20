@@ -119,7 +119,7 @@ impl BBImager {
         }));
         let updater_task = common.updater_task();
 
-        let app = if helpers::is_sandboxed() && !common.app_config.udev_notice_shown {
+        let app = if cfg!(feature = "sandboxed") && !common.app_config.udev_notice_shown {
             Self::sandbox_notice(common)
         } else {
             Self::choose_board(common)
