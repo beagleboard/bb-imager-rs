@@ -70,15 +70,11 @@ impl BBImagerCommon {
 #[derive(Debug)]
 pub(crate) struct SandboxNoticeState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) state: bb_imager_ui::sandbox_notice::State,
 }
 
 impl SandboxNoticeState {
     pub(crate) fn new(common: BBImagerCommon) -> Self {
-        Self {
-            common,
-            state: bb_imager_ui::sandbox_notice::State::new(),
-        }
+        Self { common }
     }
 }
 

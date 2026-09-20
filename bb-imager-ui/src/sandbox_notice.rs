@@ -18,26 +18,7 @@ fn udev_rules_url() -> url::Url {
     .unwrap()
 }
 
-#[derive(Debug)]
-pub struct State {
-    pub(crate) _private: (),
-}
-
-impl State {
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    let _ = state;
-
+pub fn view(scroll_id: widget::Id) -> Element<'static, Message> {
     let col = widget::column![
         widget::svg(constants::INFO_ICON.clone())
             .height(64)

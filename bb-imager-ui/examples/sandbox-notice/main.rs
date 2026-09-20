@@ -1,10 +1,10 @@
 use bb_imager_ui::{Message, sandbox_notice};
 
-struct State(sandbox_notice::State);
+struct State;
 
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
-        (State(sandbox_notice::State::new()), iced::Task::none())
+        (State, iced::Task::none())
     }
 }
 
@@ -13,6 +13,6 @@ fn main() {
     bb_imager_ui::application(app).run().unwrap()
 }
 
-fn view(s: &State) -> iced::Element<'_, Message> {
-    sandbox_notice::view(&s.0, iced::widget::Id::unique())
+fn view(_: &State) -> iced::Element<'_, Message> {
+    sandbox_notice::view(iced::widget::Id::unique())
 }
