@@ -74,11 +74,16 @@ enum BBImager {
     FlashingFail(state::FlashingFailState),
     FlashingSuccess(state::FlashingSuccessState),
     AppInfo(state::OverlayState),
+    SandboxNotice(state::SandboxNoticeState),
 }
 
 impl BBImager {
     fn choose_board(common: BBImagerCommon) -> Self {
         Self::ChooseBoard(state::ChooseBoardState::new(common))
+    }
+
+    fn sandbox_notice(common: BBImagerCommon) -> Self {
+        Self::SandboxNotice(state::SandboxNoticeState::new(common))
     }
 
     fn new() -> (Self, Task<BBImagerMessage>) {
@@ -114,8 +119,14 @@ impl BBImager {
         }));
         let updater_task = common.updater_task();
 
+        let app = if helpers::is_sandboxed() && !common.app_config.udev_notice_shown {
+            Self::sandbox_notice(common)
+        } else {
+            Self::choose_board(common)
+        };
+
         (
-            Self::choose_board(common),
+            app,
             Task::batch([db_task, updater_task]),
         )
     }
@@ -132,6 +143,7 @@ impl BBImager {
             BBImager::FlashingFail(x) => &mut x.common,
             BBImager::FlashingSuccess(x) => &mut x.common,
             BBImager::AppInfo(x) => x.common_mut(),
+            BBImager::SandboxNotice(x) => &mut x.common,
             BBImager::Dummy => panic!("Invalid State"),
         }
     }
@@ -148,6 +160,7 @@ impl BBImager {
             BBImager::FlashingFail(x) => &x.common,
             BBImager::FlashingSuccess(x) => &x.common,
             BBImager::AppInfo(x) => x.common(),
+            BBImager::SandboxNotice(x) => &x.common,
             BBImager::Dummy => panic!("Invalid state"),
         }
     }
@@ -169,6 +182,7 @@ impl BBImager {
             BBImager::Dummy | BBImager::AppInfo(_) | BBImager::ChooseBoard(_) => {
                 panic!("Unexpected screen")
             }
+            BBImager::SandboxNotice(x) => BBImager::choose_board(x.common),
         };
 
         if let BBImager::ChooseBoard(x) = self {
@@ -312,6 +326,7 @@ impl BBImager {
             }
             Self::AppInfo(inner) => inner.page.into(),
             Self::Dummy
+            | Self::SandboxNotice(_)
             | Self::FlashingSuccess(_)
             | Self::FlashingFail(_)
             | Self::FlashingCancel(_)
@@ -438,7 +453,8 @@ impl BBImager {
             | Self::FlashingFail(_)
             | Self::FlashingCancel(_)
             | Self::FlashingSuccess(_)
-            | Self::AppInfo(_) => {
+            | Self::AppInfo(_)
+            | Self::SandboxNotice(_) => {
                 panic!("Unexpected message")
             }
         };

@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct GuiConfiguration {
     #[serde(default)]
     pub(crate) sd_customization: SdCustomization,
+    /// Whether the sandbox udev notice has been shown, so it only appears once.
+    #[serde(default)]
+    pub(crate) udev_notice_shown: bool,
 }
 
 impl GuiConfiguration {
@@ -234,6 +237,7 @@ mod tests {
                     ..Default::default()
                 },
             },
+            udev_notice_shown: true,
         };
 
         let json = serde_json::to_string(&gui).unwrap();
@@ -243,6 +247,14 @@ mod tests {
             back.sd_customization.sysconf.hostname.as_deref(),
             Some("host")
         );
+        assert!(back.udev_notice_shown);
+    }
+
+    #[test]
+    fn udev_notice_shown_defaults_to_false() {
+        // A config written before the field existed must load as "not shown".
+        let back: GuiConfiguration = serde_json::from_str("{}").unwrap();
+        assert!(!back.udev_notice_shown);
     }
 
     #[cfg(feature = "sd")]

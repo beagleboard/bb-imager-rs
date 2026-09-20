@@ -10,6 +10,7 @@ pub mod flashing;
 mod helpers;
 pub mod image_selection;
 pub mod review;
+pub mod sandbox_notice;
 
 #[derive(Clone, Debug)]
 pub enum Message {
@@ -56,6 +57,8 @@ pub enum Message {
     FlashCancel,
     // Retry flashing
     Retry,
+    /// The user dismissed the first-run udev notice on a sandboxed install.
+    DismissSandboxNotice,
 }
 
 pub fn application<A>(

@@ -65,6 +65,23 @@ impl BBImagerCommon {
     }
 }
 
+/// The first-run udev notice for sandboxed installs. Static page; only the
+/// shared `common` travels through it.
+#[derive(Debug)]
+pub(crate) struct SandboxNoticeState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) state: bb_imager_ui::sandbox_notice::State,
+}
+
+impl SandboxNoticeState {
+    pub(crate) fn new(common: BBImagerCommon) -> Self {
+        Self {
+            common,
+            state: bb_imager_ui::sandbox_notice::State::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
@@ -571,7 +588,7 @@ impl TryFrom<BBImager> for OverlayData {
             BBImager::FlashingCancel(x) => Ok(Self::FlashingCancel(x)),
             BBImager::FlashingFail(x) => Ok(Self::FlashingFail(x)),
             BBImager::FlashingSuccess(x) => Ok(Self::FlashingSuccess(x)),
-            BBImager::Dummy | BBImager::AppInfo(_) => Err(()),
+            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::SandboxNotice(_) => Err(()),
         }
     }
 }

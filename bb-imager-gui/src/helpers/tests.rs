@@ -499,3 +499,13 @@ async fn plain_sd_image_ignores_the_boards_bootfs() {
     res.expect("a plain SD image must not pick up the board's bootfs");
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);
 }
+
+#[test]
+fn sandbox_detection_checks_flatpak_and_snap() {
+    assert!(sandboxed(true, None));
+    assert!(sandboxed(
+        false,
+        Some(std::ffi::OsStr::new("snap").to_owned()),
+    ));
+    assert!(!sandboxed(false, None));
+}

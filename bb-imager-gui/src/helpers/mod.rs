@@ -202,6 +202,17 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
+/// True inside a Flatpak or snap sandbox, where the packaged app cannot
+/// install udev rules of its own.
+pub(crate) fn is_sandboxed() -> bool {
+    sandboxed(std::path::Path::new("/.flatpak-info").exists(), std::env::var_os("SNAP"))
+}
+
+/// Pure detection used by [`is_sandboxed`] so the logic is unit-testable.
+fn sandboxed(flatpak_info: bool, snap: Option<std::ffi::OsString>) -> bool {
+    flatpak_info || snap.is_some()
+}
+
 pub(crate) fn system_timezone() -> Option<chrono_tz::Tz> {
     static SYSTEM_TIMEZONE: LazyLock<Option<chrono_tz::Tz>> =
         LazyLock::new(|| iana_time_zone::get_timezone().ok()?.parse().ok());
