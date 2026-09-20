@@ -7,7 +7,7 @@
 use iced::widget::{self, button, text};
 use iced::{Center, Element, Fill};
 
-use crate::helpers::page_type3;
+use crate::helpers::{VIEW_COL_PADDING, page_type3};
 use crate::{Message, constants};
 
 /// The URL of the shipped udev rules, as installed from a regular package.
@@ -33,7 +33,8 @@ pub fn view(scroll_id: widget::Id) -> Element<'static, Message> {
         ),
     ]
     .align_x(Center)
-    .spacing(16);
+    .spacing(16)
+    .padding(VIEW_COL_PADDING);
 
     let view = widget::scrollable(
         widget::container(col)
