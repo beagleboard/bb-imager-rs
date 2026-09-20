@@ -133,6 +133,15 @@ impl From<Child> for MountPoint {
     }
 }
 
+/// An untagged helper for reading a number `lsblk` may emit either as a JSON
+/// number or as a numeric string.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum U64OrString {
+    U64(u64),
+    String(String),
+}
+
 /// Deserialize an `Option<u64>` that `lsblk` may emit either as a JSON number
 /// or as a numeric string. A non-numeric string is a parse error rather than a
 /// silent fallback.
@@ -140,13 +149,6 @@ fn deserialize_fssize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum U64OrString {
-        U64(u64),
-        String(String),
-    }
-
     match Option::<U64OrString>::deserialize(deserializer)? {
         None => Ok(None),
         Some(U64OrString::U64(n)) => Ok(Some(n)),
