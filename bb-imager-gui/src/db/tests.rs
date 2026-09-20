@@ -395,6 +395,7 @@ fn add_config_inserts_os_image_for_board() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -477,6 +478,7 @@ fn os_image_by_id_returns_correct_data() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
+        sbom: None,
         info_text: Some("Test info".into()),
         support: Some(
             "https://github.com/beagleboard/bb-imager-rs"
@@ -578,6 +580,7 @@ fn add_config_inserts_os_sublist_for_board() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -663,6 +666,7 @@ fn nested_os_sublists_propagate_board_support() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -883,6 +887,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -989,6 +994,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
         devices: Box::new(["test_board".into()]),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -1362,6 +1368,7 @@ fn os_image_json_by_id_round_trips_image() {
         devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::Sysconf,
         bmap: Some("https://example.com/os.bmap".try_into().unwrap()),
+        sbom: Some("https://example.com/os.sbom.spdx.json".try_into().unwrap()),
         info_text: Some("Test info".into()),
         support: Some(
             "https://github.com/beagleboard/bb-imager-rs"
@@ -1419,6 +1426,7 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
         devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -1474,6 +1482,7 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
         devices: ["test_board".into()].into(),
         init_format: bb_config::config::InitFormat::None,
         bmap: None,
+        sbom: None,
         info_text: None,
         support: None,
     };
@@ -1584,6 +1593,7 @@ fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
                 devices: Box::new([tag.into()]),
                 init_format: bb_config::config::InitFormat::None,
                 bmap: None,
+                sbom: None,
                 info_text: None,
                 support: None,
             },

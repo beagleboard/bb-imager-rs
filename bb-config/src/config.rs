@@ -211,6 +211,8 @@ pub struct OsImage {
     pub init_format: InitFormat,
     /// Bmap file for the image
     pub bmap: Option<Url>,
+    /// SPDX Software Bill of Materials for the image
+    pub sbom: Option<Url>,
     /// Special Instructions for flashing board.
     pub info_text: Option<Box<str>>,
     /// URL to support page for image. This is where issues should be reported.

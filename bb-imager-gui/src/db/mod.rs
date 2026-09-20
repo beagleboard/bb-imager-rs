@@ -62,6 +62,7 @@ pub(crate) struct OsImage {
     pub(crate) release_date: chrono::NaiveDate,
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Box<Url>>,
+    pub(crate) sbom: Option<Box<Url>>,
     pub(crate) info_text: Option<Arc<str>>,
     pub(crate) support: Option<Url>,
 }
@@ -80,6 +81,7 @@ impl OsImage {
             release_date: value.get("release_date")?,
             init_format: value.get("init_format")?,
             bmap: value.get::<_, Option<Url>>("bmap")?.map(Box::new),
+            sbom: value.get::<_, Option<Url>>("sbom")?.map(Box::new),
             info_text: value.get("info_text")?,
             support: value.get("support")?,
         })
@@ -385,8 +387,8 @@ impl Db {
             r#"
             INSERT INTO os_images(name, parent_id, description, icon, url,
                 image_download_size, image_download_sha256, extract_size,
-                release_date, init_format, bmap, info_text, remote_config_id, support)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                release_date, init_format, bmap, sbom, info_text, remote_config_id, support)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
         )?;
         let id = stmt.insert(rusqlite::params![
@@ -401,6 +403,7 @@ impl Db {
             img.release_date,
             img.init_format,
             img.bmap,
+            img.sbom,
             img.info_text,
             remote_config_id,
             img.support
@@ -513,7 +516,7 @@ impl Db {
             r#"
             SELECT id, name, description, icon, url, image_download_size,
                 image_download_sha256, extract_size, release_date, init_format,
-                bmap, info_text, support
+                bmap, sbom, info_text, support
             FROM os_images WHERE id = $1"#,
         )?;
         stmt.query_row([id], OsImage::from_row)
@@ -801,7 +804,7 @@ impl Db {
         let mut stmt = db.prepare(
             r#"
             SELECT name, description, icon, url, image_download_size, image_download_sha256,
-                extract_size, release_date, init_format, bmap, info_text, support
+                extract_size, release_date, init_format, bmap, sbom, info_text, support
             FROM os_images WHERE id = $1"#,
         )?;
 
@@ -820,6 +823,7 @@ impl Db {
                 release_date: value.get("release_date")?,
                 init_format: value.get("init_format")?,
                 bmap: value.get("bmap")?,
+                sbom: value.get("sbom")?,
                 info_text: value.get("info_text")?,
                 support: value.get("support")?,
                 devices,

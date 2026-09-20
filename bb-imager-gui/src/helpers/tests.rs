@@ -132,6 +132,7 @@ fn remote_sd_image(flasher: config::Flasher, init_format: config::InitFormat) ->
             release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
             init_format,
             bmap: None,
+            sbom: None,
             info_text: None,
             support: None,
         },

@@ -28,6 +28,7 @@ pub(crate) enum BoardImage {
         // `Bmap` and its downloader are dead weight.
         #[cfg(feature = "sd")]
         bmap: Option<crate::img::Bmap>,
+        sbom: Option<Url>,
         info_text: Option<Arc<str>>,
         description: Option<String>,
         icon: bb_imager_ui::image_selection::ImageIcon,
@@ -48,6 +49,7 @@ impl BoardImage {
             img: bb_flasher::LocalImage::new(path.into()).into(),
             #[cfg(feature = "sd")]
             bmap: None,
+            sbom: None,
             flasher,
             // Do not try to apply customization for local images
             init_format: config::InitFormat::None,
@@ -78,6 +80,7 @@ impl BoardImage {
             img: RemoteImage::new(&image, downloader.clone(), flasher).into(),
             #[cfg(feature = "sd")]
             bmap: image.bmap.map(|url| crate::img::Bmap { url, downloader }),
+            sbom: image.sbom.map(|url| *url),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
@@ -179,6 +182,13 @@ impl BoardImage {
         match self {
             BoardImage::SdFormat { .. } => None,
             BoardImage::Image { support, .. } => support.as_ref(),
+        }
+    }
+
+    pub(crate) fn sbom(&self) -> Option<&Url> {
+        match self {
+            BoardImage::SdFormat { .. } => None,
+            BoardImage::Image { sbom, .. } => sbom.as_ref(),
         }
     }
 }
@@ -755,6 +765,7 @@ pub(crate) fn image_details(
         init_formats: value.supported_init_formats(),
         init_format: value.init_format(),
         support: value.support().cloned(),
+        sbom: value.sbom().cloned(),
     }
 }
 

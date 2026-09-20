@@ -13,6 +13,7 @@ const OS_IMAGE_JSON: &str = r#"{
     "description": "an image",
     "icon": "https://example.com/icon.png",
     "url": "https://example.com/image.img.xz",
+    "sbom": "https://example.com/image.sbom.spdx.json",
     "image_download_size": 4096,
     "image_download_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "extract_size": 8192,
@@ -97,6 +98,10 @@ fn os_list_item_untagged_disambiguation() {
             assert_eq!(img.name.as_ref(), "Test Image");
             assert_eq!(img.extract_size, 8192);
             assert_eq!(img.init_format, InitFormat::Sysconf);
+            assert_eq!(
+                img.sbom.as_ref().map(url::Url::as_str),
+                Some("https://example.com/image.sbom.spdx.json")
+            );
         }
         other => panic!("expected Image, got {other:?}"),
     }
