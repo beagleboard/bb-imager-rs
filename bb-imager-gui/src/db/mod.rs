@@ -516,7 +516,7 @@ impl Db {
             r#"
             SELECT id, name, description, icon, url, image_download_size,
                 image_download_sha256, extract_size, release_date, init_format,
-bmap, sbom, info_text, support
+                bmap, sbom, info_text, support
             FROM os_images WHERE id = $1"#,
         )?;
         stmt.query_row([id], OsImage::from_row)
