@@ -48,7 +48,7 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
         text(
             "This copy of Beagle Imaging Utility runs sandboxed (Flatpak or snap), so it \
              cannot install the udev rules needed to flash Beagle boards.\n\nCopy the rules \
-             file to /etc/udev/rules.d/ and run udevadm control --reload to grant card access.",
+             file to /etc/udev/rules.d/ and run udevadm control --reload to grant device access.",
         ),
     ]
     .align_x(Center)
