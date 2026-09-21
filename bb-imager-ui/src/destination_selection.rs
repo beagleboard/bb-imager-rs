@@ -60,6 +60,9 @@ pub struct State {
     pub image_file_name: Option<Arc<str>>,
     /// The image's note, else the board's; shown only while nothing is selected.
     pub instruction: Option<Box<str>>,
+    /// Index of the row the cursor is over, for the hover outline. The derived
+    /// "Save To File" row occupies index [`State::destinations`]`::len()`.
+    pub hovered: Option<usize>,
 }
 
 impl Default for State {
@@ -72,6 +75,7 @@ impl Default for State {
             search: "".into(),
             image_file_name: None,
             instruction: None,
+            hovered: None,
         }
     }
 }
@@ -93,7 +97,8 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
     let items = state
         .destinations
         .iter()
-        .map(|dest| {
+        .enumerate()
+        .map(|(index, dest)| {
             let is_selected = match state.selected.as_ref().map(|x| &x.id) {
                 Some(DestId::Device(sel)) => sel.as_ref() == dest.id.as_ref(),
                 _ => false,
@@ -109,13 +114,15 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
             list_item(
                 [device_icon(), label],
                 is_selected,
+                index,
+                state.hovered,
                 Message::SelectDest(dest.id.clone()),
             )
-        })
-        .map(Into::into);
+        });
 
     // Derived here rather than pushed in by the host, so that a refresh which
     // leaves the device list unchanged cannot drop it.
+    let save_index = state.destinations.len();
     let save_to_file: Vec<Element<Message>> = match state.image_file_name.as_ref() {
         Some(name) => {
             let is_selected = state
@@ -131,9 +138,10 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
                         list_label("Save To File").into(),
                     ],
                     is_selected,
+                    save_index,
+                    state.hovered,
                     Message::SelectFileDest(name.clone()),
-                )
-                .into(),
+                ),
             ]
         }
         None => Vec::new(),

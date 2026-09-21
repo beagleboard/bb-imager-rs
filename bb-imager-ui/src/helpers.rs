@@ -132,17 +132,17 @@ pub(crate) fn progress_finish_view<'a>(
     .into()
 }
 
-pub(crate) fn card_btn_style(
+fn card_style(
     theme: &iced::Theme,
-    status: widget::button::Status,
     is_selected: bool,
-) -> widget::button::Style {
-    let mut style = widget::button::Style {
-        text_color: theme.palette().text,
+    is_hovered: bool,
+) -> widget::container::Style {
+    let mut style = widget::container::Style {
+        text_color: Some(theme.palette().text),
         ..Default::default()
     };
 
-    if is_selected || matches!(status, widget::button::Status::Hovered) {
+    if is_selected || is_hovered {
         style.border = iced::Border::default()
             .color(theme.palette().primary)
             .width(3)
@@ -184,19 +184,34 @@ pub(crate) fn list_pane<'a>(
 
 /// A selectable row of a [`list_pane`], laid out as a horizontal run of
 /// `contents` (typically a leading icon followed by a label).
+///
+/// This is a [`widget::MouseArea`] around a plain container: a single click
+/// selects via `on_press`, and a double click also advances to the next step
+/// (the press replays before the double click, so the row is selected first).
+/// The container cannot observe hover itself, so the row reports enter/leave
+/// via [`Message::HoverRow`] and the page draws the outline around `hovered`.
 pub(crate) fn list_item<'a>(
     contents: impl IntoIterator<Item = Element<'a, Message>>,
     is_selected: bool,
+    index: usize,
+    hovered: Option<usize>,
     msg: Message,
-) -> widget::Button<'a, Message> {
-    widget::button(
-        widget::row(contents)
-            .spacing(12)
-            .padding(8)
-            .align_y(iced::alignment::Vertical::Center),
+) -> Element<'a, Message> {
+    let is_hovered = hovered == Some(index);
+    widget::mouse_area(
+        widget::container(
+            widget::row(contents)
+                .spacing(12)
+                .padding(8)
+                .align_y(iced::alignment::Vertical::Center),
+        )
+        .style(move |theme| card_style(theme, is_selected, is_hovered)),
     )
     .on_press(msg)
-    .style(move |theme, status| card_btn_style(theme, status, is_selected))
+    .on_double_click(Message::Next)
+    .on_enter(Message::HoverRow(Some(index)))
+    .on_exit(Message::HoverRow(None))
+    .into()
 }
 
 /// The primary label of a [`list_item`].

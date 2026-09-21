@@ -80,6 +80,9 @@ pub struct State {
     /// Only here so the search box can show what was typed; the host does the
     /// filtering and hands back a new [`State::images`].
     pub search: Arc<str>,
+    /// Index of the row the cursor is over (0 is the Back row on a sublist),
+    /// for the hover outline.
+    pub hovered: Option<usize>,
 }
 
 pub fn view<'a>(
@@ -114,10 +117,12 @@ fn os_list_pane<'a>(
         .into();
     }
 
+    let has_back = state.pos.is_some();
     let items = state
         .images
         .iter()
-        .map(|img| {
+        .enumerate()
+        .map(|(row, img)| {
             let is_selected = state
                 .selected
                 .as_ref()
@@ -147,14 +152,17 @@ fn os_list_pane<'a>(
                 );
             }
 
-            list_item(contents, is_selected, Message::SelectOs(img.id))
-        })
-        .map(Into::into);
+            list_item(
+                contents,
+                is_selected,
+                row + usize::from(has_back),
+                state.hovered,
+                Message::SelectOs(img.id),
+            )
+        });
 
     // Nested sublists get a row to walk back up to their parent.
-    let back: Vec<Element<Message>> = if state.pos.is_none() {
-        Vec::new()
-    } else {
+    let back: Vec<Element<Message>> = if has_back {
         vec![
             list_item(
                 [
@@ -162,10 +170,13 @@ fn os_list_pane<'a>(
                     list_label("Back").into(),
                 ],
                 false,
+                0,
+                state.hovered,
                 Message::GotoOsListParent,
-            )
-            .into(),
+            ),
         ]
+    } else {
+        Vec::new()
     };
 
     list_pane(&state.search, scroll_id, back, items)

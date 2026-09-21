@@ -69,6 +69,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImagerMessage::SelectBoard,
             );
         }
+        BBImagerMessage::UiState(Message::HoverRow(row)) => {
+            set_page_hover(state, row);
+        }
         BBImagerMessage::UpdateBoardList(boards) => {
             // Update board list only if still on that page
             match state {
@@ -561,10 +564,127 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
     Task::none()
 }
 
+/// Remember which list row the cursor is over, on whichever selection page is
+/// showing (the standalone page or its App Info overlay).
+fn set_page_hover(state: &mut BBImager, row: Option<usize>) {
+    match state {
+        BBImager::ChooseBoard(x) => x.state.hovered = row,
+        BBImager::ChooseOs(x) => x.state.hovered = row,
+        BBImager::ChooseDest(x) => x.state.hovered = row,
+        BBImager::AppInfo(overlay) => match &mut overlay.page {
+            OverlayData::ChooseBoard(x) => x.state.hovered = row,
+            OverlayData::ChooseOs(x) => x.state.hovered = row,
+            OverlayData::ChooseDest(x) => x.state.hovered = row,
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
 fn show_notification(msg: String) -> Task<BBImagerMessage> {
     Task::future(async move {
         let res = helpers::show_notification(msg).await;
         tracing::debug!("Notification response {res:?}");
         BBImagerMessage::Null
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{BBImagerCommon, ChooseBoardState, ChooseDestState, ChooseOsState};
+    use crate::{BBImager, db, persistance};
+    use bb_config::config;
+    use iced::widget;
+    use bb_imager_ui::Message;
+
+    /// A reusable common with a throwaway DB and downloader cache.
+    fn common() -> BBImagerCommon {
+        let cache_dir = tempfile::tempdir().unwrap();
+        BBImagerCommon {
+            app_config: persistance::GuiConfiguration::default(),
+            downloader: bb_downloader::Downloader::new(cache_dir.path()).unwrap(),
+            img_handle_cache: bb_iced_widgets::cached_icon::Cache::default(),
+            scroll_id: widget::Id::unique(),
+            db: db::Db::new().unwrap(),
+        }
+    }
+
+    fn board() -> db::Board {
+        db::Board {
+            id: 1,
+            name: "Test Board".into(),
+            icon: None,
+            description: String::new(),
+            documentation: None,
+            specification: Vec::new(),
+            oshw: None,
+            flasher: config::Flasher::default(),
+            instructions: None,
+            bootfs: None,
+        }
+    }
+
+    fn choose_board() -> BBImager {
+        BBImager::ChooseBoard(ChooseBoardState::new(common()))
+    }
+
+    fn choose_os() -> BBImager {
+        BBImager::ChooseOs(ChooseOsState {
+            common: common(),
+            selected_board: board(),
+            flasher: config::Flasher::default(),
+            selected_image: None,
+            state: Default::default(),
+        })
+    }
+
+    fn choose_dest() -> BBImager {
+        BBImager::ChooseDest(ChooseDestState::new(
+            common(),
+            board(),
+            (ImageId::Format, helpers::BoardImage::format()),
+        ))
+    }
+
+    fn set_hover(app: &mut BBImager, row: Option<usize>) {
+        let _ = update(app, BBImagerMessage::UiState(Message::HoverRow(row)));
+    }
+
+    /// Hover enter/exit must land on the hovered field of whichever selection
+    /// page is showing, and nowhere else.
+    #[test]
+    fn hover_routes_to_the_active_page() {
+        let mut app = choose_board();
+        set_hover(&mut app, Some(2));
+        match &mut app {
+            BBImager::ChooseBoard(x) => assert_eq!(x.state.hovered, Some(2)),
+            _ => panic!("expected the board page"),
+        }
+        set_hover(&mut app, None);
+        match &app {
+            BBImager::ChooseBoard(x) => assert_eq!(x.state.hovered, None),
+            _ => panic!("expected the board page"),
+        }
+    }
+
+    #[test]
+    fn hover_routes_on_os_page() {
+        let mut app = choose_os();
+        set_hover(&mut app, Some(0));
+        match &app {
+            BBImager::ChooseOs(x) => assert_eq!(x.state.hovered, Some(0)),
+            _ => panic!("expected the OS page"),
+        }
+    }
+
+    #[test]
+    fn hover_routes_on_dest_page() {
+        let mut app = choose_dest();
+        set_hover(&mut app, Some(3));
+        match &app {
+            BBImager::ChooseDest(x) => assert_eq!(x.state.hovered, Some(3)),
+            _ => panic!("expected the destination page"),
+        }
+    }
 }

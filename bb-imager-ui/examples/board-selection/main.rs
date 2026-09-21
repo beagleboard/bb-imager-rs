@@ -58,6 +58,7 @@ impl State {
                 boards,
                 selected: None,
                 search: "".into(),
+                hovered: None,
             },
         };
 
