@@ -180,27 +180,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImagerMessage::Null
             });
         }
-        BBImagerMessage::UiState(Message::DismissSandboxNotice) => {
-            let (next, task) = match std::mem::take(state) {
-                BBImager::SandboxNotice(mut inner) => {
-                    inner.common.app_config.udev_notice_shown = true;
-                    let config = inner.common.app_config.clone();
-                    let task = Task::future(blocking_future(move || {
-                        if let Err(e) = config.save() {
-                            tracing::error!("Failed to save config: {e}");
-                        }
-                        BBImagerMessage::Null
-                    }));
-                    (
-                        BBImager::ChooseBoard(crate::state::ChooseBoardState::new(inner.common)),
-                        task,
-                    )
-                }
-                _ => panic!("Unexpected message"),
-            };
-            *state = next;
-            return task;
-        }
         BBImagerMessage::UiState(Message::Next) => return state.next(),
         BBImagerMessage::UiState(Message::Back) => return state.back(),
         BBImagerMessage::UiState(Message::ResolveImage(k, v)) => state.image_cache_insert(k, v),

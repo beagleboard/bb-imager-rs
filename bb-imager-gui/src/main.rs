@@ -447,14 +447,29 @@ impl BBImager {
                     temp,
                 )
             }
+            Self::SandboxNotice(mut inner) => {
+                inner.common.app_config.udev_notice_shown = true;
+                let task = {
+                    let config = inner.common.app_config.clone();
+                    Task::future(blocking_future(move || {
+                        if let Err(e) = config.save() {
+                            tracing::error!("Failed to save config: {e}");
+                        }
+                        BBImagerMessage::Null
+                    }))
+                };
+                (
+                    Self::ChooseBoard(state::ChooseBoardState::new(inner.common)),
+                    task,
+                )
+            }
             Self::Dummy
             | Self::Review(_)
             | Self::Flashing(_)
             | Self::FlashingFail(_)
             | Self::FlashingCancel(_)
             | Self::FlashingSuccess(_)
-            | Self::AppInfo(_)
-            | Self::SandboxNotice(_) => {
+            | Self::AppInfo(_) => {
                 panic!("Unexpected message")
             }
         };

@@ -57,8 +57,6 @@ pub enum Message {
     FlashCancel,
     // Retry flashing
     Retry,
-    /// The user dismissed the first-run udev notice on a sandboxed install.
-    DismissSandboxNotice,
 }
 
 pub fn application<A>(

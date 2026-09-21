@@ -51,7 +51,7 @@ pub fn view(scroll_id: widget::Id) -> Element<'static, Message> {
             button("View Documentation")
                 .style(widget::button::primary)
                 .on_press(Message::OpenUrl(udev_rules_url())),
-            button("Got it").on_press(Message::DismissSandboxNotice),
+            button("Got it").on_press(Message::Next),
         ],
     )
 }
