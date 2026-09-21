@@ -4,22 +4,76 @@ use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 use crate::img::{RemoteImage, RemoteItem};
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
+#[allow(unused)]
+use bb_flasher::BBFlasherTarget as _;
+use bb_flasher::DownloadFlashingStatus;
 #[cfg(feature = "sd")]
 use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
-use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
+#[allow(unused)]
+use bb_imager_ui::dest_selection::Destination as _;
+use bb_imager_ui::{Message, customization};
 use std::sync::{Arc, mpsc};
 use url::Url;
 
 #[cfg(test)]
 mod tests;
 
+#[derive(serde::Serialize)]
+pub(crate) enum ImageInfo {
+    Format,
+    Local(Box<std::path::Path>),
+    Remote(Box<config::OsImage>),
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct FlashingInfo {
+    pub(crate) board: config::Device,
+    pub(crate) image: ImageInfo,
+    pub(crate) destination: Box<str>,
+    pub(crate) customization: FlashingCustomization,
+}
+
+impl FlashingInfo {
+    pub(crate) fn json(
+        db: crate::db::Db,
+        ctx: &crate::state::FlashingContext,
+    ) -> iced::Task<String> {
+        let board_id = ctx.selected_board.id;
+        let img = ctx.selected_image.clone();
+        let customization = ctx.customization.clone();
+        let destination = ctx.selected_dest.to_string().into();
+
+        iced::Task::perform(
+            async move {
+                let board = db.os_board_json_by_id(board_id).unwrap();
+
+                let image = match img {
+                    BoardImage::SdFormat => ImageInfo::Format,
+                    BoardImage::Image { img, .. } => match img {
+                        SelectedImage::LocalImage(p) => ImageInfo::Local(p.path().into()),
+                        SelectedImage::RemoteImage(x) => {
+                            ImageInfo::Remote(db.os_image_json_by_id(x.id).unwrap().into())
+                        }
+                    },
+                };
+
+                FlashingInfo {
+                    board,
+                    customization,
+                    image,
+                    destination,
+                }
+            },
+            |x| serde_json::to_string_pretty(&x).unwrap(),
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
-    SdFormat {
-        details: Vec<(&'static str, String)>,
-    },
+    SdFormat,
     Image {
         flasher: config::Flasher,
         init_format: config::InitFormat,
@@ -28,36 +82,20 @@ pub(crate) enum BoardImage {
         // `Bmap` and its downloader are dead weight.
         #[cfg(feature = "sd")]
         bmap: Option<crate::img::Bmap>,
-        sbom: Option<Url>,
         info_text: Option<Arc<str>>,
-        description: Option<String>,
-        icon: bb_imager_ui::image_selection::ImageIcon,
-        details: Vec<(&'static str, String)>,
-        support: Option<Url>,
     },
 }
 
 impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
-        let metadata = std::fs::metadata(&path).expect("File does not exist");
-        let details = vec![
-            ("Path", path.to_string_lossy().to_string()),
-            ("Size", metadata.len().to_string()),
-        ];
-
         Self::Image {
             img: bb_flasher::LocalImage::new(path.into()).into(),
             #[cfg(feature = "sd")]
             bmap: None,
-            sbom: None,
             flasher,
             // Do not try to apply customization for local images
             init_format: config::InitFormat::None,
             info_text: None,
-            description: None,
-            icon: bb_imager_ui::image_selection::ImageIcon::Local,
-            details,
-            support: None,
         }
     }
 
@@ -66,54 +104,19 @@ impl BoardImage {
         flasher: config::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
-        let mut details = vec![
-            ("Release Date", image.release_date.to_string()),
-            ("Image Size", pretty_bytes(image.extract_size as u64)),
-        ];
-
-        details.push((
-            "Download Size",
-            pretty_bytes(image.image_download_size as u64),
-        ));
-
         Self::Image {
             img: RemoteImage::new(&image, downloader.clone(), flasher).into(),
             #[cfg(feature = "sd")]
             bmap: image.bmap.map(|url| crate::img::Bmap { url, downloader }),
-            sbom: image.sbom.map(|url| *url),
             flasher,
             init_format: image.init_format,
             info_text: image.info_text,
-            description: Some(image.description),
-            icon: bb_imager_ui::image_selection::ImageIcon::Remote(image.icon),
-            details,
-            support: image.support,
-        }
-    }
-
-    pub(crate) fn format() -> Self {
-        Self::SdFormat {
-            details: vec![("Format", "FAT32".to_string())],
-        }
-    }
-
-    pub(crate) fn description(&self) -> Option<&str> {
-        match self {
-            BoardImage::SdFormat { .. } => Some("Format a SD Card to FAT32 for reuse."),
-            BoardImage::Image { description, .. } => description.as_ref().map(|x| x.as_str()),
-        }
-    }
-
-    fn icon(&self) -> bb_imager_ui::image_selection::ImageIcon {
-        match self {
-            BoardImage::SdFormat { .. } => bb_imager_ui::image_selection::ImageIcon::Format,
-            BoardImage::Image { icon, .. } => icon.clone(),
         }
     }
 
     pub(crate) const fn flasher(&self) -> config::Flasher {
         match self {
-            BoardImage::SdFormat { .. } => config::Flasher::SdCard,
+            BoardImage::SdFormat => config::Flasher::SdCard,
             BoardImage::Image { flasher, .. } => *flasher,
         }
     }
@@ -121,14 +124,14 @@ impl BoardImage {
     pub(crate) const fn init_format(&self) -> config::InitFormat {
         match self {
             BoardImage::Image { init_format, .. } => *init_format,
-            BoardImage::SdFormat { .. } => config::InitFormat::None,
+            BoardImage::SdFormat => config::InitFormat::None,
         }
     }
 
     pub(crate) fn info_text(&self) -> Option<&str> {
         match self {
             BoardImage::Image { info_text, .. } => info_text.as_ref().map(|x| x.as_ref()),
-            BoardImage::SdFormat { .. } => None,
+            BoardImage::SdFormat => None,
         }
     }
 
@@ -139,56 +142,10 @@ impl BoardImage {
         }
     }
 
-    pub(crate) fn details(&self) -> &[(&'static str, String)] {
+    pub(crate) fn is_local(&self) -> bool {
         match self {
-            BoardImage::SdFormat { details } => details,
-            BoardImage::Image { details, .. } => details,
-        }
-    }
-
-    pub(crate) fn supported_init_formats(&self) -> &'static [config::InitFormat] {
-        match self {
-            BoardImage::SdFormat { .. } => &[],
-            BoardImage::Image {
-                img,
-                init_format,
-                flasher,
-                ..
-            } if !matches!(img, SelectedImage::LocalImage(_)) => match init_format {
-                config::InitFormat::Sysconf => &[config::InitFormat::Sysconf],
-                config::InitFormat::CloudInit => &[config::InitFormat::CloudInit],
-                _ => &[],
-            },
-            BoardImage::Image {
-                flasher: config::Flasher::SdCard | config::Flasher::SdCardNoBootloader,
-                ..
-            } => &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
-            BoardImage::Image { .. } => &[],
-        }
-    }
-
-    pub(crate) fn update_init_format(&mut self, f: config::InitFormat) {
-        match self {
-            BoardImage::SdFormat { .. } => {
-                unreachable!();
-            }
-            BoardImage::Image { init_format, .. } => {
-                *init_format = f;
-            }
-        }
-    }
-
-    pub(crate) fn support(&self) -> Option<&Url> {
-        match self {
-            BoardImage::SdFormat { .. } => None,
-            BoardImage::Image { support, .. } => support.as_ref(),
-        }
-    }
-
-    pub(crate) fn sbom(&self) -> Option<&Url> {
-        match self {
-            BoardImage::SdFormat { .. } => None,
-            BoardImage::Image { sbom, .. } => sbom.as_ref(),
+            BoardImage::SdFormat => false,
+            BoardImage::Image { img, .. } => matches!(img, SelectedImage::LocalImage(_)),
         }
     }
 }
@@ -196,7 +153,7 @@ impl BoardImage {
 impl std::fmt::Display for BoardImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardImage::SdFormat { .. } => write!(f, "Format SD Card"),
+            BoardImage::SdFormat => write!(f, "Format SD Card"),
             BoardImage::Image { img: image, .. } => image.fmt(f),
         }
     }
@@ -317,7 +274,7 @@ pub(crate) async fn flash(
 
     match (img, customization, dst) {
         #[cfg(feature = "sd")]
-        (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
+        (BoardImage::SdFormat, _, Destination::SdCard(t)) => {
             tokio::task::spawn_blocking(move || bb_flasher::sd::FormatFlasher::new(t).flash())
                 .await
                 .unwrap()
@@ -444,29 +401,6 @@ pub(crate) async fn flash(
             .await
             .unwrap()
         }
-        (BoardImage::Image { img, .. }, _, Destination::LocalFile(t)) => {
-            let cb = img.into_image_fn();
-            blocking_future(move || {
-                let (img, size) = cb()?;
-                let mut dest = std::fs::File::create(t)?;
-
-                let (tx, rx) = mpsc::sync_channel(4);
-                std::thread::spawn(move || {
-                    while let Ok(msg) = rx.recv() {
-                        let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(msg));
-                    }
-                });
-
-                let mut img_reader =
-                    bb_helper::reader_progress::ReaderWithProgress::new(img, size, Some(tx));
-
-                std::io::copy(&mut img_reader, &mut dest)?;
-
-                dest.sync_all()
-            })
-            .await
-            .map_err(Into::into)
-        }
         _ => unimplemented!(),
     }
 }
@@ -500,8 +434,8 @@ impl Display for Destination {
     }
 }
 
-impl Destination {
-    pub(crate) fn size(&self) -> Option<u64> {
+impl bb_imager_ui::dest_selection::Destination for Destination {
+    fn size(&self) -> Option<u64> {
         #[cfg(feature = "sd")]
         if let Destination::SdCard(item) = self {
             return Some(item.size());
@@ -509,54 +443,22 @@ impl Destination {
 
         None
     }
+}
 
+impl Destination {
     /// Download instead of flashing
     pub(crate) fn is_download_action(&self) -> bool {
         matches!(self, Self::LocalFile(_))
-    }
-
-    /// Stable identity of this destination, used to match a click back to a
-    /// device after the list has been re-enumerated.
-    pub(crate) fn identifier(&self) -> std::borrow::Cow<'_, str> {
-        match self {
-            Self::LocalFile(p) => p.to_string_lossy(),
-            #[cfg(feature = "sd")]
-            Self::SdCard(t) => t.identifier(),
-            #[cfg(feature = "bcf_cc1352p7")]
-            Self::BeagleConnectFreedom(t) => t.identifier(),
-            #[cfg(feature = "bcf_msp430")]
-            Self::Msp430(t) => t.identifier(),
-            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-            Self::Mspm0(t) => t.identifier(),
-        }
-    }
-
-    pub(crate) fn details(&self) -> Vec<(&'static str, String)> {
-        match self {
-            Self::LocalFile(p) => vec![("Path", p.to_string_lossy().to_string())],
-            #[cfg(feature = "sd")]
-            Self::SdCard(t) => vec![
-                ("Path", t.path().to_string_lossy().to_string()),
-                ("Size", pretty_bytes(t.size())),
-            ],
-            #[cfg(feature = "bcf_cc1352p7")]
-            Self::BeagleConnectFreedom(t) => vec![("Path", t.path().to_string())],
-            #[cfg(feature = "bcf_msp430")]
-            Self::Msp430(t) => vec![("Path", t.path().to_string())],
-            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-            Self::Mspm0(t) => vec![("Path", t.path().to_string())],
-        }
     }
 }
 
 pub(crate) fn destinations(
     flasher: config::Flasher,
     filter: bool,
-    search: Arc<str>,
+    search: String,
 ) -> Box<[Destination]> {
-    let filter_func = move |t: &Destination| {
-        search.is_empty() || t.to_string().to_lowercase().contains(search.as_ref())
-    };
+    let filter_func =
+        move |t: &Destination| search.is_empty() || t.to_string().to_lowercase().contains(&search);
 
     match flasher {
         #[cfg(feature = "sd")]
@@ -619,7 +521,7 @@ pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub(crate) enum FlashingCustomization {
     NoneSd,
     LinuxSdSysconfig(crate::persistance::SdSysconfCustomization),
@@ -630,36 +532,10 @@ pub(crate) enum FlashingCustomization {
 }
 
 impl FlashingCustomization {
-    pub(crate) fn new(
-        flasher: config::Flasher,
-        img: &BoardImage,
-        app_config: &crate::persistance::GuiConfiguration,
-    ) -> Self {
-        match flasher {
-            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
-                if img.init_format() == config::InitFormat::Sysconf =>
-            {
-                Self::LinuxSdSysconfig(app_config.sd_customization.sysconf.clone())
-            }
-            config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
-                if img.init_format() == config::InitFormat::CloudInit =>
-            {
-                Self::LinuxSdCloudInit(app_config.sd_customization.sysconf.clone())
-            }
-            config::Flasher::SdCard
-            | config::Flasher::SdCardBootfs
-            | config::Flasher::SdCardNoBootloader => Self::NoneSd,
-            config::Flasher::BeagleConnectFreedom => Self::Bcf,
-            config::Flasher::Msp430Usb => Self::Msp430,
-            config::Flasher::Mspm0 => Self::Zepto,
-            _ => unimplemented!(),
-        }
-    }
-
     /// What this customization will change on the flashed image.
     pub(crate) fn modifications(&self) -> Box<[&'static str]> {
         match self {
-            Self::LinuxSdSysconfig(x) => {
+            FlashingCustomization::LinuxSdSysconfig(x) => {
                 let mut ans = sd_modifications_common(x);
                 if x.usb_enable_dhcp == Some(true) {
                     ans.push("USB DHCP enabled");
@@ -667,9 +543,12 @@ impl FlashingCustomization {
 
                 ans.into()
             }
-            Self::LinuxSdCloudInit(x) => sd_modifications_common(x).into(),
+            FlashingCustomization::LinuxSdCloudInit(x) => sd_modifications_common(x).into(),
             // Nothing is written for these, so there is nothing to report.
-            Self::NoneSd | Self::Msp430 | Self::Bcf | Self::Zepto => Box::default(),
+            FlashingCustomization::NoneSd
+            | FlashingCustomization::Msp430
+            | FlashingCustomization::Bcf
+            | FlashingCustomization::Zepto => Box::new([]),
         }
     }
 
@@ -686,86 +565,38 @@ impl FlashingCustomization {
     }
 }
 
-impl From<&bb_imager_ui::configuration::Customization> for FlashingCustomization {
-    fn from(value: &bb_imager_ui::configuration::Customization) -> Self {
+impl From<&customization::Customization> for FlashingCustomization {
+    fn from(value: &customization::Customization) -> Self {
         match value {
-            bb_imager_ui::configuration::Customization::SysConfig(x) => {
-                Self::LinuxSdSysconfig(x.into())
-            }
-            bb_imager_ui::configuration::Customization::CloudInit(x) => {
-                Self::LinuxSdCloudInit(x.into())
+            customization::Customization::SysConfig(x)
+            | customization::Customization::SelectableSd(customization::SelectableSd::SysConfig(
+                x,
+            )) => FlashingCustomization::LinuxSdSysconfig(x.into()),
+            customization::Customization::CloudInit(x)
+            | customization::Customization::SelectableSd(customization::SelectableSd::CloudInit(
+                x,
+            )) => FlashingCustomization::LinuxSdCloudInit(x.into()),
+            customization::Customization::SelectableSd(customization::SelectableSd::None) => {
+                FlashingCustomization::NoneSd
             }
         }
     }
 }
 
-impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization {
+impl From<FlashingCustomization> for customization::Customization {
     fn from(value: FlashingCustomization) -> Self {
         match value {
-            FlashingCustomization::LinuxSdSysconfig(x) => Self::SysConfig(x.into()),
-            FlashingCustomization::LinuxSdCloudInit(x) => Self::CloudInit(x.into()),
-            // [`no_customization`] answers `Some` for these, so the Customize
-            // page is skipped entirely and never has to render them.
-            FlashingCustomization::NoneSd
-            | FlashingCustomization::Bcf
-            | FlashingCustomization::Msp430
-            | FlashingCustomization::Zepto => panic!("No customization"),
+            FlashingCustomization::LinuxSdSysconfig(x) => {
+                customization::Customization::SysConfig(x.into())
+            }
+            FlashingCustomization::LinuxSdCloudInit(x) => {
+                customization::Customization::CloudInit(x.into())
+            }
+            FlashingCustomization::NoneSd => {
+                customization::Customization::SelectableSd(customization::SelectableSd::None)
+            }
+            _ => unimplemented!(),
         }
-    }
-}
-
-/// One row of the destination list, as the page renders it.
-pub(crate) fn dest_item(
-    value: &Destination,
-) -> bb_imager_ui::destination_selection::DestinationItem {
-    bb_imager_ui::destination_selection::DestinationItem {
-        id: value.identifier().into(),
-        label: value.to_string().into(),
-        subtitle: value.size().map(|x| pretty_bytes(x).into()),
-    }
-}
-
-/// The renderable projection of a selected destination.
-pub(crate) fn dest_details(
-    value: &Destination,
-) -> bb_imager_ui::destination_selection::DestinationDetails {
-    bb_imager_ui::destination_selection::DestinationDetails {
-        id: match value {
-            Destination::LocalFile(_) => bb_imager_ui::destination_selection::DestId::SaveToFile,
-            _ => bb_imager_ui::destination_selection::DestId::Device(value.identifier().into()),
-        },
-        title: value.to_string().into(),
-        details: value
-            .details()
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.into_boxed_str()))
-            .collect(),
-    }
-}
-
-/// The renderable projection of a selected image.
-///
-/// `id` comes from the selection rather than the image itself: a remote image's
-/// catalog id is not recoverable from [`BoardImage`], which only carries the
-/// flasher machinery.
-pub(crate) fn image_details(
-    id: bb_imager_ui::image_selection::ImageId,
-    value: &BoardImage,
-) -> bb_imager_ui::image_selection::ImageDetails {
-    bb_imager_ui::image_selection::ImageDetails {
-        id,
-        icon: value.icon(),
-        title: value.to_string().into(),
-        description: value.description().map(Into::into),
-        details: value
-            .details()
-            .iter()
-            .map(|(k, v)| ((*k).into(), v.as_str().into()))
-            .collect(),
-        init_formats: value.supported_init_formats(),
-        init_format: value.init_format(),
-        support: value.support().cloned(),
-        sbom: value.sbom().cloned(),
     }
 }
 
@@ -822,37 +653,18 @@ pub(crate) fn log_file_path() -> PathBuf {
     ))
 }
 
-pub(crate) fn pretty_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
-
-    if bytes == 0 {
-        return "0 B".to_string();
-    }
-
-    let mut size = bytes as f64;
-    let mut unit = 0;
-
-    while size >= 1024.0 && unit < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit += 1;
-    }
-
-    if unit == 0 {
-        format!("{} {}", bytes, UNITS[unit])
-    } else {
-        format!("{:.2} {}", size, UNITS[unit])
-    }
-}
-
 /// Return customization enum variant for cases where no customization is present
 pub(crate) fn no_customization(
     flasher: config::Flasher,
     img: &BoardImage,
 ) -> Option<FlashingCustomization> {
     match flasher {
+        // Formats we can actually write, plus local images, which offer the
+        // format picker instead of having one detected for them.
         config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
             if img.init_format() == config::InitFormat::Sysconf
-                || img.init_format() == config::InitFormat::CloudInit =>
+                || img.init_format() == config::InitFormat::CloudInit
+                || img.is_local() =>
         {
             None
         }
@@ -862,7 +674,7 @@ pub(crate) fn no_customization(
         config::Flasher::Msp430Usb => Some(FlashingCustomization::Msp430),
         config::Flasher::BeagleConnectFreedom => Some(FlashingCustomization::Bcf),
         config::Flasher::Mspm0 => Some(FlashingCustomization::Zepto),
-        _ => None,
+        _ => unimplemented!(),
     }
 }
 
@@ -875,12 +687,12 @@ pub(crate) fn app_title(_: &crate::BBImager) -> String {
 }
 
 pub(crate) fn normalize_file_dest(name: &str) -> String {
-    const SUFFIX: [&str; 2] = [".zip", ".xz"];
+    if let Some(stripped) = name.strip_suffix(".zip") {
+        return stripped.to_string();
+    }
 
-    for s in SUFFIX {
-        if let Some(stripped) = name.strip_suffix(s) {
-            return stripped.to_string();
-        }
+    if let Some(pos) = name.rfind(".img.") {
+        return name[..pos + 4].to_string();
     }
 
     name.to_string()
@@ -888,18 +700,18 @@ pub(crate) fn normalize_file_dest(name: &str) -> String {
 
 pub(crate) fn fetch_images(
     downloader: &bb_downloader::Downloader,
-    iter: impl IntoIterator<Item = Arc<url::Url>>,
+    iter: impl IntoIterator<Item = Arc<Url>>,
 ) -> iced::Task<BBImagerMessage> {
     let tasks = iter.into_iter().map(|icon| {
         let downloader = downloader.clone();
-        let key = icon.clone();
+        let icon_msg = icon.clone();
         // The downloader takes an owned `Url` (reqwest's `IntoUrl`), so this one
         // clone stays; the cache key is shared rather than cloned.
-        let target = url::Url::clone(&icon);
+        let url = Url::clone(&icon);
         iced::Task::perform(
-            async move { downloader.download(target).await },
+            async move { downloader.download(url).await },
             move |p| match p {
-                Ok(p) => BBImagerMessage::UiState(bb_imager_ui::Message::ResolveImage(key, p)),
+                Ok(p) => BBImagerMessage::UiState(Message::ResolveImage(icon_msg, p)),
                 Err(_) => {
                     tracing::warn!("Failed to fetch image {}", icon);
                     BBImagerMessage::Null

@@ -1,5 +1,3 @@
-pub(crate) const OSHW_BASE_URL: &str = "https://certification.oshwa.org";
-
 pub(crate) const LATEST_RELEASE_URL: &str =
     "https://api.github.com/repos/beagleboard/bb-imager-rs/releases/latest";
 
@@ -7,12 +5,6 @@ pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", 
 
 pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
-pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
-    "pre-release"
-} else {
-    env!("CARGO_PKG_VERSION")
-};
-pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[

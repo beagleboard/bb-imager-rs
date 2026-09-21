@@ -1,50 +1,43 @@
-use bb_imager_ui::{Message, board_selection, flash_success};
+use bb_imager_ui::{Message, flash_success};
 
-struct State {
-    /// Empty: the literal board below has no remote icon, so the pane falls back
-    /// to the bundled one. `preview-board-selection` covers the fetched path.
-    cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-    inner: flash_success::State,
-}
+struct State(flash_success::State);
 
 impl State {
-    fn new() -> (Self, iced::Task<Message>) {
-        let res = Self {
-            cache: Default::default(),
-            inner: flash_success::State {
-                is_download: false,
-                board: board_selection::BoardDetails {
-                    id: 0,
-                    name: "BeagleY-AI".into(),
-                    icon: None,
-                    description: "Affordable single board computer with a quad-core 64-bit Arm \
-                                  CPU and an integrated AI accelerator."
-                        .into(),
-                    specification: vec![
-                        ("SoC".into(), "TI AM67A".into()),
-                        ("CPU".into(), "Quad-core Arm Cortex-A53".into()),
-                        ("RAM".into(), "4 GB LPDDR4".into()),
-                        ("Connectivity".into(), "Wi-Fi 6 / Bluetooth 5.4".into()),
-                    ]
-                    .into(),
-                    documentation: url::Url::parse(
-                        "https://docs.beagleboard.org/boards/beagley/ai/",
-                    )
-                    .ok(),
-                    oshw: url::Url::parse("https://certification.oshwa.org/us002787.html").ok(),
-                },
-            },
-        };
+    fn new() -> (Self, iced::Task<Message<()>>) {
+        let res = State(flash_success::State {
+            has_customization: true,
+            device_name: "BeagleY-AI".into(),
+            software_name: "BeagleY-AI Debian 13 v7.1.x-k3 XFCE".into(),
+            storage: ("Test SD Card".into(), Some(4 * 1024 * 1024 * 1024)),
+            modificiations: vec![
+                "User account configured",
+                "Wifi configured",
+                "Hostname configured",
+                "Keymap configured",
+                "Timezone configured",
+                "SSH Key configured",
+                "USB DHCP enabled",
+            ],
+        });
 
         (res, iced::Task::none())
     }
 }
 
 fn main() {
-    let app = iced::application(State::new, |_: &mut State, _| iced::Task::none(), view);
+    let app = iced::application(
+        State::new,
+        |_: &mut State, msg| match msg {
+            Message::CopyToClipboard => {
+                iced::clipboard::write("All info regarding board, image and destination".into())
+            }
+            _ => iced::Task::none(),
+        },
+        view,
+    );
     bb_imager_ui::application(app).run().unwrap()
 }
 
-fn view(s: &State) -> iced::Element<'_, Message> {
-    flash_success::view(&s.cache, &s.inner, iced::widget::Id::unique())
+fn view(s: &State) -> iced::Element<'_, Message<()>> {
+    flash_success::view(&s.0, iced::widget::Id::unique())
 }

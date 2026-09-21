@@ -13,19 +13,18 @@ rfd = { version = "0.17.2", features = ["file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher", features = ["piped_image"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
-image = "0.25"
 tokio = { version = "1.52", default-features = false, features = ["macros", "time"] }
 webbrowser = "1.2.1"
 notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"], optional = true }
 url = "2.5.4"
 whoami = "2.1"
 iana-time-zone = "0.1"
-serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
 bb-config = { path = "../bb-config" }
-bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel", "reader_progress"] }
+bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel"] }
 semver = "1.0.28"
 anyhow = "1.0"
 tempfile = "3.26"
@@ -54,8 +53,6 @@ bcf_cc1352p7 = ["bb-flasher/bcf"]
 bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 # Handle application updates
 updater = []
-# Built by the Flatpak/snap packages: show the first-run udev notice.
-sandboxed = []
 static = ["rusqlite/bundled", "bb-flasher/static", "bb-downloader/rustls"]
 system-deps = ["bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
