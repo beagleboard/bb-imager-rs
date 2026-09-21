@@ -304,7 +304,7 @@ fn board_image_format_accessors() {
     assert_eq!(img.init_format(), config::InitFormat::None);
     assert_eq!(img.info_text(), None);
     assert_eq!(img.file_name(), None);
-    assert_eq!(img.details(), &[("Format", "FAT32".to_string())]);
+    assert_eq!(img.details(), &[("Format", "FAT32".into())]);
     assert!(img.supported_init_formats().is_empty());
     assert!(img.support().is_none());
     assert!(matches!(
@@ -334,7 +334,11 @@ fn board_image_local_reads_file_metadata() {
 
     let details = img.details();
     assert!(details.iter().any(|(k, _)| *k == "Path"));
-    assert!(details.iter().any(|(k, v)| *k == "Size" && v == "10"));
+    assert!(
+        details
+            .iter()
+            .any(|(k, v)| *k == "Size" && v.as_ref() == "10")
+    );
     // Local (non-SD) images offer no init-format customization.
     assert!(img.supported_init_formats().is_empty());
 }
