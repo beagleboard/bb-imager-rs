@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
-use message::BBImagerMessage;
+use message::{BBImagerMessage, NavDir};
 use tokio::time::interval;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -244,7 +244,7 @@ impl BBImager {
     fn subscription(&self) -> Subscription<BBImagerMessage> {
         const INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-        match self {
+        let dest = match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
                     x.selected_image.1.flasher(),
@@ -301,7 +301,75 @@ impl BBImager {
                 bb_imager_ui::focus_subscription().map(BBImagerMessage::UiState)
             }
             _ => Subscription::none(),
+        };
+
+        // Keyboard shortcuts. Enter advances to the next step when a
+        // selection exists, Escape goes back, and the arrow keys walk the
+        // selection on the three selection pages (the list rows themselves do
+        // not react to keys in iced 0.14).
+        let nav = iced::event::listen().map(|event| match event {
+            iced::event::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. }) => {
+                match key {
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter) => {
+                        BBImagerMessage::KeyboardNext
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape) => {
+                        BBImagerMessage::KeyboardBack
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp) => {
+                        BBImagerMessage::KeyboardNavigate(NavDir::Up)
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown) => {
+                        BBImagerMessage::KeyboardNavigate(NavDir::Down)
+                    }
+                    _ => BBImagerMessage::Null,
+                }
+            }
+            _ => BBImagerMessage::Null,
+        });
+
+        Subscription::batch([dest, nav])
+    }
+
+    /// Whether the current page has a selection to advance with Enter.
+    const fn can_next(&self) -> bool {
+        match self {
+            Self::ChooseBoard(inner) => inner.state.selected.is_some(),
+            Self::ChooseOs(inner) => inner.state.selected.is_some(),
+            Self::ChooseDest(inner) => inner.selected_dest.is_some(),
+            _ => false,
         }
+    }
+
+    /// Whether the current page can navigate back with Escape.
+    const fn can_back(&self) -> bool {
+        matches!(
+            self,
+            Self::ChooseOs(_)
+                | Self::ChooseDest(_)
+                | Self::Customize(_)
+                | Self::Review(_)
+                | Self::AppInfo(_)
+        )
+    }
+
+    /// Escape's handler: step back one page by reusing the sidebar navigation.
+    fn back(&mut self) -> Task<BBImagerMessage> {
+        use bb_imager_ui::SidebarEntry;
+
+        let target = match self {
+            Self::ChooseOs(_) => SidebarEntry::Hardware,
+            Self::ChooseDest(_) => SidebarEntry::Software,
+            Self::Customize(_) => SidebarEntry::Storage,
+            Self::Review(inner) if inner.ctx.has_customization => SidebarEntry::Modify,
+            Self::Review(_) => SidebarEntry::Storage,
+            Self::AppInfo(inner) => inner.state.previous,
+            _ => return Task::none(),
+        };
+
+        Task::done(BBImagerMessage::UiState(bb_imager_ui::Message::Goto(
+            target,
+        )))
     }
 
     #[cfg(feature = "sd")]
