@@ -13,12 +13,34 @@ use crate::{
     state::{OverlayData, OverlayState},
 };
 
+/// Arrow key navigation direction.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum NavDir {
+    Up,
+    Down,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
     UiState(bb_imager_ui::Message),
 
     /// Messages to ignore
     Null,
+
+    /// Mouse cursor moved; feeds the double-click detector.
+    MouseMoved(iced::Point),
+
+    /// Left mouse button pressed; feeds the double-click detector.
+    MouseClicked,
+
+    /// Enter pressed: advance to the next step when a selection exists.
+    KeyboardNext,
+
+    /// Escape pressed: navigate to the previous step.
+    KeyboardBack,
+
+    /// Arrow key pressed: move the selection on a list page.
+    KeyboardNavigate(NavDir),
 
     /// Config related options
     ExtendConfig((i64, bb_config::Config)),
@@ -555,10 +577,121 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 img.update_init_format(f);
             }
         }
+        BBImagerMessage::MouseMoved(pos) => {
+            state.common_mut().clicks.record_cursor(pos);
+        }
+        BBImagerMessage::MouseClicked => {
+            if let Some(page) = nav_page(state) {
+                let is_double = state.common_mut().clicks.click(page);
+                if is_double && state.can_next() {
+                    return state.next();
+                }
+            }
+        }
+        BBImagerMessage::KeyboardNext => {
+            if state.can_next() {
+                return state.next();
+            }
+        }
+        BBImagerMessage::KeyboardBack => {
+            if state.can_back() {
+                return state.back();
+            }
+        }
+        BBImagerMessage::KeyboardNavigate(dir) => {
+            if let Some(click) = navigate(state, dir) {
+                return update(state, BBImagerMessage::UiState(click));
+            }
+        }
         BBImagerMessage::Null | BBImagerMessage::UiState(Message::Null) => {}
     }
 
     Task::none()
+}
+
+/// The page tag used to reject cross-page double clicks.
+fn nav_page(state: &BBImager) -> Option<&'static str> {
+    match state {
+        BBImager::ChooseBoard(_) => Some("board"),
+        BBImager::ChooseOs(_) => Some("os"),
+        BBImager::ChooseDest(_) => Some("dest"),
+        _ => None,
+    }
+}
+
+/// Step the current selection index `dir`, seeding it at the ends when unset.
+fn adjacent(idx: Option<usize>, len: usize, dir: NavDir) -> Option<usize> {
+    if len == 0 {
+        return None;
+    }
+    match (dir, idx) {
+        (NavDir::Down, None) => Some(0),
+        (NavDir::Down, Some(i)) if i + 1 < len => Some(i + 1),
+        (NavDir::Up, None) => Some(len - 1),
+        (NavDir::Up, Some(i)) if i > 0 => Some(i - 1),
+        _ => None,
+    }
+}
+
+/// Re-emits the select message a click would have produced after an arrow
+/// key, so the list rows on the selection pages can be walked with the
+/// keyboard (the rows are plain buttons, which ignore keys in iced 0.14).
+fn navigate(state: &BBImager, dir: NavDir) -> Option<bb_imager_ui::Message> {
+    match state {
+        BBImager::ChooseBoard(inner) => {
+            let len = inner.state.boards.len();
+            let idx = inner
+                .selected_board
+                .as_ref()
+                .and_then(|b| inner.state.boards.iter().position(|x| x.id == b.id));
+            adjacent(idx, len, dir).map(|i| Message::SelectBoardById(inner.state.boards[i].id))
+        }
+        BBImager::ChooseOs(inner) => {
+            let has_back = inner.state.pos.is_some();
+            let len = inner.state.images.len();
+            let idx = inner
+                .selected_image
+                .as_ref()
+                .and_then(|(id, _)| inner.state.images.iter().position(|x| &x.id == id))
+                .map(|i| i + usize::from(has_back));
+            let row = adjacent(idx, len + usize::from(has_back), dir)?;
+            if has_back && row == 0 {
+                Some(Message::GotoOsListParent)
+            } else {
+                Some(Message::SelectOs(
+                    inner.state.images[row - usize::from(has_back)].id,
+                ))
+            }
+        }
+        BBImager::ChooseDest(inner) => {
+            let save_row = inner.state.image_file_name.is_some();
+            let rows = inner.destinations.len() + usize::from(save_row);
+            let idx = match inner.selected_dest.as_ref() {
+                Some(helpers::Destination::LocalFile(_)) if save_row => {
+                    Some(inner.destinations.len())
+                }
+                Some(dest) => inner
+                    .destinations
+                    .iter()
+                    .position(|x| x.identifier().as_ref() == dest.identifier().as_ref()),
+                None => None,
+            };
+            let row = adjacent(idx, rows, dir)?;
+            if save_row && row == inner.destinations.len() {
+                Some(Message::SelectFileDest(
+                    inner.state.image_file_name.clone()?,
+                ))
+            } else {
+                Some(Message::SelectDest(
+                    inner.destinations[row]
+                        .identifier()
+                        .into_owned()
+                        .into_boxed_str(),
+                ))
+            }
+        }
+        _ => None,
+    }
 }
 
 fn show_notification(msg: String) -> Task<BBImagerMessage> {

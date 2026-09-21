@@ -23,6 +23,87 @@ pub(crate) struct BBImagerCommon {
 
     pub(crate) scroll_id: widget::Id,
     pub(crate) db: db::Db,
+
+    /// Tracks cursor position and clicks for the double-click-to-next gesture.
+    pub(crate) clicks: ClickTracker,
+}
+
+/// Detects a mouse double-click on the spot, gated per page.
+///
+/// iced 0.14's widgets do not expose a click count, so the GUI watches the
+/// mouse events itself and pins a double click to the two clicks being within
+/// the usual double-click window and a few pixels of each other.
+#[derive(Debug)]
+pub(crate) struct ClickTracker {
+    pub(crate) cursor: iced::Point,
+    last_click: Option<(Instant, iced::Point, &'static str)>,
+}
+
+/// The maximum gap between two clicks that still counts as a double click.
+const DOUBLE_CLICK_WINDOW: std::time::Duration = std::time::Duration::from_millis(300);
+
+impl Default for ClickTracker {
+    fn default() -> Self {
+        Self {
+            cursor: iced::Point::ORIGIN,
+            last_click: None,
+        }
+    }
+}
+
+impl ClickTracker {
+    pub(crate) fn record_cursor(&mut self, pos: iced::Point) {
+        self.cursor = pos;
+    }
+
+    /// Records a click on `page`; returns true when it forms a double click
+    /// with the previous one, on the same page and spot.
+    pub(crate) fn click(&mut self, page: &'static str) -> bool {
+        let now = Instant::now();
+        let is_double = self
+            .last_click
+            .as_ref()
+            .filter(|(t, pos, prev_page)| {
+                *prev_page == page
+                    && now.duration_since(*t) <= DOUBLE_CLICK_WINDOW
+                    && self.cursor.distance(*pos) < 6.0
+            })
+            .is_some();
+        self.last_click = Some((now, self.cursor, page));
+        is_double
+    }
+}
+
+#[cfg(test)]
+mod click_tracker_tests {
+    use super::*;
+
+    #[test]
+    fn double_click_detection() {
+        let mut t = ClickTracker::default();
+
+        // A single click is never a double click.
+        assert!(!t.click("board"));
+        // A fast click on the same spot and page is a double click.
+        assert!(t.click("board"));
+
+        // Clicking far away, the spot gate rejects the gesture.
+        t.record_cursor(iced::Point::new(100.0, 100.0));
+        assert!(!t.click("board"));
+
+        // Moving to another page also resets the gesture.
+        t.record_cursor(iced::Point::ORIGIN);
+        assert!(!t.click("os"));
+    }
+
+    #[test]
+    fn click_window_expires() {
+        let mut t = ClickTracker::default();
+        assert!(!t.click("board"));
+
+        std::thread::sleep(DOUBLE_CLICK_WINDOW + std::time::Duration::from_millis(50));
+        assert!(!t.click("board"));
+    }
 }
 
 impl BBImagerCommon {
