@@ -40,6 +40,9 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::AppInfo(inner) => {
             bb_imager_ui::app_info::view(&inner.state, inner.common().scroll_id.clone())
         }
+        BBImager::SandboxNotice(inner) => {
+            bb_imager_ui::sandbox_notice::view(inner.common.scroll_id.clone())
+        }
         _ => panic!("Unexpected message"),
     }
     .map(BBImagerMessage::UiState)

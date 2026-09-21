@@ -73,6 +73,9 @@ SYSTEM_DEPS ?= 0
 SHARED_HIDRAW ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
 UPDATER ?= 0
+## variable: SANDBOXED: Build the GUI for a sandbox (Flatpak/snap), which shows
+## the first-run udev notice.
+SANDBOXED ?= 0
 ## variable: NOTIFY_RUST: Use notify-rust for notification. Not needed when using xdg-portal on linux.
 NOTIFY_RUST ?= 1
 ## variable: APPIMAGE_ARCH: Target arch for Appimage
@@ -128,6 +131,11 @@ endif
 # Add updater feature
 ifeq ($(UPDATER),1)
 	_RUST_ARGS_GUI += --features updater
+endif
+
+# Enable the sandboxed udev notice for Flatpak/snap package builds.
+ifeq ($(SANDBOXED),1)
+	_RUST_ARGS_GUI += --features sandboxed
 endif
 
 # Add pre-relase feature
@@ -480,7 +488,7 @@ _fetch-gui-deps:
 ## package: package-gui-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
 .PHONY: package-gui-flatpak
 package-gui-flatpak:
-	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0
+	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0 SANDBOXED=1
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui

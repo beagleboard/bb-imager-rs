@@ -10,6 +10,7 @@ pub mod flashing;
 mod helpers;
 pub mod image_selection;
 pub mod review;
+pub mod sandbox_notice;
 
 #[derive(Clone, Debug)]
 pub enum Message {
