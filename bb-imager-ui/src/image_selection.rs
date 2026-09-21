@@ -62,7 +62,7 @@ pub struct ImageDetails {
     pub icon: ImageIcon,
     pub title: Box<str>,
     pub description: Option<Box<str>>,
-    pub details: Box<[(Box<str>, Box<str>)]>,
+    pub details: Box<[(&'static str, Box<str>)]>,
     /// More than one makes the picker appear; exactly one is shown as plain text.
     pub init_formats: &'static [config::InitFormat],
     pub init_format: config::InitFormat,
