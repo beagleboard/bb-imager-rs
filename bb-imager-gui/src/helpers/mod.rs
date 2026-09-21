@@ -18,7 +18,7 @@ mod tests;
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
     SdFormat {
-        details: Vec<(&'static str, String)>,
+        details: Box<[(&'static str, Box<str>)]>,
     },
     Image {
         flasher: config::Flasher,
@@ -32,7 +32,7 @@ pub(crate) enum BoardImage {
         info_text: Option<Arc<str>>,
         description: Option<String>,
         icon: bb_imager_ui::image_selection::ImageIcon,
-        details: Vec<(&'static str, String)>,
+        details: Box<[(&'static str, Box<str>)]>,
         support: Option<Url>,
     },
 }
@@ -40,10 +40,11 @@ pub(crate) enum BoardImage {
 impl BoardImage {
     pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
         let metadata = std::fs::metadata(&path).expect("File does not exist");
-        let details = vec![
-            ("Path", path.to_string_lossy().to_string()),
-            ("Size", metadata.len().to_string()),
-        ];
+        let details = [
+            ("Path", path.to_string_lossy().into()),
+            ("Size", metadata.len().to_string().into()),
+        ]
+        .into();
 
         Self::Image {
             img: bb_flasher::LocalImage::new(path.into()).into(),
@@ -66,15 +67,15 @@ impl BoardImage {
         flasher: config::Flasher,
         downloader: bb_downloader::Downloader,
     ) -> Self {
-        let mut details = vec![
-            ("Release Date", image.release_date.to_string()),
-            ("Image Size", pretty_bytes(image.extract_size as u64)),
-        ];
-
-        details.push((
-            "Download Size",
-            pretty_bytes(image.image_download_size as u64),
-        ));
+        let details = [
+            ("Release Date", image.release_date.to_string().into()),
+            ("Image Size", pretty_bytes(image.extract_size as u64).into()),
+            (
+                "Download Size",
+                pretty_bytes(image.image_download_size as u64).into(),
+            ),
+        ]
+        .into();
 
         Self::Image {
             img: RemoteImage::new(&image, downloader.clone(), flasher).into(),
@@ -93,7 +94,7 @@ impl BoardImage {
 
     pub(crate) fn format() -> Self {
         Self::SdFormat {
-            details: vec![("Format", "FAT32".to_string())],
+            details: [("Format", "FAT32".into())].into(),
         }
     }
 
@@ -139,7 +140,7 @@ impl BoardImage {
         }
     }
 
-    pub(crate) fn details(&self) -> &[(&'static str, String)] {
+    pub(crate) fn details(&self) -> &[(&'static str, Box<str>)] {
         match self {
             BoardImage::SdFormat { details } => details,
             BoardImage::Image { details, .. } => details,
@@ -760,7 +761,7 @@ pub(crate) fn image_details(
         details: value
             .details()
             .iter()
-            .map(|(k, v)| ((*k).into(), v.as_str().into()))
+            .map(|(k, v)| ((*k).into(), v.as_ref().into()))
             .collect(),
         init_formats: value.supported_init_formats(),
         init_format: value.init_format(),
@@ -888,14 +889,14 @@ pub(crate) fn normalize_file_dest(name: &str) -> String {
 
 pub(crate) fn fetch_images(
     downloader: &bb_downloader::Downloader,
-    iter: impl IntoIterator<Item = Arc<url::Url>>,
+    iter: impl IntoIterator<Item = Arc<Url>>,
 ) -> iced::Task<BBImagerMessage> {
     let tasks = iter.into_iter().map(|icon| {
         let downloader = downloader.clone();
         let key = icon.clone();
         // The downloader takes an owned `Url` (reqwest's `IntoUrl`), so this one
         // clone stays; the cache key is shared rather than cloned.
-        let target = url::Url::clone(&icon);
+        let target = Url::clone(&icon);
         iced::Task::perform(
             async move { downloader.download(target).await },
             move |p| match p {
@@ -939,7 +940,7 @@ pub(crate) fn fetch_remote_subitems(
 pub(crate) fn sd_modifications_common(
     x: &crate::persistance::SdSysconfCustomization,
 ) -> Vec<&'static str> {
-    let mut ans = Vec::new();
+    let mut ans = Vec::with_capacity(6);
 
     if x.user.is_some() {
         ans.push("User account configured");
