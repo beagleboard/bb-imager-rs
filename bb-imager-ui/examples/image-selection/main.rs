@@ -152,10 +152,10 @@ impl State {
                 "Debian 13 (Trixie) with the Xfce Desktop for BeagleY-AI, based on the TI AM67A."
                     .into(),
             ),
-            details: vec![
-                ("Release Date".into(), "2026-07-12".into()),
-                ("Image Size".into(), "12.00 GiB".into()),
-                ("Download Size".into(), "3.20 GiB".into()),
+            details: [
+                ("Release Date", "2026-07-12".into()),
+                ("Image Size", "12.00 GiB".into()),
+                ("Download Size", "3.20 GiB".into()),
             ]
             .into(),
             // Two formats so the picker renders rather than a plain line.

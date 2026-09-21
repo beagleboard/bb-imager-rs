@@ -761,7 +761,7 @@ pub(crate) fn image_details(
         details: value
             .details()
             .iter()
-            .map(|(k, v)| ((*k).into(), v.as_ref().into()))
+            .map(|(k, v)| (*k, v.as_ref().into()))
             .collect(),
         init_formats: value.supported_init_formats(),
         init_format: value.init_format(),
