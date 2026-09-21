@@ -35,6 +35,8 @@ pub struct State {
     pub boards: Box<[Board]>,
     pub selected: Option<BoardDetails>,
     pub search: Arc<str>,
+    /// Index of the row the cursor is over, for the hover outline.
+    pub hovered: Option<usize>,
 }
 
 pub fn view<'a>(
@@ -57,7 +59,8 @@ fn board_list_pane<'a>(
     let items = state
         .boards
         .iter()
-        .map(|dev| {
+        .enumerate()
+        .map(|(index, dev)| {
             let is_selected = state
                 .selected
                 .as_ref()
@@ -73,10 +76,11 @@ fn board_list_pane<'a>(
             list_item(
                 [img, list_label(dev.name.as_ref()).into()],
                 is_selected,
+                index,
+                state.hovered,
                 Message::SelectBoardById(dev.id),
             )
-        })
-        .map(Into::into);
+        });
 
     list_pane(&state.search, scroll_id, [], items)
 }

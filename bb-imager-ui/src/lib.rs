@@ -27,6 +27,9 @@ pub enum Message {
 
     /// Select a board by its id. Only valid on the board selection page.
     SelectBoardById(i64),
+    /// The cursor entered (Some row index) or left (None) a list row on the
+    /// board, image or destination page, to drive its hover outline.
+    HoverRow(Option<usize>),
     /// Copy a board's config entry, looked up by id, to the clipboard.
     CopyBoardConfig(i64),
     /// Copy an OS image's config entry, looked up by id, to the clipboard.
