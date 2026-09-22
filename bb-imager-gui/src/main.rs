@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
-use message::BBImagerMessage;
+use message::{BBImagerMessage, NavDir};
 use tokio::time::interval;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -111,6 +111,7 @@ impl BBImager {
 
             scroll_id: widget::Id::unique(),
             db: db.clone(),
+            clicks: state::ClickTracker::default(),
         };
 
         let db_task = Task::future(blocking_future(move || {
@@ -195,7 +196,7 @@ impl BBImager {
     fn subscription(&self) -> Subscription<BBImagerMessage> {
         const INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-        match self {
+        let dest = match self {
             Self::ChooseDest(x) => Subscription::run_with(
                 (
                     x.selected_image.1.flasher(),
@@ -223,7 +224,63 @@ impl BBImager {
                 },
             ),
             _ => Subscription::none(),
+        };
+
+        // Keyboard and mouse shortcuts. Enter advances to the next step when a
+        // selection exists, Escape goes back, and the arrow keys walk the
+        // selection on the three selection pages (the list rows themselves do
+        // not react to keys in iced 0.14).
+        let nav = iced::event::listen().map(|event| match event {
+            iced::event::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. }) => {
+                match key {
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter) => {
+                        BBImagerMessage::KeyboardNext
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape) => {
+                        BBImagerMessage::KeyboardBack
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp) => {
+                        BBImagerMessage::KeyboardNavigate(NavDir::Up)
+                    }
+                    iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown) => {
+                        BBImagerMessage::KeyboardNavigate(NavDir::Down)
+                    }
+                    _ => BBImagerMessage::Null,
+                }
+            }
+            iced::event::Event::Mouse(iced::mouse::Event::ButtonPressed(
+                iced::mouse::Button::Left,
+            )) => BBImagerMessage::MouseClicked,
+            iced::event::Event::Mouse(iced::mouse::Event::CursorMoved { position }) => {
+                BBImagerMessage::MouseMoved(position)
+            }
+            _ => BBImagerMessage::Null,
+        });
+
+        Subscription::batch([dest, nav])
+    }
+
+    /// Whether the current page has a selection to advance with (double-click
+    /// or Enter).
+    fn can_next(&self) -> bool {
+        match self {
+            Self::ChooseBoard(inner) => inner.selected_board.is_some(),
+            Self::ChooseOs(inner) => inner.selected_image.is_some(),
+            Self::ChooseDest(inner) => inner.selected_dest.is_some(),
+            _ => false,
         }
+    }
+
+    /// Whether the current page can navigate back with Escape.
+    fn can_back(&self) -> bool {
+        matches!(
+            self,
+            Self::ChooseOs(_)
+                | Self::ChooseDest(_)
+                | Self::Customize(_)
+                | Self::Review(_)
+                | Self::AppInfo(_)
+        )
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
