@@ -753,6 +753,15 @@ pub(crate) fn image_details(
     id: bb_imager_ui::image_selection::ImageId,
     value: &BoardImage,
 ) -> bb_imager_ui::image_selection::ImageDetails {
+    let mut buttons = Vec::with_capacity(2);
+
+    if let Some(x) = value.support() {
+        buttons.push(("Support", x.clone()));
+    }
+    if let Some(x) = value.sbom() {
+        buttons.push(("SBOM", x.clone()));
+    }
+
     bb_imager_ui::image_selection::ImageDetails {
         id,
         icon: value.icon(),
@@ -765,8 +774,7 @@ pub(crate) fn image_details(
             .collect(),
         init_formats: value.supported_init_formats(),
         init_format: value.init_format(),
-        support: value.support().cloned(),
-        sbom: value.sbom().cloned(),
+        buttons: buttons.into(),
     }
 }
 

@@ -66,8 +66,7 @@ pub struct ImageDetails {
     /// More than one makes the picker appear; exactly one is shown as plain text.
     pub init_formats: &'static [config::InitFormat],
     pub init_format: config::InitFormat,
-    pub support: Option<url::Url>,
-    pub sbom: Option<url::Url>,
+    pub buttons: Box<[(&'static str, url::Url)]>,
 }
 
 #[derive(Default, Debug)]
@@ -249,15 +248,11 @@ fn os_view_pane<'a>(
         col = col.push(detail_entry("Init Format", img.init_formats[0].to_string()))
     }
 
-    if let Some(x) = img.support.as_ref() {
-        let row = widget::row![button("SUPPORT").on_press(Message::OpenUrl(x.clone()))].spacing(16);
-        col = col.push(widget::center(row));
-    }
-
-    if let Some(x) = img.sbom.as_ref() {
-        let row = widget::row![button("SBOM").on_press(Message::OpenUrl(x.clone()))].spacing(16);
-        col = col.push(widget::center(row));
-    }
+    col = col.extend(img.buttons.iter().map(|(label, link)| {
+        widget::row![button(*label).on_press(Message::OpenUrl(link.clone()))]
+            .spacing(16)
+            .into()
+    }));
 
     detail_pane(col, scroll_id)
 }

@@ -161,8 +161,11 @@ impl State {
             // Two formats so the picker renders rather than a plain line.
             init_formats: &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
             init_format: config::InitFormat::Sysconf,
-            support: url::Url::parse("https://forum.beagleboard.org/").ok(),
-            sbom: None,
+            buttons: [(
+                "Support",
+                url::Url::parse("https://forum.beagleboard.org/").unwrap(),
+            )]
+            .into(),
         })
     }
 }
