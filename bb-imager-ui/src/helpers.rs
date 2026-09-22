@@ -299,23 +299,11 @@ pub(crate) fn board_details_pane<'a>(
             .map(Into::into),
     );
 
-    let mut btns = Vec::with_capacity(2);
-
-    if let Some(x) = &dev.documentation {
-        btns.push(
-            widget::button(widget::text("DOCUMENTATION"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
-
-    if let Some(x) = &dev.oshw {
-        btns.push(
-            widget::button(widget::text("OSHW"))
-                .on_press(Message::OpenUrl(x.clone()))
-                .into(),
-        );
-    }
+    let btns = dev.buttons.iter().map(|(label, link)| {
+        widget::button(widget::text(*label))
+            .on_press(Message::OpenUrl(link.clone()))
+            .into()
+    });
 
     detail_pane(
         cols.push(widget::center(widget::row(btns).spacing(16))),

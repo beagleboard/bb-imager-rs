@@ -26,11 +26,19 @@ impl State {
                         ("Connectivity".into(), "Wi-Fi 6 / Bluetooth 5.4".into()),
                     ]
                     .into(),
-                    documentation: url::Url::parse(
-                        "https://docs.beagleboard.org/boards/beagley/ai/",
-                    )
-                    .ok(),
-                    oshw: url::Url::parse("https://certification.oshwa.org/us002787.html").ok(),
+                    buttons: [
+                        (
+                            "Documentation",
+                            url::Url::parse("https://docs.beagleboard.org/boards/beagley/ai/")
+                                .unwrap(),
+                        ),
+                        (
+                            "OSHW",
+                            url::Url::parse("https://certification.oshwa.org/us002787.html")
+                                .unwrap(),
+                        ),
+                    ]
+                    .into(),
                 },
             },
         };
