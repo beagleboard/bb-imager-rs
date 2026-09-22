@@ -26,8 +26,7 @@ pub struct BoardDetails {
     pub icon: Option<Arc<url::Url>>,
     pub description: Box<str>,
     pub specification: Box<[(Box<str>, Box<str>)]>,
-    pub documentation: Option<url::Url>,
-    pub oshw: Option<url::Url>,
+    pub buttons: Box<[(&'static str, url::Url)]>,
 }
 
 #[derive(Default, Debug)]

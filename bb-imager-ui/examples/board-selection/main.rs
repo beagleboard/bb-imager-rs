@@ -67,17 +67,24 @@ impl State {
     fn select(&self, id: i64) -> Option<board_selection::BoardDetails> {
         let dev = self.devices.get(usize::try_from(id).ok()?)?;
 
+        let mut btns = Vec::with_capacity(2);
+        if let Some(x) = dev.documentation.as_ref() {
+            btns.push(("Documentation", x.clone()));
+        }
+        if let Some(x) = dev.oshw.as_ref() {
+            btns.push((
+                "OSHW",
+                url::Url::parse(&format!("{OSHW_BASE_URL}/{x}.html")).unwrap(),
+            ));
+        }
+
         Some(board_selection::BoardDetails {
             id,
             name: dev.name.clone(),
             icon: dev.icon.clone().map(std::sync::Arc::new),
             description: dev.description.clone(),
             specification: dev.specification.clone().into(),
-            documentation: dev.documentation.clone(),
-            oshw: dev
-                .oshw
-                .as_ref()
-                .and_then(|x| url::Url::parse(&format!("{OSHW_BASE_URL}/{x}.html")).ok()),
+            buttons: btns.into(),
         })
     }
 }

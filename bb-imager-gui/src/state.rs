@@ -128,18 +128,24 @@ impl From<ChooseOsState> for ChooseBoardState {
 
 impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
     fn from(value: &Board) -> Self {
+        let mut btns = Vec::with_capacity(2);
+        if let Some(x) = value.documentation.as_ref() {
+            btns.push(("Documentation", x.clone()));
+        }
+        if let Some(x) = value.oshw.as_ref() {
+            btns.push((
+                "OSHW",
+                url::Url::parse(&format!("{}/{x}.html", constants::OSHW_BASE_URL)).unwrap(),
+            ));
+        }
+
         Self {
             id: value.id,
             name: value.name.clone(),
             icon: value.icon.clone(),
             description: value.description.clone().into(),
             specification: value.specification.clone().into(),
-            documentation: value.documentation.clone(),
-            // The page renders a plain link, so the OSHWA id is resolved here
-            // where the parse can still fail quietly.
-            oshw: value.oshw.as_ref().and_then(|x| {
-                url::Url::parse(&format!("{}/{}.html", constants::OSHW_BASE_URL, x)).ok()
-            }),
+            buttons: btns.into(),
         }
     }
 }
