@@ -74,9 +74,6 @@ jobs:
     - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
 
-    - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
-    - uses: snapcore/action-build@v1
-
     - name: Move to dist folders
       run: |
         mkdir -p bb-imager-cli/dist/
@@ -95,47 +92,6 @@ jobs:
         name: artifacts-snap-${{ matrix.platform }}
         path: |
           bb-imager-gui/dist/*
-          bb-imager-cli/dist/*
-
-  linux-snap-cross-job:
-    strategy:
-      matrix:
-        platform: [armhf, riscv64]
-    name: Build CLI Snap - ${{matrix.platform}}
-    runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request'
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-      with:
-        lfs: true
-
-    - uses: docker/setup-qemu-action@v4
-
-    - name: Use caching
-      uses: Swatinem/rust-cache@v2
-
-    - run: make vendor
-    - run: ln -sf snapcraft.cli.yaml snapcraft.yaml
-    - uses: canonical/snapcraft-multiarch-action@v1
-      with:
-        architecture: ${{ matrix.platform }}
-
-    - name: Move to dist folders
-      run: |
-        mkdir -p bb-imager-cli/dist/
-        mv bb-imager-cli_*.snap bb-imager-cli/dist/
-
-    # Do not do versioning for Pre-Release packages
-    - name: Rename Pre-Release Packages
-      if: github.ref_type != 'tag'
-      run: make package-rename
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v7
-      with:
-        name: artifacts-snap-cli-${{ matrix.platform }}
-        path: |
           bb-imager-cli/dist/*
 
   linux-cross-job:
@@ -276,7 +232,6 @@ jobs:
       - linux-native-job
       - linux-cross-job
       - linux-snap-job
-      - linux-snap-cross-job
       - macos-job
       - windows-job
       - vendor-deps
@@ -312,7 +267,6 @@ jobs:
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v3
 
-      # TODO: Publish CLI
       - name: Publish Snaps
         run: |
           for pkg in gui; do
