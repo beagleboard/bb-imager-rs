@@ -2,6 +2,7 @@
 	"imager": {
 		"latest_version": "2.0.0",
 		"remote_configs": [
+                        "https://github.com/beagleboard/u-boot-beagley-ai/releases/latest/download/os_list.json",
 			"https://raw.githubusercontent.com/beagleboard/distros/refs/heads/main/os_list.json",
 			"https://github.com/beagleboard/bb-imager-rs/releases/download/continuous-release/os_list.json",
 			"https://github.com/beagleboard/micropython-builder/releases/download/continuous-release/os_list.json",
