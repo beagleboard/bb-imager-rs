@@ -6,7 +6,6 @@ use tokio_util::task::AbortOnDropHandle;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteImage {
-    name: Box<str>,
     item: RemoteItem,
 }
 
@@ -23,7 +22,6 @@ impl RemoteImage {
         };
 
         Self {
-            name: img.name.clone(),
             item: RemoteItem::new(
                 img.url.clone(),
                 img.image_download_sha256,
@@ -31,10 +29,6 @@ impl RemoteImage {
                 downloader,
             ),
         }
-    }
-
-    pub(crate) fn file_name(&self) -> &str {
-        self.item.url.path_segments().unwrap().next_back().unwrap()
     }
 
     #[cfg(feature = "sd")]
@@ -47,12 +41,6 @@ impl RemoteImage {
 
     pub(crate) fn into_image_fn(self) -> impl FnOnce() -> io::Result<(OsImage, u64)> {
         self.item.into_image_fn()
-    }
-}
-
-impl std::fmt::Display for RemoteImage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
     }
 }
 

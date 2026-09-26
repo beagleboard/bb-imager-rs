@@ -116,9 +116,6 @@ fn modifications_reports_only_what_gets_written() {
 /// Remote specifically: a local image always reports `InitFormat::None`, so
 /// it cannot exercise format detection.
 fn remote_sd_image(flasher: config::Flasher, init_format: config::InitFormat) -> BoardImage {
-    let cache = tempfile::tempdir().unwrap();
-    let downloader = bb_downloader::Downloader::new(cache.path()).unwrap();
-
     BoardImage::remote(
         crate::db::OsImage {
             id: 1,
@@ -137,7 +134,6 @@ fn remote_sd_image(flasher: config::Flasher, init_format: config::InitFormat) ->
             support: None,
         },
         flasher,
-        downloader,
     )
 }
 
@@ -479,11 +475,14 @@ async fn flash_local_image(
     src.flush().unwrap();
 
     let dst = tempfile::NamedTempFile::new().unwrap();
+    let cache = tempfile::tempdir().unwrap();
     let res = flash(
         BoardImage::local(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
         Destination::LocalFile(dst.path().to_path_buf()),
         bootfs,
+        crate::db::Db::new().unwrap(),
+        bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
     );

@@ -152,18 +152,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::SelectRemoteOs((image, flasher)) => match state {
             BBImager::ChooseOs(inner) => {
                 let id = ImageId::OsImage(image.id);
-                let img =
-                    helpers::BoardImage::remote(image, flasher, inner.common.downloader.clone());
+                let img = helpers::BoardImage::remote(image, flasher);
                 inner.select_image(id, img);
             }
             BBImager::AppInfo(overlay_state) => {
                 if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
                     let id = ImageId::OsImage(image.id);
-                    let img = helpers::BoardImage::remote(
-                        image,
-                        flasher,
-                        inner.common.downloader.clone(),
-                    );
+                    let img = helpers::BoardImage::remote(image, flasher);
                     inner.select_image(id, img);
                 }
             }

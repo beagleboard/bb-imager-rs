@@ -249,6 +249,8 @@ impl BBImager {
         tracing::info!("Selected Destination: {:#?}", dst);
         tracing::info!("Selected Customization: {:#?}", customization);
 
+        let db = common.db.clone();
+        let downloader = common.downloader.clone();
         let cancel = bb_helper::cancel::CancellationToken::default();
 
         let s = iced::stream::channel(2, async move |mut chan| {
@@ -256,7 +258,16 @@ impl BBImager {
 
             let cancel_child = cancel.clone();
             let flash_task = blocking_future(move || {
-                helpers::flash(img, customization, dst, bootfs, tx, cancel_child)
+                helpers::flash(
+                    img,
+                    customization,
+                    dst,
+                    bootfs,
+                    db,
+                    downloader,
+                    tx,
+                    cancel_child,
+                )
             });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {
