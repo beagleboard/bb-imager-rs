@@ -125,10 +125,7 @@ impl BBImager {
             Self::choose_board(common)
         };
 
-        (
-            app,
-            Task::batch([db_task, updater_task]),
-        )
+        (app, Task::batch([db_task, updater_task]))
     }
 
     fn common_mut(&mut self) -> &mut BBImagerCommon {
@@ -258,8 +255,8 @@ impl BBImager {
             let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
             let cancel_child = cancel.clone();
-            let flash_task = tokio::spawn(async move {
-                helpers::flash(img, customization, dst, bootfs, tx, cancel_child).await
+            let flash_task = blocking_future(move || {
+                helpers::flash(img, customization, dst, bootfs, tx, cancel_child)
             });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {
@@ -269,11 +266,7 @@ impl BBImager {
             });
             let _guard = cancel.drop_guard();
 
-            let res = flash_task
-                .await
-                .expect("Tokio runtime failed to spawn task");
-
-            let res = match res {
+            let res = match flash_task.await {
                 Ok(_) => {
                     tracing::info!("Flashing Successfull");
                     BBImagerMessage::FlashSuccess

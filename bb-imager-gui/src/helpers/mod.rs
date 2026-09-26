@@ -303,7 +303,7 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 }
 
 /// `bootfs` is the selected board's bootfs archive, if it has one.
-pub(crate) async fn flash(
+pub(crate) fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
@@ -319,9 +319,7 @@ pub(crate) async fn flash(
     match (img, customization, dst) {
         #[cfg(feature = "sd")]
         (BoardImage::SdFormat { .. }, _, Destination::SdCard(t)) => {
-            tokio::task::spawn_blocking(move || bb_flasher::sd::FormatFlasher::new(t).flash())
-                .await
-                .unwrap()
+            bb_flasher::sd::FormatFlasher::new(t).flash()
         }
         #[cfg(feature = "sd")]
         (
@@ -335,18 +333,14 @@ pub(crate) async fn flash(
             config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
         ) =>
         {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::Flasher::with_file_dest(
-                    img.into_image_fn(),
-                    bootfs.map(|x| x.into_archive_fn(None)),
-                    bmap.map(|x| x.into_fn()),
-                    f,
-                    customization.sd_customization(),
-                )
-                .flash(Some(chan), Some(cancel_sync))
-            })
-            .await
-            .unwrap()
+            bb_flasher::sd::Flasher::with_file_dest(
+                img.into_image_fn(),
+                bootfs.map(|x| x.into_archive_fn(None)),
+                bmap.map(|x| x.into_fn()),
+                f,
+                customization.sd_customization(),
+            )
+            .flash(Some(chan), Some(cancel_sync))
         }
         #[cfg(feature = "sd")]
         (
@@ -360,113 +354,86 @@ pub(crate) async fn flash(
             config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
         ) =>
         {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::Flasher::new(
-                    img.into_image_fn(),
-                    bootfs.map(|x| x.into_archive_fn(None)),
-                    bmap.map(|x| x.into_fn()),
-                    t,
-                    customization.sd_customization(),
-                    // TODO: Impl proerly
-                    false,
-                )
-                .flash(Some(chan), Some(cancel_sync))
-            })
-            .await
-            .unwrap()
+            bb_flasher::sd::Flasher::new(
+                img.into_image_fn(),
+                bootfs.map(|x| x.into_archive_fn(None)),
+                bmap.map(|x| x.into_fn()),
+                t,
+                customization.sd_customization(),
+                // TODO: Impl proerly
+                false,
+            )
+            .flash(Some(chan), Some(cancel_sync))
         }
         #[cfg(feature = "sd")]
         (BoardImage::Image { img, flasher, .. }, _, Destination::SdCard(t))
             if flasher == config::Flasher::SdCardBootfs =>
         {
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
-            tokio::task::spawn_blocking(move || {
+            std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
                     let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
                 }
             });
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::UpdateBootFlasher::new(
-                    img.into_archive_fn(Some(tx)),
-                    t,
-                    Some(cancel_sync),
-                )
-                .flash()
-            })
-            .await
-            .unwrap()
+            bb_flasher::sd::UpdateBootFlasher::new(
+                img.into_archive_fn(Some(tx)),
+                t,
+                Some(cancel_sync),
+            )
+            .flash()
         }
         #[cfg(feature = "sd")]
         (BoardImage::Image { img, flasher, .. }, _, Destination::LocalFile(t))
             if flasher == config::Flasher::SdCardBootfs =>
         {
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
-            tokio::task::spawn_blocking(move || {
+            std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
                     let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
                 }
             });
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::sd::UpdateBootFlasher::with_file_dest(
-                    img.into_archive_fn(Some(tx)),
-                    t,
-                    Some(cancel_sync),
-                )
-                .flash()
-            })
-            .await
-            .unwrap()
+            bb_flasher::sd::UpdateBootFlasher::with_file_dest(
+                img.into_archive_fn(Some(tx)),
+                t,
+                Some(cancel_sync),
+            )
+            .flash()
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (
             BoardImage::Image { img, .. },
             FlashingCustomization::Bcf,
             Destination::BeagleConnectFreedom(t),
-        ) => tokio::task::spawn_blocking(move || {
+        ) => {
             bb_flasher::bcf::cc1352p7::Flasher::new(img.into_image_fn(), t, true, Some(cancel_sync))
                 .flash(Some(chan))
-        })
-        .await
-        .unwrap(),
+        }
         #[cfg(feature = "bcf_msp430")]
         (BoardImage::Image { img, .. }, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(chan))
-            })
-            .await
-            .unwrap()
+            bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(chan))
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         (BoardImage::Image { img, .. }, FlashingCustomization::Zepto, Destination::Mspm0(t)) => {
-            tokio::task::spawn_blocking(move || {
-                bb_flasher::mspm0::Flasher::no_prep(img.into_image_fn(), t, true, Some(cancel_sync))
-                    .flash(Some(chan))
-            })
-            .await
-            .unwrap()
+            bb_flasher::mspm0::Flasher::no_prep(img.into_image_fn(), t, true, Some(cancel_sync))
+                .flash(Some(chan))
         }
         (BoardImage::Image { img, .. }, _, Destination::LocalFile(t)) => {
             let cb = img.into_image_fn();
-            blocking_future(move || {
-                let (img, size) = cb()?;
-                let mut dest = std::fs::File::create(t)?;
+            let (img, size) = cb()?;
+            let mut dest = std::fs::File::create(t)?;
 
-                let (tx, rx) = mpsc::sync_channel(4);
-                std::thread::spawn(move || {
-                    while let Ok(msg) = rx.recv() {
-                        let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(msg));
-                    }
-                });
+            let (tx, rx) = mpsc::sync_channel(4);
+            std::thread::spawn(move || {
+                while let Ok(msg) = rx.recv() {
+                    let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(msg));
+                }
+            });
 
-                let mut img_reader =
-                    bb_helper::reader_progress::ReaderWithProgress::new(img, size, Some(tx));
+            let mut img_reader =
+                bb_helper::reader_progress::ReaderWithProgress::new(img, size, Some(tx));
 
-                std::io::copy(&mut img_reader, &mut dest)?;
-
-                dest.sync_all()
-            })
-            .await
-            .map_err(Into::into)
+            std::io::copy(&mut img_reader, &mut dest)?;
+            dest.sync_all().map_err(Into::into)
         }
         _ => unimplemented!(),
     }
