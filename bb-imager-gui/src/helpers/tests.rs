@@ -486,8 +486,7 @@ async fn flash_local_image(
         bootfs,
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
-    )
-    .await;
+    );
 
     (res, dst, data)
 }
