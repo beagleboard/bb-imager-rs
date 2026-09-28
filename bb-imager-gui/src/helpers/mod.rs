@@ -80,22 +80,34 @@ impl std::fmt::Display for BoardImage {
 
 impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
     fn from(value: bb_imager_ui::image_selection::ImageDetails) -> Self {
-        match value.id {
-            bb_imager_ui::image_selection::ImageId::Format => Self::SdFormat,
-            bb_imager_ui::image_selection::ImageId::Local(flasher) => Self::Local {
-                img: bb_flasher::LocalImage::new(value.path.unwrap()),
+        match value {
+            bb_imager_ui::image_selection::ImageDetails::Format => Self::SdFormat,
+            bb_imager_ui::image_selection::ImageDetails::Local {
                 flasher,
-                init_format: value.init_format,
+                path,
+                init_format,
+                ..
+            } => Self::Local {
+                img: bb_flasher::LocalImage::new(path),
+                flasher,
+                init_format,
             },
-            bb_imager_ui::image_selection::ImageId::OsImage(id) => Self::Remote {
+            bb_imager_ui::image_selection::ImageDetails::Remote {
                 id,
-                name: value.title,
-                file_name: value.file_name.unwrap(),
-                flasher: value.flasher.unwrap(),
-                init_format: value.init_format,
-                info_text: value.info_text,
+                title,
+                file_name,
+                flasher,
+                init_format,
+                info_text,
+                ..
+            } => Self::Remote {
+                id,
+                name: title,
+                file_name,
+                flasher,
+                init_format,
+                info_text,
             },
-            bb_imager_ui::image_selection::ImageId::OsSublist(_) => unreachable!(),
         }
     }
 }
