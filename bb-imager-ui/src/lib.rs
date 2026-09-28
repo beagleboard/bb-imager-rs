@@ -11,6 +11,7 @@ mod helpers;
 pub mod image_selection;
 pub mod review;
 pub mod sandbox_notice;
+pub(crate) mod review_inner;
 
 #[derive(Clone, Debug)]
 pub enum Message {

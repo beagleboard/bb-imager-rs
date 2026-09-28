@@ -1,32 +1,36 @@
-use std::sync::Arc;
-
 use iced::{Element, widget};
 
-use crate::board_selection::BoardDetails;
-use crate::helpers::{board_details_pane, page_type1, progress_finish_view};
-use crate::{Message, constants};
+use crate::Message;
+use crate::helpers::page_type2;
 
 #[derive(Debug)]
 pub struct State {
-    /// Whether the image was written to a file rather than to a device.
-    pub is_download: bool,
-    pub board: BoardDetails,
+    pub board: Box<str>,
+    pub image: Box<str>,
+    pub destination: Box<str>,
+    pub modifications: Box<[&'static str]>,
 }
 
-pub fn view<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: widget::Id,
-) -> Element<'a, Message> {
-    let msg = if state.is_download {
-        "Successfully Downloaded Image"
-    } else {
-        "Successfully Flashed Image"
-    };
+impl<'a> From<&'a State> for crate::review_inner::State<'a> {
+    fn from(value: &'a State) -> Self {
+        Self {
+            title: "Write Complete",
+            subtitle: "Device is ready to be used with your BeagleBoard hardware!",
+            board: &value.board,
+            image: &value.image,
+            destination: &value.destination,
+            modifications_title: "Modifications applied",
+            modifications: &value.modifications,
+            footer: Some(
+                "The storage device was ejected automatically, you can now remove it safely.",
+            ),
+        }
+    }
+}
 
-    page_type1(
-        board_details_pane(cache, &state.board, &scroll_id),
-        progress_finish_view("100%", constants::CHECK_MARK_GREEN, msg),
+pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
+    page_type2(
+        crate::review_inner::State::from(state).view(scroll_id),
         [widget::button("Flash Another")
             .style(widget::button::primary)
             .on_press(Message::Restart)],
