@@ -11,6 +11,9 @@ _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
 _APPIMAGETOOL_ARGS =
+# Resolve a runtime library's path via the linker cache (distro-agnostic: /usr/lib/<triple>, /lib64, ...)
+_LDCONFIG_ARCH = $(if $(filter aarch64,$(APPIMAGE_ARCH)),AArch64,x86-64)
+_find_lib = $(or $(shell ldconfig -p | awk '$$1 == "$(1)" && /$(_LDCONFIG_ARCH)/ { print $$NF; exit }'),$(error $(1) not found in ldconfig cache))
 _DEST_VERSION = $(VERSION)
 _DIOXUS_CLI = $(shell which dx)
 
@@ -236,13 +239,13 @@ test-gui:
 setup-debian-deps:
 	$(info "Installing Debian dependencies")
 	sudo apt-get update -y
-	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev desktop-file-utils
+	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev desktop-file-utils libxkbcommon-x11-0
 
 ## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon hidapi-devel desktop-file-utils
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon libxkbcommon-x11 hidapi-devel desktop-file-utils
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
@@ -321,7 +324,8 @@ package-gui-pacman: build-gui
 package-gui-appimage: build-gui
 	mkdir -p bb-imager-gui/dist
 	$(MAKE) _install_gui PREFIX=/usr DESTDIR=bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir GUI_NAME=org.beagleboard.imagingutility
-	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/bin/bb-imager-gui bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/AppRun
+	install -Dm755 bb-imager-gui/assets/packages/linux/appimage/AppRun bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/AppRun
+	install -Dm644 -t bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/lib $(call _find_lib,libxkbcommon-x11.so.0) $(call _find_lib,libxcb-xkb.so.1)
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/applications/org.beagleboard.imagingutility.desktop bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.desktop
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/icons/hicolor/128x128/apps/org.beagleboard.imagingutility.png bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/org.beagleboard.imagingutility.png
 	ln -srf bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.metainfo.xml bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir/usr/share/metainfo/org.beagleboard.imagingutility.appdata.xml
