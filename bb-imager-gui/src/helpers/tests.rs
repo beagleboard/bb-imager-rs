@@ -340,15 +340,6 @@ fn board_image_local_reads_file_metadata() {
 }
 
 #[test]
-fn board_image_update_init_format_on_image() {
-    let file = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(file.path(), b"x").unwrap();
-    let mut img = BoardImage::local(file.path().to_path_buf(), config::Flasher::SdCard);
-    img.update_init_format(config::InitFormat::Sysconf);
-    assert_eq!(img.init_format(), config::InitFormat::Sysconf);
-}
-
-#[test]
 fn destination_local_file_behaviour() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
     assert!(dst.is_download_action());

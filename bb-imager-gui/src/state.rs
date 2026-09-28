@@ -155,9 +155,6 @@ pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: Board,
     pub(crate) flasher: config::Flasher,
-    /// Carries the flasher machinery the page cannot render; the page keeps its
-    /// own renderable projection in `state.selected`.
-    pub(crate) selected_image: Option<(ImageId, helpers::BoardImage)>,
     pub(crate) state: bb_imager_ui::image_selection::State,
 }
 
@@ -188,7 +185,6 @@ impl ChooseOsState {
     /// Record `img` as the selection, both for the flow and for the page.
     pub(crate) fn select_image(&mut self, id: ImageId, img: helpers::BoardImage) {
         self.state.selected = Some(helpers::image_details(id, &img));
-        self.selected_image = Some((id, img));
     }
 
     pub(crate) fn resolve_remote_sublists(
@@ -262,7 +258,6 @@ impl From<ChooseDestState> for ChooseOsState {
             common: value.common,
             flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
-            selected_image: None,
             state: Default::default(),
         };
         let (id, img) = value.selected_image;

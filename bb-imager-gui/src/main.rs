@@ -366,7 +366,6 @@ impl BBImager {
                     common: inner.common,
                     flasher: selected_board.flasher,
                     selected_board,
-                    selected_image: None,
                     state: Default::default(),
                 };
 
@@ -379,15 +378,15 @@ impl BBImager {
                 (Self::ChooseOs(temp), tasks)
             }
             Self::ChooseOs(inner) => {
-                let selected_image = inner
-                    .selected_image
+                let img = inner
+                    .state
+                    .selected
                     .expect("Image should already be selected");
-
                 (
                     Self::ChooseDest(state::ChooseDestState::new(
                         inner.common,
                         inner.selected_board,
-                        selected_image,
+                        (img.id, img.into()),
                     )),
                     Task::none(),
                 )

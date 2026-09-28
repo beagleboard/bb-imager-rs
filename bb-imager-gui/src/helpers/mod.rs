@@ -172,17 +172,6 @@ impl BoardImage {
         }
     }
 
-    pub(crate) fn update_init_format(&mut self, f: config::InitFormat) {
-        match self {
-            BoardImage::SdFormat { .. } => {
-                unreachable!();
-            }
-            BoardImage::Local { init_format, .. } | BoardImage::Remote { init_format, .. } => {
-                *init_format = f;
-            }
-        }
-    }
-
     pub(crate) fn support(&self) -> Option<&Url> {
         match self {
             BoardImage::SdFormat { .. } | BoardImage::Local { .. } => None,
@@ -204,6 +193,37 @@ impl std::fmt::Display for BoardImage {
             BoardImage::SdFormat { .. } => write!(f, "Format SD Card"),
             BoardImage::Local { img, .. } => img.fmt(f),
             BoardImage::Remote { name, .. } => name.fmt(f),
+        }
+    }
+}
+
+impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
+    fn from(value: bb_imager_ui::image_selection::ImageDetails) -> Self {
+        match value.id {
+            bb_imager_ui::image_selection::ImageId::Format => Self::format(),
+            bb_imager_ui::image_selection::ImageId::Local(flasher) => {
+                Self::local(value.path.unwrap().into(), flasher)
+            }
+            bb_imager_ui::image_selection::ImageId::OsImage(id) => {
+                let icon = match value.icon {
+                    bb_imager_ui::image_selection::ImageIcon::Remote(url) => url,
+                    _ => todo!(),
+                };
+                Self::Remote {
+                    id,
+                    name: value.title,
+                    file_name: value.file_name.unwrap(),
+                    flasher: value.flasher.unwrap(),
+                    init_format: value.init_format,
+                    sbom: None,
+                    info_text: value.info_text,
+                    description: Default::default(),
+                    icon,
+                    details: Default::default(),
+                    support: None,
+                }
+            }
+            bb_imager_ui::image_selection::ImageId::OsSublist(_) => unreachable!(),
         }
     }
 }
@@ -741,6 +761,10 @@ pub(crate) fn image_details(
         init_formats: value.supported_init_formats(),
         init_format: value.init_format(),
         buttons: buttons.into(),
+        flasher: Some(value.flasher()),
+        path: Default::default(),
+        info_text: None,
+        file_name: value.file_name().map(Into::into),
     }
 }
 

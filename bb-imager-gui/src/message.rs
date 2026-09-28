@@ -545,9 +545,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         },
         BBImagerMessage::UiState(Message::UpdateInitFormat(f)) => {
             if let BBImager::ChooseOs(inner) = state
-                && let Some((_, img)) = &mut inner.selected_image
+                && let Some(img) = &mut inner.state.selected
             {
-                img.update_init_format(f);
+                img.init_format = f;
             }
         }
         BBImagerMessage::Null | BBImagerMessage::UiState(Message::Null) => {}
