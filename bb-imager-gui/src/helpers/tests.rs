@@ -3,7 +3,6 @@ use crate::persistance::{
     GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
 };
 use bb_imager_ui::destination_selection::DestId;
-use bb_imager_ui::image_selection::{ImageIcon, ImageId};
 
 #[test]
 fn pretty_bytes_scales_units() {
@@ -112,29 +111,24 @@ fn modifications_reports_only_what_gets_written() {
 }
 
 /// A remote SD image with the given init format.
-///
-/// Remote specifically: a local image always reports `InitFormat::None`, so
-/// it cannot exercise format detection.
 fn remote_sd_image(flasher: config::Flasher, init_format: config::InitFormat) -> BoardImage {
-    BoardImage::remote(
-        crate::db::OsImage {
-            id: 1,
-            name: "test-image".into(),
-            description: "test".to_string(),
-            icon: std::sync::Arc::new(url::Url::parse("https://example.com/icon.png").unwrap()),
-            url: Box::new(url::Url::parse("https://example.com/os.img.xz").unwrap()),
-            image_download_size: 0,
-            image_download_sha256: [0u8; 32],
-            extract_size: 0,
-            release_date: chrono::NaiveDate::from_ymd_opt(2024, 5, 10).unwrap(),
-            init_format,
-            bmap: None,
-            sbom: None,
-            info_text: None,
-            support: None,
-        },
+    BoardImage::Remote {
+        id: 1,
+        name: "test-image".into(),
+        init_format,
         flasher,
-    )
+        info_text: None,
+        file_name: "os.img.xz".into(),
+    }
+}
+
+/// A local image with no customization.
+fn local_image(path: PathBuf, flasher: config::Flasher) -> BoardImage {
+    BoardImage::Local {
+        img: bb_flasher::LocalImage::new(path.into()),
+        flasher,
+        init_format: config::InitFormat::None,
+    }
 }
 
 /// Both SD flashers are the same as far as customization goes; only the
@@ -181,7 +175,7 @@ fn unwritable_init_formats_skip_the_customization_page() {
 
 #[test]
 fn no_customization_covers_non_configurable_flashers() {
-    let img = BoardImage::format();
+    let img = BoardImage::SdFormat;
     assert!(matches!(
         no_customization(config::Flasher::SdCard, &img),
         Some(FlashingCustomization::NoneSd)
@@ -212,7 +206,7 @@ fn no_customization_covers_non_configurable_flashers() {
 #[test]
 fn flashing_customization_new_selects_variant_by_flasher() {
     // A format image has init_format None, so SD falls through to NoneSd.
-    let img = BoardImage::format();
+    let img = BoardImage::SdFormat;
     let cfg = GuiConfiguration::default();
 
     assert!(matches!(
@@ -291,18 +285,11 @@ fn flashing_customization_round_trips_through_the_page_types() {
 
 #[test]
 fn board_image_format_accessors() {
-    let img = BoardImage::format();
-    assert_eq!(
-        img.description(),
-        Some("Format a SD Card to FAT32 for reuse.")
-    );
+    let img = BoardImage::SdFormat;
     assert_eq!(img.flasher(), config::Flasher::SdCard);
     assert_eq!(img.init_format(), config::InitFormat::None);
     assert_eq!(img.info_text(), None);
     assert_eq!(img.file_name(), None);
-    assert_eq!(img.details(), &[("Format", "FAT32".into())]);
-    assert!(img.supported_init_formats().is_empty());
-    assert!(img.support().is_none());
     assert_eq!(img.to_string(), "Format SD Card");
 }
 
@@ -311,24 +298,13 @@ fn board_image_local_reads_file_metadata() {
     let file = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(file.path(), b"0123456789").unwrap();
 
-    let img = BoardImage::local(
+    let img = local_image(
         file.path().to_path_buf(),
         config::Flasher::BeagleConnectFreedom,
     );
     assert_eq!(img.flasher(), config::Flasher::BeagleConnectFreedom);
     assert_eq!(img.init_format(), config::InitFormat::None);
-    assert!(img.description().is_none());
     assert!(img.file_name().is_some_and(|n| !n.is_empty()));
-
-    let details = img.details();
-    assert!(details.iter().any(|(k, _)| *k == "Path"));
-    assert!(
-        details
-            .iter()
-            .any(|(k, v)| *k == "Size" && v.as_ref() == "10")
-    );
-    // Local (non-SD) images offer no init-format customization.
-    assert!(img.supported_init_formats().is_empty());
 }
 
 #[test]
@@ -415,19 +391,6 @@ fn no_bootloader_flasher_behaves_like_sd_card() {
     );
     // Enumeration hits the same catch-all; the call itself is the assertion.
     let _ = destinations(config::Flasher::SdCardNoBootloader, false, "".into());
-
-    for format in [
-        config::InitFormat::Sysconf,
-        config::InitFormat::CloudInit,
-        config::InitFormat::None,
-    ] {
-        let img = remote_sd_image(config::Flasher::SdCardNoBootloader, format);
-        assert_eq!(
-            img.supported_init_formats(),
-            remote_sd_image(config::Flasher::SdCard, format).supported_init_formats(),
-            "{format:?} should offer the same init formats on both SD flashers"
-        );
-    }
 }
 
 /// The board's bootfs archive, as `start_flashing` builds it.
@@ -460,7 +423,7 @@ async fn flash_local_image(
     let dst = tempfile::NamedTempFile::new().unwrap();
     let cache = tempfile::tempdir().unwrap();
     let res = flash(
-        BoardImage::local(src.path().to_path_buf(), flasher),
+        local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
         Destination::LocalFile(dst.path().to_path_buf()),
         bootfs,

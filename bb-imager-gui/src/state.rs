@@ -1,6 +1,6 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
-use std::{path::PathBuf, sync::Arc};
 
 use bb_config::config;
 use iced::{Task, widget};
