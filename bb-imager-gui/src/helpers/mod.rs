@@ -84,7 +84,7 @@ impl BoardImage {
                 .into(),
             flasher,
             init_format: image.init_format,
-            sbom: image.sbom.map(|url| *url),
+            sbom: image.sbom.map(|url| url),
             info_text: image.info_text,
             description: image.description,
             icon: image.icon,
@@ -727,44 +727,6 @@ pub(crate) fn dest_details(
             .into_iter()
             .map(|(k, v)| (k.into(), v.into_boxed_str()))
             .collect(),
-    }
-}
-
-/// The renderable projection of a selected image.
-///
-/// `id` comes from the selection rather than the image itself: a remote image's
-/// catalog id is not recoverable from [`BoardImage`], which only carries the
-/// flasher machinery.
-pub(crate) fn image_details(
-    id: bb_imager_ui::image_selection::ImageId,
-    value: &BoardImage,
-) -> bb_imager_ui::image_selection::ImageDetails {
-    let mut buttons = Vec::with_capacity(2);
-
-    if let Some(x) = value.support() {
-        buttons.push(("Support", x.clone()));
-    }
-    if let Some(x) = value.sbom() {
-        buttons.push(("SBOM", x.clone()));
-    }
-
-    bb_imager_ui::image_selection::ImageDetails {
-        id,
-        icon: value.icon(),
-        title: value.to_string().into(),
-        description: value.description().map(Into::into),
-        details: value
-            .details()
-            .iter()
-            .map(|(k, v)| (*k, v.as_ref().into()))
-            .collect(),
-        init_formats: value.supported_init_formats(),
-        init_format: value.init_format(),
-        buttons: buttons.into(),
-        flasher: Some(value.flasher()),
-        path: Default::default(),
-        info_text: None,
-        file_name: value.file_name().map(Into::into),
     }
 }
 

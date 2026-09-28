@@ -303,10 +303,6 @@ fn board_image_format_accessors() {
     assert_eq!(img.details(), &[("Format", "FAT32".into())]);
     assert!(img.supported_init_formats().is_empty());
     assert!(img.support().is_none());
-    assert!(matches!(
-        crate::helpers::image_details(ImageId::Format, &img).icon,
-        ImageIcon::Format
-    ));
     assert_eq!(img.to_string(), "Format SD Card");
 }
 
@@ -321,10 +317,6 @@ fn board_image_local_reads_file_metadata() {
     );
     assert_eq!(img.flasher(), config::Flasher::BeagleConnectFreedom);
     assert_eq!(img.init_format(), config::InitFormat::None);
-    assert!(matches!(
-        crate::helpers::image_details(ImageId::Local(img.flasher()), &img).icon,
-        ImageIcon::Local
-    ));
     assert!(img.description().is_none());
     assert!(img.file_name().is_some_and(|n| !n.is_empty()));
 

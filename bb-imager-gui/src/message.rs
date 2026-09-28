@@ -36,7 +36,11 @@ pub(crate) enum BBImagerMessage {
 
     /// ChooseOs Page
     UpdateOsList((Vec<bb_imager_ui::image_selection::ImageItem>, Option<i64>)),
-    SelectLocalOs(helpers::BoardImage),
+    SelectLocalOs {
+        path: Box<std::path::Path>,
+        flasher: bb_config::config::Flasher,
+        size: u64,
+    },
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
 
     /// Choose Destination page
@@ -105,22 +109,28 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::UiState(Message::SelectOs(id)) => match state {
             BBImager::ChooseOs(inner) => match id {
-                ImageId::Format => inner.select_image(id, helpers::BoardImage::format()),
+                ImageId::Format => inner.select_format_image(),
                 ImageId::Local(flasher) => {
                     let extensions = helpers::file_filter(flasher);
 
                     return Task::perform(
                         async move {
-                            rfd::AsyncFileDialog::new()
+                            let fpath = rfd::AsyncFileDialog::new()
                                 .add_filter("image", extensions)
                                 .pick_file()
                                 .await
-                                .map(|x| x.inner().to_path_buf())
+                                .map(|x| x.inner().to_path_buf().into())?;
+
+                            let size = tokio::fs::metadata(&fpath).await.unwrap().len();
+
+                            Some((fpath, size))
                         },
                         move |x| match x {
-                            Some(y) => BBImagerMessage::SelectLocalOs(helpers::BoardImage::local(
-                                y, flasher,
-                            )),
+                            Some((path, size)) => BBImagerMessage::SelectLocalOs {
+                                path,
+                                flasher,
+                                size,
+                            },
                             None => BBImagerMessage::Null,
                         },
                     );
@@ -151,21 +161,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         },
         BBImagerMessage::SelectRemoteOs((image, flasher)) => match state {
             BBImager::ChooseOs(inner) => {
-                let id = ImageId::OsImage(image.id);
-                let img = helpers::BoardImage::remote(image, flasher);
-                inner.select_image(id, img);
+                inner.select_remote_image(image, flasher);
             }
             BBImager::AppInfo(overlay_state) => {
                 if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
-                    let id = ImageId::OsImage(image.id);
-                    let img = helpers::BoardImage::remote(image, flasher);
-                    inner.select_image(id, img);
+                    inner.select_remote_image(image, flasher);
                 }
             }
             _ => {}
         },
-        BBImagerMessage::SelectLocalOs(image) => match state {
-            BBImager::ChooseOs(inner) => inner.select_image(ImageId::Local(image.flasher()), image),
+        BBImagerMessage::SelectLocalOs {
+            path,
+            flasher,
+            size,
+        } => match state {
+            BBImager::ChooseOs(inner) => inner.select_local_image(path, flasher, size),
             _ => panic!("Unexpected message"),
         },
         BBImagerMessage::UiState(Message::OpenUrl(x)) => {

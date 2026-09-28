@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::path::Path;
 use std::time::Instant;
+use std::{path::PathBuf, sync::Arc};
 
 use bb_config::config;
 use iced::{Task, widget};
@@ -182,9 +183,107 @@ impl ChooseOsState {
         self.state.pos = pos;
     }
 
-    /// Record `img` as the selection, both for the flow and for the page.
-    pub(crate) fn select_image(&mut self, id: ImageId, img: helpers::BoardImage) {
-        self.state.selected = Some(helpers::image_details(id, &img));
+    pub(crate) fn select_format_image(&mut self) {
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
+            id: ImageId::Format,
+            icon: bb_imager_ui::image_selection::ImageIcon::Format,
+            title: "Format SD Card".into(),
+            description: Some("Format a SD Card to FAT32 for reuse.".into()),
+            details: [("Format", "FAT32".into())].into(),
+            init_formats: &[config::InitFormat::None],
+            init_format: config::InitFormat::None,
+            buttons: Default::default(),
+            flasher: Some(config::Flasher::SdCard),
+            path: Default::default(),
+            info_text: None,
+            file_name: None,
+        });
+    }
+
+    pub(crate) fn select_local_image(
+        &mut self,
+        path: Box<Path>,
+        flasher: config::Flasher,
+        size: u64,
+    ) {
+        let details = [
+            ("Path", path.to_string_lossy().into()),
+            ("Size", size.to_string().into()),
+        ]
+        .into();
+
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
+            id: ImageId::Local(flasher),
+            icon: bb_imager_ui::image_selection::ImageIcon::Local,
+            title: path.to_string_lossy().into(),
+            description: None,
+            details,
+            init_formats: if matches!(
+                flasher,
+                config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
+            ) {
+                &[config::InitFormat::Sysconf, config::InitFormat::CloudInit]
+            } else {
+                &[]
+            },
+            init_format: config::InitFormat::None,
+            buttons: Default::default(),
+            flasher: Some(flasher),
+            info_text: None,
+            file_name: Some(path.file_name().unwrap().to_string_lossy().into()),
+            path: Some(path),
+        })
+    }
+
+    pub(crate) fn select_remote_image(
+        &mut self,
+        image: crate::db::OsImage,
+        flasher: config::Flasher,
+    ) {
+        let mut buttons = Vec::with_capacity(2);
+
+        if let Some(x) = image.support {
+            buttons.push(("Support", x));
+        }
+        if let Some(x) = image.sbom {
+            buttons.push(("SBOM", x));
+        }
+
+        let details = [
+            ("Release Date", image.release_date.to_string().into()),
+            (
+                "Image Size",
+                helpers::pretty_bytes(image.extract_size as u64).into(),
+            ),
+            (
+                "Download Size",
+                helpers::pretty_bytes(image.image_download_size as u64).into(),
+            ),
+        ]
+        .into();
+
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
+            id: ImageId::OsImage(image.id),
+            icon: bb_imager_ui::image_selection::ImageIcon::Remote(image.icon),
+            title: image.name,
+            description: Some(image.description.into()),
+            details,
+            init_formats: &[],
+            init_format: image.init_format,
+            buttons: buttons.into(),
+            flasher: Some(flasher),
+            path: None,
+            info_text: image.info_text,
+            file_name: Some(
+                image
+                    .url
+                    .path_segments()
+                    .unwrap()
+                    .next_back()
+                    .unwrap()
+                    .into(),
+            ),
+        })
     }
 
     pub(crate) fn resolve_remote_sublists(
@@ -254,15 +353,12 @@ impl ChooseOsState {
 
 impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
-        let mut res = Self {
+        Self {
             common: value.common,
             flasher: value.selected_board.flasher,
             selected_board: value.selected_board,
             state: Default::default(),
-        };
-        let (id, img) = value.selected_image;
-        res.select_image(id, img);
-        res
+        }
     }
 }
 
