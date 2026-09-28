@@ -17,14 +17,11 @@ mod tests;
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
-    SdFormat {
-        details: Box<[(&'static str, Box<str>)]>,
-    },
+    SdFormat,
     Local {
         img: bb_flasher::LocalImage,
         flasher: config::Flasher,
         init_format: config::InitFormat,
-        details: Box<[(&'static str, Box<str>)]>,
     },
     /// A catalog image. Only what the pages render is kept; the download url,
     /// checksum, sizes and bmap are read back from the db by [`flash`].
@@ -34,92 +31,14 @@ pub(crate) enum BoardImage {
         file_name: Box<str>,
         flasher: config::Flasher,
         init_format: config::InitFormat,
-        sbom: Option<Url>,
         info_text: Option<Arc<str>>,
-        description: String,
-        icon: Arc<Url>,
-        details: Box<[(&'static str, Box<str>)]>,
-        support: Option<Url>,
     },
 }
 
 impl BoardImage {
-    pub(crate) fn local(path: PathBuf, flasher: config::Flasher) -> Self {
-        let metadata = std::fs::metadata(&path).expect("File does not exist");
-        let details = [
-            ("Path", path.to_string_lossy().into()),
-            ("Size", metadata.len().to_string().into()),
-        ]
-        .into();
-
-        Self::Local {
-            img: bb_flasher::LocalImage::new(path.into()),
-            flasher,
-            // Do not try to apply customization for local images
-            init_format: config::InitFormat::None,
-            details,
-        }
-    }
-
-    pub(crate) fn remote(image: crate::db::OsImage, flasher: config::Flasher) -> Self {
-        let details = [
-            ("Release Date", image.release_date.to_string().into()),
-            ("Image Size", pretty_bytes(image.extract_size as u64).into()),
-            (
-                "Download Size",
-                pretty_bytes(image.image_download_size as u64).into(),
-            ),
-        ]
-        .into();
-
-        Self::Remote {
-            id: image.id,
-            name: image.name,
-            file_name: image
-                .url
-                .path_segments()
-                .unwrap()
-                .next_back()
-                .unwrap()
-                .into(),
-            flasher,
-            init_format: image.init_format,
-            sbom: image.sbom.map(|url| *url),
-            info_text: image.info_text,
-            description: image.description,
-            icon: image.icon,
-            details,
-            support: image.support,
-        }
-    }
-
-    pub(crate) fn format() -> Self {
-        Self::SdFormat {
-            details: [("Format", "FAT32".into())].into(),
-        }
-    }
-
-    pub(crate) fn description(&self) -> Option<&str> {
-        match self {
-            BoardImage::SdFormat { .. } => Some("Format a SD Card to FAT32 for reuse."),
-            BoardImage::Local { .. } => None,
-            BoardImage::Remote { description, .. } => Some(description),
-        }
-    }
-
-    fn icon(&self) -> bb_imager_ui::image_selection::ImageIcon {
-        match self {
-            BoardImage::SdFormat { .. } => bb_imager_ui::image_selection::ImageIcon::Format,
-            BoardImage::Local { .. } => bb_imager_ui::image_selection::ImageIcon::Local,
-            BoardImage::Remote { icon, .. } => {
-                bb_imager_ui::image_selection::ImageIcon::Remote(icon.clone())
-            }
-        }
-    }
-
     pub(crate) const fn flasher(&self) -> config::Flasher {
         match self {
-            BoardImage::SdFormat { .. } => config::Flasher::SdCard,
+            BoardImage::SdFormat => config::Flasher::SdCard,
             BoardImage::Local { flasher, .. } | BoardImage::Remote { flasher, .. } => *flasher,
         }
     }
@@ -129,14 +48,14 @@ impl BoardImage {
             BoardImage::Local { init_format, .. } | BoardImage::Remote { init_format, .. } => {
                 *init_format
             }
-            BoardImage::SdFormat { .. } => config::InitFormat::None,
+            BoardImage::SdFormat => config::InitFormat::None,
         }
     }
 
     pub(crate) fn info_text(&self) -> Option<&str> {
         match self {
             BoardImage::Remote { info_text, .. } => info_text.as_deref(),
-            BoardImage::SdFormat { .. } | BoardImage::Local { .. } => None,
+            BoardImage::SdFormat | BoardImage::Local { .. } => None,
         }
     }
 
@@ -147,63 +66,36 @@ impl BoardImage {
             Self::Remote { file_name, .. } => Some(file_name.to_string()),
         }
     }
-
-    pub(crate) fn details(&self) -> &[(&'static str, Box<str>)] {
-        match self {
-            BoardImage::SdFormat { details }
-            | BoardImage::Local { details, .. }
-            | BoardImage::Remote { details, .. } => details,
-        }
-    }
-
-    pub(crate) fn supported_init_formats(&self) -> &'static [config::InitFormat] {
-        match self {
-            BoardImage::SdFormat { .. } => &[],
-            BoardImage::Remote { init_format, .. } => match init_format {
-                config::InitFormat::Sysconf => &[config::InitFormat::Sysconf],
-                config::InitFormat::CloudInit => &[config::InitFormat::CloudInit],
-                _ => &[],
-            },
-            BoardImage::Local {
-                flasher: config::Flasher::SdCard | config::Flasher::SdCardNoBootloader,
-                ..
-            } => &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
-            BoardImage::Local { .. } => &[],
-        }
-    }
-
-    pub(crate) fn update_init_format(&mut self, f: config::InitFormat) {
-        match self {
-            BoardImage::SdFormat { .. } => {
-                unreachable!();
-            }
-            BoardImage::Local { init_format, .. } | BoardImage::Remote { init_format, .. } => {
-                *init_format = f;
-            }
-        }
-    }
-
-    pub(crate) fn support(&self) -> Option<&Url> {
-        match self {
-            BoardImage::SdFormat { .. } | BoardImage::Local { .. } => None,
-            BoardImage::Remote { support, .. } => support.as_ref(),
-        }
-    }
-
-    pub(crate) fn sbom(&self) -> Option<&Url> {
-        match self {
-            BoardImage::SdFormat { .. } | BoardImage::Local { .. } => None,
-            BoardImage::Remote { sbom, .. } => sbom.as_ref(),
-        }
-    }
 }
 
 impl std::fmt::Display for BoardImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardImage::SdFormat { .. } => write!(f, "Format SD Card"),
+            BoardImage::SdFormat => write!(f, "Format SD Card"),
             BoardImage::Local { img, .. } => img.fmt(f),
             BoardImage::Remote { name, .. } => name.fmt(f),
+        }
+    }
+}
+
+impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
+    fn from(value: bb_imager_ui::image_selection::ImageDetails) -> Self {
+        match value.id {
+            bb_imager_ui::image_selection::ImageId::Format => Self::SdFormat,
+            bb_imager_ui::image_selection::ImageId::Local(flasher) => Self::Local {
+                img: bb_flasher::LocalImage::new(value.path.unwrap()),
+                flasher,
+                init_format: value.init_format,
+            },
+            bb_imager_ui::image_selection::ImageId::OsImage(id) => Self::Remote {
+                id,
+                name: value.title,
+                file_name: value.file_name.unwrap(),
+                flasher: value.flasher.unwrap(),
+                init_format: value.init_format,
+                info_text: value.info_text,
+            },
+            bb_imager_ui::image_selection::ImageId::OsSublist(_) => unreachable!(),
         }
     }
 }
@@ -315,7 +207,7 @@ pub(crate) fn flash(
 
     let (img, bmap) = match img {
         #[cfg(feature = "sd")]
-        BoardImage::SdFormat { .. } => {
+        BoardImage::SdFormat => {
             let Destination::SdCard(t) = dst else {
                 unimplemented!()
             };
@@ -707,40 +599,6 @@ pub(crate) fn dest_details(
             .into_iter()
             .map(|(k, v)| (k.into(), v.into_boxed_str()))
             .collect(),
-    }
-}
-
-/// The renderable projection of a selected image.
-///
-/// `id` comes from the selection rather than the image itself: a remote image's
-/// catalog id is not recoverable from [`BoardImage`], which only carries the
-/// flasher machinery.
-pub(crate) fn image_details(
-    id: bb_imager_ui::image_selection::ImageId,
-    value: &BoardImage,
-) -> bb_imager_ui::image_selection::ImageDetails {
-    let mut buttons = Vec::with_capacity(2);
-
-    if let Some(x) = value.support() {
-        buttons.push(("Support", x.clone()));
-    }
-    if let Some(x) = value.sbom() {
-        buttons.push(("SBOM", x.clone()));
-    }
-
-    bb_imager_ui::image_selection::ImageDetails {
-        id,
-        icon: value.icon(),
-        title: value.to_string().into(),
-        description: value.description().map(Into::into),
-        details: value
-            .details()
-            .iter()
-            .map(|(k, v)| (*k, v.as_ref().into()))
-            .collect(),
-        init_formats: value.supported_init_formats(),
-        init_format: value.init_format(),
-        buttons: buttons.into(),
     }
 }
 

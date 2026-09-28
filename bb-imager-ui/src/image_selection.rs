@@ -67,6 +67,10 @@ pub struct ImageDetails {
     pub init_formats: &'static [config::InitFormat],
     pub init_format: config::InitFormat,
     pub buttons: Box<[(&'static str, url::Url)]>,
+    pub flasher: Option<config::Flasher>,
+    pub path: Option<Box<std::path::Path>>,
+    pub info_text: Option<Arc<str>>,
+    pub file_name: Option<Box<str>>,
 }
 
 #[derive(Default, Debug)]

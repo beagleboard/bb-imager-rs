@@ -166,6 +166,10 @@ impl State {
                 url::Url::parse("https://forum.beagleboard.org/").unwrap(),
             )]
             .into(),
+            flasher: None,
+            path: None,
+            info_text: None,
+            file_name: None,
         })
     }
 }

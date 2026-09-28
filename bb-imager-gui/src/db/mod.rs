@@ -62,7 +62,7 @@ pub(crate) struct OsImage {
     pub(crate) release_date: chrono::NaiveDate,
     pub(crate) init_format: bb_config::config::InitFormat,
     pub(crate) bmap: Option<Box<Url>>,
-    pub(crate) sbom: Option<Box<Url>>,
+    pub(crate) sbom: Option<Url>,
     pub(crate) info_text: Option<Arc<str>>,
     pub(crate) support: Option<Url>,
 }
@@ -81,7 +81,7 @@ impl OsImage {
             release_date: value.get("release_date")?,
             init_format: value.get("init_format")?,
             bmap: value.get::<_, Option<Url>>("bmap")?.map(Box::new),
-            sbom: value.get::<_, Option<Url>>("sbom")?.map(Box::new),
+            sbom: value.get::<_, Option<Url>>("sbom")?,
             info_text: value.get("info_text")?,
             support: value.get("support")?,
         })
