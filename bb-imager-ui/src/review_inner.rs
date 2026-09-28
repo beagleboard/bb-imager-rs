@@ -1,6 +1,9 @@
 use iced::{Element, widget};
 
-use crate::{Message, constants};
+use crate::{
+    Message,
+    constants::{self, FONT_BOLD},
+};
 
 const HEADING_SIZE: u32 = 26;
 
@@ -10,8 +13,9 @@ pub(crate) struct State<'a> {
     pub(crate) board: &'a str,
     pub(crate) image: &'a str,
     pub(crate) destination: &'a str,
+    pub(crate) modifications_title: &'static str,
     pub(crate) modifications: &'a [&'static str],
-    pub(crate) footer: Option<&'a str>,
+    pub(crate) footer: Option<&'static str>,
 }
 
 impl<'a> State<'a> {
@@ -41,7 +45,7 @@ impl<'a> State<'a> {
         if !self.modifications.is_empty() {
             col = col.extend([
                 widget::rule::horizontal(2).into(),
-                widget::text("Modifications to apply")
+                widget::text(self.modifications_title)
                     .font(constants::FONT_BOLD)
                     .size(HEADING_SIZE)
                     .into(),
@@ -58,7 +62,11 @@ impl<'a> State<'a> {
         }
 
         if let Some(f) = self.footer {
-            col = col.push(widget::container(f).style(widget::container::primary))
+            col = col.push(
+                widget::container(widget::text(f).font(FONT_BOLD))
+                    .style(widget::container::primary)
+                    .padding(4),
+            )
         }
 
         crate::helpers::detail_pane(col, &scroll_id)

@@ -537,8 +537,10 @@ impl From<FlashingState> for FlashingSuccessState {
     fn from(value: FlashingState) -> Self {
         Self {
             state: bb_imager_ui::flash_success::State {
-                is_download: value.ctx.is_download(),
-                board: (&value.ctx.selected_board).into(),
+                board: value.ctx.selected_board.name.clone(),
+                image: value.ctx.selected_image.1.to_string().into(),
+                destination: value.ctx.selected_destination().into(),
+                modifications: value.ctx.customization.modifications(),
             },
             common: value.common,
         }

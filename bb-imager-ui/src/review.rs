@@ -20,6 +20,7 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
             board: &value.board,
             image: &value.image,
             destination: &value.destination,
+            modifications_title: "modifications to apply",
             modifications: &value.modifications,
             footer: None,
         }
