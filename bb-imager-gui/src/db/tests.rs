@@ -335,7 +335,10 @@ fn add_config_updates_existing_device_with_same_name() {
         .board_by_id(board_id)
         .expect("Fetching board by id should succeed");
 
-    assert_eq!(updated_board.description, device_v1.description.as_ref());
+    assert_eq!(
+        updated_board.description.as_ref(),
+        device_v1.description.as_ref()
+    );
     assert_eq!(updated_board.flasher, device_v1.flasher);
     assert_eq!(
         updated_board.instructions.as_deref(),
@@ -515,7 +518,7 @@ fn os_image_by_id_returns_correct_data() {
         .expect("os_image_by_id should succeed");
 
     assert_eq!(stored.name, image.name);
-    assert_eq!(stored.description, image.description.as_ref());
+    assert_eq!(stored.description.as_ref(), image.description.as_ref());
     assert_eq!(stored.url.as_str(), image.url.as_str());
     assert_eq!(stored.icon.as_str(), image.icon.as_str());
     assert_eq!(stored.image_download_size, 1024);

@@ -24,7 +24,7 @@ pub struct BoardDetails {
     pub id: i64,
     pub name: Box<str>,
     pub icon: Option<Arc<url::Url>>,
-    pub description: Box<str>,
+    pub description: Arc<str>,
     pub specification: Box<[(Box<str>, Box<str>)]>,
     pub buttons: Box<[(&'static str, url::Url)]>,
 }
