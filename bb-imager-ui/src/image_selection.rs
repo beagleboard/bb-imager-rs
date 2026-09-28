@@ -27,15 +27,6 @@ impl ImageId {
     const fn is_sublist(&self) -> bool {
         matches!(self, Self::OsSublist(_))
     }
-
-    /// Id of this image's config entry, if it has one. Local files and the
-    /// format action are not in the config, so there is nothing to copy.
-    const fn config_id(&self) -> Option<i64> {
-        match self {
-            Self::OsImage(id) => Some(*id),
-            _ => None,
-        }
-    }
 }
 
 /// One row of the image list.
@@ -46,31 +37,52 @@ pub struct ImageItem {
     pub label: Cow<'static, str>,
 }
 
-/// Which icon the detail pane shows; local files and the format action have no
-/// remote icon to fetch.
-#[derive(Debug, Clone)]
-pub enum ImageIcon {
-    Remote(Arc<url::Url>),
-    Local,
-    Format,
-}
-
 /// The selected image, as the detail pane renders it.
 #[derive(Debug, Clone)]
-pub struct ImageDetails {
-    pub id: ImageId,
-    pub icon: ImageIcon,
-    pub title: Box<str>,
-    pub description: Option<Box<str>>,
-    pub details: Box<[(&'static str, Box<str>)]>,
-    /// More than one makes the picker appear; exactly one is shown as plain text.
-    pub init_formats: &'static [config::InitFormat],
-    pub init_format: config::InitFormat,
-    pub buttons: Box<[(&'static str, url::Url)]>,
-    pub flasher: Option<config::Flasher>,
-    pub path: Option<Box<std::path::Path>>,
-    pub info_text: Option<Arc<str>>,
-    pub file_name: Option<Box<str>>,
+pub enum ImageDetails {
+    Format,
+    Local {
+        flasher: config::Flasher,
+        path: Box<std::path::Path>,
+        size: u64,
+        init_format: config::InitFormat,
+    },
+    Remote {
+        id: i64,
+        icon: Arc<url::Url>,
+        title: Box<str>,
+        description: Box<str>,
+        details: Box<[(&'static str, Box<str>)]>,
+        init_format: config::InitFormat,
+        buttons: Box<[(&'static str, url::Url)]>,
+        /// Rides along for the host; the page never reads it.
+        flasher: config::Flasher,
+        /// Rides along for the host; the page never reads it.
+        file_name: Box<str>,
+        /// Rides along for the host; the page never reads it.
+        info_text: Option<Arc<str>>,
+    },
+}
+
+impl ImageDetails {
+    pub const fn id(&self) -> ImageId {
+        match self {
+            Self::Format => ImageId::Format,
+            Self::Local { flasher, .. } => ImageId::Local(*flasher),
+            Self::Remote { id, .. } => ImageId::OsImage(*id),
+        }
+    }
+}
+
+/// Init formats a local image can be customized with. More than one makes the
+/// picker appear.
+const fn init_formats(flasher: config::Flasher) -> &'static [config::InitFormat] {
+    match flasher {
+        config::Flasher::SdCard | config::Flasher::SdCardNoBootloader => {
+            &[config::InitFormat::Sysconf, config::InitFormat::CloudInit]
+        }
+        _ => &[],
+    }
 }
 
 #[derive(Default, Debug)]
@@ -124,7 +136,7 @@ fn os_list_pane<'a>(
             let is_selected = state
                 .selected
                 .as_ref()
-                .map(|x| x.id == img.id)
+                .map(|x| x.id() == img.id)
                 .unwrap_or(false);
 
             let icon: Element<Message> = match img.id {
@@ -183,82 +195,102 @@ fn os_view_pane<'a>(
         return placeholder_pane("Please Select an OS");
     };
 
-    let icon: Element<'a, Message> = match &img.icon {
-        ImageIcon::Remote(url) => bb_iced_widgets::cached_icon(cache, url)
-            .width(iced::Length::Fill)
-            .height(100)
-            .into(),
-        ImageIcon::Local => widget::svg(constants::FILE_ADD_ICON.clone())
-            .height(100)
-            .width(iced::Length::Fill)
-            .into(),
-        ImageIcon::Format => widget::svg(constants::FORMAT_ICON.clone())
-            .height(100)
-            .width(iced::Length::Fill)
-            .into(),
-    };
+    let col = match img {
+        ImageDetails::Format => widget::column![
+            svg_big(constants::FORMAT_ICON.clone()),
+            title("Format SD Card"),
+            description("Format a SD Card to FAT32 for reuse."),
+            detail_entry("Format", "FAT32"),
+            detail_entry("Init Format", config::InitFormat::None.to_string()),
+        ],
+        ImageDetails::Local {
+            flasher,
+            path,
+            size,
+            init_format,
+        } => {
+            let path = path.to_string_lossy();
+            let mut col = widget::column![
+                svg_big(constants::FILE_ADD_ICON.clone()),
+                title(path.clone()),
+                detail_entry("Path", path),
+                detail_entry("Size", size.to_string()),
+            ];
 
-    let mut col = widget::column![icon];
+            let formats = init_formats(*flasher);
+            if formats.len() > 1 {
+                let el = widget::pick_list(
+                    formats,
+                    if *init_format == config::InitFormat::None {
+                        None
+                    } else {
+                        Some(*init_format)
+                    },
+                    Message::UpdateInitFormat,
+                );
+                col = col.push(
+                    widget::row![text("Init Format: ").font(constants::FONT_BOLD), el]
+                        .align_y(iced::Alignment::Center)
+                        .padding(iced::Padding::ZERO.right(16)),
+                );
+            }
 
-    // Add button to copy image info when it makes sense.
-    if let Some(id) = img.id.config_id() {
-        col = col.push(widget::center(
-            copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyImageConfig(id)),
-        ));
-    }
-
-    col = col.push(
-        text(img.title.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-    );
-
-    // Add description if present
-    let col = match img.description.as_ref() {
-        Some(x) => col
-            .push(
-                text(x.as_ref())
-                    .align_x(iced::alignment::Alignment::Center)
-                    .width(iced::Length::Fill),
-            )
-            .width(iced::Length::Fill),
-        None => col,
-    };
-
-    let mut col = col.extend(
-        img.details
-            .iter()
-            .map(|(k, v)| detail_entry(k, v.as_ref()))
-            .map(Into::into),
-    );
-
-    if img.init_formats.len() > 1 {
-        let el = widget::pick_list(
-            img.init_formats,
-            if img.init_format == config::InitFormat::None {
-                None
-            } else {
-                Some(img.init_format)
-            },
-            Message::UpdateInitFormat,
-        );
-        col = col.push(
-            widget::row![text("Init Format: ").font(constants::FONT_BOLD), el]
-                .align_y(iced::Alignment::Center)
-                .padding(iced::Padding::ZERO.right(16)),
+            col
+        }
+        ImageDetails::Remote {
+            id,
+            icon,
+            title: name,
+            description: desc,
+            details,
+            buttons,
+            ..
+        } => widget::column![
+            bb_iced_widgets::cached_icon(cache, icon)
+                .width(iced::Length::Fill)
+                .height(100),
+            widget::center(
+                copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyImageConfig(*id)),
+            ),
+            title(name.as_ref()),
+            description(desc.as_ref()),
+        ]
+        .extend(
+            details
+                .iter()
+                .map(|(k, v)| detail_entry(k, v.as_ref()))
+                .map(Into::into),
         )
-    } else if img.init_formats.len() == 1 {
-        col = col.push(detail_entry("Init Format", img.init_formats[0].to_string()))
-    }
-
-    col = col.extend(img.buttons.iter().map(|(label, link)| {
-        widget::row![button(*label).on_press(Message::OpenUrl(link.clone()))]
-            .spacing(16)
-            .into()
-    }));
+        .extend(buttons.iter().map(|(label, link)| {
+            widget::row![button(*label).on_press(Message::OpenUrl(link.clone()))]
+                .spacing(16)
+                .into()
+        })),
+    };
 
     detail_pane(col, scroll_id)
+}
+
+fn svg_big<'a>(handle: widget::svg::Handle) -> Element<'a, Message> {
+    widget::svg(handle)
+        .height(100)
+        .width(iced::Length::Fill)
+        .into()
+}
+
+fn title<'a>(t: impl text::IntoFragment<'a>) -> Element<'a, Message> {
+    text(t)
+        .size(24)
+        .align_x(iced::alignment::Alignment::Center)
+        .width(iced::Length::Fill)
+        .into()
+}
+
+fn description<'a>(t: impl text::IntoFragment<'a>) -> Element<'a, Message> {
+    text(t)
+        .align_x(iced::alignment::Alignment::Center)
+        .width(iced::Length::Fill)
+        .into()
 }
 
 fn svg_sized<'a>(handle: widget::svg::Handle) -> Element<'a, Message> {

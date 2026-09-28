@@ -125,52 +125,42 @@ impl State {
     }
 
     fn select(&self, id: image_selection::ImageId) -> Option<image_selection::ImageDetails> {
-        let label = self
-            .inner
-            .images
-            .iter()
-            .find(|x| x.id == id)
-            .map(|x| x.label.clone())?;
+        let item = self.inner.images.iter().find(|x| x.id == id)?;
 
-        let remote = self
-            .inner
-            .images
-            .iter()
-            .find(|x| x.id == id)
-            .and_then(|x| x.icon.clone());
-
-        Some(image_selection::ImageDetails {
-            id,
-            icon: match (id, remote) {
-                (image_selection::ImageId::Format, _) => image_selection::ImageIcon::Format,
-                (image_selection::ImageId::Local(_), _) => image_selection::ImageIcon::Local,
-                (_, Some(u)) => image_selection::ImageIcon::Remote(u),
-                (_, None) => image_selection::ImageIcon::Local,
-            },
-            title: label.as_ref().into(),
-            description: Some(
-                "Debian 13 (Trixie) with the Xfce Desktop for BeagleY-AI, based on the TI AM67A."
+        match id {
+            image_selection::ImageId::Format => Some(image_selection::ImageDetails::Format),
+            image_selection::ImageId::Local(flasher) => Some(image_selection::ImageDetails::Local {
+                flasher,
+                path: std::path::Path::new("/home/beagle/Downloads/beagley-ai-debian.img.xz")
                     .into(),
-            ),
-            details: [
-                ("Release Date", "2026-07-12".into()),
-                ("Image Size", "12.00 GiB".into()),
-                ("Download Size", "3.20 GiB".into()),
-            ]
-            .into(),
-            // Two formats so the picker renders rather than a plain line.
-            init_formats: &[config::InitFormat::Sysconf, config::InitFormat::CloudInit],
-            init_format: config::InitFormat::Sysconf,
-            buttons: [(
-                "Support",
-                url::Url::parse("https://forum.beagleboard.org/").unwrap(),
-            )]
-            .into(),
-            flasher: None,
-            path: None,
-            info_text: None,
-            file_name: None,
-        })
+                size: 3_435_973_837,
+                init_format: config::InitFormat::Sysconf,
+            }),
+            image_selection::ImageId::OsImage(id) => Some(image_selection::ImageDetails::Remote {
+                id,
+                icon: item.icon.clone()?,
+                title: item.label.as_ref().into(),
+                description:
+                    "Debian 13 (Trixie) with the Xfce Desktop for BeagleY-AI, based on the TI AM67A."
+                        .into(),
+                details: [
+                    ("Release Date", "2026-07-12".into()),
+                    ("Image Size", "12.00 GiB".into()),
+                    ("Download Size", "3.20 GiB".into()),
+                ]
+                .into(),
+                init_format: config::InitFormat::Sysconf,
+                buttons: [(
+                    "Support",
+                    url::Url::parse("https://forum.beagleboard.org/").unwrap(),
+                )]
+                .into(),
+                flasher: config::Flasher::SdCard,
+                file_name: "beagley-ai-debian.img.xz".into(),
+                info_text: None,
+            }),
+            image_selection::ImageId::OsSublist(_) => None,
+        }
     }
 }
 
@@ -189,8 +179,10 @@ fn main() {
                     s.goto(parent);
                 }
                 Message::UpdateInitFormat(f) => {
-                    if let Some(x) = s.inner.selected.as_mut() {
-                        x.init_format = f;
+                    if let Some(image_selection::ImageDetails::Local { init_format, .. }) =
+                        s.inner.selected.as_mut()
+                    {
+                        *init_format = f;
                     }
                 }
                 _ => {}

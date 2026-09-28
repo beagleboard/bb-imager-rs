@@ -386,7 +386,7 @@ impl BBImager {
                     Self::ChooseDest(state::ChooseDestState::new(
                         inner.common,
                         inner.selected_board,
-                        (img.id, img.into()),
+                        (img.id(), img.into()),
                     )),
                     Task::none(),
                 )

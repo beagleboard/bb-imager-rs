@@ -184,20 +184,7 @@ impl ChooseOsState {
     }
 
     pub(crate) fn select_format_image(&mut self) {
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
-            id: ImageId::Format,
-            icon: bb_imager_ui::image_selection::ImageIcon::Format,
-            title: "Format SD Card".into(),
-            description: Some("Format a SD Card to FAT32 for reuse.".into()),
-            details: [("Format", "FAT32".into())].into(),
-            init_formats: &[config::InitFormat::None],
-            init_format: config::InitFormat::None,
-            buttons: Default::default(),
-            flasher: Some(config::Flasher::SdCard),
-            path: Default::default(),
-            info_text: None,
-            file_name: None,
-        });
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Format);
     }
 
     pub(crate) fn select_local_image(
@@ -206,32 +193,11 @@ impl ChooseOsState {
         flasher: config::Flasher,
         size: u64,
     ) {
-        let details = [
-            ("Path", path.to_string_lossy().into()),
-            ("Size", size.to_string().into()),
-        ]
-        .into();
-
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
-            id: ImageId::Local(flasher),
-            icon: bb_imager_ui::image_selection::ImageIcon::Local,
-            title: path.to_string_lossy().into(),
-            description: None,
-            details,
-            init_formats: if matches!(
-                flasher,
-                config::Flasher::SdCard | config::Flasher::SdCardNoBootloader
-            ) {
-                &[config::InitFormat::Sysconf, config::InitFormat::CloudInit]
-            } else {
-                &[]
-            },
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Local {
+            flasher,
+            path,
+            size,
             init_format: config::InitFormat::None,
-            buttons: Default::default(),
-            flasher: Some(flasher),
-            info_text: None,
-            file_name: Some(path.file_name().unwrap().to_string_lossy().into()),
-            path: Some(path),
         })
     }
 
@@ -262,27 +228,23 @@ impl ChooseOsState {
         ]
         .into();
 
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails {
-            id: ImageId::OsImage(image.id),
-            icon: bb_imager_ui::image_selection::ImageIcon::Remote(image.icon),
+        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Remote {
+            id: image.id,
+            icon: image.icon,
             title: image.name,
-            description: Some(image.description.into()),
+            description: image.description.into(),
             details,
-            init_formats: &[],
             init_format: image.init_format,
             buttons: buttons.into(),
-            flasher: Some(flasher),
-            path: None,
+            flasher,
             info_text: image.info_text,
-            file_name: Some(
-                image
-                    .url
-                    .path_segments()
-                    .unwrap()
-                    .next_back()
-                    .unwrap()
-                    .into(),
-            ),
+            file_name: image
+                .url
+                .path_segments()
+                .unwrap()
+                .next_back()
+                .unwrap()
+                .into(),
         })
     }
 
