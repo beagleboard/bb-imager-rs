@@ -82,7 +82,7 @@ impl State {
             id,
             name: dev.name.clone(),
             icon: dev.icon.clone().map(std::sync::Arc::new),
-            description: dev.description.clone(),
+            description: dev.description.clone().into(),
             specification: dev.specification.clone().into(),
             buttons: btns.into(),
         })

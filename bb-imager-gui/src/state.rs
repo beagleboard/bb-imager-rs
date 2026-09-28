@@ -144,7 +144,7 @@ impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
             id: value.id,
             name: value.name.clone(),
             icon: value.icon.clone(),
-            description: value.description.clone().into(),
+            description: value.description.clone(),
             specification: value.specification.clone().into(),
             buttons: btns.into(),
         }
@@ -232,7 +232,7 @@ impl ChooseOsState {
             id: image.id,
             icon: image.icon,
             title: image.name,
-            description: image.description.into(),
+            description: image.description,
             details,
             init_format: image.init_format,
             buttons: buttons.into(),
