@@ -1,7 +1,6 @@
 use iced::{Element, widget};
 
-use crate::constants::FONT_BOLD;
-use crate::helpers::{VIEW_COL_PADDING, page_type1, page_type2, progress_finish_view};
+use crate::helpers::{VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
 #[derive(Debug)]
