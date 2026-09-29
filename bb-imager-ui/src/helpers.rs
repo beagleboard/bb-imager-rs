@@ -1,4 +1,3 @@
-use bb_iced_widgets::circle_bar;
 use iced::{Element, widget};
 
 use crate::{Message, constants};
@@ -116,20 +115,6 @@ pub(crate) fn detail_pane<'a>(
     widget::scrollable(content.spacing(16).padding(VIEW_COL_PADDING))
         .id(scroll_id.clone())
         .into()
-}
-
-pub(crate) fn progress_finish_view<'a>(
-    label: &'static str,
-    color: iced::Color,
-    details: impl widget::text::IntoFragment<'a>,
-) -> Element<'a, Message> {
-    widget::column![
-        circle_bar(label, 10.0f32, color, constants::FONT_BOLD),
-        widget::text(details)
-    ]
-    .align_x(iced::Center)
-    .padding(VIEW_COL_PADDING)
-    .into()
 }
 
 pub(crate) fn card_btn_style(
