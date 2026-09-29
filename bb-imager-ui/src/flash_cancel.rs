@@ -1,30 +1,28 @@
-use std::sync::Arc;
-
 use iced::{Element, widget};
 
-use crate::board_selection::BoardDetails;
-use crate::helpers::{board_details_pane, page_type1, progress_finish_view};
+use crate::helpers::{VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
-#[derive(Debug)]
-pub struct State {
-    pub board: BoardDetails,
-}
-
-pub fn view<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: widget::Id,
-) -> Element<'a, Message> {
-    page_type1(
-        board_details_pane(cache, &state.board, &scroll_id),
-        progress_finish_view(
-            "Cancelled",
-            constants::DANGER,
-            "Flashing Cancelled by the user",
-        ),
+pub fn view<'a>(scroll_id: widget::Id) -> Element<'a, Message> {
+    page_type2(
+        cancel_view(scroll_id),
         [widget::button("Restart")
             .style(widget::button::danger)
             .on_press(Message::Restart)],
     )
+}
+
+fn cancel_view<'a>(scroll_id: widget::Id) -> Element<'a, Message> {
+    widget::scrollable(
+        widget::column![
+            widget::text("Write Cancelled")
+                .size(28)
+                .font(constants::FONT_BOLD),
+            widget::text("Flashing Cancelled by the user").style(widget::text::warning)
+        ]
+        .spacing(8)
+        .padding(VIEW_COL_PADDING),
+    )
+    .id(scroll_id)
+    .into()
 }
