@@ -299,7 +299,6 @@ impl BBImager {
             cancel_flashing: h,
             // Built before `ctx` is moved in below.
             state: Box::new(bb_imager_ui::flashing::State {
-                board: (&ctx.selected_board).into(),
                 progress: Default::default(),
                 start_timestamp: None,
             }),

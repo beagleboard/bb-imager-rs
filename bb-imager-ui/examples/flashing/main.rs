@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use bb_imager_ui::{board_selection, flashing};
+use bb_imager_ui::flashing;
 
 /// The page's own messages are folded into [`Message::Ui`]; the ticks driving
 /// the fake progress are this example's own.
@@ -17,9 +17,6 @@ impl From<bb_imager_ui::Message> for Message {
 }
 
 struct State {
-    /// Empty: the literal board below has no remote icon, so the pane falls back
-    /// to the bundled one. `preview-board-selection` covers the fetched path.
-    cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
     /// Drives the phase cycle; runs 0.0 -> 4.0 and wraps.
     step: f32,
     inner: flashing::State,
@@ -28,39 +25,10 @@ struct State {
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
         let res = Self {
-            cache: Default::default(),
             step: 0.0,
             inner: flashing::State {
                 progress: Default::default(),
                 start_timestamp: None,
-                board: board_selection::BoardDetails {
-                    id: 0,
-                    name: "BeagleY-AI".into(),
-                    icon: None,
-                    description: "Affordable single board computer with a quad-core 64-bit Arm \
-                                  CPU and an integrated AI accelerator."
-                        .into(),
-                    specification: vec![
-                        ("SoC".into(), "TI AM67A".into()),
-                        ("CPU".into(), "Quad-core Arm Cortex-A53".into()),
-                        ("RAM".into(), "4 GB LPDDR4".into()),
-                        ("Connectivity".into(), "Wi-Fi 6 / Bluetooth 5.4".into()),
-                    ]
-                    .into(),
-                    buttons: [
-                        (
-                            "Documentation",
-                            url::Url::parse("https://docs.beagleboard.org/boards/beagley/ai/")
-                                .unwrap(),
-                        ),
-                        (
-                            "OSHW",
-                            url::Url::parse("https://certification.oshwa.org/us002787.html")
-                                .unwrap(),
-                        ),
-                    ]
-                    .into(),
-                },
             },
         };
 
@@ -115,5 +83,5 @@ fn main() {
 }
 
 fn view(s: &State) -> iced::Element<'_, Message> {
-    flashing::view(&s.cache, &s.inner, iced::widget::Id::unique()).map(Into::into)
+    flashing::view(&s.inner, iced::widget::Id::unique()).map(Into::into)
 }
