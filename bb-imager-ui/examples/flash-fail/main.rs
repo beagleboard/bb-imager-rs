@@ -1,12 +1,15 @@
 use bb_imager_ui::{Message, flash_fail};
+use iced::widget::text_editor::{Action, Motion};
 
 struct State(flash_fail::State);
 
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
+        let mut logs = iced::widget::text_editor::Content::with_text(LOGS.trim());
+        logs.perform(Action::Move(Motion::DocumentEnd));
         let res = State(flash_fail::State {
             reason: "Fail Reason for Testing".into(),
-            logs: iced::widget::text_editor::Content::with_text(LOGS.trim()),
+            logs,
         });
 
         (res, iced::Task::none())

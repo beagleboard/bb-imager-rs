@@ -574,8 +574,11 @@ impl FlashingFailState {
     pub(crate) fn new(
         state: FlashingState,
         err: String,
-        logs: widget::text_editor::Content,
+        mut logs: widget::text_editor::Content,
     ) -> Self {
+        logs.perform(widget::text_editor::Action::Move(
+            widget::text_editor::Motion::DocumentEnd,
+        ));
         Self {
             common: state.common,
             ctx: state.ctx,
