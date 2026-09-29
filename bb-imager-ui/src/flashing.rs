@@ -1,11 +1,8 @@
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bb_iced_widgets::progress_circle;
 use iced::{Element, widget};
 
-use crate::board_selection::BoardDetails;
-use crate::helpers::{VIEW_COL_PADDING, board_details_pane, detail_entry, page_type1};
+use crate::helpers::{VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
 /// How far along the flash is.
@@ -23,53 +20,68 @@ pub enum Progress {
 
 #[derive(Debug)]
 pub struct State {
-    pub board: BoardDetails,
     pub progress: Progress,
     /// Stamped by the host on the first byte-moving update; the ETA is
     /// extrapolated from how long has elapsed since.
     pub start_timestamp: Option<Instant>,
 }
 
-pub fn view<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<Arc<url::Url>>,
-    state: &'a State,
-    scroll_id: widget::Id,
-) -> Element<'a, Message> {
-    page_type1(
-        board_details_pane(cache, &state.board, &scroll_id),
-        progress_view(state),
+pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
+    page_type2(
+        progress_view(state, scroll_id),
         [widget::button("Cancel")
             .style(widget::button::danger)
             .on_press(Message::FlashCancel)],
     )
 }
 
-fn progress_view(state: &State) -> Element<'_, Message> {
-    let (prog, label) = match state.progress {
-        Progress::Preparing => (0.0, "Preparing ..."),
-        Progress::Downloading(x) => (x, "Downloading ..."),
-        Progress::Flashing(x) => (x, "Flashing Image ..."),
-        Progress::Verifying => (0.99, "Verifying ..."),
-        Progress::Customizing => (0.99, "Customizing ..."),
+fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
+    let (progress_label, progress_bar) = match state.progress {
+        Progress::Preparing => (
+            widget::text("Preparing..."),
+            widget::progress_bar(0.0..=1.0, 0.0),
+        ),
+        Progress::Flashing(f) | Progress::Downloading(f) => (
+            widget::text(format!("Writing... ({}%)", (f * 100.0) as u8)),
+            widget::progress_bar(0.0..=1.0, f),
+        ),
+        Progress::Verifying => (
+            widget::text("Verifying..."),
+            widget::progress_bar(0.0..=1.0, 0.99),
+        ),
+        Progress::Customizing => (
+            widget::text("Customizing..."),
+            widget::progress_bar(0.0..=1.0, 0.99),
+        ),
     };
 
-    let progress = progress_circle(
-        prog,
-        10.0f32,
-        constants::TONGUE_ORANGE,
-        constants::FONT_BOLD,
-    );
+    let time_remaining =
+        match time_remaining_from(state.progress, state.start_timestamp.map(|t| t.elapsed())) {
+            Some(x) => widget::span::<'_, (), _>(pretty_duration(x)),
+            None => widget::span("Calculating"),
+        };
 
-    let mut col = widget::column![progress, widget::text(label)];
-
-    // Recomputed every frame against a live clock, so the estimate keeps
-    // shrinking between progress updates.
-    if let Some(x) = time_remaining_from(state.progress, state.start_timestamp.map(|t| t.elapsed()))
-    {
-        col = col.push(detail_entry("Time Remaining", pretty_duration(x)));
-    }
-
-    col.align_x(iced::Center).padding(VIEW_COL_PADDING).into()
+    widget::scrollable(
+        widget::column![
+            widget::text("Writing Image")
+                .font(constants::FONT_BOLD)
+                .size(26),
+            widget::text("Do not disconnect the storage device!").style(widget::text::danger),
+            widget::rule::horizontal(2),
+            progress_label
+                .font(constants::FONT_BOLD)
+                .style(widget::text::secondary),
+            progress_bar,
+            widget::rich_text![
+                widget::span("Time Remaining: ").font(constants::FONT_BOLD),
+                time_remaining
+            ]
+        ]
+        .padding(VIEW_COL_PADDING)
+        .spacing(16),
+    )
+    .id(scroll_id)
+    .into()
 }
 
 /// Estimate the remaining flashing time from the current `progress` and how

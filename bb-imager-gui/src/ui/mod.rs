@@ -21,11 +21,9 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::Review(inner) => {
             bb_imager_ui::review::view(&inner.state, inner.common.scroll_id.clone())
         }
-        BBImager::Flashing(inner) => bb_imager_ui::flashing::view(
-            &inner.common.img_handle_cache,
-            &inner.state,
-            inner.common.scroll_id.clone(),
-        ),
+        BBImager::Flashing(inner) => {
+            bb_imager_ui::flashing::view(&inner.state, inner.common.scroll_id.clone())
+        }
         BBImager::FlashingCancel(inner) => {
             bb_imager_ui::flash_cancel::view(inner.common.scroll_id.clone())
         }
