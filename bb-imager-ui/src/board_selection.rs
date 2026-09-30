@@ -27,6 +27,8 @@ pub struct BoardDetails {
     pub description: Arc<str>,
     pub specification: Box<[(Box<str>, Box<str>)]>,
     pub buttons: Box<[(&'static str, url::Url)]>,
+    pub flasher: bb_config::config::Flasher,
+    pub instructions: Option<Box<str>>,
 }
 
 #[derive(Default, Debug)]

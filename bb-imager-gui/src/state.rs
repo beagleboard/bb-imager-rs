@@ -82,9 +82,6 @@ impl SandboxNoticeState {
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    /// The full board, kept for the rest of the flow (`flasher`, `instructions`,
-    /// `bootfs`), none of which the page renders.
-    pub(crate) selected_board: Option<Board>,
     pub(crate) state: bb_imager_ui::board_selection::State,
 }
 
@@ -92,15 +89,13 @@ impl ChooseBoardState {
     pub(crate) fn new(common: BBImagerCommon) -> Self {
         Self {
             common,
-            selected_board: None,
             state: Default::default(),
         }
     }
 
     /// Record `board` as the selection, both for the flow and for the page.
     pub(crate) fn select_board(&mut self, board: Board) {
-        self.state.selected = Some((&board).into());
-        self.selected_board = Some(board);
+        self.state.selected = Some(board.into());
     }
 
     pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
@@ -121,14 +116,12 @@ impl ChooseBoardState {
 
 impl From<ChooseOsState> for ChooseBoardState {
     fn from(value: ChooseOsState) -> Self {
-        let mut res = Self::new(value.common);
-        res.select_board(value.selected_board);
-        res
+        Self::new(value.common)
     }
 }
 
-impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
-    fn from(value: &Board) -> Self {
+impl From<Board> for bb_imager_ui::board_selection::BoardDetails {
+    fn from(value: Board) -> Self {
         let mut btns = Vec::with_capacity(2);
         if let Some(x) = value.documentation.as_ref() {
             btns.push(("Documentation", x.clone()));
@@ -142,11 +135,13 @@ impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
 
         Self {
             id: value.id,
-            name: value.name.clone(),
-            icon: value.icon.clone(),
-            description: value.description.clone(),
-            specification: value.specification.clone().into(),
+            name: value.name,
+            icon: value.icon,
+            description: value.description,
+            specification: value.specification.into(),
             buttons: btns.into(),
+            flasher: value.flasher,
+            instructions: value.instructions,
         }
     }
 }
@@ -154,7 +149,7 @@ impl From<&Board> for bb_imager_ui::board_selection::BoardDetails {
 #[derive(Debug)]
 pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
+    pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) flasher: config::Flasher,
     pub(crate) state: bb_imager_ui::image_selection::State,
 }
@@ -327,7 +322,7 @@ impl From<ChooseDestState> for ChooseOsState {
 #[derive(Debug)]
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_board: Board,
+    pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
     /// Carries the flasher machinery the page cannot render.
     pub(crate) selected_dest: Option<helpers::Destination>,
@@ -340,7 +335,7 @@ pub(crate) struct ChooseDestState {
 impl ChooseDestState {
     pub(crate) fn new(
         common: BBImagerCommon,
-        selected_board: Board,
+        selected_board: helpers::SelectedBoard,
         selected_image: (ImageId, helpers::BoardImage),
     ) -> Self {
         // The image's own note wins over the board-wide one.
@@ -394,7 +389,7 @@ impl ChooseDestState {
 /// there through Customize, Review, Flashing and the failure page.
 #[derive(Debug)]
 pub(crate) struct FlashingContext {
-    pub(crate) selected_board: Board,
+    pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
     pub(crate) selected_dest: helpers::Destination,
     pub(crate) customization: helpers::FlashingCustomization,
