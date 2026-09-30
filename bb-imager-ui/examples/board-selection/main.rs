@@ -85,6 +85,8 @@ impl State {
             description: dev.description.clone().into(),
             specification: dev.specification.clone().into(),
             buttons: btns.into(),
+            flasher: bb_config::config::Flasher::SdCard,
+            instructions: None,
         })
     }
 }

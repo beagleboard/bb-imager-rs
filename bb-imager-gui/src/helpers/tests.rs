@@ -393,25 +393,12 @@ fn no_bootloader_flasher_behaves_like_sd_card() {
     let _ = destinations(config::Flasher::SdCardNoBootloader, false, "".into());
 }
 
-/// The board's bootfs archive, as `start_flashing` builds it.
-#[cfg(feature = "sd")]
-fn board_bootfs() -> RemoteItem {
-    let cache = tempfile::tempdir().unwrap();
-
-    RemoteItem::new(
-        Box::new(url::Url::parse("https://example.com/bootfs.tar.xz").unwrap()),
-        [7u8; 32],
-        4096,
-        bb_downloader::Downloader::new(cache.path()).unwrap(),
-    )
-}
-
 /// A local image flashed to a file, so the flash needs no SD card and no
-/// elevated permissions.
+/// elevated permissions. The database is left empty, so any board lookup
+/// fails.
 #[cfg(feature = "sd")]
 async fn flash_local_image(
     flasher: config::Flasher,
-    bootfs: Option<RemoteItem>,
 ) -> (anyhow::Result<()>, tempfile::NamedTempFile, Vec<u8>) {
     use std::io::Write;
 
@@ -423,10 +410,10 @@ async fn flash_local_image(
     let dst = tempfile::NamedTempFile::new().unwrap();
     let cache = tempfile::tempdir().unwrap();
     let res = flash(
+        0,
         local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
         Destination::LocalFile(dst.path().to_path_buf()),
-        bootfs,
         crate::db::Db::new().unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
@@ -436,13 +423,13 @@ async fn flash_local_image(
     (res, dst, data)
 }
 
-/// The board's archive is handed to every SD flash, so only the flasher type
-/// decides who writes it. The archive here points at a host that does not
-/// resolve, so applying it to a plain SD image would fail the flash.
+/// Only the flasher type decides whether the board's archive is looked up.
+/// The board here is not in the database, so looking its bootfs up for a
+/// plain SD image would fail the flash.
 #[cfg(feature = "sd")]
 #[tokio::test]
 async fn plain_sd_image_ignores_the_boards_bootfs() {
-    let (res, dst, data) = flash_local_image(config::Flasher::SdCard, Some(board_bootfs())).await;
+    let (res, dst, data) = flash_local_image(config::Flasher::SdCard).await;
 
     res.expect("a plain SD image must not pick up the board's bootfs");
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);

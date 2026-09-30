@@ -232,16 +232,9 @@ impl BBImager {
         };
 
         let customization = ctx.customization.clone();
+        let board = ctx.selected_board.id;
         let img = ctx.selected_image.1.clone();
         let dst = ctx.selected_dest.clone();
-        let bootfs = ctx.selected_board.bootfs.as_ref().map(|x| {
-            img::RemoteItem::new(
-                Box::new(x.url.clone()),
-                x.image_download_sha256,
-                x.image_download_size,
-                common.downloader.clone(),
-            )
-        });
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", ctx.selected_board);
@@ -259,10 +252,10 @@ impl BBImager {
             let cancel_child = cancel.clone();
             let flash_task = blocking_future(move || {
                 helpers::flash(
+                    board,
                     img,
                     customization,
                     dst,
-                    bootfs,
                     db,
                     downloader,
                     tx,
@@ -357,14 +350,15 @@ impl BBImager {
         let (state, task) = match std::mem::take(self) {
             Self::ChooseBoard(inner) => {
                 let selected_board = inner
-                    .selected_board
+                    .state
+                    .selected
                     .expect("Board should alread have been selected");
                 let board_id = selected_board.id;
 
                 let temp = state::ChooseOsState {
                     common: inner.common,
                     flasher: selected_board.flasher,
-                    selected_board,
+                    selected_board: selected_board.into(),
                     state: Default::default(),
                 };
 

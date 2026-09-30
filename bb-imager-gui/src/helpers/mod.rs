@@ -14,6 +14,25 @@ use url::Url;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug)]
+pub(crate) struct SelectedBoard {
+    pub(crate) id: i64,
+    pub(crate) flasher: bb_config::config::Flasher,
+    pub(crate) instructions: Option<Box<str>>,
+    pub(crate) name: Box<str>,
+}
+
+impl From<bb_imager_ui::board_selection::BoardDetails> for SelectedBoard {
+    fn from(value: bb_imager_ui::board_selection::BoardDetails) -> Self {
+        Self {
+            id: value.id,
+            flasher: value.flasher,
+            instructions: value.instructions,
+            name: value.name,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
@@ -201,10 +220,10 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 /// carried through the pages.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn flash(
+    board: i64,
     img: BoardImage,
     customization: FlashingCustomization,
     dst: Destination,
-    bootfs: Option<RemoteItem>,
     db: crate::db::Db,
     downloader: bb_downloader::Downloader,
     chan: mpsc::SyncSender<DownloadFlashingStatus>,
@@ -215,7 +234,20 @@ pub(crate) fn flash(
     // Every SD flash is handed the board's archive; only images that carry no bootloader of
     // their own may have it written over their boot partition.
     #[cfg(feature = "sd")]
-    let bootfs = bootfs.filter(|_| flasher == config::Flasher::SdCardNoBootloader);
+    let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
+        let bootfs = db
+            .board_by_id(board)?
+            .bootfs
+            .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
+        Some(RemoteItem::new(
+            Box::new(bootfs.url),
+            bootfs.image_download_sha256,
+            bootfs.image_download_size,
+            downloader.clone(),
+        ))
+    } else {
+        None
+    };
 
     let (img, bmap) = match img {
         #[cfg(feature = "sd")]
