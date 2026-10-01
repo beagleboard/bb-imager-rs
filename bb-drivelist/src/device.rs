@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 /// Mountpoints of a drive
 pub struct MountPoint {
     pub path: String,
@@ -21,6 +22,7 @@ impl MountPoint {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 /// Device Description
 pub struct DeviceDescriptor {
     pub enumerator: Cow<'static, str>,
