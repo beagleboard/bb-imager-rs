@@ -1,6 +1,6 @@
 [package]
 name = "bb-downloader"
-version = "0.2.0"
+version = "0.3.0"
 description = "A simple async downloader for applications"
 edition.workspace = true
 authors.workspace = true
