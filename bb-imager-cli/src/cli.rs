@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
+#[non_exhaustive]
 #[command(version, about)]
 pub struct Opt {
     #[command(subcommand)]
@@ -14,8 +15,10 @@ pub struct Opt {
 }
 
 #[derive(Subcommand, Debug)]
+#[non_exhaustive]
 pub enum Commands {
     /// Command to flash an image to a specific destination.
+    #[non_exhaustive]
     Flash {
         #[command(subcommand)]
         /// Type of BeagleBoard to flash
@@ -27,6 +30,7 @@ pub enum Commands {
     },
 
     /// Command to list available destinations for flashing based on the selected target.
+    #[non_exhaustive]
     ListDestinations {
         /// Specifies the target type for listing destinations.
         target: DestinationsTarget,
@@ -42,6 +46,7 @@ pub enum Commands {
     },
 
     /// Command to format SD Card
+    #[non_exhaustive]
     Format {
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: PathBuf,
@@ -52,6 +57,7 @@ pub enum Commands {
     },
 
     /// Command to generate shell completion
+    #[non_exhaustive]
     GenerateCompletion {
         /// Specifies the target shell type for completion
         shell: clap_complete::Shell,
@@ -59,9 +65,11 @@ pub enum Commands {
 }
 
 #[derive(Subcommand, Debug)]
+#[non_exhaustive]
 pub enum TargetCommands {
     /// Flash BeagleConnect Freedom.
     #[cfg(feature = "bcf_cc1352p7")]
+    #[non_exhaustive]
     Bcf {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
@@ -74,6 +82,7 @@ pub enum TargetCommands {
         no_verify: bool,
     },
     /// Flash an SD card with customizable settings for BeagleBoard devices.
+    #[non_exhaustive]
     Sd {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
@@ -145,6 +154,7 @@ pub enum TargetCommands {
         resizefs: bool,
     },
     /// Update boot partition with contents from archive
+    #[non_exhaustive]
     SdBootUpdate {
         /// Local path to bootfs archive.
         img: Box<Path>,
@@ -154,6 +164,7 @@ pub enum TargetCommands {
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
+    #[non_exhaustive]
     Msp430 {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
@@ -163,6 +174,7 @@ pub enum TargetCommands {
     },
     /// Flash MSPM0 on Pocketbeagle2.
     #[cfg(feature = "pb2_mspm0")]
+    #[non_exhaustive]
     Pb2Mspm0 {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
@@ -172,6 +184,7 @@ pub enum TargetCommands {
         no_eeprom: bool,
     },
     #[cfg(feature = "dfu")]
+    #[non_exhaustive]
     Dfu {
         /// Identifer is in the following format: `{bus_num}:{address}:{vendor_id}:{product_id}`.
         /// All fields are in hex.
@@ -182,6 +195,7 @@ pub enum TargetCommands {
     },
     /// Flash Zepto
     #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
+    #[non_exhaustive]
     Zepto {
         /// Local path to image file. Can be compressed (xz) or extracted file
         img: Box<Path>,
@@ -202,6 +216,7 @@ pub enum TargetCommands {
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum DestinationsTarget {
     /// BeagleConnect Freedom targets.
     #[cfg(feature = "bcf_cc1352p7")]
