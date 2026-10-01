@@ -40,6 +40,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 /// Errors for CC1352P7
+#[non_exhaustive]
 pub enum Error {
     /// Status for failing flash erase or program operation
     #[error("Status for failing flash erase or program operation.")]
