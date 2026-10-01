@@ -30,6 +30,24 @@ jobs:
     - name: Run tests
       run: make test
 
+  semver-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+    - name: Install dependencies
+      run: make setup-debian-deps
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Install cargo-semver-checks
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-semver-checks
+    - name: Run semver checks
+      run: make semver-checks
+
   cargo-deny:
     runs-on: ubuntu-22.04
     strategy:
