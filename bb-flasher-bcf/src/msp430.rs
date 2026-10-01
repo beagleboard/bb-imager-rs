@@ -45,6 +45,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 /// Errors for MSP430F5503
+#[non_exhaustive]
 pub enum Error {
     /// Could not unlock the BSL. Maybe a custom password is being used.
     #[error("Failed to unlock BSL.")]
