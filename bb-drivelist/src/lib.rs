@@ -14,6 +14,7 @@ use thiserror::Error;
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     #[cfg(target_os = "linux")]
     #[error("Failed to execute lsblk.")]
