@@ -6,6 +6,7 @@ authors.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 iced = { version = "0.14.0", features = ["tokio"] }

@@ -8,6 +8,7 @@ repository.workspace = true
 license.workspace = true
 readme = "README.md"
 keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
+publish = false
 
 [dependencies]
 thiserror = "2.0"
