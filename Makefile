@@ -3,12 +3,14 @@
 _HOST_TARGET = $(shell rustc --print host-tuple)
 _CARGO_TOML_VERSION = $(shell grep 'version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 _DATE = $(shell date +%F)
-_RUST_ARGS_BASE = --locked
+_RUST_ARGS_BASE ?= --locked
 _RUST_ARGS = ${_RUST_ARGS_BASE} --features bcf_cc1352p7,zepto_uart
 _RUST_ARGS_CLI = ${_RUST_ARGS} --features dfu
 _RUST_ARGS_GUI = ${_RUST_ARGS} --features sd
 _PACKAGER_ARGS = -r -vvv --verbose
-_CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check)
+_CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check) --all-targets
+_CARGO_CHECK_NON_WORKSPACE_FLAGS ?=
+_CARGO_CHECK_SKIP_UNPUBLISHED ?=
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
 _APPIMAGETOOL_ARGS =
 # Resolve a runtime library's path via the linker cache (distro-agnostic: /usr/lib/<triple>, /lib64, ...)
@@ -66,7 +68,7 @@ METAINFO_DIR ?= $(PREFIX)/share/metainfo
 TARGET ?= $(_HOST_TARGET)
 ## variable: PB2_MSPM0: Enable pb2_mspm0 feature. Only used in CLI.
 PB2_MSPM0 ?= 0
-## variable: ZEPTO_I2C: Enable zepto_i2c feature. Only supported in GUI.
+## variable: ZEPTO_I2C: Enable zepto_i2c feature. Only supported in CLI.
 ZEPTO_I2C ?= $(if $(findstring linux,$(TARGET)),1)
 ## variable: BCF_MSP430: Enable bcf_msp430 feature. Only disabled in snap package.
 BCF_MSP430 ?= 1
@@ -196,16 +198,19 @@ ifneq (${VERSION}, ${_CARGO_TOML_VERSION})
 endif
 
 _check_common:
-	$(_CARGO_CHECK) --all-targets --all-features --workspace --exclude bb-flasher-bcf \
+	$(_CARGO_CHECK) --all-features --workspace --exclude bb-flasher-bcf \
 		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli
-	$(_CARGO_CHECK) --all-targets -p bb-flasher-bcf -F msp430,static
-	$(_CARGO_CHECK) --all-targets -p bb-flasher -F bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
+	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher-bcf --features msp430,static
+# bb-flasher is not on crates.io yet, so semver-checks has no baseline for it.
+ifeq ($(_CARGO_CHECK_SKIP_UNPUBLISHED),)
+	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher --features bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
+endif
 
 _check_cli:
-	$(_CARGO_CHECK) --all-targets -p bb-imager-cli ${_RUST_ARGS_CLI} -F pb2_mspm0,zepto_i2c
+	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-cli ${_RUST_ARGS_CLI} --features pb2_mspm0,zepto_i2c
 
 _check_gui:
-	$(_CARGO_CHECK) --all-targets -p bb-imager-gui ${_RUST_ARGS_GUI} -F updater,zepto_i2c,pre-release
+	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-gui ${_RUST_ARGS_GUI} --features updater,zepto_i2c,pre-release
 	
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
@@ -222,17 +227,17 @@ check-gui: _check_common _check_gui
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
 test:
-	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} test"
+	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} test --all-targets"
 
 ## housekeeping: test-cli: Run tests on CLI.
 .PHONY: test-cli
 test-cli:
-	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH} test"
+	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH} test --all-targets"
 
 ## housekeeping: test-gui: Run tests on GUI.
 .PHONY: test-gui
 test-gui:
-	$(MAKE) check-gui _CARGO_CHECK="${CARGO_PATH} test"
+	$(MAKE) check-gui _CARGO_CHECK="${CARGO_PATH} test --all-targets"
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
@@ -585,3 +590,9 @@ preview-image-selection:
 ## preview: preview-destination-selection: Preview Destination selection page.
 preview-destination-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example destination-selection --features debug
+
+.PHONY: semver-checks
+semver-checks:
+	$(MAKE) _check_common _CARGO_CHECK="${CARGO_PATH} semver-checks" \
+		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" _CARGO_CHECK_SKIP_UNPUBLISHED=1 PB2_MSPM0=1 \
+		_RUST_ARGS_BASE=

@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "http2", "native-tls"] }
