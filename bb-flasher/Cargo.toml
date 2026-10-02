@@ -9,6 +9,7 @@ license.workspace = true
 readme = "README.md"
 keywords = ["beagle", "flasher"]
 categories = ["development-tools", "embedded", "hardware-support"]
+publish = false
 
 [dependencies]
 qcow2-core = "0.3"
