@@ -21,7 +21,7 @@ gptman = "3"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
 tokio = { version = "1.52", optional = true, default-features = false, features = ["rt", "signal"] }
 anyhow = "1.0"
-bb-helper = { path = "../bb-helper", features = ["cancel"] }
+bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel"] }
 tempfile = { version = "3.27", optional = true }
 
 [dev-dependencies]

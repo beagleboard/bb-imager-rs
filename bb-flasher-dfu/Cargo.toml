@@ -11,4 +11,4 @@ publish = false
 dfu-libusb = "0.6"
 rusb = "0.9"
 thiserror = "2.0"
-bb-helper = { path = "../bb-helper", features = ["cancel", "reader_progress"] }
+bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel", "reader_progress"] }

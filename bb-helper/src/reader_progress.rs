@@ -1,5 +1,12 @@
+//! Reader wrapper that reports progress.
+
 use std::{io, sync::mpsc};
 
+/// Wraps a reader and sends the fraction of `size` read so far (`0.0..=1.0`) over a channel after
+/// each read.
+///
+/// Progress is sent with [`mpsc::SyncSender::try_send`], so updates are dropped rather than
+/// blocking when the channel is full. No progress is reported when `size` is `0`.
 pub struct ReaderWithProgress<R> {
     reader: R,
     pos: u64,
@@ -8,6 +15,7 @@ pub struct ReaderWithProgress<R> {
 }
 
 impl<R> ReaderWithProgress<R> {
+    /// Creates a new reader. `size` is the total number of bytes expected to be read.
     pub const fn new(reader: R, size: u64, chan: Option<mpsc::SyncSender<f32>>) -> Self {
         Self {
             reader,
@@ -39,4 +47,3 @@ impl<R: io::Seek> io::Seek for ReaderWithProgress<R> {
         Ok(self.pos)
     }
 }
-
