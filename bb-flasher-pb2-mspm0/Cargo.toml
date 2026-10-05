@@ -9,7 +9,6 @@ license.workspace = true
 readme = "README.md"
 keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
 categories = ["embedded", "hardware-support", "os::linux-apis"]
-publish = false
 
 [dependencies]
 thiserror = "2.0"
