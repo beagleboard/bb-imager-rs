@@ -97,6 +97,10 @@ where
     prep_hook()?;
 
     let firmware = Firmware::parse(firmware)?;
+    // Empty or all 0xff firmware has nothing to flash.
+    if firmware.file.maximum_address().is_none() {
+        return Err(crate::Error::InvalidImage);
+    }
 
     let mut mspm0 = port_open()?;
     tracing::info!("MSPM0 Connected");
@@ -288,6 +292,22 @@ mod tests {
         assert!(status.contains(&Status::Preparing));
         // It should NOT contain flashing statuses because it returns early
         assert!(!status.iter().any(|s| matches!(s, Status::Flashing(_))));
+    }
+
+    #[test]
+    fn test_flash_rejects_empty_firmware() {
+        for firmware in [&[][..], &[0xff; 16][..]] {
+            let result = flash(
+                firmware,
+                || Mspm0::new(MockBsl::default()),
+                true,
+                None,
+                None,
+                || Ok(()),
+            );
+
+            assert!(matches!(result, Err(crate::Error::InvalidImage)));
+        }
     }
 
     #[test]
