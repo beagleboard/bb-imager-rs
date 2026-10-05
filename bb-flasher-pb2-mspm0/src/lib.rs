@@ -1,4 +1,4 @@
-//! A library to flash MSPM0 co-processor in [PocketBeagle 2]. It uses the kernel driver which support
+//! A library to flash MSPM0 co-processor in [PocketBeagle 2]. It uses the kernel driver which supports
 //! [Linux Firmware Upload API].
 //!
 //! [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
@@ -19,27 +19,39 @@ pub enum Error {
     /// Failed to open a sysfs entry.
     #[error("Failed to open {fname}.")]
     FailedToOpen {
+        /// Name of the sysfs entry.
         fname: &'static str,
+        /// Underlying I/O error.
         #[source]
         source: io::Error,
     },
     /// Failed to read sysfs entry
     #[error("Failed to read {fname}.")]
     FailedToRead {
+        /// Name of the sysfs entry.
         fname: &'static str,
+        /// Underlying I/O error.
         #[source]
         source: io::Error,
     },
     /// Failed to write to a sysfs entry
     #[error("Failed to write to {fname}.")]
     FailedToWrite {
+        /// Name of the sysfs entry.
         fname: &'static str,
+        /// Underlying I/O error.
         #[source]
         source: io::Error,
     },
     /// Flashing failed
     #[error("Failed to flash at {stage}.")]
-    FlashingError { stage: String, code: String },
+    FlashingError {
+        /// Upload stage reported by the driver, or `unknown` if the driver's error could not be
+        /// parsed.
+        stage: String,
+        /// Error code reported by the driver.
+        code: String,
+    },
     /// Invalid firmware
     #[error("Provided firmware is not valid.")]
     InvalidFirmware,
@@ -49,7 +61,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Flash firmware to MSPM0. Also provides live [`Status`] using a channel.
 ///
-/// [PocketBeagle 2] also uses MSPM0 as an EEPROM. Hence provide optional persistance support for
+/// [PocketBeagle 2] also uses MSPM0 as an EEPROM. Hence provide optional persistence support for
 /// EEPROM contents.
 ///
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
@@ -244,12 +256,11 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
             // Skipped since firmware is the same
             "preparing:firmware-invalid" => return Ok(()),
             _ => {
-                let resp: Vec<&str> = temp.split(':').collect();
-                assert_eq!(resp.len(), 2);
+                let (stage, code) = temp.split_once(':').unwrap_or(("unknown", temp));
 
                 return Err(Error::FlashingError {
-                    stage: resp[0].to_string(),
-                    code: resp[1].to_string(),
+                    stage: stage.to_string(),
+                    code: code.to_string(),
                 });
             }
         }
@@ -270,16 +281,24 @@ pub fn device() -> Device {
 }
 
 /// Flashing status
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Status {
+    /// Driver is preparing for the firmware upload.
     Preparing,
+    /// Firmware is being transferred. Progress is in `0.0..=1.0`.
     Flashing(f32),
+    /// Driver is programming and verifying the firmware.
     Verifying,
 }
 
 /// PocketBeagle 2 MSPM0 information.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
+    /// Device name.
     pub name: String,
+    /// Path of the firmware upload sysfs directory.
     pub path: String,
+    /// Maximum firmware size in bytes.
     pub flash_size: usize,
 }
 
@@ -341,6 +360,20 @@ mod tests {
             Error::FlashingError { stage, code } => {
                 assert_eq!(stage, "write");
                 assert_eq!(code, "0x1234");
+            }
+            other => panic!("expected FlashingError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn flash_fw_api_malformed_error_does_not_panic() {
+        let dir = fake_sysfs("garbage");
+        let (tx, _rx) = mpsc::sync_channel(1);
+
+        match flash_fw_api(dir.path(), b"x", &tx).unwrap_err() {
+            Error::FlashingError { stage, code } => {
+                assert_eq!(stage, "unknown");
+                assert_eq!(code, "garbage");
             }
             other => panic!("expected FlashingError, got {other:?}"),
         }

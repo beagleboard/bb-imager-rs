@@ -1,10 +1,9 @@
 //! Integration tests for the parts of the public API that do not require the
 //! PocketBeagle 2 firmware-upload sysfs interface (and hence real hardware).
 //!
-//! The sysfs flashing paths need a `flash_fw_api(&Path, ..)` seam plus a
-//! temp-dir fixture to test without hardware; that is deferred. Covered here:
-//! the oversize-firmware guard (which returns before touching sysfs) and the
-//! pure `device()` accessor.
+//! The sysfs upload state machine is covered by inline tests in `src/lib.rs`
+//! against a temp-dir fixture. Covered here: the oversize-firmware guard
+//! (which returns before touching sysfs) and the pure `device()` accessor.
 
 use std::sync::mpsc;
 
