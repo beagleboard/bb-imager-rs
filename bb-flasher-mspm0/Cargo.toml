@@ -9,7 +9,6 @@ license.workspace = true
 readme = "README.md"
 keywords = ["mspm0", "bsl", "flasher", "beagle"]
 categories = ["embedded", "hardware-support"]
-publish = false
 
 [dependencies]
 serialport = { version = "4.7", default-features = false, optional = true }
