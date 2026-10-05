@@ -1,10 +1,14 @@
 [package]
 name = "bb-flasher-mspm0"
-version.workspace = true
+version = "0.1.0"
+description = "A library to flash the MSPM0 co-processor over its UART/I2C bootloader (BSL)"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+readme = "README.md"
+keywords = ["mspm0", "bsl", "flasher", "beagle"]
+categories = ["embedded", "hardware-support"]
 publish = false
 
 [dependencies]
@@ -26,3 +30,6 @@ nix = { version = "0.31", features = ["fs"], optional = true }
 default = ["uart"]
 uart = ["serialport"]
 i2c = ["i2cdev", "nix"]
+
+[package.metadata.docs.rs]
+all-features = true

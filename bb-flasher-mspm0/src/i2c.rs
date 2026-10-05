@@ -1,3 +1,5 @@
+//! Flash MSPM0 over I2C. Linux only.
+
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -37,6 +39,16 @@ impl std::io::Write for I2CDev {
     }
 }
 
+/// Flash firmware to MSPM0 over I2C.
+///
+/// - `firmware`: raw binary or a text format supported by [`bin_file`].
+/// - `port`: I2C bus device path, see [`ports`].
+/// - `verify`: skip flashing if the device already has the same firmware, and verify the CRC
+///   after flashing.
+/// - `chan`: optional channel for live [`Status`] updates.
+/// - `cancel`: optional token to abort flashing.
+/// - `prep_hook`: called before connecting, e.g. to put MSPM0 into BSL mode (see
+///   [`crate::bsl_gpio_cdev_by_name`]).
 pub fn flash(
     firmware: &[u8],
     port: &Path,
@@ -58,10 +70,12 @@ pub fn flash(
     )
 }
 
-/// Returns all paths to serial ports.
+/// Returns all paths to I2C bus devices. Returns nothing if `/dev` cannot be read.
 pub fn ports() -> impl Iterator<Item = PathBuf> {
     std::fs::read_dir("/dev")
-        .unwrap()
+        .inspect_err(|e| tracing::warn!("Failed to read /dev: {e}"))
+        .into_iter()
+        .flatten()
         .filter_map(|x| x.ok())
         .filter(|x| {
             matches!(

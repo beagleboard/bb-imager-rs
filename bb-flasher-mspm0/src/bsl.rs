@@ -284,6 +284,7 @@ pub(crate) struct Mspm0<S> {
     max_buffer_size: usize,
 }
 
+#[cfg(feature = "uart")]
 impl<S> Mspm0<S>
 where
     S: serialport::SerialPort,
