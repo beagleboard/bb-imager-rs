@@ -15,6 +15,7 @@ use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 pub struct Target(String);
 
 impl Target {
+    /// Serial port path.
     pub fn path(&self) -> &str {
         self.0.as_str()
     }
@@ -60,6 +61,8 @@ pub struct Flasher<I> {
 }
 
 impl<I> Flasher<I> {
+    /// Create a flasher for `img` on `port`. With `verify`, the flashed image is verified, and
+    /// flashing is skipped if the target already has the same image.
     pub fn new(img: I, port: Target, verify: bool, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
@@ -74,6 +77,7 @@ impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
+    /// Flash the image. Progress is reported over `chan`.
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,

@@ -81,7 +81,7 @@ impl BoardImage {
     pub(crate) fn file_name(&self) -> Option<String> {
         match self {
             Self::SdFormat { .. } => None,
-            Self::Local { img, .. } => Some(img.file_name().to_string_lossy().to_string()),
+            Self::Local { img, .. } => img.file_name().map(|x| x.to_string_lossy().to_string()),
             Self::Remote { file_name, .. } => Some(file_name.to_string()),
         }
     }

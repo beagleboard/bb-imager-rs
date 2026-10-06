@@ -1,3 +1,7 @@
+//! Flash devices over [USB DFU].
+//!
+//! [USB DFU]: https://www.usb.org/sites/default/files/DFU_1.1.pdf
+
 use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
 use std::borrow::Cow;
@@ -6,28 +10,31 @@ use std::sync::mpsc;
 
 use bb_helper::cancel::CancellationToken;
 
+/// USB DFU device
 #[derive(Hash, Eq, PartialEq)]
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
     fn destinations_internal(filter: bool) -> impl Iterator<Item = Self> {
-        bb_flasher_dfu::devices(filter)
-            .into_iter()
-            .map(Self)
+        bb_flasher_dfu::devices(filter).into_iter().map(Self)
     }
 
+    /// USB bus number.
     pub const fn bus_number(&self) -> u8 {
         self.0.bus_num
     }
 
+    /// USB port number.
     pub const fn port_num(&self) -> u8 {
         self.0.port_num
     }
 
+    /// USB vendor id.
     pub const fn vendor_id(&self) -> u16 {
         self.0.vendor_id
     }
 
+    /// USB product id.
     pub const fn product_id(&self) -> u16 {
         self.0.product_id
     }
@@ -54,6 +61,7 @@ impl BBFlasherTarget for Target {
     }
 }
 
+/// Flasher to download one or more images to a USB DFU device.
 pub struct Flasher<R> {
     imgs: Vec<(String, R)>,
     vendor_id: u16,
@@ -82,6 +90,11 @@ impl<R> Flasher<R> {
         }
     }
 
+    /// Create a flasher for a device given its [`BBFlasherTarget::identifier`]
+    /// (`bus:port:vendor_id:product_id` in hex).
+    ///
+    /// `imgs` are `(name, opener)` pairs, flashed in order. `name` selects the DFU interface to
+    /// download to.
     pub fn from_identifier(
         imgs: Vec<(String, R)>,
         id: &str,
@@ -114,6 +127,7 @@ impl<R> Flasher<R>
 where
     R: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)>,
 {
+    /// Flash the images. Progress across all images is reported over `chan`.
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,

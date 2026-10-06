@@ -16,7 +16,9 @@ pub(crate) fn flash(
 ) -> Result<(), Error> {
     std::thread::scope(|s| {
         let d = bb_flasher_pb2_mspm0::device();
-        let firmware = img.to_bytes(0..d.flash_size, None).unwrap();
+        let firmware = img
+            .to_bytes(0..d.flash_size, None)
+            .map_err(|_| Error::InvalidFirmware)?;
 
         let (tx, rx) = mpsc::sync_channel::<bb_flasher_pb2_mspm0::Status>(2);
         if let Some(chan) = chan {
