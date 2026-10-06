@@ -1,3 +1,6 @@
+//! Library backing the `bb-imager-cli` binary. [`cli`] defines the command line interface and
+//! [`run`] executes a parsed command.
+
 pub mod cli;
 mod helpers;
 
@@ -8,6 +11,7 @@ use helpers::LocalStringFile;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
+/// Execute the command in `opt`.
 pub fn run(opt: Opt) {
     match opt.command {
         Commands::Flash { target, quiet } => flash(*target, quiet),
