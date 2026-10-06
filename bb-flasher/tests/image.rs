@@ -23,9 +23,17 @@ fn local_image_accessors_and_display() {
 
     let img = LocalImage::new(path.clone().into_boxed_path());
     assert_eq!(img.path(), path.as_path());
-    assert_eq!(img.file_name(), "myimage.img");
+    assert_eq!(img.file_name(), Some("myimage.img".as_ref()));
     // Display renders the file name.
     assert_eq!(img.to_string(), "myimage.img");
+}
+
+#[test]
+fn local_image_without_file_name() {
+    let img = LocalImage::new(std::path::PathBuf::from("/").into_boxed_path());
+    assert_eq!(img.file_name(), None);
+    // Display falls back to the full path instead of panicking.
+    assert_eq!(img.to_string(), "/");
 }
 
 #[test]
@@ -54,7 +62,9 @@ fn build_tar() -> Vec<u8> {
         dir_header.set_size(0);
         dir_header.set_mode(0o755);
         dir_header.set_cksum();
-        builder.append_data(&mut dir_header, "config", std::io::empty()).unwrap();
+        builder
+            .append_data(&mut dir_header, "config", std::io::empty())
+            .unwrap();
 
         let contents = b"tar file contents";
         let mut file_header = tar::Header::new_gnu();

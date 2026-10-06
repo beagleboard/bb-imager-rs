@@ -1,3 +1,5 @@
+//! Flash MSPM0 microcontrollers using their ROM bootloader (BSL) over UART or I2C.
+
 #[cfg(feature = "mspm0_i2c")]
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -7,16 +9,19 @@ use bb_helper::cancel::CancellationToken;
 
 use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
-/// MSPM0 UART target
+/// MSPM0 target
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum Target {
+    /// Serial port path.
     #[cfg(feature = "mspm0_uart")]
     Uart(String),
+    /// I2C bus device path.
     #[cfg(feature = "mspm0_i2c")]
     I2c(PathBuf),
 }
 
 impl Target {
+    /// Port or device path.
     pub fn path(&self) -> String {
         match self {
             #[cfg(feature = "mspm0_uart")]
@@ -103,6 +108,11 @@ pub struct Flasher<I, P> {
 }
 
 impl<I, P> Flasher<I, P> {
+    /// Create a flasher for `img` on `port`.
+    ///
+    /// With `verify`, the flashed image is verified, and flashing is skipped if the target
+    /// already has the same image. `prep_hook` is called before connecting, e.g. to put MSPM0
+    /// into BSL mode.
     pub fn new(
         img: I,
         port: Target,
@@ -121,6 +131,7 @@ impl<I, P> Flasher<I, P> {
 }
 
 impl<I> Flasher<I, fn() -> Result<(), bb_flasher_mspm0::Error>> {
+    /// Create a flasher without a prep hook. MSPM0 must already be in BSL mode.
     pub fn no_prep(img: I, port: Target, verify: bool, cancel: Option<CancellationToken>) -> Self {
         Self::new(img, port, verify, cancel, || Ok(()))
     }
@@ -128,6 +139,8 @@ impl<I> Flasher<I, fn() -> Result<(), bb_flasher_mspm0::Error>> {
 
 #[cfg(target_os = "linux")]
 impl<I> Flasher<I, Box<dyn FnOnce() -> bb_flasher_mspm0::Result<()> + Send>> {
+    /// Create a flasher that puts MSPM0 into BSL mode using the `reset` and `bsl` GPIO lines,
+    /// found by name.
     pub fn gpio_by_name(
         img: I,
         port: Target,
@@ -151,6 +164,7 @@ where
     I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
     P: FnOnce() -> bb_flasher_mspm0::Result<()> + Send + 'static,
 {
+    /// Flash the image. Progress is reported over `chan`.
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,

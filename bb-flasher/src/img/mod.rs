@@ -19,6 +19,9 @@ mod test;
 
 const XZ_MAGIC: [u8; 6] = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00];
 
+/// A tar archive (optionally xz compressed) of files, such as the contents of a boot partition.
+///
+/// Iterate over `&mut OsArchive` to get its entries.
 #[cfg(feature = "sd")]
 pub struct OsArchive {
     inner: OsArchiveCompression,
@@ -32,6 +35,7 @@ impl OsArchive {
         Ok(Self { inner: img })
     }
 
+    /// Open an archive from a local file. Read progress is reported over `chan`.
     pub fn from_path(path: &Path, chan: Option<mpsc::SyncSender<f32>>) -> io::Result<Self> {
         let file = std::fs::File::open(path)?;
         let len = file.metadata()?.len();
@@ -40,6 +44,8 @@ impl OsArchive {
         Self::new(img, chan, len)
     }
 
+    /// Open an archive from a stream of `size` bytes being written by `_background`, which is
+    /// aborted when the archive is dropped. Read progress is reported over `chan`.
     #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,
@@ -62,12 +68,22 @@ impl<'a> IntoIterator for &'a mut OsArchive {
 
     fn into_iter(self) -> Self::IntoIter {
         match &mut self.inner {
-            OsArchiveCompression::TarXz(archive) => {
-                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
-            }
-            OsArchiveCompression::Tar(archive) => {
-                Box::new(archive.entries().unwrap().flat_map(flat_map_with_log))
-            }
+            OsArchiveCompression::TarXz(archive) => Box::new(
+                archive
+                    .entries()
+                    .inspect_err(|e| tracing::warn!("Failed to read archive entries: {}", e))
+                    .into_iter()
+                    .flatten()
+                    .flat_map(flat_map_with_log),
+            ),
+            OsArchiveCompression::Tar(archive) => Box::new(
+                archive
+                    .entries()
+                    .inspect_err(|e| tracing::warn!("Failed to read archive entries: {}", e))
+                    .into_iter()
+                    .flatten()
+                    .flat_map(flat_map_with_log),
+            ),
         }
     }
 }
@@ -77,7 +93,7 @@ fn flat_map_with_log<'a, R: Read>(
     entry: io::Result<tar::Entry<'a, R>>,
 ) -> Option<(Box<str>, ContentType<'a>)> {
     match entry {
-        Ok(x) => Some(tar_entry_map(x)),
+        Ok(x) => tar_entry_map(x),
         Err(e) => {
             tracing::warn!("Dropping archive entry: {}", e);
             None
@@ -86,8 +102,14 @@ fn flat_map_with_log<'a, R: Read>(
 }
 
 #[cfg(feature = "sd")]
-fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentType<'a>) {
-    let p = entry.path().unwrap().to_string_lossy().to_string().into();
+fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> Option<(Box<str>, ContentType<'a>)> {
+    let p = match entry.path() {
+        Ok(x) => x.to_string_lossy().to_string().into(),
+        Err(e) => {
+            tracing::warn!("Dropping archive entry with invalid path: {}", e);
+            return None;
+        }
+    };
     let f = if entry.header().entry_type().is_dir() {
         ContentType::Dir
     } else {
@@ -95,7 +117,7 @@ fn tar_entry_map<'a, R: Read>(entry: tar::Entry<'a, R>) -> (Box<str>, ContentTyp
         ContentType::Reader(temp)
     };
 
-    (p, f)
+    Some((p, f))
 }
 
 #[cfg(feature = "sd")]
@@ -121,12 +143,17 @@ impl OsArchiveCompression {
     }
 }
 
+/// An OS image, read uncompressed.
+///
+/// xz, zip and qcow2 images are detected and decompressed automatically. Anything else is read
+/// as a raw image.
 pub struct OsImage {
     size: u64,
     img: OsImageCompression<OsImageSource>,
 }
 
 impl OsImage {
+    /// Open an image from a local file.
     pub fn from_path(path: &Path) -> io::Result<Self> {
         let file = std::fs::File::open(path)?;
         let mut img = OsImageCompression::new(OsImageSource::from(file))?;
@@ -149,6 +176,8 @@ impl OsImage {
         Ok(Self { size, img })
     }
 
+    /// Open an image from a stream being written by `_background`, which is aborted when the image
+    /// is dropped. `size` is the uncompressed image size.
     #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,

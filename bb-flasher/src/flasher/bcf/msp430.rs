@@ -17,6 +17,7 @@ pub struct Target {
 }
 
 impl Target {
+    /// HID device path.
     pub fn path(&self) -> &str {
         self.display_path.as_str()
     }
@@ -72,6 +73,7 @@ pub struct Flasher<I> {
 }
 
 impl<I> Flasher<I> {
+    /// Create a flasher for `img` on `port`.
     pub fn new(img: I, port: Target) -> Self {
         Self {
             img,
@@ -84,6 +86,7 @@ impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
+    /// Flash the image. Progress is reported over `chan`.
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,

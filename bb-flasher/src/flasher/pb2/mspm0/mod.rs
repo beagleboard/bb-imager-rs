@@ -57,6 +57,8 @@ pub struct Flasher<I> {
 }
 
 impl<I> Flasher<I> {
+    /// Create a flasher for `img`. With `persist_eeprom`, the EEPROM contents are restored after
+    /// flashing.
     pub const fn new(img: I, persist_eeprom: bool) -> Self {
         Self {
             img,
@@ -69,6 +71,7 @@ impl<I> Flasher<I>
 where
     I: FnOnce() -> std::io::Result<(crate::img::OsImage, u64)> + Send + 'static,
 {
+    /// Flash the image. Progress is reported over `chan`.
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,

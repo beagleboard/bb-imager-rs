@@ -19,8 +19,8 @@ yaml_serde = { version = "0.10", optional = true }
 thiserror = { version = "2.0" }
 tracing = "0.1"
 bb-flasher-pb2-mspm0 = { version = "0.1", path = "../bb-flasher-pb2-mspm0", optional = true }
-bb-flasher-bcf = { path = "../bb-flasher-bcf", optional = true }
-bb-flasher-sd = { path = "../bb-flasher-sd", optional = true }
+bb-flasher-bcf = { version = "2", path = "../bb-flasher-bcf", optional = true }
+bb-flasher-sd = { version = "3", path = "../bb-flasher-sd", optional = true }
 bin_file = { version = "0.2", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["rt"] }
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel"] }

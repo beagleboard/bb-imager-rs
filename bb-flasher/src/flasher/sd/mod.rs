@@ -1,4 +1,4 @@
-//! Flash Linux Os Images to SD Cards with optioinal post-install customization.
+//! Flash Linux Os Images to SD Cards with optional post-install customization.
 //!
 //! Post-install customization is only available for [BeagleBoard.org] images
 //!
@@ -11,6 +11,7 @@ use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::common::{BBFlasherTarget, DownloadFlashingStatus};
 
+/// Typed `None` for the `bootfs` argument of [`Flasher::new`] / [`Flasher::with_file_dest`].
 pub const NONE_BOOTFS: Option<fn() -> std::io::Result<crate::img::OsArchive>> = None;
 
 /// SD Card
@@ -27,6 +28,7 @@ impl Target {
         self.0.size
     }
 
+    /// SD Card device path
     pub fn path(&self) -> &std::path::Path {
         &self.0.path
     }
@@ -82,6 +84,10 @@ fn sysconf_w(sysconf: &mut Vec<u8>, key: &str, value: &str) {
 }
 
 impl FlashingSdLinuxConfig {
+    /// Customization for images configured by `sysconf.txt` in the boot partition.
+    ///
+    /// `user` and `wifi` are `(name, password)` / `(ssid, psk)` pairs. `ssh` is an authorized
+    /// public key.
     pub fn sysconfig(
         hostname: Option<&str>,
         timezone: Option<&str>,
@@ -136,6 +142,8 @@ impl FlashingSdLinuxConfig {
         }
     }
 
+    /// Customization for images configured by cloud-init. Arguments are the same as
+    /// [`Self::sysconfig`].
     pub fn cloud_init(
         hostname: Option<&str>,
         timezone: Option<&str>,
@@ -148,10 +156,12 @@ impl FlashingSdLinuxConfig {
         Self(vec![("cloud-init".into(), Some(data.to_file_data()))])
     }
 
+    /// Write a single file with `file_content` to the boot partition.
     pub fn generic_file(file_name: Box<str>, file_content: Box<str>) -> Self {
         Self(vec![(file_name, Some(file_content.into_boxed_bytes()))])
     }
 
+    /// No customization.
     pub const fn none() -> Self {
         Self(Vec::new())
     }
@@ -168,10 +178,12 @@ impl Extend<Self> for FlashingSdLinuxConfig {
 pub struct FormatFlasher(PathBuf);
 
 impl FormatFlasher {
+    /// Create a flasher to format `p`.
     pub fn new(p: Target) -> Self {
         Self(p.0.path)
     }
 
+    /// Format the SD Card.
     pub fn flash(self) -> anyhow::Result<()> {
         bb_flasher_sd::format(self.0.as_path()).map_err(Into::into)
     }
@@ -194,6 +206,14 @@ pub struct Flasher<I, B, T> {
 }
 
 impl<I, B, T> Flasher<I, B, T> {
+    /// Create a flasher to write `img` to the SD Card `dst`.
+    ///
+    /// - `bootfs`: optional archive whose contents replace the boot partition.
+    /// - `bmap`: optional [bmap] contents, to only write mapped blocks.
+    /// - `customization`: post-install customization.
+    /// - `resize`: grow the last partition to fill the SD Card.
+    ///
+    /// [bmap]: https://github.com/yoctoproject/bmaptool
     pub fn new(
         img: I,
         bootfs: Option<T>,
@@ -212,6 +232,8 @@ impl<I, B, T> Flasher<I, B, T> {
         }
     }
 
+    /// Like [`Self::new`], but writes to the file `dst` instead of an SD Card. The last partition
+    /// is not resized.
     pub fn with_file_dest(
         img: I,
         bootfs: Option<T>,
@@ -240,6 +262,8 @@ where
     B: FnOnce() -> std::io::Result<Box<str>> + Send,
     T: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
+    /// Flash the image. Progress is reported over `chan`. Flashing stops when `cancel` is
+    /// cancelled.
     pub fn flash(
         self,
         chan: Option<std::sync::mpsc::SyncSender<DownloadFlashingStatus>>,
@@ -298,7 +322,7 @@ where
     }
 }
 
-/// Flasher of updaing BOOT partition on pre-flashed SD Card
+/// Flasher of updating BOOT partition on pre-flashed SD Card
 pub struct UpdateBootFlasher<I> {
     img: I,
     dst: bb_flasher_sd::Destination,
@@ -309,6 +333,7 @@ impl<F> UpdateBootFlasher<F>
 where
     F: FnOnce() -> std::io::Result<crate::img::OsArchive>,
 {
+    /// Create a flasher to replace the boot partition of `dst` with the contents of `img`.
     pub fn new(img: F, dst: Target, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
@@ -317,6 +342,7 @@ where
         }
     }
 
+    /// Like [`Self::new`], but updates the image file `dst` instead of an SD Card.
     pub fn with_file_dest(img: F, dst: PathBuf, cancel: Option<CancellationToken>) -> Self {
         Self {
             img,
@@ -325,6 +351,7 @@ where
         }
     }
 
+    /// Update the boot partition.
     pub fn flash(self) -> anyhow::Result<()> {
         bb_flasher_sd::bootfs_update::flash(self.img, self.dst, self.cancel).map_err(Into::into)
     }
