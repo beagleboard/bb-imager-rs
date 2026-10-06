@@ -90,6 +90,7 @@ pub enum InitFormat {
     CloudInit,
 }
 
+#[cfg(feature = "rusqlite")]
 impl rusqlite::ToSql for InitFormat {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         let val: u8 = match self {
@@ -102,6 +103,7 @@ impl rusqlite::ToSql for InitFormat {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl rusqlite::types::FromSql for InitFormat {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         value.as_i64().and_then(|val| match val {
@@ -240,6 +242,7 @@ pub enum Flasher {
     SdCardNoBootloader,
 }
 
+#[cfg(feature = "rusqlite")]
 impl rusqlite::ToSql for Flasher {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         let val: u8 = match self {
@@ -256,6 +259,7 @@ impl rusqlite::ToSql for Flasher {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl rusqlite::types::FromSql for Flasher {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         value.as_i64().and_then(|val| match val {
