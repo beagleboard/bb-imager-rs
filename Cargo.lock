@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "bb-iced-widgets"
-version = "1.0.18"
+version = "1.0.19"
 dependencies = [
  "iced",
  "iced_aw",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-cli"
-version = "1.0.18"
+version = "1.0.19"
 dependencies = [
  "anyhow",
  "bb-flasher",
@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-gui"
-version = "1.0.18"
+version = "1.0.19"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "bb-imager-ui"
-version = "1.0.18"
+version = "1.0.19"
 dependencies = [
  "bb-config",
  "bb-downloader",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "bb-os-list-generator"
-version = "1.0.18"
+version = "1.0.19"
 dependencies = [
  "anyhow",
  "bb-config",
