@@ -591,5 +591,5 @@ preview-destination-selection:
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:
-	$(MAKE) _check_common _CARGO_CHECK="${CARGO_PATH} semver-checks" \
+	$(MAKE) _check_cli _CARGO_CHECK="${CARGO_PATH} semver-checks" \
 		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" PB2_MSPM0=1 _RUST_ARGS_BASE=
