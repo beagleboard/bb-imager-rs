@@ -197,8 +197,9 @@ ifneq (${VERSION}, ${_CARGO_TOML_VERSION})
 endif
 
 _check_common:
-	$(_CARGO_CHECK) --all-features --workspace --exclude bb-flasher-bcf \
-		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli
+	$(_CARGO_CHECK) --all-features --workspace --exclude bb-flasher-bcf --exclude bb-flasher \
+		--exclude bb-imager-gui --exclude bb-imager-cli --exclude bb-config --exclude bb-downloader \
+		--exclude bb-iced-widgets --exclude bb-imager-ui --exclude bb-os-list-generator
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher-bcf --features msp430,static
 # bb-flasher is not on crates.io yet, so semver-checks has no baseline for it.
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher --features bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
@@ -206,7 +207,11 @@ _check_common:
 _check_cli:
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-cli ${_RUST_ARGS_CLI} --features pb2_mspm0,zepto_i2c
 
-_check_gui:
+_check_gui_common:
+	$(_CARGO_CHECK) --all-features -p bb-config -p bb-downloader
+
+_check_gui: _check_gui_common
+	$(_CARGO_CHECK) --all-features -p bb-iced-widgets -p bb-imager-ui -p bb-os-list-generator
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-gui ${_RUST_ARGS_GUI} --features updater,zepto_i2c,pre-release
 	
 ## housekeeping: check: Run code quality checks.
@@ -591,5 +596,5 @@ preview-destination-selection:
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:
-	$(MAKE) _check_cli _CARGO_CHECK="${CARGO_PATH} semver-checks" \
-		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" PB2_MSPM0=1 _RUST_ARGS_BASE=
+	$(MAKE) check-cli _check_gui_common _CARGO_CHECK="${CARGO_PATH} semver-checks" PB2_MSPM0=1 \
+		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" _RUST_ARGS_BASE=
