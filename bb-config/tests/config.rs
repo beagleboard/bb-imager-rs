@@ -160,6 +160,7 @@ fn flasher_serde_strings() {
 }
 
 #[test]
+#[cfg(feature = "rusqlite")]
 fn flasher_sqlite_round_trip() {
     let conn = rusqlite::Connection::open_in_memory().unwrap();
     conn.execute("CREATE TABLE t (id INTEGER, f)", []).unwrap();
@@ -190,6 +191,7 @@ fn flasher_sqlite_round_trip() {
 }
 
 #[test]
+#[cfg(feature = "rusqlite")]
 fn init_format_sqlite_round_trip() {
     let conn = rusqlite::Connection::open_in_memory().unwrap();
     conn.execute("CREATE TABLE t (id INTEGER, f)", []).unwrap();
@@ -218,6 +220,7 @@ fn init_format_sqlite_round_trip() {
 }
 
 #[test]
+#[cfg(feature = "rusqlite")]
 fn sqlite_invalid_discriminant_errors() {
     let conn = rusqlite::Connection::open_in_memory().unwrap();
     conn.execute("CREATE TABLE t (f)", []).unwrap();
