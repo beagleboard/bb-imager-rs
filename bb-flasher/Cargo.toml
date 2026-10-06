@@ -25,7 +25,7 @@ bin_file = { version = "0.2", optional = true }
 tokio-util = { version = "0.7", optional = true, features = ["rt"] }
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel"] }
 rc-zip-sync = { version = "4.4", default-features = false, features = ["deflate"] }
-bb-flasher-dfu = { path = "../bb-flasher-dfu", optional = true }
+bb-flasher-dfu = { version = "0.1", path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 bb-flasher-mspm0 = { version = "0.1", path = "../bb-flasher-mspm0", optional = true }
 tar = "0.4"
