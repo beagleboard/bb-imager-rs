@@ -9,7 +9,6 @@ license.workspace = true
 readme = "README.md"
 keywords = ["dfu", "usb", "flasher", "beagle"]
 categories = ["embedded", "hardware-support"]
-publish = false
 
 [dependencies]
 dfu-libusb = "0.6"
