@@ -10,7 +10,6 @@ _RUST_ARGS_GUI = ${_RUST_ARGS} --features sd
 _PACKAGER_ARGS = -r -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check) --all-targets
 _CARGO_CHECK_NON_WORKSPACE_FLAGS ?=
-_CARGO_CHECK_SKIP_UNPUBLISHED ?=
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
 _APPIMAGETOOL_ARGS =
 # Resolve a runtime library's path via the linker cache (distro-agnostic: /usr/lib/<triple>, /lib64, ...)
@@ -202,9 +201,7 @@ _check_common:
 		--exclude bb-flasher --exclude bb-imager-gui --exclude bb-imager-cli
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher-bcf --features msp430,static
 # bb-flasher is not on crates.io yet, so semver-checks has no baseline for it.
-ifeq ($(_CARGO_CHECK_SKIP_UNPUBLISHED),)
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher --features bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
-endif
 
 _check_cli:
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-cli ${_RUST_ARGS_CLI} --features pb2_mspm0,zepto_i2c
@@ -595,5 +592,4 @@ preview-destination-selection:
 .PHONY: semver-checks
 semver-checks:
 	$(MAKE) _check_common _CARGO_CHECK="${CARGO_PATH} semver-checks" \
-		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" _CARGO_CHECK_SKIP_UNPUBLISHED=1 PB2_MSPM0=1 \
-		_RUST_ARGS_BASE=
+		_CARGO_CHECK_NON_WORKSPACE_FLAGS="--default-features" PB2_MSPM0=1 _RUST_ARGS_BASE=
