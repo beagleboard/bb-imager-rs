@@ -14,7 +14,7 @@ fn open_usb_dev(
     port_num: u8,
 ) -> Result<rusb::DeviceHandle<rusb::Context>> {
     // Due to some sort of internal caching, creating a new context each time is the most reliable.
-    let ctx = rusb::Context::new().unwrap();
+    let ctx = rusb::Context::new().map_err(|source| crate::Error::UsbUnavailable { source })?;
 
     // First try open_device_with_vid_pid. This should be sufficient if only one usb device with
     // the vendor_id and product_id exists
@@ -31,7 +31,7 @@ fn open_usb_dev(
     // Iterate the device list
     let all_usb_devs = ctx
         .devices()
-        .expect("rusb seems to not be implemented for this platform");
+        .map_err(|source| crate::Error::UsbUnavailable { source })?;
     for dev in all_usb_devs.iter() {
         if dev.bus_number() == bus_num && dev.port_number() == port_num {
             return dev
@@ -55,13 +55,16 @@ fn open_dfu_dev(
         name: &str,
     ) -> Result<Option<dfu_libusb::Dfu<rusb::Context>>, dfu_libusb::Error> {
         let langs = dev.read_languages(DELAY)?;
+        let Some(&lang) = langs.first() else {
+            return Ok(None);
+        };
         let active_desc = dev.device().active_config_descriptor()?;
 
         for intf in active_desc.interfaces() {
             let descs = intf.descriptors();
 
             for desc in descs {
-                let Ok(intf_str) = dev.read_interface_string(langs[0], &desc, DELAY) else {
+                let Ok(intf_str) = dev.read_interface_string(lang, &desc, DELAY) else {
                     continue;
                 };
 

@@ -585,12 +585,13 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-dfu"
-version = "1.0.18"
+version = "0.1.0"
 dependencies = [
  "bb-helper",
  "dfu-libusb",
  "rusb",
  "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]
