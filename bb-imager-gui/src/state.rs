@@ -155,6 +155,15 @@ pub(crate) struct ChooseOsState {
 }
 
 impl ChooseOsState {
+    pub(crate) fn new(common: BBImagerCommon, selected_board: helpers::SelectedBoard) -> Self {
+        Self {
+            common,
+            flasher: selected_board.flasher,
+            selected_board,
+            state: Default::default(),
+        }
+    }
+
     pub(crate) fn update_images(
         &mut self,
         mut imgs: Vec<bb_imager_ui::image_selection::ImageItem>,
@@ -310,12 +319,7 @@ impl ChooseOsState {
 
 impl From<ChooseDestState> for ChooseOsState {
     fn from(value: ChooseDestState) -> Self {
-        Self {
-            common: value.common,
-            flasher: value.selected_board.flasher,
-            selected_board: value.selected_board,
-            state: Default::default(),
-        }
+        Self::new(value.common, value.selected_board)
     }
 }
 
