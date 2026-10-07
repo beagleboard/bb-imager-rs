@@ -12,6 +12,12 @@ On Linux, building requires the udev, liblzma and hidapi development packages, e
 
 Prebuilt packages are available from the [releases page](https://github.com/beagleboard/bb-imager-rs/releases).
 
+On Linux (x86_64, aarch64 and armv7), [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) can install the prebuilt binary instead of building from source:
+
+```shell
+cargo binstall bb-imager-cli
+```
+
 # Usage
 
 List SD Cards:
