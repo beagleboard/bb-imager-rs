@@ -432,7 +432,13 @@ impl From<CustomizeState> for ChooseDestState {
 
 impl From<ReviewState> for ChooseDestState {
     fn from(value: ReviewState) -> Self {
-        CustomizeState::from(value).into()
+        let mut res = ChooseDestState::new(
+            value.common,
+            value.ctx.selected_board,
+            value.ctx.selected_image,
+        );
+        res.select_dest(value.ctx.selected_dest);
+        res
     }
 }
 

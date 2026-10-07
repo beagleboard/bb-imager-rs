@@ -477,8 +477,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             };
             *state = inner.page.into();
 
-            let jump = update(state, BBImagerMessage::UiState(Message::Goto(target)));
-            return Task::batch([jump, state.scroll_reset()]);
+            return update(state, BBImagerMessage::UiState(Message::Goto(target)));
         }
         BBImagerMessage::UiState(Message::Goto(SidebarEntry::AppOptions)) => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
@@ -487,8 +486,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return state.scroll_reset();
         }
-        // Leaving a running flash would orphan its task. ChooseBoard is reached
-        // here when App Options returns to it, and is already the target.
+        // Leaving a running flash would orphan its task.
         BBImagerMessage::UiState(Message::Goto(SidebarEntry::Hardware))
             if !matches!(state, BBImager::Flashing(_)) =>
         {
@@ -562,8 +560,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         {
             return state.scroll_reset();
         }
-        // Forward jumps, steps while flashing, and jumps from pages that no
-        // longer hold the earlier picks.
+        // The sidebar only enables the steps handled above.
         BBImagerMessage::UiState(Message::Goto(_)) => unreachable!(),
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
