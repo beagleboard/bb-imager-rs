@@ -3,7 +3,7 @@ use iced::{Element, widget};
 use crate::{Message, constants};
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
-pub(crate) const LIST_COL_PADDING: iced::Padding = iced::Padding {
+const LIST_COL_PADDING: iced::Padding = iced::Padding {
     right: 16.0,
     ..iced::Padding::ZERO
 };
@@ -117,7 +117,7 @@ pub(crate) fn detail_pane<'a>(
         .into()
 }
 
-pub(crate) fn card_btn_style(
+fn card_btn_style(
     theme: &iced::Theme,
     status: widget::button::Status,
     is_selected: bool,
@@ -245,55 +245,6 @@ pub(crate) fn network_image_or_default<'a>(
             .style(svg_icon_style)
             .into(),
     }
-}
-
-/// The pane detailing one board: icon, name, description, specification table
-/// and its documentation/OSHW links.
-pub(crate) fn board_details_pane<'a>(
-    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
-    dev: &'a crate::board_selection::BoardDetails,
-    scroll_id: &widget::Id,
-) -> Element<'a, Message> {
-    let img = network_image_or_default(
-        cache,
-        dev.icon.as_ref(),
-        constants::BOARD_ICON.clone(),
-        iced::Fill,
-        iced::Shrink,
-    );
-
-    let copy_btn =
-        copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyBoardConfig(dev.id));
-
-    let cols = widget::column![
-        img,
-        widget::center(copy_btn),
-        widget::text(dev.name.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-        widget::text(dev.description.as_ref())
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
-    ];
-
-    let cols = cols.extend(
-        dev.specification
-            .iter()
-            .map(|(k, v)| -> widget::text::Rich<'a, (), Message> { detail_entry(k, v.as_ref()) })
-            .map(Into::into),
-    );
-
-    let btns = dev.buttons.iter().map(|(label, link)| {
-        widget::button(widget::text(*label))
-            .on_press(Message::OpenUrl(link.clone()))
-            .into()
-    });
-
-    detail_pane(
-        cols.push(widget::center(widget::row(btns).spacing(16))),
-        scroll_id,
-    )
 }
 
 fn search_box<'a>(inp: &'a str) -> widget::Container<'a, Message> {
