@@ -2,6 +2,8 @@ use std::sync::LazyLock;
 
 use iced::{color, widget};
 
+pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
+
 // Icons Bytes
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
 pub(crate) const INFO_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/info.svg");

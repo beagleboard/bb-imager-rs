@@ -10,8 +10,8 @@ pub mod flashing;
 mod helpers;
 pub mod image_selection;
 pub mod review;
-pub mod sandbox_notice;
 pub(crate) mod review_inner;
+pub mod sandbox_notice;
 
 #[derive(Clone, Debug)]
 pub enum Message {
@@ -83,8 +83,8 @@ where
     let icon = iced::window::icon::from_file_data(constants::WINDOW_ICON_BYTES, None).ok();
     assert!(icon.is_some());
     let settings = iced::window::Settings {
-        min_size: Some(iced::Size::new(680.0, 450.0)),
-        size: iced::Size::new(680.0, 450.0),
+        min_size: Some(constants::WINDOW_SIZE),
+        size: constants::WINDOW_SIZE,
         icon,
         ..Default::default()
     };
