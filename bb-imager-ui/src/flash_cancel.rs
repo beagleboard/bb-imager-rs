@@ -3,7 +3,10 @@ use iced::{Element, widget};
 use crate::helpers::{VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
-pub fn view<'a>(scroll_id: widget::Id) -> Element<'a, Message> {
+#[derive(Debug)]
+pub struct State;
+
+pub fn view<'a>(_: &State, scroll_id: widget::Id) -> Element<'a, Message> {
     page_type2(
         cancel_view(scroll_id),
         [widget::button("Restart")

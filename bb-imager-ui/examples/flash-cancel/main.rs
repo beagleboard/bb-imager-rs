@@ -1,10 +1,10 @@
 use bb_imager_ui::{Message, flash_cancel};
 
-struct State;
+struct State(flash_cancel::State);
 
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
-        let res = Self;
+        let res = Self(flash_cancel::State);
 
         (res, iced::Task::none())
     }
@@ -15,6 +15,6 @@ fn main() {
     bb_imager_ui::application(app).run().unwrap()
 }
 
-fn view(_s: &State) -> iced::Element<'_, Message> {
-    flash_cancel::view(iced::widget::Id::unique())
+fn view(s: &State) -> iced::Element<'_, Message> {
+    flash_cancel::view(&s.0, iced::widget::Id::unique())
 }
