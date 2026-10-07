@@ -4,8 +4,8 @@ use bb_iced_widgets::cached_icon::Cache;
 use iced::{Element, widget};
 
 use crate::helpers::{
-    board_details_pane, list_item, list_label, list_pane, network_image_or_default, page_type1,
-    placeholder_pane,
+    copy_btn, detail_entry, detail_pane, list_item, list_label, list_pane,
+    network_image_or_default, page_type1, placeholder_pane,
 };
 use crate::{Message, constants};
 
@@ -91,4 +91,53 @@ fn board_view_pane<'a>(
         Some(dev) => board_details_pane(cache, dev, scroll_id),
         None => placeholder_pane("Please Select a Board"),
     }
+}
+
+/// The pane detailing one board: icon, name, description, specification table
+/// and its documentation/OSHW links.
+fn board_details_pane<'a>(
+    cache: &'a bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
+    dev: &'a crate::board_selection::BoardDetails,
+    scroll_id: &widget::Id,
+) -> Element<'a, Message> {
+    let img = network_image_or_default(
+        cache,
+        dev.icon.as_ref(),
+        constants::BOARD_ICON.clone(),
+        iced::Fill,
+        iced::Shrink,
+    );
+
+    let copy_btn =
+        copy_btn(constants::COPY_ICON.clone()).on_press(Message::CopyBoardConfig(dev.id));
+
+    let cols = widget::column![
+        img,
+        widget::center(copy_btn),
+        widget::text(dev.name.as_ref())
+            .size(24)
+            .align_x(iced::alignment::Alignment::Center)
+            .width(iced::Length::Fill),
+        widget::text(dev.description.as_ref())
+            .align_x(iced::alignment::Alignment::Center)
+            .width(iced::Length::Fill),
+    ];
+
+    let cols = cols.extend(
+        dev.specification
+            .iter()
+            .map(|(k, v)| -> widget::text::Rich<'a, (), Message> { detail_entry(k, v.as_ref()) })
+            .map(Into::into),
+    );
+
+    let btns = dev.buttons.iter().map(|(label, link)| {
+        widget::button(widget::text(*label))
+            .on_press(Message::OpenUrl(link.clone()))
+            .into()
+    });
+
+    detail_pane(
+        cols.push(widget::center(widget::row(btns).spacing(16))),
+        scroll_id,
+    )
 }
