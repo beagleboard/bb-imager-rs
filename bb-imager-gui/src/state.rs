@@ -545,12 +545,14 @@ impl From<FlashingState> for FlashingSuccessState {
 #[derive(Debug)]
 pub(crate) struct FlashingCancelState {
     pub(crate) common: BBImagerCommon,
+    pub(crate) state: bb_imager_ui::flash_cancel::State,
 }
 
 impl From<FlashingState> for FlashingCancelState {
     fn from(value: FlashingState) -> Self {
         Self {
             common: value.common,
+            state: bb_imager_ui::flash_cancel::State,
         }
     }
 }
