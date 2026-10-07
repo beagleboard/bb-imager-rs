@@ -19,6 +19,7 @@ impl State {
                 "USB DHCP enabled",
             ]
             .into(),
+            has_customization: true,
         });
 
         (res, iced::Task::none())

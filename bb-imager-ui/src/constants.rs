@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use iced::{color, widget};
 
-pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(680.0, 450.0);
+pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(850.0, 500.0);
 
 // Icons Bytes
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");
@@ -17,6 +17,9 @@ pub(crate) const FILE_ADD_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/fi
 pub(crate) const FORMAT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/format.svg");
 pub(crate) const USB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/usb.svg");
 pub(crate) const FILE_SAVE_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/file-save.svg");
+pub(crate) const BB_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/beagleboard-logo.svg");
+pub(crate) const SETTINGS_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/settings.svg");
+pub(crate) const BUG_REPORT_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/bug-report.svg");
 
 // Icon Handles
 pub(crate) static WINDOW_ICON: LazyLock<widget::image::Handle> =
@@ -41,6 +44,12 @@ pub(crate) static USB_ICON: LazyLock<widget::svg::Handle> =
     LazyLock::new(|| widget::svg::Handle::from_memory(USB_ICON_BYTES));
 pub(crate) static FILE_SAVE_ICON: LazyLock<widget::svg::Handle> =
     LazyLock::new(|| widget::svg::Handle::from_memory(FILE_SAVE_ICON_BYTES));
+pub(crate) static BB_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(BB_ICON_BYTES));
+pub(crate) static SETTINGS_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(SETTINGS_ICON_BYTES));
+pub(crate) static BUG_REPORT_ICON: LazyLock<widget::svg::Handle> =
+    LazyLock::new(|| widget::svg::Handle::from_memory(BUG_REPORT_ICON_BYTES));
 
 // Fonts
 pub(crate) const FONT_REGULAR: iced::Font = iced::Font::with_name("Nunito");
@@ -61,3 +70,7 @@ pub(crate) const HAIR_LIGHT_BROWN: iced::Color = color!(171, 131, 60);
 pub(crate) const BACKGROUND: iced::Color = color!(30, 30, 30);
 pub(crate) const DANGER: iced::Color = color!(255, 0, 0);
 pub(crate) const CARD: iced::Color = color!(45, 45, 45);
+
+pub(crate) static ISSUE_TRACKER: LazyLock<url::Url> = LazyLock::new(|| {
+    url::Url::parse("https://github.com/beagleboard/bb-imager-rs/issues").unwrap()
+});

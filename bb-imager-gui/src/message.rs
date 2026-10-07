@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use bb_imager_ui::Message;
+use bb_imager_ui::{Message, SidebarEntry};
 use iced::Task;
 
 use bb_imager_ui::image_selection::ImageId;
@@ -184,7 +184,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
         }
         BBImagerMessage::UiState(Message::Next) => return state.next(),
-        BBImagerMessage::UiState(Message::Back) => return state.back(),
         BBImagerMessage::UiState(Message::ResolveImage(k, v)) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
@@ -469,13 +468,103 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => panic!("Unexpected message"),
             },
         },
-        BBImagerMessage::UiState(Message::GotoAppInfo) => {
+        // Leave App Options for the page beneath, then jump from there.
+        BBImagerMessage::UiState(Message::Goto(target))
+            if matches!(state, BBImager::AppInfo(_)) =>
+        {
+            let BBImager::AppInfo(inner) = std::mem::take(state) else {
+                unreachable!()
+            };
+            *state = inner.page.into();
+
+            let jump = update(state, BBImagerMessage::UiState(Message::Goto(target)));
+            return Task::batch([jump, state.scroll_reset()]);
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::AppOptions)) => {
             *state = BBImager::AppInfo(crate::state::OverlayState::new(
                 std::mem::take(state).try_into().expect("Unexpected page"),
             ));
 
             return state.scroll_reset();
         }
+        // Leaving a running flash would orphan its task. ChooseBoard is reached
+        // here when App Options returns to it, and is already the target.
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Hardware))
+            if !matches!(state, BBImager::Flashing(_)) =>
+        {
+            let task = state.restart();
+            return Task::batch([task, state.scroll_reset()]);
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Software)) => {
+            let page = match std::mem::take(state) {
+                BBImager::ChooseOs(x) => x,
+                BBImager::ChooseDest(x) => x.into(),
+                BBImager::Customize(x) => x.into(),
+                BBImager::Review(x) => x.into(),
+                BBImager::FlashingFail(x) => x.into(),
+                BBImager::FlashingSuccess(x) => x.into(),
+                BBImager::FlashingCancel(x) => x.into(),
+                _ => unreachable!(),
+            };
+            let board_id = page.selected_board.id;
+            let tasks = Task::batch([
+                page.refresh_image_list(),
+                page.common.refresh_image_icons(board_id),
+            ]);
+            *state = BBImager::ChooseOs(page);
+
+            return Task::batch([tasks, state.scroll_reset()]);
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Storage)) => {
+            *state = BBImager::ChooseDest(match std::mem::take(state) {
+                BBImager::ChooseDest(x) => x,
+                BBImager::Customize(x) => x.into(),
+                BBImager::Review(x) => x.into(),
+                BBImager::FlashingFail(x) => x.into(),
+                BBImager::FlashingSuccess(x) => x.into(),
+                BBImager::FlashingCancel(x) => x.into(),
+                _ => unreachable!(),
+            });
+
+            return state.scroll_reset();
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Modify)) => {
+            *state = BBImager::Customize(match std::mem::take(state) {
+                BBImager::Customize(x) => x,
+                BBImager::Review(x) => x.into(),
+                BBImager::FlashingFail(x) => x.into(),
+                BBImager::FlashingSuccess(x) => x.into(),
+                BBImager::FlashingCancel(x) => x.into(),
+                _ => unreachable!(),
+            });
+
+            return state.scroll_reset();
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Review)) => {
+            *state = BBImager::Review(match std::mem::take(state) {
+                BBImager::Review(x) => x,
+                BBImager::FlashingFail(x) => x.into(),
+                BBImager::FlashingSuccess(x) => x.into(),
+                BBImager::FlashingCancel(x) => x.into(),
+                _ => unreachable!(),
+            });
+
+            return state.scroll_reset();
+        }
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Write))
+            if matches!(
+                state,
+                BBImager::Flashing(_)
+                    | BBImager::FlashingFail(_)
+                    | BBImager::FlashingSuccess(_)
+                    | BBImager::FlashingCancel(_)
+            ) =>
+        {
+            return state.scroll_reset();
+        }
+        // Forward jumps, steps while flashing, and jumps from pages that no
+        // longer hold the earlier picks.
+        BBImagerMessage::UiState(Message::Goto(_)) => unreachable!(),
         BBImagerMessage::CopyToClipboard(data) => {
             return iced::clipboard::write(data);
         }

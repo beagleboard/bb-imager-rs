@@ -1,16 +1,21 @@
 use iced::{Element, widget};
 
-use crate::helpers::{VIEW_COL_PADDING, page_type2};
+use crate::helpers::{SidebarEntry, VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
 #[derive(Debug)]
 pub struct State {
     pub reason: Box<str>,
     pub logs: widget::text_editor::Content,
+    /// Whether this run has a Modify step.
+    pub has_customization: bool,
 }
 
 pub fn view(state: &State) -> Element<'_, Message> {
     page_type2(
+        SidebarEntry::Write,
+        state.has_customization,
+        false,
         info_view(state),
         [
             widget::button("Flash New")

@@ -4,7 +4,7 @@ use bb_iced_widgets::cached_icon::Cache;
 use iced::{Element, widget};
 
 use crate::helpers::{
-    copy_btn, detail_entry, detail_pane, list_item, list_label, list_pane,
+    SidebarEntry, copy_btn, detail_entry, detail_pane, list_item, list_label, list_pane,
     network_image_or_default, page_type1, placeholder_pane,
 };
 use crate::{Message, constants};
@@ -44,6 +44,7 @@ pub fn view<'a>(
     scroll_id: widget::Id,
 ) -> Element<'a, Message> {
     page_type1(
+        SidebarEntry::Hardware,
         board_list_pane(cache, state, &scroll_id),
         board_view_pane(cache, state, &scroll_id),
         [widget::button("NEXT").on_press_maybe(state.selected.as_ref().map(|_| Message::Next))],

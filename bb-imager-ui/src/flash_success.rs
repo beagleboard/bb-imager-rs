@@ -1,7 +1,7 @@
 use iced::{Element, widget};
 
 use crate::Message;
-use crate::helpers::page_type2;
+use crate::helpers::{SidebarEntry, page_type2};
 
 #[derive(Debug)]
 pub struct State {
@@ -9,6 +9,8 @@ pub struct State {
     pub image: Box<str>,
     pub destination: Box<str>,
     pub modifications: Box<[&'static str]>,
+    /// Whether this run has a Modify step.
+    pub has_customization: bool,
 }
 
 impl<'a> From<&'a State> for crate::review_inner::State<'a> {
@@ -30,6 +32,9 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
     page_type2(
+        SidebarEntry::Write,
+        state.has_customization,
+        false,
         crate::review_inner::State::from(state).view(scroll_id),
         [widget::button("Flash Another")
             .style(widget::button::primary)

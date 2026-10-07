@@ -309,44 +309,6 @@ impl BBImager {
         )
     }
 
-    fn back(&mut self) -> Task<BBImagerMessage> {
-        *self = match std::mem::take(self) {
-            Self::ChooseOs(inner) => Self::ChooseBoard(inner.into()),
-            Self::ChooseDest(inner) => Self::ChooseOs(inner.into()),
-            Self::Customize(inner) => Self::ChooseDest(inner.ctx.choose_dest(inner.common)),
-            Self::Review(inner) => {
-                if inner.ctx.has_customization {
-                    Self::Customize(inner.into())
-                } else {
-                    Self::ChooseDest(inner.ctx.choose_dest(inner.common))
-                }
-            }
-            Self::AppInfo(inner) => inner.page.into(),
-            Self::Dummy
-            | Self::SandboxNotice(_)
-            | Self::FlashingSuccess(_)
-            | Self::FlashingFail(_)
-            | Self::FlashingCancel(_)
-            | Self::Flashing(_)
-            | Self::ChooseBoard(_) => panic!("Unexpected message"),
-        };
-
-        match self {
-            BBImager::ChooseBoard(inner) => {
-                Task::batch([inner.refresh_board_list(), self.scroll_reset()])
-            }
-            BBImager::ChooseOs(inner) => {
-                let board_id = inner.selected_board.id;
-                Task::batch([
-                    inner.refresh_image_list(),
-                    self.common().refresh_image_icons(board_id),
-                    self.scroll_reset(),
-                ])
-            }
-            _ => self.scroll_reset(),
-        }
-    }
-
     fn next(&mut self) -> Task<BBImagerMessage> {
         let (state, task) = match std::mem::take(self) {
             Self::ChooseBoard(inner) => {

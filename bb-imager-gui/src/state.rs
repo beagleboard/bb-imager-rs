@@ -5,6 +5,7 @@ use std::time::Instant;
 use bb_config::config;
 use iced::{Task, widget};
 
+use bb_imager_ui::SidebarEntry;
 use bb_imager_ui::image_selection::ImageId;
 
 use crate::{
@@ -341,6 +342,18 @@ impl From<FlashingFailState> for ChooseOsState {
     }
 }
 
+impl From<FlashingSuccessState> for ChooseOsState {
+    fn from(value: FlashingSuccessState) -> Self {
+        Self::new(value.common, value.ctx.selected_board)
+    }
+}
+
+impl From<FlashingCancelState> for ChooseOsState {
+    fn from(value: FlashingCancelState) -> Self {
+        Self::new(value.common, value.ctx.selected_board)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
@@ -429,6 +442,18 @@ impl From<FlashingFailState> for ChooseDestState {
     }
 }
 
+impl From<FlashingSuccessState> for ChooseDestState {
+    fn from(value: FlashingSuccessState) -> Self {
+        ReviewState::from(value).into()
+    }
+}
+
+impl From<FlashingCancelState> for ChooseDestState {
+    fn from(value: FlashingCancelState) -> Self {
+        ReviewState::from(value).into()
+    }
+}
+
 /// The choices that make up a flashing job.
 ///
 /// Complete once a destination has been picked, and carried unchanged from
@@ -457,13 +482,6 @@ impl FlashingContext {
 
     pub(crate) fn is_download(&self) -> bool {
         self.selected_dest.is_download_action()
-    }
-
-    /// Rebuild the destination page this context was completed on.
-    pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
-        let mut res = ChooseDestState::new(common, self.selected_board, self.selected_image);
-        res.select_dest(self.selected_dest);
-        res
     }
 }
 
@@ -513,6 +531,18 @@ impl From<FlashingFailState> for CustomizeState {
     }
 }
 
+impl From<FlashingSuccessState> for CustomizeState {
+    fn from(value: FlashingSuccessState) -> Self {
+        Self::new(value.common, value.ctx)
+    }
+}
+
+impl From<FlashingCancelState> for CustomizeState {
+    fn from(value: FlashingCancelState) -> Self {
+        Self::new(value.common, value.ctx)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ReviewState {
     pub(crate) common: BBImagerCommon,
@@ -530,6 +560,7 @@ impl ReviewState {
                 image: ctx.selected_image.1.to_string().into(),
                 destination: ctx.selected_destination().into(),
                 modifications: ctx.customization.modifications(),
+                has_customization: ctx.has_customization,
             },
             ctx,
         }
@@ -538,6 +569,18 @@ impl ReviewState {
 
 impl From<FlashingFailState> for ReviewState {
     fn from(value: FlashingFailState) -> Self {
+        ReviewState::new(value.common, value.ctx)
+    }
+}
+
+impl From<FlashingSuccessState> for ReviewState {
+    fn from(value: FlashingSuccessState) -> Self {
+        ReviewState::new(value.common, value.ctx)
+    }
+}
+
+impl From<FlashingCancelState> for ReviewState {
+    fn from(value: FlashingCancelState) -> Self {
         ReviewState::new(value.common, value.ctx)
     }
 }
@@ -583,6 +626,7 @@ fn progress_from(value: bb_flasher::DownloadFlashingStatus) -> bb_imager_ui::fla
 #[derive(Debug)]
 pub(crate) struct FlashingSuccessState {
     pub(crate) common: BBImagerCommon,
+    pub(crate) ctx: FlashingContext,
     pub(crate) state: bb_imager_ui::flash_success::State,
 }
 
@@ -594,8 +638,10 @@ impl From<FlashingState> for FlashingSuccessState {
                 image: value.ctx.selected_image.1.to_string().into(),
                 destination: value.ctx.selected_destination().into(),
                 modifications: value.ctx.customization.modifications(),
+                has_customization: value.ctx.has_customization,
             },
             common: value.common,
+            ctx: value.ctx,
         }
     }
 }
@@ -603,14 +649,18 @@ impl From<FlashingState> for FlashingSuccessState {
 #[derive(Debug)]
 pub(crate) struct FlashingCancelState {
     pub(crate) common: BBImagerCommon,
+    pub(crate) ctx: FlashingContext,
     pub(crate) state: bb_imager_ui::flash_cancel::State,
 }
 
 impl From<FlashingState> for FlashingCancelState {
     fn from(value: FlashingState) -> Self {
         Self {
+            state: bb_imager_ui::flash_cancel::State {
+                has_customization: value.ctx.has_customization,
+            },
             common: value.common,
-            state: bb_imager_ui::flash_cancel::State,
+            ctx: value.ctx,
         }
     }
 }
@@ -631,12 +681,13 @@ impl FlashingFailState {
             widget::text_editor::Motion::DocumentEnd,
         ));
         Self {
-            common: state.common,
-            ctx: state.ctx,
             state: bb_imager_ui::flash_fail::State {
                 reason: err.into(),
                 logs,
+                has_customization: state.ctx.has_customization,
             },
+            common: state.common,
+            ctx: state.ctx,
         }
     }
 }
@@ -734,6 +785,20 @@ impl OverlayState {
             .cache_dir()
             .to_string_lossy()
             .to_string();
+        // Step of the page beneath, and whether its run has Modify. That is not
+        // decided before Customize, and Modify cannot be reached from there.
+        let (previous, has_customization) = match &page {
+            OverlayData::ChooseBoard(_) => (SidebarEntry::Hardware, false),
+            OverlayData::ChooseOs(_) => (SidebarEntry::Software, false),
+            OverlayData::ChooseDest(_) => (SidebarEntry::Storage, false),
+            OverlayData::Customize(_) => (SidebarEntry::Modify, true),
+            OverlayData::Review(x) => (SidebarEntry::Review, x.ctx.has_customization),
+            OverlayData::Flashing(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            OverlayData::FlashingFail(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            OverlayData::FlashingSuccess(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            OverlayData::FlashingCancel(x) => (SidebarEntry::Write, x.ctx.has_customization),
+        };
+        let is_flashing = matches!(page, OverlayData::Flashing(_));
 
         Self {
             page,
@@ -746,6 +811,9 @@ impl OverlayState {
                 cache_dir: cache_dir.into(),
                 // TODO: Make Arc
                 log_path: log_path.into(),
+                previous,
+                has_customization,
+                is_flashing,
             },
         }
     }

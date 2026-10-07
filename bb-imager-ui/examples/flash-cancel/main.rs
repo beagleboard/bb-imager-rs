@@ -4,7 +4,9 @@ struct State(flash_cancel::State);
 
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
-        let res = Self(flash_cancel::State);
+        let res = Self(flash_cancel::State {
+            has_customization: true,
+        });
 
         (res, iced::Task::none())
     }

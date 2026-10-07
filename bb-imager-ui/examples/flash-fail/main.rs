@@ -10,6 +10,7 @@ impl State {
         let res = State(flash_fail::State {
             reason: "Fail Reason for Testing".into(),
             logs,
+            has_customization: true,
         });
 
         (res, iced::Task::none())

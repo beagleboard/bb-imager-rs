@@ -1,6 +1,6 @@
 use iced::{Element, widget};
 
-use crate::helpers::{VIEW_COL_PADDING, page_type3};
+use crate::helpers::{SidebarEntry, VIEW_COL_PADDING, page_type2_overlay};
 use crate::{Message, constants};
 
 pub struct State {
@@ -10,14 +10,21 @@ pub struct State {
     pub license: widget::text_editor::Content,
     pub cache_dir: std::sync::Arc<str>,
     pub log_path: std::sync::Arc<str>,
+    /// Step of the page beneath.
+    pub previous: SidebarEntry,
+    /// Whether the run of the page beneath has a Modify step.
+    pub has_customization: bool,
+    /// Whether the page beneath is a running flash.
+    pub is_flashing: bool,
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    page_type3(
+    page_type2_overlay(
+        state.previous,
+        state.has_customization,
+        state.is_flashing,
         review_view(state, scroll_id),
-        [widget::button("BACK")
-            .on_press(Message::Back)
-            .style(widget::button::secondary)],
+        [],
     )
 }
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::{Element, widget};
 
 use crate::Message;
-use crate::helpers::{detail_pane, page_type2};
+use crate::helpers::{SidebarEntry, detail_pane, page_type2};
 
 const INPUT_WIDTH: u32 = 200;
 
@@ -70,14 +70,15 @@ pub struct State {
 
 pub fn view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
     page_type2(
+        SidebarEntry::Modify,
+        // Modify is this page, so it shows as selected either way.
+        true,
+        false,
         customization_pane(state, &scroll_id),
         [
             widget::button("RESET")
                 .style(widget::button::danger)
                 .on_press(Message::Reset),
-            widget::button("BACK")
-                .on_press(Message::Back)
-                .style(widget::button::secondary),
             widget::button("NEXT").on_press_maybe(if state.customization.is_invalid() {
                 None
             } else {

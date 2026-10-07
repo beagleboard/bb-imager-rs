@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use iced::{Element, widget};
 
-use crate::helpers::{VIEW_COL_PADDING, page_type2};
+use crate::helpers::{SidebarEntry, VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
 /// How far along the flash is.
@@ -28,6 +28,10 @@ pub struct State {
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
     page_type2(
+        SidebarEntry::Write,
+        // Every step is locked while flashing, Modify included.
+        false,
+        true,
         progress_view(state, scroll_id),
         [widget::button("Cancel")
             .style(widget::button::danger)
