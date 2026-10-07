@@ -27,7 +27,7 @@ rc-zip-sync = { version = "4.4", default-features = false, features = ["deflate"
 bb-flasher-dfu = { version = "0.1", path = "../bb-flasher-dfu", optional = true }
 anyhow = "1.0"
 bb-flasher-mspm0 = { version = "0.1", path = "../bb-flasher-mspm0", optional = true }
-tar = "0.4"
+tar = { version = "0.4", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 liblzma = { version = "0.4", features = ["parallel"] }
@@ -41,7 +41,7 @@ bb-flasher-sd = { path = "../bb-flasher-sd", features = ["mock_sd"] }
 [features]
 default = []
 serde = ["dep:serde"]
-sd = ["bb-flasher-sd", "serde", "dep:yaml_serde", "bb-helper/reader_progress"]
+sd = ["bb-flasher-sd", "serde", "dep:yaml_serde", "dep:tar", "bb-helper/reader_progress"]
 sd_linux_udev = ["bb-flasher-sd?/udev"]
 sd_macos_authopen = ["bb-flasher-sd?/macos_authopen"]
 bcf = ["bb-flasher-bcf/cc1352p7"]
