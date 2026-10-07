@@ -61,3 +61,17 @@ generate_desktop_entry = false
 "dist/.target/man" = "/usr/share/man/man1"
 "dist/.target/shell-comp/_bb-imager-cli" = "/usr/share/zsh/site-functions/_bb-imager-cli"
 "dist/.target/shell-comp/bb-imager-cli.bash" = "/usr/share/bash-completion/bb-imager-cli.bash"
+
+# Prebuilt binaries are only released for Linux. Other targets fall back to building from source.
+[package.metadata.binstall]
+pkg-fmt = "tzstd"
+bin-dir = "{ name }/usr/bin/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/{ version }/{ name }_{ version }_x86_64{ archive-suffix }"
+
+[package.metadata.binstall.overrides.aarch64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/{ version }/{ name }_{ version }_aarch64{ archive-suffix }"
+
+[package.metadata.binstall.overrides.armv7-unknown-linux-gnueabihf]
+pkg-url = "{ repo }/releases/download/{ version }/{ name }_{ version }_armv7{ archive-suffix }"
