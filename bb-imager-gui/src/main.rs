@@ -313,12 +313,12 @@ impl BBImager {
         *self = match std::mem::take(self) {
             Self::ChooseOs(inner) => Self::ChooseBoard(inner.into()),
             Self::ChooseDest(inner) => Self::ChooseOs(inner.into()),
-            Self::Customize(inner) => Self::ChooseDest(inner.ctx.choose_dest(inner.common)),
+            Self::Customize(inner) => Self::ChooseDest(inner.into()),
             Self::Review(inner) => {
                 if inner.ctx.has_customization {
                     Self::Customize(inner.into())
                 } else {
-                    Self::ChooseDest(inner.ctx.choose_dest(inner.common))
+                    Self::ChooseDest(inner.into())
                 }
             }
             Self::AppInfo(inner) => inner.page.into(),

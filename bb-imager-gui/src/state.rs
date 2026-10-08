@@ -458,13 +458,6 @@ impl FlashingContext {
     pub(crate) fn is_download(&self) -> bool {
         self.selected_dest.is_download_action()
     }
-
-    /// Rebuild the destination page this context was completed on.
-    pub(crate) fn choose_dest(self, common: BBImagerCommon) -> ChooseDestState {
-        let mut res = ChooseDestState::new(common, self.selected_board, self.selected_image);
-        res.select_dest(self.selected_dest);
-        res
-    }
 }
 
 #[derive(Debug)]
