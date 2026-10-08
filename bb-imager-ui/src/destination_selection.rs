@@ -4,8 +4,8 @@ use iced::Element;
 use iced::widget::{self, text};
 
 use crate::helpers::{
-    detail_entry, detail_pane, list_item, list_label, list_pane, list_separator, page_type1,
-    placeholder_heading, svg_icon_style,
+    SidebarEntry, detail_entry, detail_pane, list_item, list_label, list_pane, list_separator,
+    page_type1, placeholder_heading, svg_icon_style,
 };
 use crate::{Message, constants};
 
@@ -78,14 +78,10 @@ impl Default for State {
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
     page_type1(
+        SidebarEntry::Storage,
         dest_list_pane(state, &scroll_id),
         dest_view_pane(state, &scroll_id),
-        [
-            widget::button("BACK")
-                .on_press(Message::Back)
-                .style(widget::button::secondary),
-            widget::button("NEXT").on_press_maybe(state.selected.as_ref().map(|_| Message::Next)),
-        ],
+        [widget::button("NEXT").on_press_maybe(state.selected.as_ref().map(|_| Message::Next))],
     )
 }
 

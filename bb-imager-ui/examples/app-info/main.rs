@@ -1,4 +1,4 @@
-use bb_imager_ui::{Message, app_info};
+use bb_imager_ui::{Message, SidebarEntry, app_info};
 
 struct State(app_info::State);
 
@@ -13,6 +13,9 @@ impl State {
                 "/var/home/ayush/.var/app/org.beagleboard.imagingutility/cache/imagingutility"
                     .into(),
             log_path: "/var/home/ayush/.var/app/org.beagleboard.imagingutility/cache/org.beagleboard.imagingutility.log".into(),
+            previous: SidebarEntry::Review,
+            has_customization: true,
+            is_flashing: false,
         });
 
         (res, iced::Task::none())

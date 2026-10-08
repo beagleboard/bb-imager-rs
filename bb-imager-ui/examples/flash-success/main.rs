@@ -21,6 +21,7 @@ impl State {
                     "USB DHCP enabled",
                 ]
                 .into(),
+                has_customization: true,
             },
         };
 

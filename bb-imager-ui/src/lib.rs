@@ -13,12 +13,13 @@ pub mod review;
 pub(crate) mod review_inner;
 pub mod sandbox_notice;
 
+pub use helpers::SidebarEntry;
+
 #[derive(Clone, Debug)]
 pub enum Message {
-    GotoAppInfo,
+    Goto(helpers::SidebarEntry),
 
     Null,
-    Back,
     Next,
     Restart,
     /// Reset the customization back to its defaults.

@@ -1,13 +1,19 @@
 use iced::{Element, widget};
 
-use crate::helpers::{VIEW_COL_PADDING, page_type2};
+use crate::helpers::{SidebarEntry, VIEW_COL_PADDING, page_type2};
 use crate::{Message, constants};
 
 #[derive(Debug)]
-pub struct State;
+pub struct State {
+    /// Whether this run has a Modify step.
+    pub has_customization: bool,
+}
 
-pub fn view<'a>(_: &State, scroll_id: widget::Id) -> Element<'a, Message> {
+pub fn view<'a>(state: &State, scroll_id: widget::Id) -> Element<'a, Message> {
     page_type2(
+        SidebarEntry::Write,
+        state.has_customization,
+        false,
         cancel_view(scroll_id),
         [widget::button("Restart")
             .style(widget::button::danger)
