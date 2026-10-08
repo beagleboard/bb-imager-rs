@@ -1,0 +1,67 @@
+= Install BeagleBoard Imaging Utility (CLI)
+
+:crates-io-url: https://crates.io/crates/bb-imager-cli
+
+This page explains how to install the command-line version of the BeagleBoard Imaging Utility (`bb-imager-cli`).
+
+== Installation Options
+
+=== crates.io (Recommended)
+
+`bb-imager-cli` is published on https://crates.io/crates/bb-imager-cli[crates.io].
+
+==== Using cargo-binstall (Fastest)
+
+On supported platforms (Linux x86_64, aarch64, and armv7), https://github.com/cargo-bins/cargo-binstall[cargo-binstall] installs pre-built binaries directly without compiling from source:
+
+[source,shell]
+----
+cargo binstall bb-imager-cli
+----
+
+==== Building from Source via Cargo
+
+You can compile and install `bb-imager-cli` directly with Cargo:
+
+[source,shell]
+----
+cargo install bb-imager-cli
+----
+
+===== Build Dependencies
+
+When building from source on Linux, required system development packages include `libudev`, `liblzma`, and `libhidapi`:
+
+.Ubuntu / Debian
+[source,shell]
+----
+sudo apt-get install -y libudev-dev liblzma-dev libhidapi-dev
+----
+
+.Fedora
+[source,shell]
+----
+sudo dnf install -y systemd-devel xz-devel hidapi-devel
+----
+
+=== Prebuilt Binaries
+
+Prebuilt binaries for various architectures and platforms are available on the https://github.com/beagleboard/bb-imager-rs/releases[Releases page].
+
+== Features
+
+The CLI supports optional build features:
+
+*Default Features:*
+
+* `bcf_cc1352p7`: Flash the main processor (CC1352P7) on BeagleConnect Freedom.
+* `zepto_uart`: Flash Zepto (MSPM0) over UART.
+* `dfu`: Flash devices over USB DFU.
+* `static-hidraw`: Statically link hidraw.
+
+*Optional Features:*
+
+* `bcf_msp430`: Flash MSP430 in BeagleConnect Freedom (USB to UART bridge).
+* `zepto_i2c`: Flash Zepto (MSPM0) over I2C (Linux only).
+* `pb2_mspm0`: Flash PocketBeagle 2 MSPM0 (requires root permissions).
+* `shared-hidraw`: Dynamically link hidraw instead of statically linking.
