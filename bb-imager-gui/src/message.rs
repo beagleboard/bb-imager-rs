@@ -7,11 +7,9 @@ use iced::Task;
 
 use bb_imager_ui::image_selection::ImageId;
 
-use crate::{
-    BBImager,
-    helpers::{self, blocking_future},
-    state::{OverlayData, OverlayState},
-};
+use crate::BBImager;
+use crate::helpers::{self, blocking_future};
+use crate::state::{OverlayData, OverlayState};
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {

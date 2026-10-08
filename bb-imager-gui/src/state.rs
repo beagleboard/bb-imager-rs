@@ -323,6 +323,24 @@ impl From<ChooseDestState> for ChooseOsState {
     }
 }
 
+impl From<CustomizeState> for ChooseOsState {
+    fn from(value: CustomizeState) -> Self {
+        Self::new(value.common, value.ctx.selected_board)
+    }
+}
+
+impl From<ReviewState> for ChooseOsState {
+    fn from(value: ReviewState) -> Self {
+        Self::new(value.common, value.ctx.selected_board)
+    }
+}
+
+impl From<FlashingFailState> for ChooseOsState {
+    fn from(value: FlashingFailState) -> Self {
+        Self::new(value.common, value.ctx.selected_board)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
@@ -384,6 +402,30 @@ impl ChooseDestState {
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
         self.state.search = search;
+    }
+}
+
+impl From<CustomizeState> for ChooseDestState {
+    fn from(value: CustomizeState) -> Self {
+        let mut res = ChooseDestState::new(
+            value.common,
+            value.ctx.selected_board,
+            value.ctx.selected_image,
+        );
+        res.select_dest(value.ctx.selected_dest);
+        res
+    }
+}
+
+impl From<ReviewState> for ChooseDestState {
+    fn from(value: ReviewState) -> Self {
+        CustomizeState::from(value).into()
+    }
+}
+
+impl From<FlashingFailState> for ChooseDestState {
+    fn from(value: FlashingFailState) -> Self {
+        ReviewState::from(value).into()
     }
 }
 
@@ -465,6 +507,12 @@ impl From<ReviewState> for CustomizeState {
     }
 }
 
+impl From<FlashingFailState> for CustomizeState {
+    fn from(value: FlashingFailState) -> Self {
+        Self::new(value.common, value.ctx)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ReviewState {
     pub(crate) common: BBImagerCommon,
@@ -485,6 +533,12 @@ impl ReviewState {
             },
             ctx,
         }
+    }
+}
+
+impl From<FlashingFailState> for ReviewState {
+    fn from(value: FlashingFailState) -> Self {
+        ReviewState::new(value.common, value.ctx)
     }
 }
 
