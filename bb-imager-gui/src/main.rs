@@ -355,12 +355,7 @@ impl BBImager {
                     .expect("Board should alread have been selected");
                 let board_id = selected_board.id;
 
-                let temp = state::ChooseOsState {
-                    common: inner.common,
-                    flasher: selected_board.flasher,
-                    selected_board: selected_board.into(),
-                    state: Default::default(),
-                };
+                let temp = state::ChooseOsState::new(inner.common, selected_board.into());
 
                 let tasks = Task::batch([
                     temp.resolve_all_remote_sublists(board_id),
