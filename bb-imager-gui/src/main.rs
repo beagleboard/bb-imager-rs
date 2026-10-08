@@ -176,7 +176,8 @@ impl BBImager {
             BBImager::FlashingCancel(x) => BBImager::choose_board(x.common),
             BBImager::FlashingSuccess(x) => BBImager::choose_board(x.common),
             BBImager::FlashingFail(x) => BBImager::choose_board(x.common),
-            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::ChooseBoard(_) => {
+            BBImager::ChooseBoard(x) => BBImager::ChooseBoard(x),
+            BBImager::Dummy | BBImager::AppInfo(_) => {
                 panic!("Unexpected screen")
             }
             BBImager::SandboxNotice(x) => BBImager::choose_board(x.common),
