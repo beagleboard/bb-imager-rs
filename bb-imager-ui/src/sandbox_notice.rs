@@ -32,21 +32,14 @@ pub fn view(scroll_id: widget::Id) -> Element<'static, Message> {
              file to /etc/udev/rules.d/ and run udevadm control --reload to grant device access.",
         ),
     ]
+    .height(iced::Length::Fill)
+    .width(iced::Length::Fill)
     .align_x(Center)
     .spacing(16)
     .padding(VIEW_COL_PADDING);
 
-    let view = widget::scrollable(
-        widget::container(col)
-            .align_x(Center)
-            .align_y(Center)
-            .height(Fill),
-    )
-    .id(scroll_id)
-    .into();
-
     page_type3(
-        view,
+        col.into(),
         [
             button("View Documentation")
                 .style(widget::button::primary)
