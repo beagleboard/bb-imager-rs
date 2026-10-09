@@ -10,6 +10,7 @@ pub mod flashing;
 pub mod format_media_destination;
 pub mod format_media_progress;
 pub mod format_media_review;
+pub mod format_media_success;
 mod helpers;
 pub mod image_selection;
 pub mod review;
