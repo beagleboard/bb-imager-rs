@@ -5,7 +5,7 @@
 //! sandbox this page points them at the rules file and the reload command.
 
 use iced::widget::{self, button, text};
-use iced::{Center, Element, Fill};
+use iced::{Center, Element};
 
 use crate::helpers::{VIEW_COL_PADDING, page_type3};
 use crate::{Message, constants};
@@ -18,7 +18,7 @@ fn udev_rules_url() -> url::Url {
     .unwrap()
 }
 
-pub fn view(scroll_id: widget::Id) -> Element<'static, Message> {
+pub fn view() -> Element<'static, Message> {
     let col = widget::column![
         widget::svg(constants::INFO_ICON.clone())
             .height(64)
