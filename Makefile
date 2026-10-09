@@ -613,6 +613,10 @@ preview-format-media-progress:
 preview-format-media-success:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-success --features debug
 
+## preview: preview-format-media-fail: Preview format media fail page.
+preview-format-media-fail:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-fail --features debug
+
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:
