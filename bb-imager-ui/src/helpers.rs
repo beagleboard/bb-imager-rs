@@ -172,13 +172,14 @@ pub(crate) fn page_type3<'a>(
 /// |--------|
 pub(crate) fn page_type4<'a>(
     current: SidebarEntry,
+    is_flashing: bool,
     row1: Element<'a, Message>,
 ) -> Element<'a, Message> {
     with_sidebar(
         current,
         None,
         false,
-        false,
+        is_flashing,
         widget::container(card_box(row1).height(iced::Fill).width(iced::Fill)).padding(24),
     )
 }
