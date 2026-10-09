@@ -41,7 +41,11 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    page_type4(SidebarEntry::FormatMedia, dest_list_pane(state, &scroll_id))
+    page_type4(
+        SidebarEntry::FormatMedia,
+        false,
+        dest_list_pane(state, &scroll_id),
+    )
 }
 
 fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, Message> {

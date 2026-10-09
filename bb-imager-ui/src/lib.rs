@@ -8,6 +8,7 @@ pub mod flash_fail;
 pub mod flash_success;
 pub mod flashing;
 pub mod format_media_destination;
+pub mod format_media_progress;
 pub mod format_media_review;
 mod helpers;
 pub mod image_selection;
