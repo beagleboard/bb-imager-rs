@@ -19,8 +19,8 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
         Self {
             title: "Write Image",
             subtitle: "Review your choices before flashing",
-            board: &value.board,
-            image: &value.image,
+            board: Some(&value.board),
+            image: Some(&value.image),
             destination: &value.destination,
             modifications_title: "modifications to apply",
             modifications: &value.modifications,

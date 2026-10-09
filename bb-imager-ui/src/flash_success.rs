@@ -18,8 +18,8 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
         Self {
             title: "Write Complete",
             subtitle: "Device is ready to be used with your BeagleBoard hardware!",
-            board: &value.board,
-            image: &value.image,
+            board: Some(&value.board),
+            image: Some(&value.image),
             destination: &value.destination,
             modifications_title: "Modifications applied",
             modifications: &value.modifications,

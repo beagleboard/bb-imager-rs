@@ -7,11 +7,14 @@ use crate::{
 
 const HEADING_SIZE: u32 = 26;
 
+#[derive(Default)]
 pub(crate) struct State<'a> {
     pub(crate) title: &'static str,
     pub(crate) subtitle: &'static str,
-    pub(crate) board: &'a str,
-    pub(crate) image: &'a str,
+    /// Summary row, omitted when `None`.
+    pub(crate) board: Option<&'a str>,
+    /// Summary row, omitted when `None`.
+    pub(crate) image: Option<&'a str>,
     pub(crate) destination: &'a str,
     pub(crate) modifications_title: &'static str,
     pub(crate) modifications: &'a [&'static str],
@@ -20,6 +23,15 @@ pub(crate) struct State<'a> {
 
 impl<'a> State<'a> {
     pub(crate) fn view(&self, scroll_id: widget::Id) -> Element<'a, Message> {
+        let summary = [
+            ("Device", self.board),
+            ("Operating System", self.image),
+            ("Storage", Some(self.destination)),
+        ]
+        .into_iter()
+        .filter_map(|(k, v)| v.map(|v| (k, v)))
+        .flat_map(|(k, v)| [k.into(), v.into()]);
+
         let mut col = widget::column![
             widget::text(self.title)
                 .font(constants::FONT_BOLD)
@@ -29,17 +41,10 @@ impl<'a> State<'a> {
             widget::text("Summary")
                 .font(constants::FONT_BOLD)
                 .size(HEADING_SIZE),
-            widget::grid![
-                widget::text("Device"),
-                widget::text(self.board),
-                widget::text("Operating System"),
-                widget::text(self.image),
-                widget::text("Storage"),
-                widget::text(self.destination)
-            ]
-            .height(iced::Length::Shrink)
-            .spacing(8)
-            .columns(2),
+            widget::grid(summary)
+                .height(iced::Length::Shrink)
+                .spacing(8)
+                .columns(2),
         ];
 
         if !self.modifications.is_empty() {

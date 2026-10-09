@@ -601,6 +601,10 @@ preview-sandbox-notice:
 preview-format-media-destination:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-destination --features debug
 
+## preview: preview-format-media-review: Preview format media review page.
+preview-format-media-review:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-review --features debug
+
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:
