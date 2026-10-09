@@ -75,6 +75,16 @@ enum BBImager {
     FlashingSuccess(state::FlashingSuccessState),
     AppInfo(state::OverlayState),
     SandboxNotice(state::SandboxNoticeState),
+    #[cfg(feature = "sd")]
+    FormatMedia(state::FormatMediaState),
+    #[cfg(feature = "sd")]
+    FormatMediaReview(state::FormatMediaReviewState),
+    #[cfg(feature = "sd")]
+    FormatMediaProgress(state::FormatMediaProgressState),
+    #[cfg(feature = "sd")]
+    FormatMediaSuccess(state::FormatMediaSuccessState),
+    #[cfg(feature = "sd")]
+    FormatMediaFail(state::FormatMediaFailState),
 }
 
 impl BBImager {
@@ -141,6 +151,16 @@ impl BBImager {
             BBImager::FlashingSuccess(x) => &mut x.common,
             BBImager::AppInfo(x) => x.common_mut(),
             BBImager::SandboxNotice(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaReview(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaProgress(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaSuccess(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaFail(x) => &mut x.common,
             BBImager::Dummy => panic!("Invalid State"),
         }
     }
@@ -158,12 +178,32 @@ impl BBImager {
             BBImager::FlashingSuccess(x) => &x.common,
             BBImager::AppInfo(x) => x.common(),
             BBImager::SandboxNotice(x) => &x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(x) => &x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaReview(x) => &x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaProgress(x) => &x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaSuccess(x) => &x.common,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaFail(x) => &x.common,
             BBImager::Dummy => panic!("Invalid state"),
         }
     }
 
     fn image_cache_insert(&mut self, k: Arc<url::Url>, v: std::path::PathBuf) {
         self.common_mut().img_handle_cache.insert(k, v)
+    }
+
+    /// Whether a flash or format is running, which must not be left.
+    fn is_running(&self) -> bool {
+        match self {
+            BBImager::Flashing(_) => true,
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaProgress(_) => true,
+            _ => false,
+        }
     }
 
     fn restart(&mut self) -> Task<BBImagerMessage> {
@@ -182,6 +222,16 @@ impl BBImager {
                 panic!("Unexpected screen")
             }
             BBImager::SandboxNotice(x) => BBImager::choose_board(x.common),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(x) => BBImager::choose_board(x.common),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaReview(x) => BBImager::choose_board(x.common),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaProgress(x) => BBImager::choose_board(x.common),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaSuccess(x) => BBImager::choose_board(x.common),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaFail(x) => BBImager::choose_board(x.common),
         };
 
         if let BBImager::ChooseBoard(x) = self {
@@ -221,8 +271,65 @@ impl BBImager {
                     )
                 },
             ),
+            #[cfg(feature = "sd")]
+            Self::FormatMedia(x) => Subscription::run_with(
+                (
+                    x.state.filter_destination,
+                    Arc::<str>::from(x.state.search.to_lowercase()),
+                ),
+                |(filter, search_text)| {
+                    let mut interval = interval(INTERVAL);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+                    iced::futures::stream::unfold(
+                        (*filter, search_text.clone(), interval),
+                        async move |(filter, search_text, mut interval)| {
+                            interval.tick().await;
+                            let search = search_text.clone();
+                            let dest = blocking_future(move || {
+                                helpers::format_destinations(filter, search)
+                            })
+                            .await;
+
+                            let msg = BBImagerMessage::FormatDestinations(dest);
+                            Some((msg, (filter, search_text, interval)))
+                        },
+                    )
+                },
+            ),
             _ => Subscription::none(),
         }
+    }
+
+    #[cfg(feature = "sd")]
+    fn start_format(&mut self) -> Task<BBImagerMessage> {
+        // Retrying from the failure page re-runs with the same card.
+        let inner: state::FormatMediaProgressState = match std::mem::take(self) {
+            Self::FormatMediaReview(inner) => inner.into(),
+            Self::FormatMediaFail(inner) => inner.into(),
+            _ => panic!("Unexpected page"),
+        };
+
+        let dst = inner.selected_dest.clone();
+
+        tracing::info!("Starting Format Process");
+        tracing::info!("Selected Destination: {:#?}", dst);
+
+        *self = Self::FormatMediaProgress(inner);
+
+        Task::perform(
+            blocking_future(move || bb_flasher::sd::FormatFlasher::new(dst).flash()),
+            |res| match res {
+                Ok(()) => {
+                    tracing::info!("Formatting Successfull");
+                    BBImagerMessage::FlashSuccess
+                }
+                Err(e) => {
+                    tracing::error!("Formatting failed with error: {:#?}", e);
+                    BBImagerMessage::FlashFail(e.to_string())
+                }
+            },
+        )
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
@@ -417,6 +524,14 @@ impl BBImager {
                     Self::ChooseBoard(state::ChooseBoardState::new(inner.common)),
                     task,
                 )
+            }
+            #[cfg(feature = "sd")]
+            Self::FormatMedia(_)
+            | Self::FormatMediaReview(_)
+            | Self::FormatMediaProgress(_)
+            | Self::FormatMediaSuccess(_)
+            | Self::FormatMediaFail(_) => {
+                panic!("Unexpected message")
             }
             Self::Dummy
             | Self::Review(_)

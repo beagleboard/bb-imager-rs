@@ -2,7 +2,7 @@ use iced::{Element, widget};
 
 use crate::{
     Message,
-    constants::{self, BB_ICON, BUG_REPORT_ICON, ISSUE_TRACKER, SETTINGS_ICON},
+    constants::{self, BB_ICON, BUG_REPORT_ICON, FORMAT_ICON, ISSUE_TRACKER, SETTINGS_ICON},
 };
 
 pub(crate) const VIEW_COL_PADDING: u16 = 16;
@@ -394,6 +394,11 @@ fn sidebar<'a>(
         let s = state(entry, enabled);
         sidebar_btn(step_badge(n, &s), entry.label(), s)
     };
+    // A running flash can't be left, but App Options can return to a running format.
+    let format_media = state(
+        SidebarEntry::FormatMedia,
+        !is_flashing || previous == Some(SidebarEntry::FormatMedia),
+    );
     let app_options = state(SidebarEntry::AppOptions, true);
     let issue_tracker = SidebarEntryState::Enabled(Message::OpenUrl(ISSUE_TRACKER.clone()));
 
@@ -406,6 +411,11 @@ fn sidebar<'a>(
         step(6, SidebarEntry::Write),
         widget::space::vertical(),
         widget::rule::horizontal(2),
+        sidebar_btn(
+            sidebar_icon(FORMAT_ICON.clone(), &format_media),
+            SidebarEntry::FormatMedia.label(),
+            format_media,
+        ),
         sidebar_btn(
             sidebar_icon(SETTINGS_ICON.clone(), &app_options),
             SidebarEntry::AppOptions.label(),

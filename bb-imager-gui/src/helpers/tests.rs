@@ -175,7 +175,7 @@ fn unwritable_init_formats_skip_the_customization_page() {
 
 #[test]
 fn no_customization_covers_non_configurable_flashers() {
-    let img = BoardImage::SdFormat;
+    let img = local_image(PathBuf::from("/tmp/os.img"), config::Flasher::SdCard);
     assert!(matches!(
         no_customization(config::Flasher::SdCard, &img),
         Some(FlashingCustomization::NoneSd)
@@ -205,8 +205,8 @@ fn no_customization_covers_non_configurable_flashers() {
 
 #[test]
 fn flashing_customization_new_selects_variant_by_flasher() {
-    // A format image has init_format None, so SD falls through to NoneSd.
-    let img = BoardImage::SdFormat;
+    // A local image has init_format None, so SD falls through to NoneSd.
+    let img = local_image(PathBuf::from("/tmp/os.img"), config::Flasher::SdCard);
     let cfg = GuiConfiguration::default();
 
     assert!(matches!(
@@ -281,16 +281,6 @@ fn flashing_customization_round_trips_through_the_page_types() {
         }
         _ => panic!("variant should be preserved"),
     }
-}
-
-#[test]
-fn board_image_format_accessors() {
-    let img = BoardImage::SdFormat;
-    assert_eq!(img.flasher(), config::Flasher::SdCard);
-    assert_eq!(img.init_format(), config::InitFormat::None);
-    assert_eq!(img.info_text(), None);
-    assert_eq!(img.file_name(), None);
-    assert_eq!(img.to_string(), "Format SD Card");
 }
 
 #[test]

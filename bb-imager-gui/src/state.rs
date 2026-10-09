@@ -5,6 +5,8 @@ use std::time::Instant;
 use bb_config::config;
 use iced::{Task, widget};
 
+#[cfg(feature = "sd")]
+use bb_flasher::BBFlasherTarget;
 use bb_imager_ui::SidebarEntry;
 use bb_imager_ui::image_selection::ImageId;
 
@@ -170,14 +172,6 @@ impl ChooseOsState {
         mut imgs: Vec<bb_imager_ui::image_selection::ImageItem>,
         pos: Option<i64>,
     ) {
-        if self.flasher == config::Flasher::SdCard {
-            imgs.push(bb_imager_ui::image_selection::ImageItem {
-                id: ImageId::Format,
-                icon: None,
-                label: "Format SD Card".into(),
-            });
-        }
-
         imgs.push(bb_imager_ui::image_selection::ImageItem {
             id: ImageId::Local(self.flasher),
             icon: None,
@@ -186,10 +180,6 @@ impl ChooseOsState {
 
         self.state.images = imgs.into();
         self.state.pos = pos;
-    }
-
-    pub(crate) fn select_format_image(&mut self) {
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Format);
     }
 
     pub(crate) fn select_local_image(
@@ -710,6 +700,12 @@ pub(crate) enum OverlayData {
     FlashingCancel(FlashingCancelState),
     FlashingFail(FlashingFailState),
     FlashingSuccess(FlashingSuccessState),
+    #[cfg(feature = "sd")]
+    FormatMediaProgress(FormatMediaProgressState),
+    #[cfg(feature = "sd")]
+    FormatMediaSuccess(FormatMediaSuccessState),
+    #[cfg(feature = "sd")]
+    FormatMediaFail(FormatMediaFailState),
 }
 
 impl OverlayData {
@@ -724,6 +720,12 @@ impl OverlayData {
             Self::FlashingCancel(x) => &mut x.common,
             Self::FlashingFail(x) => &mut x.common,
             Self::FlashingSuccess(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaProgress(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaSuccess(x) => &mut x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaFail(x) => &mut x.common,
         }
     }
 
@@ -738,6 +740,12 @@ impl OverlayData {
             Self::FlashingCancel(x) => &x.common,
             Self::FlashingFail(x) => &x.common,
             Self::FlashingSuccess(x) => &x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaProgress(x) => &x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaSuccess(x) => &x.common,
+            #[cfg(feature = "sd")]
+            Self::FormatMediaFail(x) => &x.common,
         }
     }
 }
@@ -756,6 +764,21 @@ impl TryFrom<BBImager> for OverlayData {
             BBImager::FlashingCancel(x) => Ok(Self::FlashingCancel(x)),
             BBImager::FlashingFail(x) => Ok(Self::FlashingFail(x)),
             BBImager::FlashingSuccess(x) => Ok(Self::FlashingSuccess(x)),
+            // Doesn't make sense to try preserve FormatMedia state
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(x) => Ok(Self::ChooseBoard(ChooseBoardState::new(x.common))),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaReview(x) => {
+                Ok(Self::ChooseBoard(ChooseBoardState::new(x.common)))
+            }
+            // A running format is kept, and so is its outcome, since it may
+            // land while App Options is open.
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaProgress(x) => Ok(Self::FormatMediaProgress(x)),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaSuccess(x) => Ok(Self::FormatMediaSuccess(x)),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMediaFail(x) => Ok(Self::FormatMediaFail(x)),
             BBImager::Dummy | BBImager::AppInfo(_) | BBImager::SandboxNotice(_) => Err(()),
         }
     }
@@ -773,6 +796,12 @@ impl From<OverlayData> for BBImager {
             OverlayData::FlashingCancel(x) => Self::FlashingCancel(x),
             OverlayData::FlashingFail(x) => Self::FlashingFail(x),
             OverlayData::FlashingSuccess(x) => Self::FlashingSuccess(x),
+            #[cfg(feature = "sd")]
+            OverlayData::FormatMediaProgress(x) => Self::FormatMediaProgress(x),
+            #[cfg(feature = "sd")]
+            OverlayData::FormatMediaSuccess(x) => Self::FormatMediaSuccess(x),
+            #[cfg(feature = "sd")]
+            OverlayData::FormatMediaFail(x) => Self::FormatMediaFail(x),
         }
     }
 }
@@ -803,8 +832,17 @@ impl OverlayState {
             OverlayData::FlashingFail(x) => (SidebarEntry::Write, x.ctx.has_customization),
             OverlayData::FlashingSuccess(x) => (SidebarEntry::Write, x.ctx.has_customization),
             OverlayData::FlashingCancel(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            #[cfg(feature = "sd")]
+            OverlayData::FormatMediaProgress(_)
+            | OverlayData::FormatMediaSuccess(_)
+            | OverlayData::FormatMediaFail(_) => (SidebarEntry::FormatMedia, false),
         };
-        let is_flashing = matches!(page, OverlayData::Flashing(_));
+        let is_flashing = match &page {
+            OverlayData::Flashing(_) => true,
+            #[cfg(feature = "sd")]
+            OverlayData::FormatMediaProgress(_) => true,
+            _ => false,
+        };
 
         Self {
             page,
@@ -830,5 +868,155 @@ impl OverlayState {
 
     pub(crate) fn common_mut(&mut self) -> &mut BBImagerCommon {
         self.page.common_mut()
+    }
+}
+
+#[cfg(feature = "sd")]
+#[derive(Debug)]
+pub(crate) struct FormatMediaState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) destinations: Box<[bb_flasher::sd::Target]>,
+    pub(crate) state: bb_imager_ui::format_media_destination::State,
+}
+
+#[cfg(feature = "sd")]
+impl FormatMediaState {
+    pub(crate) fn new(common: BBImagerCommon) -> Self {
+        Self {
+            common,
+            destinations: Box::default(),
+            state: bb_imager_ui::format_media_destination::State {
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Rebuild the page's device rows.
+    pub(crate) fn update_destinations(&mut self, destinations: Box<[bb_flasher::sd::Target]>) {
+        self.state.destinations = destinations
+            .iter()
+            .map(
+                |x| bb_imager_ui::format_media_destination::DestinationItem {
+                    id: x.identifier().into(),
+                    label: x.to_string().into(),
+                    subtitle: Some(helpers::pretty_bytes(x.size()).into()),
+                },
+            )
+            .collect();
+        self.destinations = destinations;
+    }
+
+    pub(crate) fn update_search(&mut self, search: Arc<str>) {
+        self.state.search = search;
+    }
+}
+
+#[cfg(feature = "sd")]
+#[derive(Debug)]
+pub(crate) struct FormatMediaReviewState {
+    pub(crate) common: BBImagerCommon,
+    /// The card to format.
+    pub(crate) selected_dest: bb_flasher::sd::Target,
+    pub(crate) state: bb_imager_ui::format_media_review::State,
+}
+
+#[cfg(feature = "sd")]
+impl FormatMediaReviewState {
+    pub(crate) fn new(common: BBImagerCommon, dest: bb_flasher::sd::Target) -> Self {
+        let destination = format!("{} ({})", dest, helpers::pretty_bytes(dest.size()));
+
+        Self {
+            common,
+            state: bb_imager_ui::format_media_review::State {
+                destination: destination.into(),
+            },
+            selected_dest: dest,
+        }
+    }
+}
+
+#[cfg(feature = "sd")]
+#[derive(Debug)]
+pub(crate) struct FormatMediaProgressState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) selected_dest: bb_flasher::sd::Target,
+    pub(crate) state: bb_imager_ui::format_media_progress::State,
+}
+
+#[cfg(feature = "sd")]
+impl From<FormatMediaReviewState> for FormatMediaProgressState {
+    fn from(value: FormatMediaReviewState) -> Self {
+        Self {
+            common: value.common,
+            selected_dest: value.selected_dest,
+            state: bb_imager_ui::format_media_progress::State {
+                destination: value.state.destination,
+            },
+        }
+    }
+}
+
+/// Retry with the same card.
+#[cfg(feature = "sd")]
+impl From<FormatMediaFailState> for FormatMediaProgressState {
+    fn from(value: FormatMediaFailState) -> Self {
+        Self {
+            common: value.common,
+            selected_dest: value.selected_dest,
+            state: bb_imager_ui::format_media_progress::State {
+                destination: value.destination,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "sd")]
+#[derive(Debug)]
+pub(crate) struct FormatMediaSuccessState {
+    pub(crate) common: BBImagerCommon,
+    pub(crate) state: bb_imager_ui::format_media_success::State,
+}
+
+#[cfg(feature = "sd")]
+impl From<FormatMediaProgressState> for FormatMediaSuccessState {
+    fn from(value: FormatMediaProgressState) -> Self {
+        Self {
+            common: value.common,
+            state: bb_imager_ui::format_media_success::State {
+                destination: value.state.destination,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "sd")]
+pub(crate) struct FormatMediaFailState {
+    pub(crate) common: BBImagerCommon,
+    /// Kept for Retry.
+    pub(crate) selected_dest: bb_flasher::sd::Target,
+    /// Kept for Retry, so the progress page can name the card again.
+    pub(crate) destination: Box<str>,
+    pub(crate) state: bb_imager_ui::format_media_fail::State,
+}
+
+#[cfg(feature = "sd")]
+impl FormatMediaFailState {
+    pub(crate) fn new(
+        state: FormatMediaProgressState,
+        err: String,
+        mut logs: widget::text_editor::Content,
+    ) -> Self {
+        logs.perform(widget::text_editor::Action::Move(
+            widget::text_editor::Motion::DocumentEnd,
+        ));
+        Self {
+            common: state.common,
+            selected_dest: state.selected_dest,
+            destination: state.state.destination,
+            state: bb_imager_ui::format_media_fail::State {
+                reason: err.into(),
+                logs,
+            },
+        }
     }
 }
