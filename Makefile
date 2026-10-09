@@ -593,6 +593,10 @@ preview-image-selection:
 preview-destination-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-ui --example destination-selection --features debug
 
+#preview: preview-sandbox-notice: Preview sandbox notice page.
+preview-sandbox-notice:
+	$(_DIOXUS_CLI) serve -p bb-imager-ui --example sandbox-notice --features debug
+
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:
