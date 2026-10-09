@@ -7,6 +7,7 @@ pub mod flash_cancel;
 pub mod flash_fail;
 pub mod flash_success;
 pub mod flashing;
+pub mod format_media_destination;
 mod helpers;
 pub mod image_selection;
 pub mod review;

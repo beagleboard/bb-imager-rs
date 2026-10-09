@@ -18,6 +18,7 @@ const SIDEBAR_MARKER_SIZE: f32 = 20.0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SidebarEntry {
     Hardware,
+    FormatMedia,
     Software,
     Storage,
     Modify,
@@ -36,6 +37,7 @@ impl SidebarEntry {
             Self::Modify => "Modify",
             Self::Review => "Review",
             Self::Write => "Write",
+            Self::FormatMedia => "Format Media",
             Self::AppOptions => "App Options",
         }
     }
@@ -161,6 +163,24 @@ pub(crate) fn page_type3<'a>(
         .padding(24)
         .spacing(24)
         .into()
+}
+
+/// |--------|
+/// |        |
+/// |  row1  |
+/// |        |
+/// |--------|
+pub(crate) fn page_type4<'a>(
+    current: SidebarEntry,
+    row1: Element<'a, Message>,
+) -> Element<'a, Message> {
+    with_sidebar(
+        current,
+        None,
+        false,
+        false,
+        widget::container(card_box(row1).height(iced::Fill).width(iced::Fill)).padding(24),
+    )
 }
 
 /// Scrollable pane detailing whatever is currently selected in a [`list_pane`].
