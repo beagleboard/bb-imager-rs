@@ -14,5 +14,6 @@ fn main() {
 }
 
 fn view(_: &State) -> iced::Element<'_, Message> {
-    sandbox_notice::view(iced::widget::Id::unique())
+    sandbox_notice::view()
 }
+
