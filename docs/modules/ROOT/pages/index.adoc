@@ -1,5 +1,14 @@
 = BeagleBoard Imaging Utility
 
+== Installation
+
+Choose between the graphical interface (GUI) or the command-line interface (CLI):
+
+* xref:install-gui.adoc[*Install GUI Application*] – Prebuilt packages for Linux (Flatpak, Snap, AppImage), Windows (`.msi`), and macOS (`.dmg`).
+* xref:install-cli.adoc[*Install CLI Application*] – Available via `cargo binstall bb-imager-cli` or `cargo install bb-imager-cli` on crates.io, and prebuilt binaries.
+
+== About
+
 The *BeagleBoard Imaging Utility* (bb-imager) is an official tool from BeagleBoard.org for preparing bootable storage media for BeagleBoard hardware. It simplifies the process of selecting, downloading, and flashing operating system images to SD cards and other removable devices.
 
 bb-imager is designed to work well for both new users and experienced developers. It provides a clean graphical interface for interactive use, as well as a command-line interface for automation, scripting, and headless workflows. The tool handles common tasks such as device detection, image verification, and safe flashing, reducing the chances of user error.
