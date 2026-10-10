@@ -21,3 +21,6 @@ rusqlite = { version = "0.40", optional = true }
 [dev-dependencies]
 serde_json = "1.0"
 rusqlite = { version = "0.40", features = ["bundled"] }
+
+[lints]
+workspace = true
