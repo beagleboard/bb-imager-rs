@@ -9,13 +9,13 @@ pub enum HashValue {
 }
 
 impl HashValue {
-    pub fn to_type(&self) -> HashType {
+    pub const fn to_type(&self) -> HashType {
         match self {
             HashValue::Sha256(_) => HashType::Sha256,
         }
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    pub const fn as_slice(&self) -> &[u8] {
         match self {
             HashValue::Sha256(v) => v,
         }
@@ -30,15 +30,15 @@ pub struct BlockRange {
 }
 
 impl BlockRange {
-    pub fn checksum(&self) -> HashValue {
+    pub const fn checksum(&self) -> HashValue {
         self.checksum
     }
 
-    pub fn offset(&self) -> u64 {
+    pub const fn offset(&self) -> u64 {
         self.offset
     }
 
-    pub fn length(&self) -> u64 {
+    pub const fn length(&self) -> u64 {
         self.length
     }
 }
@@ -64,7 +64,7 @@ impl Bmap {
     }
 
     /// Image size in bytes
-    pub fn image_size(&self) -> u64 {
+    pub const fn image_size(&self) -> u64 {
         self.image_size
     }
 
@@ -74,17 +74,17 @@ impl Bmap {
     }
 
     /// number of blocks in the image
-    pub fn blocks(&self) -> u64 {
+    pub const fn blocks(&self) -> u64 {
         self.blocks
     }
 
     /// number of mapped blocks in the image
-    pub fn mapped_blocks(&self) -> u64 {
+    pub const fn mapped_blocks(&self) -> u64 {
         self.mapped_blocks
     }
 
     /// checksum type used
-    pub fn checksum_type(&self) -> HashType {
+    pub const fn checksum_type(&self) -> HashType {
         self.checksum_type
     }
 
@@ -94,7 +94,7 @@ impl Bmap {
     }
 
     /// Total mapped size in bytes
-    pub fn total_mapped_size(&self) -> u64 {
+    pub const fn total_mapped_size(&self) -> u64 {
         self.block_size * self.mapped_blocks
     }
 }
@@ -126,27 +126,27 @@ pub struct BmapBuilder {
 }
 
 impl BmapBuilder {
-    pub fn image_size(&mut self, size: u64) -> &mut Self {
+    pub const fn image_size(&mut self, size: u64) -> &mut Self {
         self.image_size = Some(size);
         self
     }
 
-    pub fn block_size(&mut self, block_size: u64) -> &mut Self {
+    pub const fn block_size(&mut self, block_size: u64) -> &mut Self {
         self.block_size = Some(block_size);
         self
     }
 
-    pub fn blocks(&mut self, blocks: u64) -> &mut Self {
+    pub const fn blocks(&mut self, blocks: u64) -> &mut Self {
         self.blocks = Some(blocks);
         self
     }
 
-    pub fn mapped_blocks(&mut self, blocks: u64) -> &mut Self {
+    pub const fn mapped_blocks(&mut self, blocks: u64) -> &mut Self {
         self.mapped_blocks = Some(blocks);
         self
     }
 
-    pub fn checksum_type(&mut self, checksum_type: HashType) -> &mut Self {
+    pub const fn checksum_type(&mut self, checksum_type: HashType) -> &mut Self {
         self.checksum_type = Some(checksum_type);
         self
     }

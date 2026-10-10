@@ -35,3 +35,6 @@ edition = "2024"
 authors = ["Ayush Singh <ayush@beagleboard.org>"]
 repository = "https://github.com/beagleboard/bb-imager-rs"
 license = "MIT"
+
+[workspace.lints.clippy]
+missing_const_for_fn = "warn"
