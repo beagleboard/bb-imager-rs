@@ -15,7 +15,6 @@ const ICON_WIDTH: u32 = 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageId {
-    Format,
     /// The flasher rides along so the host can pick a file filter without a
     /// second lookup; the page never reads it.
     Local(config::Flasher),
@@ -40,7 +39,6 @@ pub struct ImageItem {
 /// The selected image, as the detail pane renders it.
 #[derive(Debug, Clone)]
 pub enum ImageDetails {
-    Format,
     Local {
         flasher: config::Flasher,
         path: Box<std::path::Path>,
@@ -67,7 +65,6 @@ pub enum ImageDetails {
 impl ImageDetails {
     pub const fn id(&self) -> ImageId {
         match self {
-            Self::Format => ImageId::Format,
             Self::Local { flasher, .. } => ImageId::Local(*flasher),
             Self::Remote { id, .. } => ImageId::OsImage(*id),
         }
@@ -136,7 +133,6 @@ fn os_list_pane<'a>(
                 .unwrap_or(false);
 
             let icon: Element<Message> = match img.id {
-                ImageId::Format => svg_sized(constants::FORMAT_ICON.clone()),
                 ImageId::Local(_) => svg_sized(constants::FILE_ADD_ICON.clone()),
                 ImageId::OsImage(_) | ImageId::OsSublist(_) => bb_iced_widgets::cached_icon(
                     cache,
@@ -192,13 +188,6 @@ fn os_view_pane<'a>(
     };
 
     let col = match img {
-        ImageDetails::Format => widget::column![
-            svg_big(constants::FORMAT_ICON.clone()),
-            title("Format SD Card"),
-            description("Format a SD Card to FAT32 for reuse."),
-            detail_entry("Format", "FAT32"),
-            detail_entry("Init Format", config::InitFormat::None.to_string()),
-        ],
         ImageDetails::Local {
             flasher,
             path,

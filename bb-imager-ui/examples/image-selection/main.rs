@@ -110,11 +110,6 @@ impl State {
     fn goto(&mut self, pos: Option<i64>) {
         let mut imgs = self.catalog.items(pos);
         imgs.push(item(
-            image_selection::ImageId::Format,
-            "Format SD Card",
-            None,
-        ));
-        imgs.push(item(
             image_selection::ImageId::Local(config::Flasher::SdCard),
             "Select Local Image",
             None,
@@ -128,7 +123,6 @@ impl State {
         let item = self.inner.images.iter().find(|x| x.id == id)?;
 
         match id {
-            image_selection::ImageId::Format => Some(image_selection::ImageDetails::Format),
             image_selection::ImageId::Local(flasher) => Some(image_selection::ImageDetails::Local {
                 flasher,
                 path: std::path::Path::new("/home/beagle/Downloads/beagley-ai-debian.img.xz")

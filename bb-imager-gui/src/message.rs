@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "sd")]
+use bb_flasher::BBFlasherTarget;
 use bb_imager_ui::{Message, SidebarEntry};
 use iced::Task;
 
@@ -9,6 +11,8 @@ use bb_imager_ui::image_selection::ImageId;
 
 use crate::BBImager;
 use crate::helpers::{self, blocking_future};
+#[cfg(feature = "sd")]
+use crate::state::{FormatMediaFailState, FormatMediaReviewState, FormatMediaState};
 use crate::state::{OverlayData, OverlayState};
 
 #[derive(Debug, Clone)]
@@ -54,6 +58,9 @@ pub(crate) enum BBImagerMessage {
 
     /// Update destinations
     Destinations(Box<[helpers::Destination]>),
+    /// Update the SD cards listed for formatting
+    #[cfg(feature = "sd")]
+    FormatDestinations(Box<[bb_flasher::sd::Target]>),
 
     /// Copy text to clipboard.
     CopyToClipboard(String),
@@ -107,7 +114,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::UiState(Message::SelectOs(id)) => match state {
             BBImager::ChooseOs(inner) => match id {
-                ImageId::Format => inner.select_format_image(),
                 ImageId::Local(flasher) => {
                     let extensions = helpers::file_filter(flasher);
 
@@ -279,6 +285,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 inner.update_destinations(x);
             }
         }
+        #[cfg(feature = "sd")]
+        BBImagerMessage::FormatDestinations(x) => {
+            if let BBImager::FormatMedia(inner) = state
+                && x != inner.destinations
+            {
+                inner.update_destinations(x);
+            }
+        }
         BBImagerMessage::SelectDest(x) => match state {
             BBImager::ChooseDest(inner) => inner.select_dest(x),
             _ => panic!("Unexpected message"),
@@ -295,6 +309,28 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     .cloned()
                 {
                     Some(dest) => inner.select_dest(dest),
+                    None => tracing::warn!("Destination {ident} is gone; ignoring selection"),
+                }
+            }
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(inner) => {
+                match inner
+                    .destinations
+                    .iter()
+                    .find(|x| x.identifier().as_ref() == ident.as_ref())
+                    .cloned()
+                {
+                    Some(dest) => {
+                        let BBImager::FormatMedia(inner) = std::mem::take(state) else {
+                            unreachable!()
+                        };
+                        *state = BBImager::FormatMediaReview(FormatMediaReviewState::new(
+                            inner.common,
+                            dest,
+                        ));
+
+                        return state.scroll_reset();
+                    }
                     None => tracing::warn!("Destination {ident} is gone; ignoring selection"),
                 }
             }
@@ -319,6 +355,10 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::UiState(Message::DestinationFilter(x)) => match state {
             BBImager::ChooseDest(inner) => {
+                inner.state.filter_destination = x;
+            }
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(inner) => {
                 inner.state.filter_destination = x;
             }
             _ => panic!("Unexpected message"),
@@ -395,6 +435,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
                     BBImager::FlashingFail(crate::state::FlashingFailState::new(inner, err, logs))
                 }
+                #[cfg(feature = "sd")]
+                BBImager::FormatMediaProgress(inner) => {
+                    msg = "Formatting failed";
+                    BBImager::FormatMediaFail(FormatMediaFailState::new(inner, err, logs))
+                }
                 BBImager::AppInfo(inner) => {
                     match inner.page {
                         OverlayData::Flashing(flashing_state) => {
@@ -406,6 +451,18 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                                 page: OverlayData::FlashingFail(
                                     crate::state::FlashingFailState::new(flashing_state, err, logs),
                                 ),
+                                ..inner
+                            })
+                        }
+                        #[cfg(feature = "sd")]
+                        OverlayData::FormatMediaProgress(format_state) => {
+                            msg = "Formatting failed";
+                            BBImager::AppInfo(OverlayState {
+                                page: OverlayData::FormatMediaFail(FormatMediaFailState::new(
+                                    format_state,
+                                    err,
+                                    logs,
+                                )),
                                 ..inner
                             })
                         }
@@ -428,6 +485,15 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // Debug build can be slow.
             _ => {}
         },
+        #[cfg(feature = "sd")]
+        BBImagerMessage::UiState(Message::FlashStart | Message::Retry)
+            if matches!(
+                state,
+                BBImager::FormatMediaReview(_) | BBImager::FormatMediaFail(_)
+            ) =>
+        {
+            return Task::batch([state.start_format(), state.scroll_reset()]);
+        }
         BBImagerMessage::UiState(Message::FlashStart)
         | BBImagerMessage::UiState(Message::Retry) => {
             return state.start_flashing();
@@ -442,6 +508,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     }
                     BBImager::FlashingSuccess(inner.into())
                 }
+                #[cfg(feature = "sd")]
+                BBImager::FormatMediaProgress(inner) => {
+                    msg = "Formatting finished successfully";
+                    BBImager::FormatMediaSuccess(inner.into())
+                }
                 BBImager::AppInfo(inner) => match inner.page {
                     OverlayData::Flashing(flashing_state) => {
                         if flashing_state.ctx.is_download() {
@@ -450,6 +521,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
                         BBImager::AppInfo(OverlayState {
                             page: OverlayData::FlashingSuccess(flashing_state.into()),
+                            ..inner
+                        })
+                    }
+                    #[cfg(feature = "sd")]
+                    OverlayData::FormatMediaProgress(format_state) => {
+                        msg = "Formatting finished successfully";
+                        BBImager::AppInfo(OverlayState {
+                            page: OverlayData::FormatMediaSuccess(format_state.into()),
                             ..inner
                         })
                     }
@@ -464,6 +543,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             iced::widget::text_editor::Action::Edit(_) => {}
             _ => match state {
                 BBImager::FlashingFail(x) => x.state.logs.perform(evt),
+                #[cfg(feature = "sd")]
+                BBImager::FormatMediaFail(x) => x.state.logs.perform(evt),
                 BBImager::AppInfo(x) => x.state.license.perform(evt),
                 _ => panic!("Unexpected message"),
             },
@@ -486,10 +567,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return state.scroll_reset();
         }
-        // Leaving a running flash would orphan its task.
-        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Hardware))
-            if !matches!(state, BBImager::Flashing(_)) =>
-        {
+        // Leaving a running flash or format would orphan its task.
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::Hardware)) if !state.is_running() => {
             let task = state.restart();
             return Task::batch([task, state.scroll_reset()]);
         }
@@ -560,6 +639,35 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         {
             return state.scroll_reset();
         }
+        // Leaving a running format would orphan its task; App Options returns here.
+        #[cfg(feature = "sd")]
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::FormatMedia))
+            if matches!(state, BBImager::FormatMediaProgress(_)) =>
+        {
+            return state.scroll_reset();
+        }
+        #[cfg(feature = "sd")]
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::FormatMedia)) => {
+            *state = BBImager::FormatMedia(match std::mem::take(state) {
+                BBImager::ChooseBoard(x) => FormatMediaState::new(x.common),
+                BBImager::ChooseOs(x) => FormatMediaState::new(x.common),
+                BBImager::ChooseDest(x) => FormatMediaState::new(x.common),
+                BBImager::Customize(x) => FormatMediaState::new(x.common),
+                BBImager::Review(x) => FormatMediaState::new(x.common),
+                BBImager::FlashingCancel(x) => FormatMediaState::new(x.common),
+                BBImager::FlashingFail(x) => FormatMediaState::new(x.common),
+                BBImager::FlashingSuccess(x) => FormatMediaState::new(x.common),
+                BBImager::SandboxNotice(x) => FormatMediaState::new(x.common),
+                BBImager::FormatMedia(x) => x,
+                BBImager::FormatMediaReview(x) => FormatMediaState::new(x.common),
+                BBImager::FormatMediaSuccess(x) => FormatMediaState::new(x.common),
+                BBImager::FormatMediaFail(x) => FormatMediaState::new(x.common),
+                _ => unreachable!(),
+            });
+        }
+        // Formatting needs SD card support; without it the entry does nothing.
+        #[cfg(not(feature = "sd"))]
+        BBImagerMessage::UiState(Message::Goto(SidebarEntry::FormatMedia)) => {}
         // The sidebar only enables the steps handled above.
         BBImagerMessage::UiState(Message::Goto(_)) => unreachable!(),
         BBImagerMessage::CopyToClipboard(data) => {
@@ -635,6 +743,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             BBImager::ChooseBoard(inner) => return inner.update_search(x),
             BBImager::ChooseOs(inner) => return inner.update_search(x),
             BBImager::ChooseDest(inner) => inner.update_search(x),
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(inner) => inner.update_search(x),
             _ => {}
         },
         BBImagerMessage::UiState(Message::UpdateInitFormat(f)) => {

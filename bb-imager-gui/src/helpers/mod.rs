@@ -36,7 +36,6 @@ impl From<bb_imager_ui::board_selection::BoardDetails> for SelectedBoard {
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum BoardImage {
-    SdFormat,
     Local {
         img: bb_flasher::LocalImage,
         flasher: config::Flasher,
@@ -57,7 +56,6 @@ pub(crate) enum BoardImage {
 impl BoardImage {
     pub(crate) const fn flasher(&self) -> config::Flasher {
         match self {
-            BoardImage::SdFormat => config::Flasher::SdCard,
             BoardImage::Local { flasher, .. } | BoardImage::Remote { flasher, .. } => *flasher,
         }
     }
@@ -67,20 +65,18 @@ impl BoardImage {
             BoardImage::Local { init_format, .. } | BoardImage::Remote { init_format, .. } => {
                 *init_format
             }
-            BoardImage::SdFormat => config::InitFormat::None,
         }
     }
 
     pub(crate) fn info_text(&self) -> Option<&str> {
         match self {
             BoardImage::Remote { info_text, .. } => info_text.as_deref(),
-            BoardImage::SdFormat | BoardImage::Local { .. } => None,
+            BoardImage::Local { .. } => None,
         }
     }
 
     pub(crate) fn file_name(&self) -> Option<String> {
         match self {
-            Self::SdFormat { .. } => None,
             Self::Local { img, .. } => img.file_name().map(|x| x.to_string_lossy().to_string()),
             Self::Remote { file_name, .. } => Some(file_name.to_string()),
         }
@@ -90,7 +86,6 @@ impl BoardImage {
 impl std::fmt::Display for BoardImage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardImage::SdFormat => write!(f, "Format SD Card"),
             BoardImage::Local { img, .. } => img.fmt(f),
             BoardImage::Remote { name, .. } => name.fmt(f),
         }
@@ -100,7 +95,6 @@ impl std::fmt::Display for BoardImage {
 impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
     fn from(value: bb_imager_ui::image_selection::ImageDetails) -> Self {
         match value {
-            bb_imager_ui::image_selection::ImageDetails::Format => Self::SdFormat,
             bb_imager_ui::image_selection::ImageDetails::Local {
                 flasher,
                 path,
@@ -250,15 +244,6 @@ pub(crate) fn flash(
     };
 
     let (img, bmap) = match img {
-        #[cfg(feature = "sd")]
-        BoardImage::SdFormat => {
-            let Destination::SdCard(t) = dst else {
-                unimplemented!()
-            };
-            return bb_flasher::sd::FormatFlasher::new(t).flash();
-        }
-        #[cfg(not(feature = "sd"))]
-        BoardImage::SdFormat { .. } => unimplemented!(),
         BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
         BoardImage::Remote { id, .. } => {
             let image = db.os_image_by_id(id)?;
@@ -488,6 +473,14 @@ pub(crate) fn destinations(
             .collect(),
         _ => unimplemented!(),
     }
+}
+
+/// SD cards that can be formatted, matching `search` like [`destinations`].
+#[cfg(feature = "sd")]
+pub(crate) fn format_destinations(filter: bool, search: Arc<str>) -> Box<[bb_flasher::sd::Target]> {
+    bb_flasher::sd::Target::destinations(filter)
+        .filter(|t| search.is_empty() || t.to_string().to_lowercase().contains(search.as_ref()))
+        .collect()
 }
 
 pub(crate) fn file_filter(flasher: config::Flasher) -> &'static [&'static str] {
