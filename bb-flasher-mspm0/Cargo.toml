@@ -32,3 +32,6 @@ i2c = ["i2cdev", "nix"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true
