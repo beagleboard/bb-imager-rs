@@ -16,3 +16,6 @@ rusb = "0.9"
 thiserror = "2.0"
 tracing = "0.1"
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel", "reader_progress"] }
+
+[lints]
+workspace = true
