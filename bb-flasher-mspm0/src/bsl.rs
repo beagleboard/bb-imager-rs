@@ -407,7 +407,7 @@ where
         resp.validate()
     }
 
-    pub(crate) fn program_data_max_len(&self) -> usize {
+    pub(crate) const fn program_data_max_len(&self) -> usize {
         let max_data_len = self.max_buffer_size - BSL_PROGRAM_DATA_REQ_LEN;
 
         // Align to 8 bytes
