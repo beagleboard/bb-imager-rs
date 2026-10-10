@@ -28,3 +28,6 @@ shared_hidraw = ["hidapi?/linux-shared-hidraw"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true
