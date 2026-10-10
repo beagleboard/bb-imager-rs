@@ -36,3 +36,6 @@ sha2 = { version = "0.10", features = ["asm"] }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

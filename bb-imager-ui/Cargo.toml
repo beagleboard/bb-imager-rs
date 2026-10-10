@@ -22,3 +22,6 @@ bb-downloader = { path = "../bb-downloader" }
 
 [features]
 debug = ["iced/hot"]
+
+[lints]
+workspace = true
