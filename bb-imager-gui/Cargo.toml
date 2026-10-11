@@ -84,3 +84,6 @@ files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-b
 
 [package.metadata.packager.pacman]
 files = { "assets/packages/linux/udev/10-beagle.rules" = "/etc/udev/rules.d/10-beagle.rules" }
+
+[lints]
+workspace = true

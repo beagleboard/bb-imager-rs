@@ -72,7 +72,7 @@ pub(crate) struct RemoteItem {
 }
 
 impl RemoteItem {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         url: Box<url::Url>,
         sha256: [u8; 32],
         size: u64,
