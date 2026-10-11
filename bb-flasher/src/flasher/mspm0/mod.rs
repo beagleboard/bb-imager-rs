@@ -113,7 +113,7 @@ impl<I, P> Flasher<I, P> {
     /// With `verify`, the flashed image is verified, and flashing is skipped if the target
     /// already has the same image. `prep_hook` is called before connecting, e.g. to put MSPM0
     /// into BSL mode.
-    pub fn new(
+    pub const fn new(
         img: I,
         port: Target,
         verify: bool,
