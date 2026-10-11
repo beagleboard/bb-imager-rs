@@ -92,7 +92,7 @@ impl BBImager {
         Self::ChooseBoard(state::ChooseBoardState::new(common))
     }
 
-    fn sandbox_notice(common: BBImagerCommon) -> Self {
+    const fn sandbox_notice(common: BBImagerCommon) -> Self {
         Self::SandboxNotice(state::SandboxNoticeState::new(common))
     }
 
@@ -197,7 +197,7 @@ impl BBImager {
     }
 
     /// Whether a flash or format is running, which must not be left.
-    fn is_running(&self) -> bool {
+    const fn is_running(&self) -> bool {
         match self {
             BBImager::Flashing(_) => true,
             #[cfg(feature = "sd")]

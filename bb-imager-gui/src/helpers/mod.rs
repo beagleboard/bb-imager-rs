@@ -389,7 +389,7 @@ impl Display for Destination {
 }
 
 impl Destination {
-    pub(crate) fn size(&self) -> Option<u64> {
+    pub(crate) const fn size(&self) -> Option<u64> {
         #[cfg(feature = "sd")]
         if let Destination::SdCard(item) = self {
             return Some(item.size());
@@ -399,7 +399,7 @@ impl Destination {
     }
 
     /// Download instead of flashing
-    pub(crate) fn is_download_action(&self) -> bool {
+    pub(crate) const fn is_download_action(&self) -> bool {
         matches!(self, Self::LocalFile(_))
     }
 

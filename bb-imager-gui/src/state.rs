@@ -77,7 +77,7 @@ pub(crate) struct SandboxNoticeState {
 }
 
 impl SandboxNoticeState {
-    pub(crate) fn new(common: BBImagerCommon) -> Self {
+    pub(crate) const fn new(common: BBImagerCommon) -> Self {
         Self { common }
     }
 }
@@ -476,7 +476,7 @@ impl FlashingContext {
         }
     }
 
-    pub(crate) fn is_download(&self) -> bool {
+    pub(crate) const fn is_download(&self) -> bool {
         self.selected_dest.is_download_action()
     }
 }
@@ -607,7 +607,9 @@ impl FlashingState {
 }
 
 /// Both types are foreign to this crate, so this cannot be a `From` impl.
-fn progress_from(value: bb_flasher::DownloadFlashingStatus) -> bb_imager_ui::flashing::Progress {
+const fn progress_from(
+    value: bb_flasher::DownloadFlashingStatus,
+) -> bb_imager_ui::flashing::Progress {
     use bb_imager_ui::flashing::Progress;
 
     match value {
@@ -709,7 +711,7 @@ pub(crate) enum OverlayData {
 }
 
 impl OverlayData {
-    pub(crate) fn common_mut(&mut self) -> &mut BBImagerCommon {
+    pub(crate) const fn common_mut(&mut self) -> &mut BBImagerCommon {
         match self {
             Self::ChooseBoard(x) => &mut x.common,
             Self::ChooseOs(x) => &mut x.common,
@@ -729,7 +731,7 @@ impl OverlayData {
         }
     }
 
-    pub(crate) fn common(&self) -> &BBImagerCommon {
+    pub(crate) const fn common(&self) -> &BBImagerCommon {
         match self {
             Self::ChooseBoard(x) => &x.common,
             Self::ChooseOs(x) => &x.common,
@@ -862,11 +864,11 @@ impl OverlayState {
         }
     }
 
-    pub(crate) fn common(&self) -> &BBImagerCommon {
+    pub(crate) const fn common(&self) -> &BBImagerCommon {
         self.page.common()
     }
 
-    pub(crate) fn common_mut(&mut self) -> &mut BBImagerCommon {
+    pub(crate) const fn common_mut(&mut self) -> &mut BBImagerCommon {
         self.page.common_mut()
     }
 }
