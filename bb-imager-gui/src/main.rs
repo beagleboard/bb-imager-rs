@@ -520,10 +520,10 @@ impl BBImager {
                         BBImagerMessage::Null
                     }))
                 };
-                (
-                    Self::ChooseBoard(state::ChooseBoardState::new(inner.common)),
-                    task,
-                )
+                let state = state::ChooseBoardState::new(inner.common);
+                let task2 = state.refresh_board_list();
+
+                (Self::ChooseBoard(state), Task::batch([task, task2]))
             }
             #[cfg(feature = "sd")]
             Self::FormatMedia(_)
