@@ -357,6 +357,8 @@ fn check_macos_device_path(dst: PathBuf) -> PathBuf {
 }
 
 #[cfg(not(target_os = "macos"))]
+// Kept non-const to match the macOS variant, which prompts the user.
+#[allow(clippy::missing_const_for_fn)]
 fn check_macos_device_path(dst: PathBuf) -> PathBuf {
     dst
 }
