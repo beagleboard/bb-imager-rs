@@ -105,7 +105,7 @@ impl MockSd {
         }
     }
 
-    pub fn size(&self) -> u64 {
+    pub const fn size(&self) -> u64 {
         DISK_SIZE
     }
 
@@ -218,7 +218,7 @@ impl MockContent {
 pub struct MockArchive(Vec<(Box<str>, MockContent)>);
 
 impl MockArchive {
-    pub fn from_entries(entries: Vec<(Box<str>, MockContent)>) -> Self {
+    pub const fn from_entries(entries: Vec<(Box<str>, MockContent)>) -> Self {
         Self(entries)
     }
 }

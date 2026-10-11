@@ -214,7 +214,7 @@ where
     for<'b> &'b mut Be: IntoIterator<Item = (Box<str>, ContentType<'b>)>,
     Cu: Iterator<Item = (Box<str>, crate::ContentType<'a>)> + Send,
 {
-    pub fn new(
+    pub const fn new(
         img: I,
         bootfs: Option<B>,
         bmap: Option<M>,

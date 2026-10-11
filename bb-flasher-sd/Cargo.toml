@@ -42,3 +42,6 @@ nix = { version = "0.31", features = ["socket", "uio"], optional = true }
 macos_authopen = ["dep:security-framework", "dep:nix"]
 udev = ["dep:udisks2", "dep:tokio"]
 mock_sd = ["dep:tempfile"]
+
+[lints]
+workspace = true
