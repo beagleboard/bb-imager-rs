@@ -46,7 +46,7 @@ fn no_bmap() -> Option<fn() -> io::Result<Box<str>>> {
 type NoCustomizations =
     std::iter::Empty<Customization<std::iter::Empty<(Box<str>, ContentType<'static>)>>>;
 
-fn no_customizations() -> NoCustomizations {
+const fn no_customizations() -> NoCustomizations {
     std::iter::empty()
 }
 
