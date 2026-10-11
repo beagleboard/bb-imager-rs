@@ -18,6 +18,8 @@ pub struct Target {
 
 impl Target {
     /// HID device path.
+    // `String::as_str` is only const on recent Rust; stay usable on older toolchains.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn path(&self) -> &str {
         self.display_path.as_str()
     }
