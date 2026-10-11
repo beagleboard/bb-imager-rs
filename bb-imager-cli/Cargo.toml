@@ -75,3 +75,6 @@ pkg-url = "{ repo }/releases/download/{ version }/{ name }_{ version }_aarch64{ 
 
 [package.metadata.binstall.overrides.armv7-unknown-linux-gnueabihf]
 pkg-url = "{ repo }/releases/download/{ version }/{ name }_{ version }_armv7{ archive-suffix }"
+
+[lints]
+workspace = true
