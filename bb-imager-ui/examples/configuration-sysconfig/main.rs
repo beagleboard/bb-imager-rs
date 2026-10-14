@@ -27,6 +27,8 @@ fn main() {
                 Message::Reset => {
                     s.0.customization = configuration::Customization::SysConfig(Default::default())
                 }
+                Message::FocusNext => return iced::widget::operation::focus_next(),
+                Message::FocusPrevious => return iced::widget::operation::focus_previous(),
                 _ => {}
             }
             iced::Task::none()
@@ -34,7 +36,10 @@ fn main() {
         view,
     );
 
-    bb_imager_ui::application(app).run().unwrap()
+    bb_imager_ui::application(app)
+        .subscription(|_| bb_imager_ui::focus_subscription())
+        .run()
+        .unwrap()
 }
 
 fn view(s: &State) -> iced::Element<'_, Message> {

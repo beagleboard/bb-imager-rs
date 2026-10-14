@@ -58,12 +58,35 @@ pub enum Message {
     ResolveImage(std::sync::Arc<url::Url>, std::path::PathBuf),
 
     EditorEvent(iced::widget::text_editor::Action),
+    /// Move keyboard focus to the next focusable widget.
+    FocusNext,
+    /// Move keyboard focus to the previous focusable widget.
+    FocusPrevious,
 
     FlashStart,
     /// Cancel an in-progress flash.
     FlashCancel,
     // Retry flashing
     Retry,
+}
+
+/// Tab / Shift+Tab move focus between focusable widgets.
+///
+/// Listens regardless of capture status, since an open combo box captures Tab
+/// to cycle its options, which would otherwise trap focus in it.
+pub fn focus_subscription() -> iced::Subscription<Message> {
+    iced::event::listen_with(|event, _status, _window| match event {
+        iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+            key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+            modifiers,
+            ..
+        }) => Some(if modifiers.shift() {
+            Message::FocusPrevious
+        } else {
+            Message::FocusNext
+        }),
+        _ => None,
+    })
 }
 
 pub fn application<A>(
