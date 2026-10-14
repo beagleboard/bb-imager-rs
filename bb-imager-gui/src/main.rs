@@ -297,6 +297,9 @@ impl BBImager {
                     )
                 },
             ),
+            Self::Customize(_) | Self::AppInfo(_) => {
+                bb_imager_ui::focus_subscription().map(BBImagerMessage::UiState)
+            }
             _ => Subscription::none(),
         }
     }

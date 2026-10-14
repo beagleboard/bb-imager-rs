@@ -190,6 +190,12 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             });
         }
         BBImagerMessage::UiState(Message::Next) => return state.next(),
+        BBImagerMessage::UiState(Message::FocusNext) => {
+            return iced::widget::operation::focus_next();
+        }
+        BBImagerMessage::UiState(Message::FocusPrevious) => {
+            return iced::widget::operation::focus_previous();
+        }
         BBImagerMessage::UiState(Message::ResolveImage(k, v)) => state.image_cache_insert(k, v),
         BBImagerMessage::FilterResolveImages(x) => {
             let common = state.common_mut();
