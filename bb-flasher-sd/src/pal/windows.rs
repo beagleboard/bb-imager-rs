@@ -129,7 +129,7 @@ fn diskpart_clean(path: &Path) -> Result<()> {
         .ok_or(io::Error::new(io::ErrorKind::NotFound, "Drive not found"))?;
 
     let resp = std::process::Command::new("powershell")
-        .args(&[
+        .args([
             "Clear-Disk",
             "-Number",
             disk_num,
