@@ -157,11 +157,11 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
                 tracing::info!("Result: {:#?}", result);
 
                 for msg in result.cmsgs().expect("Unexpected error") {
-                    if let ControlMessageOwned::ScmRights(scm_rights) = msg {
-                        if let Some(fd) = scm_rights.into_iter().next() {
-                            tracing::debug!("receive file descriptor");
-                            return Ok(unsafe { File::from_raw_fd(fd) });
-                        }
+                    if let ControlMessageOwned::ScmRights(scm_rights) = msg
+                        && let Some(fd) = scm_rights.into_iter().next()
+                    {
+                        tracing::debug!("receive file descriptor");
+                        return Ok(unsafe { File::from_raw_fd(fd) });
                     }
                 }
             }
