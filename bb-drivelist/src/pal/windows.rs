@@ -59,7 +59,7 @@ pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
             }
 
             let enumerator_name = get_enumerator_name(h_device_info, &device_info_data);
-            let friendly_name = get_friendly_name(h_device_info, &mut device_info_data);
+            let friendly_name = get_friendly_name(h_device_info, &device_info_data);
             if friendly_name.is_empty() {
                 continue;
             }
@@ -68,11 +68,11 @@ pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
                 description: friendly_name.clone(),
                 enumerator: enumerator_name.clone().into(),
                 is_usb: is_usb_drive(&enumerator_name),
-                is_removable: is_removable(h_device_info, &mut device_info_data),
+                is_removable: is_removable(h_device_info, &device_info_data),
                 ..Default::default()
             };
 
-            get_detail_data(&mut item, h_device_info, &mut device_info_data).unwrap();
+            get_detail_data(&mut item, h_device_info, &device_info_data).unwrap();
 
             let bt = item.bus_type.clone().unwrap_or("UNKNOWN".to_string());
             item.is_card = ["SDCARD", "MMC"].contains(&bt.as_str());
@@ -234,31 +234,19 @@ fn get_detail_data(
             .open(&device.device)
             .unwrap();
         if let Err(err) = get_device_size(device, HANDLE(h_physical.as_raw_handle())) {
-            device.error = Some(format!(
-                "Couldn't get device size: Error {}",
-                err.to_string()
-            ));
+            device.error = Some(format!("Couldn't get device size: Error {err}"));
             break;
         }
         if let Err(err) = get_partition_table_type(device, HANDLE(h_physical.as_raw_handle())) {
-            device.error = Some(format!(
-                "Couldn't get device partition type: Error {}",
-                err.to_string()
-            ));
+            device.error = Some(format!("Couldn't get device partition type: Error {err}"));
             break;
         }
         if let Err(err) = get_adapter_info(device, HANDLE(h_physical.as_raw_handle())) {
-            device.error = Some(format!(
-                "Couldn't get device adapter info: Error {}",
-                err.to_string()
-            ));
+            device.error = Some(format!("Couldn't get device adapter info: Error {err}"));
             break;
         }
         if let Err(err) = get_device_block_size(device, HANDLE(h_physical.as_raw_handle())) {
-            device.error = Some(format!(
-                "Couldn't get device block size: Error {}",
-                err.to_string()
-            ));
+            device.error = Some(format!("Couldn't get device block size: Error {err}"));
             break;
         }
         device.is_readonly = is_readonly(HANDLE(h_physical.as_raw_handle()));
@@ -518,10 +506,8 @@ fn get_device_number(h_device: HANDLE) -> Option<u32> {
         )
     };
 
-    if res.is_ok() {
-        if disk_extents.NumberOfDiskExtents >= 2 {
-            return None;
-        }
+    if res.is_ok() && disk_extents.NumberOfDiskExtents >= 2 {
+        return None;
     }
 
     let mut device_number = STORAGE_DEVICE_NUMBER::default();
