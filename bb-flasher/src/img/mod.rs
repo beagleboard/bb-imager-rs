@@ -5,6 +5,8 @@ use bb_flasher_sd::ContentType;
 #[cfg(feature = "piped_image")]
 use bb_helper::file_stream::ReaderFileStream;
 use rc_zip_sync::ReadZipStreaming;
+#[cfg(feature = "piped_image")]
+use std::sync::Arc;
 #[cfg(feature = "sd")]
 use std::sync::mpsc;
 use std::{
@@ -45,11 +47,12 @@ impl OsArchive {
     }
 
     /// Open an archive from a stream of `size` bytes being written by `_background`, which is
-    /// aborted when the archive is dropped. Read progress is reported over `chan`.
+    /// aborted once every archive or image sharing it is dropped. Read progress is reported over
+    /// `chan`.
     #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,
-        _background: AbortOnDropHandle<io::Result<()>>,
+        _background: Arc<AbortOnDropHandle<io::Result<()>>>,
         size: u64,
         chan: Option<mpsc::SyncSender<f32>>,
     ) -> io::Result<Self> {
@@ -176,12 +179,12 @@ impl OsImage {
         Ok(Self { size, img })
     }
 
-    /// Open an image from a stream being written by `_background`, which is aborted when the image
-    /// is dropped. `size` is the uncompressed image size.
+    /// Open an image from a stream being written by `_background`, which is aborted once every
+    /// image sharing it is dropped. `size` is the uncompressed image size.
     #[cfg(feature = "piped_image")]
     pub fn from_piped(
         img: ReaderFileStream,
-        _background: AbortOnDropHandle<io::Result<()>>,
+        _background: Arc<AbortOnDropHandle<io::Result<()>>>,
         size: u64,
     ) -> io::Result<Self> {
         Ok(Self {
@@ -256,7 +259,7 @@ enum OsImageSource {
     #[cfg(feature = "piped_image")]
     FileStream {
         reader: ReaderFileStream,
-        _background: AbortOnDropHandle<io::Result<()>>,
+        _background: Arc<AbortOnDropHandle<io::Result<()>>>,
     },
 }
 

@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, sync::Arc};
 
 use bb_flasher::img::{OsArchive, OsImage};
 use bb_helper::file_stream::ReaderFileStream;
@@ -129,7 +129,7 @@ impl RemoteItem {
         let tx_clone = tx.clone();
         self.open(
             move |p| OsArchive::from_path(p, tx_clone),
-            move |rx, abort, es| OsArchive::from_piped(rx, abort, es, tx),
+            move |rx, abort, es| OsArchive::from_piped(rx, Arc::new(abort), es, tx),
         )
     }
 
@@ -138,7 +138,7 @@ impl RemoteItem {
         self.open(
             move |p| Ok((OsImage::from_path(p)?, extract_size)),
             move |rx, abort, es| {
-                let img = OsImage::from_piped(rx, abort, es)?;
+                let img = OsImage::from_piped(rx, Arc::new(abort), es)?;
                 Ok((img, es))
             },
         )
