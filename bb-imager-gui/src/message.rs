@@ -45,13 +45,16 @@ pub(crate) enum BBImagerMessage {
     },
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
 
-    /// Choose Destination page
+    /// Choose Destination page. Toggles the destination in the selection.
     SelectDest(bb_imager_ui::destination_selection::DestId),
 
     // Flashing Page
-    FlashProgress(bb_flasher::DownloadFlashingStatus),
+    /// Progress of the destination at this index.
+    FlashProgress(usize, bb_flasher::DownloadFlashingStatus),
+    /// Every destination succeeded.
     FlashSuccess,
-    FlashFail(String),
+    /// Each destination that failed to flash, with its error.
+    FlashFail(Box<[(helpers::Destination, Box<str>)]>),
     /// Each card that failed to format, with its error.
     #[cfg(feature = "sd")]
     FormatFail(Box<[(bb_flasher::sd::Target, Box<str>)]>),
@@ -338,6 +341,15 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         // The page derives this row and owns the suggested name, so there is
         // nothing to re-derive here.
         BBImagerMessage::UiState(Message::SelectFileDest(name)) => {
+            // A second click on a selected "Save To File" deselects it instead
+            // of asking for another file.
+            if let BBImager::ChooseDest(inner) = state
+                && inner.has_file_dest()
+            {
+                inner.remove_file_dest();
+                return Task::none();
+            }
+
             return Task::perform(
                 async move {
                     rfd::AsyncFileDialog::new()
@@ -421,7 +433,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::Restart) => {
             return state.restart();
         }
-        BBImagerMessage::FlashFail(err) => {
+        BBImagerMessage::FlashFail(failures) => {
             let mut msg = "Flashing failed";
 
             let logs =
@@ -434,25 +446,27 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         msg = "Download failed";
                     }
 
-                    BBImager::FlashingFail(crate::state::FlashingFailState::new(inner, err, logs))
+                    BBImager::FlashingFail(crate::state::FlashingFailState::new(
+                        inner, failures, logs,
+                    ))
                 }
-                BBImager::AppInfo(inner) => {
-                    match inner.page {
-                        OverlayData::Flashing(flashing_state) => {
-                            if flashing_state.ctx.is_download() {
-                                msg = "Download failed";
-                            }
-
-                            BBImager::AppInfo(OverlayState {
-                                page: OverlayData::FlashingFail(
-                                    crate::state::FlashingFailState::new(flashing_state, err, logs),
-                                ),
-                                ..inner
-                            })
+                BBImager::AppInfo(inner) => match inner.page {
+                    OverlayData::Flashing(flashing_state) => {
+                        if flashing_state.ctx.is_download() {
+                            msg = "Download failed";
                         }
-                        _ => panic!("Unexpected message"),
+
+                        BBImager::AppInfo(OverlayState {
+                            page: OverlayData::FlashingFail(crate::state::FlashingFailState::new(
+                                flashing_state,
+                                failures,
+                                logs,
+                            )),
+                            ..inner
+                        })
                     }
-                }
+                    _ => panic!("Unexpected message"),
+                },
                 _ => panic!("Unexpected message"),
             };
 
@@ -500,13 +514,12 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
         }
-        // TODO: per-destination progress once flash() reports it.
-        BBImagerMessage::FlashProgress(x) => match state {
+        BBImagerMessage::FlashProgress(i, x) => match state {
             BBImager::Flashing(inner) => {
-                inner.progress_update(0, x);
+                inner.progress_update(i, x);
             }
             BBImager::AppInfo(inner) => match &mut inner.page {
-                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(0, x),
+                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(i, x),
                 _ => panic!("Unexpected message"),
             },
             // Debug build can be slow.

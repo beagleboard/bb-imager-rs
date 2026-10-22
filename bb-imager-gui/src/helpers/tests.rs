@@ -391,15 +391,56 @@ async fn flash_local_image(
         0,
         local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
-        Destination::LocalFile(dst.path().into()),
+        [Destination::LocalFile(dst.path().into())].into(),
         crate::db::Db::new().unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
     )
-    .await;
+    .await
+    .and_then(|failures| match failures.into_iter().next() {
+        Some((_, e)) => Err(anyhow::anyhow!("{e}")),
+        None => Ok(()),
+    });
 
     (res, dst, data)
+}
+
+/// One flash writes every destination in full.
+#[cfg(feature = "sd")]
+#[tokio::test]
+async fn flash_writes_every_destination() {
+    use std::io::Write;
+
+    let data: Vec<u8> = (0..4096u32).map(|x| (x % 251) as u8).collect();
+    let mut src = tempfile::NamedTempFile::new().unwrap();
+    src.write_all(&data).unwrap();
+    src.flush().unwrap();
+
+    let dsts = [
+        tempfile::NamedTempFile::new().unwrap(),
+        tempfile::NamedTempFile::new().unwrap(),
+    ];
+    let cache = tempfile::tempdir().unwrap();
+    let failures = flash(
+        0,
+        local_image(src.path().to_path_buf(), config::Flasher::SdCard),
+        FlashingCustomization::NoneSd,
+        dsts.iter()
+            .map(|x| Destination::LocalFile(x.path().into()))
+            .collect(),
+        crate::db::Db::new().unwrap(),
+        bb_downloader::Downloader::new(cache.path()).unwrap(),
+        mpsc::sync_channel(8).0,
+        bb_helper::cancel::CancellationToken::default(),
+    )
+    .await
+    .unwrap();
+    assert!(failures.is_empty());
+
+    for dst in &dsts {
+        assert_eq!(std::fs::read(dst.path()).unwrap(), data);
+    }
 }
 
 /// Only the flasher type decides whether the board's archive is looked up.
