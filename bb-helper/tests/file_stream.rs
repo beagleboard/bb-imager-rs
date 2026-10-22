@@ -136,3 +136,53 @@ async fn persist_writes_byte_exact_file() {
 
     assert_eq!(tokio::fs::read(&dest).await.unwrap(), b"persist me");
 }
+
+/// Each reader opened from the writer sees the whole stream, independently of
+/// the others, including data written before it was opened.
+#[tokio::test]
+async fn multiple_readers_each_receive_all_data() {
+    let (mut writer, reader) = file_stream().unwrap();
+
+    writer.write_all(b"hello ").await.unwrap();
+    writer.flush().await.unwrap();
+
+    let readers = [reader.clone(), reader.clone(), reader];
+    let tasks = readers.map(|mut reader| {
+        tokio::task::spawn_blocking(move || {
+            let mut out = Vec::new();
+            reader.read_to_end(&mut out).unwrap();
+            out
+        })
+    });
+
+    tokio::task::yield_now().await;
+
+    writer.write_all(b"world!").await.unwrap();
+    writer.flush().await.unwrap();
+    drop(writer);
+
+    for task in tasks {
+        assert_eq!(task.await.unwrap(), b"hello world!");
+    }
+}
+
+/// Readers keep the backing file alive after the writer, which owns the temp
+/// file, is dropped.
+#[tokio::test]
+async fn reader_outlives_writer() {
+    let (mut writer, reader1) = file_stream().unwrap();
+
+    writer.write_all(b"still here").await.unwrap();
+    writer.flush().await.unwrap();
+
+    let mut reader2 = reader1.clone();
+    drop(writer);
+
+    tokio::task::spawn_blocking(move || {
+        let mut out = Vec::new();
+        reader2.read_to_end(&mut out).unwrap();
+        assert_eq!(out, b"still here");
+    })
+    .await
+    .unwrap()
+}
