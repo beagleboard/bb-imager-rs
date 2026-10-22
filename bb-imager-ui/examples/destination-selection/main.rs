@@ -74,16 +74,8 @@ fn devices(filter: bool, search: &str) -> Box<[destination_selection::Destinatio
 }
 
 fn select(ident: &str) -> Option<destination_selection::DestinationDetails> {
-    let (_, label, size) = DEVICES.iter().find(|(i, _, _)| *i == ident)?;
-
     Some(destination_selection::DestinationDetails {
         id: destination_selection::DestId::Device(ident.into()),
-        title: (*label).into(),
-        details: vec![
-            ("Path".into(), ident.into()),
-            ("Size".into(), pretty_bytes(*size).into()),
-        ]
-        .into(),
     })
 }
 
@@ -101,12 +93,10 @@ fn main() {
                     s.refresh();
                 }
                 Message::SelectDest(ident) => s.inner.selected = select(&ident),
-                Message::SelectFileDest(name) => {
+                Message::SelectFileDest(_) => {
                     // The host opens a save dialog here; pretend it was accepted.
                     s.inner.selected = Some(destination_selection::DestinationDetails {
                         id: destination_selection::DestId::SaveToFile,
-                        title: "Save To File".into(),
-                        details: vec![("Path".into(), format!("/tmp/{name}").into())].into(),
                     });
                 }
                 _ => {}

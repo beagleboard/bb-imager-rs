@@ -4,8 +4,8 @@ use iced::Element;
 use iced::widget::{self, text};
 
 use crate::helpers::{
-    SidebarEntry, detail_entry, detail_pane, list_item, list_label, list_pane, list_separator,
-    page_type1, placeholder_heading, svg_icon_style,
+    SidebarEntry, detail_pane, list_item, list_label, list_pane, list_separator, page_type1,
+    page_type2, svg_icon_style,
 };
 use crate::{Message, constants};
 
@@ -40,8 +40,6 @@ pub struct DestinationItem {
 #[derive(Debug, Clone)]
 pub struct DestinationDetails {
     pub id: DestId,
-    pub title: Box<str>,
-    pub details: Box<[(Box<str>, Box<str>)]>,
 }
 
 #[derive(Debug)]
@@ -77,12 +75,28 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    page_type1(
-        SidebarEntry::Storage,
-        dest_list_pane(state, &scroll_id),
-        dest_view_pane(state, &scroll_id),
-        [widget::button("NEXT").on_press_maybe(state.selected.as_ref().map(|_| Message::Next))],
-    )
+    if let Some(instr) = state.instruction.as_ref() {
+        page_type1(
+            SidebarEntry::Storage,
+            dest_list_pane(state, &scroll_id),
+            instr_view_pane(instr, &scroll_id),
+            [
+                widget::button("NEXT")
+                    .on_press_maybe(state.selected.as_ref().map(|_| Message::Next)),
+            ],
+        )
+    } else {
+        page_type2(
+            SidebarEntry::Storage,
+            false,
+            false,
+            dest_list_pane(state, &scroll_id),
+            [
+                widget::button("NEXT")
+                    .on_press_maybe(state.selected.as_ref().map(|_| Message::Next)),
+            ],
+        )
+    }
 }
 
 fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, Message> {
@@ -162,47 +176,13 @@ fn sized_icon<'a>(handle: widget::svg::Handle) -> Element<'a, Message> {
         .into()
 }
 
-fn dest_view_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, Message> {
-    let Some(dest) = state.selected.as_ref() else {
-        let col = widget::column![placeholder_heading("Please Select a Destination")];
-
-        let col = match state.instruction.as_ref() {
-            Some(x) => col.extend([
-                widget::rule::horizontal(2).into(),
-                text("Special instructions")
-                    .size(16)
-                    .font(constants::FONT_BOLD)
-                    .into(),
-                text(x.as_ref()).into(),
-            ]),
-            None => col,
-        };
-
-        return widget::center(detail_pane(col, scroll_id)).into();
-    };
-
-    let icon = match dest.id {
-        DestId::SaveToFile => widget::svg(constants::FILE_SAVE_ICON.clone()),
-        DestId::Device(_) => widget::svg(constants::USB_ICON.clone()),
-    }
-    .height(100)
-    .width(iced::Fill)
-    .style(svg_icon_style);
-
+fn instr_view_pane<'a>(instr: &'a str, scroll_id: &widget::Id) -> Element<'a, Message> {
     let col = widget::column![
-        icon,
-        text(dest.title.as_ref())
-            .size(24)
-            .align_x(iced::alignment::Alignment::Center)
-            .width(iced::Length::Fill),
+        text("Special instructions")
+            .size(16)
+            .font(constants::FONT_BOLD),
+        text(instr),
     ];
 
-    let col = col.extend(
-        dest.details
-            .iter()
-            .map(|(k, v)| detail_entry(k, v.as_ref()))
-            .map(Into::into),
-    );
-
-    detail_pane(col, scroll_id)
+    widget::center(detail_pane(col, scroll_id)).into()
 }

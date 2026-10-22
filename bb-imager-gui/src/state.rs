@@ -399,7 +399,7 @@ impl ChooseDestState {
 
     /// Record `dest` as the selection, both for the flow and for the page.
     pub(crate) fn select_dest(&mut self, dest: helpers::Destination) {
-        self.state.selected = Some(helpers::dest_details(&dest));
+        self.state.selected = Some((&dest).into());
         self.selected_dest = Some(dest);
     }
 
