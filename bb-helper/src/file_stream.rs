@@ -8,6 +8,7 @@ use std::{
     sync::{Arc, Condvar, Mutex},
 };
 
+use tempfile::NamedTempFile;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 type SharedState = Arc<(Mutex<bool>, Condvar)>;
@@ -86,11 +87,26 @@ impl Drop for WriterFileStream {
 pub struct ReaderFileStream {
     file: std::fs::File,
     writing: SharedState,
+    inner: Arc<NamedTempFile>,
+}
+
+impl Clone for ReaderFileStream {
+    fn clone(&self) -> Self {
+        Self {
+            file: self.inner.reopen().unwrap(),
+            writing: self.writing.clone(),
+            inner: self.inner.clone(),
+        }
+    }
 }
 
 impl ReaderFileStream {
-    const fn new(file: std::fs::File, writing: SharedState) -> Self {
-        Self { file, writing }
+    fn new(inner: Arc<NamedTempFile>, writing: SharedState) -> Self {
+        Self {
+            file: inner.reopen().unwrap(),
+            writing,
+            inner,
+        }
     }
 }
 
@@ -167,11 +183,11 @@ impl std::io::Seek for ReaderFileStream {
 /// Returns a tuple of (writer, reader) that share a temporary file.
 /// The writer can write asynchronously, while the reader provides synchronous access.
 pub fn file_stream() -> io::Result<(WriterFileStream, ReaderFileStream)> {
-    let file = tempfile::NamedTempFile::new()?;
+    let file = Arc::new(tempfile::NamedTempFile::new()?);
     let flag = Arc::new((Mutex::new(true), Condvar::new()));
 
-    let reader = ReaderFileStream::new(file.reopen()?, flag.clone());
-    let writer = WriterFileStream::new(file.into_file().into(), flag);
+    let reader = ReaderFileStream::new(file.clone(), flag.clone());
+    let writer = WriterFileStream::new(file.reopen()?.into(), flag);
 
     Ok((writer, reader))
 }
