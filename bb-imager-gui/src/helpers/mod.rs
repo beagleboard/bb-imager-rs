@@ -418,23 +418,6 @@ impl Destination {
             Self::Mspm0(t) => t.identifier(),
         }
     }
-
-    pub(crate) fn details(&self) -> Vec<(&'static str, String)> {
-        match self {
-            Self::LocalFile(p) => vec![("Path", p.to_string_lossy().to_string())],
-            #[cfg(feature = "sd")]
-            Self::SdCard(t) => vec![
-                ("Path", t.path().to_string_lossy().to_string()),
-                ("Size", pretty_bytes(t.size())),
-            ],
-            #[cfg(feature = "bcf_cc1352p7")]
-            Self::BeagleConnectFreedom(t) => vec![("Path", t.path().to_string())],
-            #[cfg(feature = "bcf_msp430")]
-            Self::Msp430(t) => vec![("Path", t.path().to_string())],
-            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-            Self::Mspm0(t) => vec![("Path", t.path().to_string())],
-        }
-    }
 }
 
 pub(crate) fn destinations(
@@ -621,21 +604,16 @@ pub(crate) fn dest_item(
     }
 }
 
-/// The renderable projection of a selected destination.
-pub(crate) fn dest_details(
-    value: &Destination,
-) -> bb_imager_ui::destination_selection::DestinationDetails {
-    bb_imager_ui::destination_selection::DestinationDetails {
-        id: match value {
-            Destination::LocalFile(_) => bb_imager_ui::destination_selection::DestId::SaveToFile,
-            _ => bb_imager_ui::destination_selection::DestId::Device(value.identifier().into()),
-        },
-        title: value.to_string().into(),
-        details: value
-            .details()
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.into_boxed_str()))
-            .collect(),
+impl From<&Destination> for bb_imager_ui::destination_selection::DestinationDetails {
+    fn from(value: &Destination) -> Self {
+        Self {
+            id: match value {
+                Destination::LocalFile(_) => {
+                    bb_imager_ui::destination_selection::DestId::SaveToFile
+                }
+                _ => bb_imager_ui::destination_selection::DestId::Device(value.identifier().into()),
+            },
+        }
     }
 }
 
