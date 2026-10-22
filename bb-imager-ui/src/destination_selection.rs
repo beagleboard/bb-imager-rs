@@ -11,7 +11,7 @@ use crate::{Message, constants};
 
 const ICON_WIDTH: u32 = 60;
 
-/// Identifies the current selection.
+/// Identifies a selected destination.
 ///
 /// Devices are keyed by their stable hardware identifier rather than by
 /// position: the host re-enumerates every second, so an index could resolve to
@@ -150,11 +150,22 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
         None => Vec::new(),
     };
 
-    let filter_toggle = widget::container(
-        widget::toggler(!state.filter_destination)
-            .label("Show all destinations")
-            .on_toggle(|x| Message::DestinationFilter(!x)),
-    )
+    let toggler = widget::toggler(!state.filter_destination)
+        .label("Show all destinations")
+        .on_toggle(|x| Message::DestinationFilter(!x));
+    let filter_toggle = widget::container(if state.selected.len() > 1 {
+        Element::from(
+            widget::row![
+                toggler,
+                widget::space::horizontal(),
+                widget::text(format!("{} selected", state.selected.len()))
+                    .style(widget::text::secondary),
+            ]
+            .align_y(iced::Center),
+        )
+    } else {
+        toggler.into()
+    })
     .padding(16);
 
     list_pane(

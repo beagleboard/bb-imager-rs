@@ -23,9 +23,11 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
             destinations: &value.destinations,
             modifications_title: "Modifications applied",
             modifications: &value.modifications,
-            footer: Some(
-                "The storage device was ejected automatically, you can now remove it safely.",
-            ),
+            footer: Some(if value.destinations.len() > 1 {
+                "The storage devices were ejected automatically, you can now remove them safely."
+            } else {
+                "The storage device was ejected automatically, you can now remove it safely."
+            }),
         }
     }
 }

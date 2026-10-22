@@ -18,12 +18,54 @@ pub enum Progress {
     Customizing,
 }
 
+impl Progress {
+    /// How far along this is, for comparing destinations.
+    const fn fraction(self) -> f32 {
+        match self {
+            Progress::Preparing => 0.0,
+            Progress::Downloading(x) | Progress::Flashing(x) => x,
+            Progress::Verifying | Progress::Customizing => 0.99,
+        }
+    }
+}
+
+/// One destination being written.
+#[derive(Debug)]
+pub struct DestProgress {
+    pub label: Box<str>,
+    pub progress: Progress,
+    /// `Some` once this destination has finished, with its error if it failed.
+    pub result: Option<Result<(), Box<str>>>,
+}
+
+impl DestProgress {
+    pub fn new(label: Box<str>) -> Self {
+        Self {
+            label,
+            progress: Progress::default(),
+            result: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct State {
-    pub progress: Progress,
+    /// Never empty.
+    pub dests: Box<[DestProgress]>,
     /// Stamped by the host on the first byte-moving update; the ETA is
     /// extrapolated from how long has elapsed since.
     pub start_timestamp: Option<Instant>,
+}
+
+impl State {
+    /// The furthest-behind destination still being written, which the ETA is based on.
+    fn slowest(&self) -> Option<Progress> {
+        self.dests
+            .iter()
+            .filter(|x| x.result.is_none())
+            .map(|x| x.progress)
+            .min_by(|a, b| a.fraction().total_cmp(&b.fraction()))
+    }
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
@@ -40,7 +82,83 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
 }
 
 fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
-    let (progress_label, progress_bar) = match state.progress {
+    let time_remaining = match state
+        .slowest()
+        .and_then(|p| time_remaining_from(p, state.start_timestamp.map(|t| t.elapsed())))
+    {
+        Some(x) => widget::span::<'_, (), _>(pretty_duration(x)),
+        None => widget::span("Calculating"),
+    };
+
+    let (warning, progress): (_, Element<'_, Message>) = match state.dests.as_ref() {
+        [dest] => {
+            let (label, bar) = progress_row(dest.progress);
+            (
+                "Do not disconnect the storage device!",
+                widget::column![
+                    label
+                        .font(constants::FONT_BOLD)
+                        .style(widget::text::secondary),
+                    bar
+                ]
+                .spacing(16)
+                .into(),
+            )
+        }
+        dests => (
+            "Do not disconnect the storage devices!",
+            widget::column(dests.iter().map(dest_view))
+                .spacing(16)
+                .into(),
+        ),
+    };
+
+    widget::scrollable(
+        widget::column![
+            widget::text("Writing Image")
+                .font(constants::FONT_BOLD)
+                .size(26),
+            widget::text(warning).style(widget::text::danger),
+            widget::rule::horizontal(2),
+            progress,
+            widget::rich_text![
+                widget::span("Time Remaining: ").font(constants::FONT_BOLD),
+                time_remaining
+            ]
+        ]
+        .padding(VIEW_COL_PADDING)
+        .spacing(16),
+    )
+    .id(scroll_id)
+    .into()
+}
+
+/// One destination's row when several are written at once.
+fn dest_view(dest: &DestProgress) -> Element<'_, Message> {
+    let (status, bar) = match &dest.result {
+        None => progress_row(dest.progress),
+        Some(Ok(())) => (
+            widget::text("Done").style(widget::text::success),
+            widget::progress_bar(0.0..=1.0, 1.0),
+        ),
+        Some(Err(e)) => (
+            widget::text(format!("Failed: {e}")).style(widget::text::danger),
+            widget::progress_bar(0.0..=1.0, dest.progress.fraction())
+                .style(widget::progress_bar::danger),
+        ),
+    };
+
+    widget::column![
+        widget::text(dest.label.as_ref()).font(constants::FONT_BOLD),
+        status.style(widget::text::secondary),
+        bar
+    ]
+    .spacing(4)
+    .into()
+}
+
+fn progress_row<'a>(progress: Progress) -> (widget::Text<'a>, widget::ProgressBar<'a>) {
+    match progress {
         Progress::Preparing => (
             widget::text("Preparing..."),
             widget::progress_bar(0.0..=1.0, 0.0),
@@ -57,35 +175,7 @@ fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
             widget::text("Customizing..."),
             widget::progress_bar(0.0..=1.0, 0.99),
         ),
-    };
-
-    let time_remaining =
-        match time_remaining_from(state.progress, state.start_timestamp.map(|t| t.elapsed())) {
-            Some(x) => widget::span::<'_, (), _>(pretty_duration(x)),
-            None => widget::span("Calculating"),
-        };
-
-    widget::scrollable(
-        widget::column![
-            widget::text("Writing Image")
-                .font(constants::FONT_BOLD)
-                .size(26),
-            widget::text("Do not disconnect the storage device!").style(widget::text::danger),
-            widget::rule::horizontal(2),
-            progress_label
-                .font(constants::FONT_BOLD)
-                .style(widget::text::secondary),
-            progress_bar,
-            widget::rich_text![
-                widget::span("Time Remaining: ").font(constants::FONT_BOLD),
-                time_remaining
-            ]
-        ]
-        .padding(VIEW_COL_PADDING)
-        .spacing(16),
-    )
-    .id(scroll_id)
-    .into()
+    }
 }
 
 /// Estimate the remaining flashing time from the current `progress` and how
@@ -191,6 +281,39 @@ mod tests {
             time_remaining_from(Progress::Verifying, Some(Duration::from_secs(5))),
             None
         );
+    }
+
+    fn dest(progress: Progress, result: Option<Result<(), Box<str>>>) -> DestProgress {
+        DestProgress {
+            label: "dest".into(),
+            progress,
+            result,
+        }
+    }
+
+    #[test]
+    fn slowest_ignores_finished_destinations() {
+        let state = State {
+            dests: Box::new([
+                dest(Progress::Flashing(0.1), Some(Err("gone".into()))),
+                dest(Progress::Flashing(0.6), None),
+                dest(Progress::Customizing, None),
+                dest(Progress::Flashing(0.2), Some(Ok(()))),
+            ]),
+            start_timestamp: None,
+        };
+
+        assert!(matches!(state.slowest(), Some(Progress::Flashing(x)) if x == 0.6));
+    }
+
+    #[test]
+    fn slowest_is_none_once_all_finished() {
+        let state = State {
+            dests: Box::new([dest(Progress::Flashing(1.0), Some(Ok(())))]),
+            start_timestamp: None,
+        };
+
+        assert!(state.slowest().is_none());
     }
 
     #[test]

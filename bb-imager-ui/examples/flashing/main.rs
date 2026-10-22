@@ -27,7 +27,10 @@ impl State {
         let res = Self {
             step: 0.0,
             inner: flashing::State {
-                progress: Default::default(),
+                dests: Box::new([
+                    flashing::DestProgress::new("SD Card 1 (32.00 GiB)".into()),
+                    flashing::DestProgress::new("SD Card 2 (64.00 GiB)".into()),
+                ]),
                 start_timestamp: None,
             },
         };
@@ -44,17 +47,20 @@ impl State {
     fn tick(&mut self) {
         self.step = (self.step + 0.02) % 4.0;
 
-        self.inner.progress = match self.step {
-            s if s < 1.0 => flashing::Progress::Preparing,
-            s if s < 2.0 => flashing::Progress::Downloading(s - 1.0),
-            s if s < 3.0 => flashing::Progress::Flashing(s - 2.0),
-            s if s < 3.5 => flashing::Progress::Verifying,
-            _ => flashing::Progress::Customizing,
-        };
+        // The second destination trails the first, to show rows moving independently.
+        for (dest, lag) in self.inner.dests.iter_mut().zip([0.0, 0.3]) {
+            dest.progress = match (self.step - lag).max(0.0) {
+                s if s < 1.0 => flashing::Progress::Preparing,
+                s if s < 2.0 => flashing::Progress::Downloading(s - 1.0),
+                s if s < 3.0 => flashing::Progress::Flashing(s - 2.0),
+                s if s < 3.5 => flashing::Progress::Verifying,
+                _ => flashing::Progress::Customizing,
+            };
+        }
 
         // The host stamps this on the first byte-moving update; mimic that so
         // the ETA has an elapsed time to extrapolate from.
-        match self.inner.progress {
+        match self.inner.dests[0].progress {
             flashing::Progress::Downloading(_) | flashing::Progress::Flashing(_) => {
                 self.inner.start_timestamp.get_or_insert_with(Instant::now);
             }

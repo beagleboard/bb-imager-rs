@@ -387,18 +387,68 @@ async fn flash_local_image(
 
     let dst = tempfile::NamedTempFile::new().unwrap();
     let cache = tempfile::tempdir().unwrap();
-    let res = flash(
+    let res = prepare_flash(
         0,
         local_image(src.path().to_path_buf(), flasher),
-        FlashingCustomization::NoneSd,
-        Destination::LocalFile(dst.path().into()),
-        crate::db::Db::new().unwrap(),
+        1,
+        &crate::db::Db::new().unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
-        mpsc::sync_channel(8).0,
-        bb_helper::cancel::CancellationToken::default(),
-    );
+    )
+    .and_then(|mut srcs| {
+        flash(
+            flasher,
+            srcs.pop().unwrap(),
+            FlashingCustomization::NoneSd,
+            Destination::LocalFile(dst.path().into()),
+            mpsc::sync_channel(8).0,
+            bb_helper::cancel::CancellationToken::default(),
+        )
+    });
 
     (res, dst, data)
+}
+
+/// Every destination gets its own source, and each is written in full.
+#[cfg(feature = "sd")]
+#[tokio::test]
+async fn prepared_sources_flash_every_destination() {
+    use std::io::Write;
+
+    let data: Vec<u8> = (0..4096u32).map(|x| (x % 251) as u8).collect();
+    let mut src = tempfile::NamedTempFile::new().unwrap();
+    src.write_all(&data).unwrap();
+    src.flush().unwrap();
+
+    let dsts = [
+        tempfile::NamedTempFile::new().unwrap(),
+        tempfile::NamedTempFile::new().unwrap(),
+    ];
+    let cache = tempfile::tempdir().unwrap();
+    let srcs = prepare_flash(
+        0,
+        local_image(src.path().to_path_buf(), config::Flasher::SdCard),
+        dsts.len(),
+        &crate::db::Db::new().unwrap(),
+        bb_downloader::Downloader::new(cache.path()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(srcs.len(), dsts.len());
+
+    for (src, dst) in srcs.into_iter().zip(&dsts) {
+        flash(
+            config::Flasher::SdCard,
+            src,
+            FlashingCustomization::NoneSd,
+            Destination::LocalFile(dst.path().into()),
+            mpsc::sync_channel(8).0,
+            bb_helper::cancel::CancellationToken::default(),
+        )
+        .unwrap();
+    }
+
+    for dst in &dsts {
+        assert_eq!(std::fs::read(dst.path()).unwrap(), data);
+    }
 }
 
 /// Only the flasher type decides whether the board's archive is looked up.
@@ -411,4 +461,47 @@ async fn plain_sd_image_ignores_the_boards_bootfs() {
 
     res.expect("a plain SD image must not pick up the board's bootfs");
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);
+}
+
+#[test]
+fn toggle_dest_adds_then_removes() {
+    let a = DestId::SaveToFile(PathBuf::from("/tmp/a.img").into());
+    let mut selected = Vec::new();
+
+    toggle_dest(&mut selected, a.clone());
+    assert_eq!(selected, [a]);
+
+    // Selecting a file again replaces the slot rather than removing it.
+    let b = DestId::SaveToFile(PathBuf::from("/tmp/b.img").into());
+    toggle_dest(&mut selected, b.clone());
+    assert_eq!(selected, [b]);
+}
+
+#[cfg(feature = "sd")]
+#[test]
+fn multi_dest_only_for_sd_flashers() {
+    assert!(multi_dest_supported(config::Flasher::SdCard));
+    assert!(multi_dest_supported(config::Flasher::SdCardBootfs));
+    assert!(multi_dest_supported(config::Flasher::SdCardNoBootloader));
+    assert!(!multi_dest_supported(config::Flasher::BeagleConnectFreedom));
+    assert!(!multi_dest_supported(config::Flasher::Mspm0));
+}
+
+#[test]
+fn toggle_dest_keeps_devices_unique() {
+    let dev = |x: &str| DestId::Device(x.into());
+    let file = DestId::SaveToFile(PathBuf::from("/tmp/a.img").into());
+    let mut selected = Vec::new();
+
+    toggle_dest(&mut selected, dev("/dev/ttyUSB0"));
+    toggle_dest(&mut selected, file.clone());
+    toggle_dest(&mut selected, dev("/dev/ttyUSB1"));
+    assert_eq!(
+        selected,
+        [dev("/dev/ttyUSB0"), file.clone(), dev("/dev/ttyUSB1")]
+    );
+
+    // A second click on a device deselects it, leaving the others alone.
+    toggle_dest(&mut selected, dev("/dev/ttyUSB0"));
+    assert_eq!(selected, [file, dev("/dev/ttyUSB1")]);
 }
