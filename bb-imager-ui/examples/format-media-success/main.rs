@@ -5,7 +5,7 @@ struct State(format_media_success::State);
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
         let res = State(format_media_success::State {
-            destination: "Test SD Card (32 GB)".into(),
+            destinations: ["Test SD Card (32 GB)".into()].into(),
         });
 
         (res, iced::Task::none())

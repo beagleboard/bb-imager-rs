@@ -10,7 +10,7 @@ impl State {
             inner: flash_success::State {
                 board: "BeagleY-AI".into(),
                 image: "BeagleY-AI Debian 13 v7.1.x-k3 XFCE".into(),
-                destination: "Test SD Card".into(),
+                destinations: ["Test SD Card".into()].into(),
                 modifications: vec![
                     "User account configured",
                     "Wifi configured",

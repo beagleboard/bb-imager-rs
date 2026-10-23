@@ -8,7 +8,7 @@ pub struct State {
     pub is_download: bool,
     pub board: Box<str>,
     pub image: Box<str>,
-    pub destination: Box<str>,
+    pub destinations: Box<[Box<str>]>,
     pub modifications: Box<[&'static str]>,
     /// Whether this run has a Modify step.
     pub has_customization: bool,
@@ -21,7 +21,7 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
             subtitle: "Review your choices before flashing",
             board: Some(&value.board),
             image: Some(&value.image),
-            destination: &value.destination,
+            destinations: &value.destinations,
             modifications_title: "modifications to apply",
             modifications: &value.modifications,
             footer: None,
