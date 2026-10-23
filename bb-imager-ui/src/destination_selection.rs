@@ -36,18 +36,12 @@ pub struct DestinationItem {
     pub subtitle: Option<Box<str>>,
 }
 
-/// The selected destination, as the detail pane renders it.
-#[derive(Debug, Clone)]
-pub struct DestinationDetails {
-    pub id: DestId,
-}
-
 #[derive(Debug)]
 pub struct State {
     /// Enumerated devices only. The "Save To File" row is derived from
     /// [`State::image_file_name`] at render time, so no host update can drop it.
     pub destinations: Box<[DestinationItem]>,
-    pub selected: Option<DestinationDetails>,
+    pub selected: Option<DestId>,
     pub filter_destination: bool,
     /// Only here so the search box can show what was typed; the host does the
     /// filtering and hands back a new [`State::destinations`].
@@ -104,7 +98,7 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
         .destinations
         .iter()
         .map(|dest| {
-            let is_selected = match state.selected.as_ref().map(|x| &x.id) {
+            let is_selected = match state.selected.as_ref() {
                 Some(DestId::Device(sel)) => sel.as_ref() == dest.id.as_ref(),
                 _ => false,
             };
@@ -128,11 +122,7 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
     // leaves the device list unchanged cannot drop it.
     let save_to_file: Vec<Element<Message>> = match state.image_file_name.as_ref() {
         Some(name) => {
-            let is_selected = state
-                .selected
-                .as_ref()
-                .map(|x| x.id == DestId::SaveToFile)
-                .unwrap_or(false);
+            let is_selected = matches!(state.selected, Some(DestId::SaveToFile));
 
             vec![
                 list_item(
