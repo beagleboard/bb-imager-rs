@@ -554,7 +554,7 @@ impl ReviewState {
                 is_download: ctx.is_download(),
                 board: ctx.selected_board.name.clone(),
                 image: ctx.selected_image.1.to_string().into(),
-                destination: ctx.selected_destination().into(),
+                destinations: [ctx.selected_destination().into()].into(),
                 modifications: ctx.customization.modifications(),
                 has_customization: ctx.has_customization,
             },
@@ -634,7 +634,7 @@ impl From<FlashingState> for FlashingSuccessState {
             state: bb_imager_ui::flash_success::State {
                 board: value.ctx.selected_board.name.clone(),
                 image: value.ctx.selected_image.1.to_string().into(),
-                destination: value.ctx.selected_destination().into(),
+                destinations: [value.ctx.selected_destination().into()].into(),
                 modifications: value.ctx.customization.modifications(),
                 has_customization: value.ctx.has_customization,
             },
@@ -930,7 +930,7 @@ impl FormatMediaReviewState {
         Self {
             common,
             state: bb_imager_ui::format_media_review::State {
-                destination: destination.into(),
+                destinations: [destination.into()].into(),
             },
             selected_dest: dest,
         }
@@ -952,7 +952,8 @@ impl From<FormatMediaReviewState> for FormatMediaProgressState {
             common: value.common,
             selected_dest: value.selected_dest,
             state: bb_imager_ui::format_media_progress::State {
-                destination: value.state.destination,
+                // TODO: Properly implement this at some point.
+                destination: value.state.destinations.into_iter().next().unwrap(),
             },
         }
     }
@@ -985,7 +986,7 @@ impl From<FormatMediaProgressState> for FormatMediaSuccessState {
         Self {
             common: value.common,
             state: bb_imager_ui::format_media_success::State {
-                destination: value.state.destination,
+                destinations: [value.state.destination].into(),
             },
         }
     }

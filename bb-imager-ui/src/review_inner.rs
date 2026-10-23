@@ -15,7 +15,7 @@ pub(crate) struct State<'a> {
     pub(crate) board: Option<&'a str>,
     /// Summary row, omitted when `None`.
     pub(crate) image: Option<&'a str>,
-    pub(crate) destination: &'a str,
+    pub(crate) destinations: &'a [Box<str>],
     pub(crate) modifications_title: &'static str,
     pub(crate) modifications: &'a [&'static str],
     pub(crate) footer: Option<&'static str>,
@@ -23,14 +23,22 @@ pub(crate) struct State<'a> {
 
 impl<'a> State<'a> {
     pub(crate) fn view(&self, scroll_id: widget::Id) -> Element<'a, Message> {
-        let summary = [
-            ("Device", self.board),
-            ("Operating System", self.image),
-            ("Storage", Some(self.destination)),
-        ]
-        .into_iter()
-        .filter_map(|(k, v)| v.map(|v| (k, v)))
-        .flat_map(|(k, v)| [k.into(), v.into()]);
+        let storage =
+            widget::column(self.destinations.iter().map(|x| x.as_ref().into())).spacing(4);
+
+        let summary = [("Device", self.board), ("Operating System", self.image)]
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .flat_map(|(k, v)| [k.into(), v.into()])
+            .chain([
+                if self.destinations.len() > 1 {
+                    "Storage Devices"
+                } else {
+                    "Storage"
+                }
+                .into(),
+                storage.into(),
+            ]);
 
         let mut col = widget::column![
             widget::text(self.title)

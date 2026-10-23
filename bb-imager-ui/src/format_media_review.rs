@@ -5,7 +5,7 @@ use crate::helpers::{SidebarEntry, page_type2};
 
 #[derive(Debug)]
 pub struct State {
-    pub destination: Box<str>,
+    pub destinations: Box<[Box<str>]>,
 }
 
 impl<'a> From<&'a State> for crate::review_inner::State<'a> {
@@ -13,7 +13,7 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
         Self {
             title: "Format Media",
             subtitle: "Review your choices before formatting",
-            destination: &value.destination,
+            destinations: &value.destinations,
             footer: Some("All data on this storage device will be permanently erased."),
             ..Default::default()
         }
