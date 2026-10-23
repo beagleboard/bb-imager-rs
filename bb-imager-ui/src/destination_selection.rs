@@ -20,7 +20,7 @@ const ICON_WIDTH: u32 = 60;
 pub enum DestId {
     Device(Box<str>),
     /// The image was written to a file rather than a device.
-    SaveToFile,
+    SaveToFile(Box<std::path::Path>),
 }
 
 /// One row of the device list.
@@ -122,7 +122,7 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
     // leaves the device list unchanged cannot drop it.
     let save_to_file: Vec<Element<Message>> = match state.image_file_name.as_ref() {
         Some(name) => {
-            let is_selected = matches!(state.selected, Some(DestId::SaveToFile));
+            let is_selected = matches!(state.selected, Some(DestId::SaveToFile(_)));
 
             vec![
                 list_item(

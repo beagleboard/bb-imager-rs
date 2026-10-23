@@ -454,9 +454,17 @@ impl BBImager {
                 )
             }
             Self::ChooseDest(inner) => {
-                let selected_dest = inner
-                    .selected_dest
-                    .expect("Destination should already be selcted");
+                let selected_dest = match inner.state.selected.unwrap() {
+                    bb_imager_ui::destination_selection::DestId::Device(ident) => inner
+                        .destinations
+                        .iter()
+                        .find(|x| x.identifier().as_ref() == ident.as_ref())
+                        .cloned()
+                        .unwrap(),
+                    bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
+                        helpers::Destination::LocalFile(path.into())
+                    }
+                };
 
                 let flasher = inner.selected_image.1.flasher();
 

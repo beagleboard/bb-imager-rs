@@ -604,10 +604,10 @@ pub(crate) fn dest_item(
     }
 }
 
-impl From<&Destination> for bb_imager_ui::destination_selection::DestId {
-    fn from(value: &Destination) -> Self {
+impl From<Destination> for bb_imager_ui::destination_selection::DestId {
+    fn from(value: Destination) -> Self {
         match value {
-            Destination::LocalFile(_) => Self::SaveToFile,
+            Destination::LocalFile(x) => Self::SaveToFile(x.into()),
             _ => Self::Device(value.identifier().into()),
         }
     }
