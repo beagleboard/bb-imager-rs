@@ -323,9 +323,9 @@ fn dest_item_projects_a_row() {
 #[test]
 fn dest_details_projects_the_detail_pane() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
-    let details = bb_imager_ui::destination_selection::DestinationDetails::from(&dst);
+    let details = bb_imager_ui::destination_selection::DestId::from(&dst);
 
-    assert_eq!(details.id, DestId::SaveToFile);
+    assert_eq!(details, DestId::SaveToFile);
 }
 
 /// A row's id and the selection's id must name the same device, or a click
@@ -333,11 +333,11 @@ fn dest_details_projects_the_detail_pane() {
 #[test]
 fn dest_item_and_details_agree_on_identity() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
-    let details = bb_imager_ui::destination_selection::DestinationDetails::from(&dst);
+    let details = bb_imager_ui::destination_selection::DestId::from(&dst);
 
     // A `LocalFile` only ever reaches the detail pane, never the device list,
     // so its details carry the file identity while a row carries the raw id.
-    assert_eq!(details.id, DestId::SaveToFile);
+    assert_eq!(details, DestId::SaveToFile);
     assert_eq!(dest_item(&dst).id, dst.identifier().as_ref().into());
 }
 

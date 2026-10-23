@@ -73,10 +73,8 @@ fn devices(filter: bool, search: &str) -> Box<[destination_selection::Destinatio
         .collect()
 }
 
-fn select(ident: &str) -> Option<destination_selection::DestinationDetails> {
-    Some(destination_selection::DestinationDetails {
-        id: destination_selection::DestId::Device(ident.into()),
-    })
+fn select(ident: &str) -> Option<destination_selection::DestId> {
+    Some(destination_selection::DestId::Device(ident.into()))
 }
 
 fn main() {
@@ -95,9 +93,7 @@ fn main() {
                 Message::SelectDest(ident) => s.inner.selected = select(&ident),
                 Message::SelectFileDest(_) => {
                     // The host opens a save dialog here; pretend it was accepted.
-                    s.inner.selected = Some(destination_selection::DestinationDetails {
-                        id: destination_selection::DestId::SaveToFile,
-                    });
+                    s.inner.selected = Some(destination_selection::DestId::SaveToFile);
                 }
                 _ => {}
             }
