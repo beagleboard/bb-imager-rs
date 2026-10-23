@@ -349,10 +349,6 @@ pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    /// Carries the flasher machinery the page cannot render.
-    pub(crate) selected_dest: Option<helpers::Destination>,
-    /// Kept so a [`DestId`] can be resolved back to a real destination, and so
-    /// the 1 Hz refresh can skip redraws when nothing changed.
     pub(crate) destinations: Box<[helpers::Destination]>,
     pub(crate) state: bb_imager_ui::destination_selection::State,
 }
@@ -380,7 +376,6 @@ impl ChooseDestState {
             common,
             selected_board,
             selected_image,
-            selected_dest: None,
             destinations: Box::default(),
             state: bb_imager_ui::destination_selection::State {
                 instruction,
@@ -398,9 +393,8 @@ impl ChooseDestState {
     }
 
     /// Record `dest` as the selection, both for the flow and for the page.
-    pub(crate) fn select_dest(&mut self, dest: helpers::Destination) {
-        self.state.selected = Some((&dest).into());
-        self.selected_dest = Some(dest);
+    pub(crate) fn select_dest(&mut self, dest: bb_imager_ui::destination_selection::DestId) {
+        self.state.selected = Some(dest);
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -415,7 +409,7 @@ impl From<CustomizeState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.select_dest(value.ctx.selected_dest);
+        res.select_dest(value.ctx.selected_dest.into());
         res
     }
 }
@@ -427,7 +421,7 @@ impl From<ReviewState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.select_dest(value.ctx.selected_dest);
+        res.select_dest(value.ctx.selected_dest.into());
         res
     }
 }

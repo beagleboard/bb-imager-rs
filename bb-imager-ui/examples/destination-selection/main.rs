@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bb_imager_ui::{Message, destination_selection};
 
 /// Stands in for the hardware enumeration the real app re-runs every second.
@@ -91,9 +93,11 @@ fn main() {
                     s.refresh();
                 }
                 Message::SelectDest(ident) => s.inner.selected = select(&ident),
-                Message::SelectFileDest(_) => {
+                Message::SelectFileDest(x) => {
                     // The host opens a save dialog here; pretend it was accepted.
-                    s.inner.selected = Some(destination_selection::DestId::SaveToFile);
+                    s.inner.selected = Some(destination_selection::DestId::SaveToFile(
+                        PathBuf::from(x.as_ref()).into(),
+                    ));
                 }
                 _ => {}
             }

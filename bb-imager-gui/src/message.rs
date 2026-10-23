@@ -46,7 +46,7 @@ pub(crate) enum BBImagerMessage {
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
 
     /// Choose Destination page
-    SelectDest(helpers::Destination),
+    SelectDest(bb_imager_ui::destination_selection::DestId),
 
     // Flashing Page
     FlashProgress(bb_flasher::DownloadFlashingStatus),
@@ -308,14 +308,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             // re-enumerated every second, so a click landing after a refresh
             // must not retarget to whatever now sits at that index.
             BBImager::ChooseDest(inner) => {
-                match inner
+                if inner
                     .destinations
                     .iter()
-                    .find(|x| x.identifier().as_ref() == ident.as_ref())
-                    .cloned()
+                    .any(|x| x.identifier().as_ref() == ident.as_ref())
                 {
-                    Some(dest) => inner.select_dest(dest),
-                    None => tracing::warn!("Destination {ident} is gone; ignoring selection"),
+                    inner.select_dest(bb_imager_ui::destination_selection::DestId::Device(ident));
+                } else {
+                    tracing::warn!("Destination {ident} is gone; ignoring selection")
                 }
             }
             #[cfg(feature = "sd")]
@@ -354,7 +354,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         .map(|x| x.inner().to_path_buf())
                 },
                 move |x| match x {
-                    Some(y) => BBImagerMessage::SelectDest(helpers::Destination::LocalFile(y)),
+                    Some(y) => BBImagerMessage::SelectDest(
+                        bb_imager_ui::destination_selection::DestId::SaveToFile(y.into()),
+                    ),
                     None => BBImagerMessage::Null,
                 },
             );
