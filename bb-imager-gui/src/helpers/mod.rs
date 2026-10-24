@@ -1,7 +1,7 @@
 use std::io;
 use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
-use crate::img::{RemoteImage, RemoteItem};
+use crate::img::{RemoteImage, RemoteItem, RemoteSource};
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 #[cfg(feature = "sd")]
@@ -170,10 +170,10 @@ pub(crate) fn default_user() -> &'static str {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum SelectedImage {
     LocalImage(bb_flasher::LocalImage),
-    RemoteImage(RemoteImage),
+    RemoteImage(RemoteSource),
 }
 
 impl SelectedImage {
@@ -196,67 +196,103 @@ impl SelectedImage {
     }
 }
 
-impl From<RemoteImage> for SelectedImage {
-    fn from(value: RemoteImage) -> Self {
-        Self::RemoteImage(value)
-    }
+/// Everything flashing one destination reads from, opened by [`prepare_flash`].
+#[derive(Debug)]
+pub(crate) struct FlashSource {
+    img: SelectedImage,
+    #[cfg(feature = "sd")]
+    bmap: Option<crate::img::Bmap>,
+    /// The selected board's bootfs archive, if it has one.
+    #[cfg(feature = "sd")]
+    bootfs: Option<RemoteSource>,
 }
 
-impl From<bb_flasher::LocalImage> for SelectedImage {
-    fn from(value: bb_flasher::LocalImage) -> Self {
-        Self::LocalImage(value)
-    }
-}
-
-/// `bootfs` is the selected board's bootfs archive, if it has one.
+/// Open the image (and bmap/bootfs) once for `n` destinations, returning one [`FlashSource`]
+/// per destination.
 ///
-/// A remote image's download details are looked up in `db` here rather than
-/// carried through the pages.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn flash(
+/// A remote image is downloaded once, with every destination streaming from the same download.
+/// Its download details are looked up in `db` here rather than carried through the pages.
+pub(crate) fn prepare_flash(
     board: i64,
     img: BoardImage,
-    customization: FlashingCustomization,
-    dst: Destination,
-    db: crate::db::Db,
+    n: usize,
+    db: &crate::db::Db,
     downloader: bb_downloader::Downloader,
-    chan: mpsc::SyncSender<DownloadFlashingStatus>,
-    cancel_sync: bb_helper::cancel::CancellationToken,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<FlashSource>> {
     let flasher = img.flasher();
 
     // Every SD flash is handed the board's archive; only images that carry no bootloader of
     // their own may have it written over their boot partition.
     #[cfg(feature = "sd")]
-    let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
+    let mut bootfs = if flasher == config::Flasher::SdCardNoBootloader {
         let bootfs = db
             .board_by_id(board)?
             .bootfs
             .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
-        Some(RemoteItem::new(
+        RemoteItem::new(
             Box::new(bootfs.url),
             bootfs.image_download_sha256,
             bootfs.image_download_size,
             downloader.clone(),
-        ))
+        )
+        .open(n)?
     } else {
-        None
+        Vec::new()
     };
+    #[cfg(not(feature = "sd"))]
+    let _ = board;
 
-    let (img, bmap) = match img {
-        BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
+    let (imgs, bmap): (Vec<SelectedImage>, _) = match img {
+        BoardImage::Local { img, .. } => (
+            std::iter::repeat_n(img, n)
+                .map(SelectedImage::LocalImage)
+                .collect(),
+            None,
+        ),
         BoardImage::Remote { id, .. } => {
             let image = db.os_image_by_id(id)?;
-            let img = RemoteImage::new(&image, downloader.clone(), flasher);
             #[cfg(feature = "sd")]
-            let bmap = image.bmap.map(|url| crate::img::Bmap { url, downloader });
+            let bmap = image
+                .bmap
+                .clone()
+                .map(|url| crate::img::Bmap::new(url, downloader.clone()));
             #[cfg(not(feature = "sd"))]
-            let bmap = None;
-            (img.into(), bmap)
+            let bmap: Option<()> = None;
+            let imgs = RemoteImage::new(&image, downloader, flasher)
+                .open(n)?
+                .into_iter()
+                .map(SelectedImage::RemoteImage)
+                .collect();
+            (imgs, bmap)
         }
     };
     #[cfg(not(feature = "sd"))]
     let _: Option<()> = bmap;
+
+    Ok(imgs
+        .into_iter()
+        .map(|img| FlashSource {
+            img,
+            #[cfg(feature = "sd")]
+            bmap: bmap.clone(),
+            #[cfg(feature = "sd")]
+            bootfs: bootfs.pop(),
+        })
+        .collect())
+}
+
+/// Flash one destination from a source opened by [`prepare_flash`].
+pub(crate) fn flash(
+    flasher: config::Flasher,
+    src: FlashSource,
+    customization: FlashingCustomization,
+    dst: Destination,
+    chan: mpsc::SyncSender<DownloadFlashingStatus>,
+    cancel_sync: bb_helper::cancel::CancellationToken,
+) -> anyhow::Result<()> {
+    let img = src.img;
+    #[cfg(feature = "sd")]
+    let (bmap, bootfs) = (src.bmap, src.bootfs);
 
     match (img, customization, dst) {
         #[cfg(feature = "sd")]
@@ -403,6 +439,14 @@ impl Destination {
         matches!(self, Self::LocalFile(_))
     }
 
+    /// What the summary pages call this destination: its name, with the size where there is one.
+    pub(crate) fn label(&self) -> Box<str> {
+        match self.size() {
+            Some(x) => format!("{} ({})", self, pretty_bytes(x)).into(),
+            None => self.to_string().into(),
+        }
+    }
+
     /// Stable identity of this destination, used to match a click back to a
     /// device after the list has been re-enumerated.
     pub(crate) fn identifier(&self) -> std::borrow::Cow<'_, str> {
@@ -495,6 +539,40 @@ pub(crate) const fn flasher_supported(flasher: config::Flasher) -> bool {
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         config::Flasher::Mspm0 => true,
         _ => false,
+    }
+}
+
+/// Whether `flasher` can write several destinations in one go. Such flashers take any number of
+/// devices, plus at most one file.
+pub(crate) const fn multi_dest_supported(flasher: config::Flasher) -> bool {
+    match flasher {
+        #[cfg(feature = "sd")]
+        config::Flasher::SdCard
+        | config::Flasher::SdCardBootfs
+        | config::Flasher::SdCardNoBootloader => true,
+        _ => false,
+    }
+}
+
+/// Add `dest` to `selected`, or remove it if it is already there. A file destination replaces
+/// any earlier one, since there is only one "Save To File" slot.
+pub(crate) fn toggle_dest(
+    selected: &mut Vec<bb_imager_ui::destination_selection::DestId>,
+    dest: bb_imager_ui::destination_selection::DestId,
+) {
+    use bb_imager_ui::destination_selection::DestId;
+
+    if let DestId::SaveToFile(_) = dest {
+        selected.retain(|x| !matches!(x, DestId::SaveToFile(_)));
+        selected.push(dest);
+        return;
+    }
+
+    match selected.iter().position(|x| *x == dest) {
+        Some(i) => {
+            selected.remove(i);
+        }
+        None => selected.push(dest),
     }
 }
 

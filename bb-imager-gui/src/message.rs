@@ -45,12 +45,17 @@ pub(crate) enum BBImagerMessage {
     },
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
 
-    /// Choose Destination page
+    /// Choose Destination page. Toggles the destination in the selection.
     SelectDest(bb_imager_ui::destination_selection::DestId),
 
     // Flashing Page
-    FlashProgress(bb_flasher::DownloadFlashingStatus),
+    /// Progress of the destination at this index.
+    FlashProgress(usize, bb_flasher::DownloadFlashingStatus),
+    /// The destination at this index finished, with its error if it failed.
+    FlashDestDone(usize, Result<(), String>),
+    /// Every destination succeeded.
     FlashSuccess,
+    /// At least one destination failed.
     FlashFail(String),
 
     // Download images which have not already been downloaded
@@ -345,6 +350,15 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         // The page derives this row and owns the suggested name, so there is
         // nothing to re-derive here.
         BBImagerMessage::UiState(Message::SelectFileDest(name)) => {
+            // A second click on a selected "Save To File" deselects it instead
+            // of asking for another file.
+            if let BBImager::ChooseDest(inner) = state
+                && inner.has_file_dest()
+            {
+                inner.remove_file_dest();
+                return Task::none();
+            }
+
             return Task::perform(
                 async move {
                     rfd::AsyncFileDialog::new()
@@ -429,7 +443,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return state.restart();
         }
         BBImagerMessage::FlashFail(err) => {
-            let mut msg = "Flashing failed";
+            let msg;
 
             let logs =
                 std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
@@ -437,24 +451,18 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             *state = match std::mem::take(state) {
                 BBImager::Flashing(inner) => {
-                    if inner.ctx.is_download() {
-                        msg = "Download failed";
-                    }
-
+                    msg = inner.fail_notification();
                     BBImager::FlashingFail(crate::state::FlashingFailState::new(inner, err, logs))
                 }
                 #[cfg(feature = "sd")]
                 BBImager::FormatMediaProgress(inner) => {
-                    msg = "Formatting failed";
+                    msg = "Formatting failed".to_string();
                     BBImager::FormatMediaFail(FormatMediaFailState::new(inner, err, logs))
                 }
                 BBImager::AppInfo(inner) => {
                     match inner.page {
                         OverlayData::Flashing(flashing_state) => {
-                            if flashing_state.ctx.is_download() {
-                                msg = "Download failed";
-                            }
-
+                            msg = flashing_state.fail_notification();
                             BBImager::AppInfo(OverlayState {
                                 page: OverlayData::FlashingFail(
                                     crate::state::FlashingFailState::new(flashing_state, err, logs),
@@ -464,7 +472,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         }
                         #[cfg(feature = "sd")]
                         OverlayData::FormatMediaProgress(format_state) => {
-                            msg = "Formatting failed";
+                            msg = "Formatting failed".to_string();
                             BBImager::AppInfo(OverlayState {
                                 page: OverlayData::FormatMediaFail(FormatMediaFailState::new(
                                     format_state,
@@ -480,17 +488,26 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => panic!("Unexpected message"),
             };
 
-            return show_notification(msg.to_string());
+            return show_notification(msg);
         }
-        BBImagerMessage::FlashProgress(x) => match state {
+        BBImagerMessage::FlashProgress(i, x) => match state {
             BBImager::Flashing(inner) => {
-                inner.progress_update(x);
+                inner.progress_update(i, x);
             }
             BBImager::AppInfo(inner) => match &mut inner.page {
-                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(x),
+                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(i, x),
                 _ => panic!("Unexpected message"),
             },
             // Debug build can be slow.
+            _ => {}
+        },
+        BBImagerMessage::FlashDestDone(i, res) => match state {
+            BBImager::Flashing(inner) => inner.dest_done(i, res),
+            BBImager::AppInfo(inner) => match &mut inner.page {
+                OverlayData::Flashing(flashing_state) => flashing_state.dest_done(i, res),
+                _ => panic!("Unexpected message"),
+            },
+            // Can trail a cancel.
             _ => {}
         },
         #[cfg(feature = "sd")]
@@ -507,26 +524,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess => {
-            let mut msg = "Flashing finished successfully";
+            let msg;
 
             *state = match std::mem::take(state) {
                 BBImager::Flashing(inner) => {
-                    if inner.ctx.is_download() {
-                        msg = "Download finished successfully";
-                    }
+                    msg = inner.success_notification();
                     BBImager::FlashingSuccess(inner.into())
                 }
                 #[cfg(feature = "sd")]
                 BBImager::FormatMediaProgress(inner) => {
-                    msg = "Formatting finished successfully";
+                    msg = "Formatting finished successfully".to_string();
                     BBImager::FormatMediaSuccess(inner.into())
                 }
                 BBImager::AppInfo(inner) => match inner.page {
                     OverlayData::Flashing(flashing_state) => {
-                        if flashing_state.ctx.is_download() {
-                            msg = "Download finished successfully";
-                        }
-
+                        msg = flashing_state.success_notification();
                         BBImager::AppInfo(OverlayState {
                             page: OverlayData::FlashingSuccess(flashing_state.into()),
                             ..inner
@@ -534,7 +546,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     }
                     #[cfg(feature = "sd")]
                     OverlayData::FormatMediaProgress(format_state) => {
-                        msg = "Formatting finished successfully";
+                        msg = "Formatting finished successfully".to_string();
                         BBImager::AppInfo(OverlayState {
                             page: OverlayData::FormatMediaSuccess(format_state.into()),
                             ..inner
@@ -545,7 +557,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 _ => panic!("Unexpected message"),
             };
 
-            return show_notification(msg.to_string());
+            return show_notification(msg);
         }
         BBImagerMessage::UiState(Message::EditorEvent(evt)) => match evt {
             iced::widget::text_editor::Action::Edit(_) => {}

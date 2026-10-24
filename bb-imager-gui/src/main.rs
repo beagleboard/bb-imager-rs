@@ -336,22 +336,37 @@ impl BBImager {
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
-        // Retrying from the failure page re-runs with the same choices.
-        let (common, ctx) = match std::mem::take(self) {
-            Self::Review(inner) => (inner.common, inner.ctx),
-            Self::FlashingFail(inner) => (inner.common, inner.ctx),
+        // Retrying from the failure page re-runs with the same choices, writing only the
+        // destinations that failed.
+        let (common, ctx, dsts) = match std::mem::take(self) {
+            Self::Review(inner) => {
+                let dsts = inner.ctx.selected_dests.clone();
+                (inner.common, inner.ctx, dsts)
+            }
+            Self::FlashingFail(inner) => {
+                let dsts = if inner.retry_dests.is_empty() {
+                    inner.ctx.selected_dests.clone()
+                } else {
+                    inner.retry_dests
+                };
+                (inner.common, inner.ctx, dsts)
+            }
             _ => panic!("Unexpected page"),
+        };
+        let ctx = state::FlashingContext {
+            selected_dests: dsts,
+            ..ctx
         };
 
         let customization = ctx.customization.clone();
         let board = ctx.selected_board.id;
         let img = ctx.selected_image.1.clone();
-        let dst = ctx.selected_dest.clone();
+        let dsts = ctx.selected_dests.clone();
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", ctx.selected_board);
         tracing::info!("Selected Image: {:#?}", img);
-        tracing::info!("Selected Destination: {:#?}", dst);
+        tracing::info!("Selected Destinations: {:#?}", dsts);
         tracing::info!("Selected Customization: {:#?}", customization);
 
         let db = common.db.clone();
@@ -359,42 +374,77 @@ impl BBImager {
         let cancel = bb_helper::cancel::CancellationToken::default();
 
         let s = iced::stream::channel(2, async move |mut chan| {
-            let (tx, rx) = std::sync::mpsc::sync_channel(2);
-
-            let cancel_child = cancel.clone();
-            let flash_task = blocking_future(move || {
-                helpers::flash(
-                    board,
-                    img,
-                    customization,
-                    dst,
-                    db,
-                    downloader,
-                    tx,
-                    cancel_child,
-                )
-            });
-            let mut chan_clone = chan.clone();
-            let progress_task = tokio::task::spawn_blocking(move || {
-                while let Ok(progress) = rx.recv() {
-                    let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(progress));
-                }
-            });
             let _guard = cancel.drop_guard();
+            let flasher = img.flasher();
+            let n = dsts.len();
 
-            let res = match flash_task.await {
-                Ok(_) => {
-                    tracing::info!("Flashing Successfull");
-                    BBImagerMessage::FlashSuccess
-                }
+            let srcs = match blocking_future(move || {
+                helpers::prepare_flash(board, img, n, &db, downloader)
+            })
+            .await
+            {
+                Ok(x) => x,
                 Err(e) => {
-                    tracing::error!("Flashing failed with error: {:#?}", e);
-                    BBImagerMessage::FlashFail(e.to_string())
+                    tracing::error!("Failed to open the image: {:#?}", e);
+                    for i in 0..n {
+                        let _ = chan
+                            .send(BBImagerMessage::FlashDestDone(i, Err(e.to_string())))
+                            .await;
+                    }
+                    let _ = chan.send(BBImagerMessage::FlashFail(e.to_string())).await;
+                    return;
                 }
             };
 
+            let mut tasks: iced::futures::stream::FuturesUnordered<_> = srcs
+                .into_iter()
+                .zip(dsts)
+                .enumerate()
+                .map(|(i, (src, dst))| {
+                    let (tx, rx) = std::sync::mpsc::sync_channel(2);
+                    let mut chan_clone = chan.clone();
+                    let progress_task = tokio::task::spawn_blocking(move || {
+                        while let Ok(progress) = rx.recv() {
+                            let _ =
+                                chan_clone.try_send(BBImagerMessage::FlashProgress(i, progress));
+                        }
+                    });
+
+                    let customization = customization.clone();
+                    let cancel = cancel.clone();
+                    let flash_task = blocking_future(move || {
+                        let label = dst.label();
+                        helpers::flash(flasher, src, customization, dst, tx, cancel).inspect_err(
+                            |e| tracing::error!("Flashing {label} failed with error: {:#?}", e),
+                        )
+                    });
+
+                    async move {
+                        let res = flash_task.await;
+                        progress_task.abort();
+                        (i, res.map_err(|e| e.to_string()))
+                    }
+                })
+                .collect();
+
+            let mut first_err = None;
+            while let Some((i, res)) = iced::futures::StreamExt::next(&mut tasks).await {
+                if let Err(e) = &res {
+                    first_err.get_or_insert_with(|| e.clone());
+                }
+                let _ = chan.send(BBImagerMessage::FlashDestDone(i, res)).await;
+            }
+
+            let res = match first_err {
+                None => {
+                    tracing::info!("Flashing Successfull");
+                    BBImagerMessage::FlashSuccess
+                }
+                Some(e) if n == 1 => BBImagerMessage::FlashFail(e),
+                Some(_) => BBImagerMessage::FlashFail("Some destinations failed".to_string()),
+            };
+
             let _ = chan.send(res).await;
-            progress_task.abort();
         });
 
         let (t, h) = Task::stream(s).abortable();
@@ -404,7 +454,11 @@ impl BBImager {
             cancel_flashing: h,
             // Built before `ctx` is moved in below.
             state: Box::new(bb_imager_ui::flashing::State {
-                progress: Default::default(),
+                dests: ctx
+                    .selected_dests
+                    .iter()
+                    .map(|x| bb_imager_ui::flashing::DestProgress::new(x.label()))
+                    .collect(),
                 start_timestamp: None,
             }),
             ctx,
@@ -454,17 +508,22 @@ impl BBImager {
                 )
             }
             Self::ChooseDest(inner) => {
-                let selected_dest = match inner.state.selected.into_iter().next().unwrap() {
-                    bb_imager_ui::destination_selection::DestId::Device(ident) => inner
-                        .destinations
-                        .iter()
-                        .find(|x| x.identifier().as_ref() == ident.as_ref())
-                        .cloned()
-                        .unwrap(),
-                    bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
-                        helpers::Destination::LocalFile(path)
-                    }
-                };
+                let selected_dests = inner
+                    .state
+                    .selected
+                    .into_iter()
+                    .map(|id| match id {
+                        bb_imager_ui::destination_selection::DestId::Device(ident) => inner
+                            .destinations
+                            .iter()
+                            .find(|x| x.identifier().as_ref() == ident.as_ref())
+                            .cloned()
+                            .unwrap(),
+                        bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
+                            helpers::Destination::LocalFile(path)
+                        }
+                    })
+                    .collect();
 
                 let flasher = inner.selected_image.1.flasher();
 
@@ -485,7 +544,7 @@ impl BBImager {
                 let ctx = state::FlashingContext {
                     selected_board: inner.selected_board,
                     selected_image: inner.selected_image,
-                    selected_dest,
+                    selected_dests,
                     customization,
                     has_customization,
                 };

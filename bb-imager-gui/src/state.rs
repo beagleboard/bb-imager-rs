@@ -8,6 +8,7 @@ use iced::{Task, widget};
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
 use bb_imager_ui::SidebarEntry;
+use bb_imager_ui::destination_selection::DestId;
 use bb_imager_ui::image_selection::ImageId;
 
 use crate::{
@@ -392,9 +393,32 @@ impl ChooseDestState {
         self.destinations = destinations;
     }
 
-    /// Record `dest` as the selection, both for the flow and for the page.
-    pub(crate) fn toggle_dest(&mut self, dest: bb_imager_ui::destination_selection::DestId) {
-        self.state.selected = vec![dest];
+    /// Toggle `dest` in the selection. Flashers that can only write one destination have it
+    /// replace the selection instead.
+    pub(crate) fn toggle_dest(&mut self, dest: DestId) {
+        if helpers::multi_dest_supported(self.selected_image.1.flasher()) {
+            helpers::toggle_dest(&mut self.state.selected, dest);
+        } else {
+            self.state.selected = vec![dest];
+        }
+    }
+
+    /// Deselect "Save To File".
+    pub(crate) fn remove_file_dest(&mut self) {
+        self.state
+            .selected
+            .retain(|x| !matches!(x, DestId::SaveToFile(_)));
+    }
+
+    pub(crate) fn has_file_dest(&self) -> bool {
+        self.state
+            .selected
+            .iter()
+            .any(|x| matches!(x, DestId::SaveToFile(_)))
+    }
+
+    fn select_dests(&mut self, dests: impl IntoIterator<Item = helpers::Destination>) {
+        self.state.selected = dests.into_iter().map(Into::into).collect();
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -409,7 +433,7 @@ impl From<CustomizeState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.toggle_dest(value.ctx.selected_dest.into());
+        res.select_dests(value.ctx.selected_dests);
         res
     }
 }
@@ -421,7 +445,7 @@ impl From<ReviewState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.toggle_dest(value.ctx.selected_dest.into());
+        res.select_dests(value.ctx.selected_dests);
         res
     }
 }
@@ -452,7 +476,8 @@ impl From<FlashingCancelState> for ChooseDestState {
 pub(crate) struct FlashingContext {
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
+    /// Never empty, and unique.
+    pub(crate) selected_dests: Box<[helpers::Destination]>,
     pub(crate) customization: helpers::FlashingCustomization,
     /// Whether the Customize page is part of this flow.
     ///
@@ -463,15 +488,19 @@ pub(crate) struct FlashingContext {
 }
 
 impl FlashingContext {
-    pub(crate) fn selected_destination(&self) -> String {
-        match self.selected_dest.size() {
-            Some(x) => format!("{} ({})", self.selected_dest, helpers::pretty_bytes(x)),
-            None => self.selected_dest.to_string(),
-        }
+    /// One label per destination.
+    pub(crate) fn selected_destinations(&self) -> Box<[Box<str>]> {
+        self.selected_dests
+            .iter()
+            .map(helpers::Destination::label)
+            .collect()
     }
 
-    pub(crate) const fn is_download(&self) -> bool {
-        self.selected_dest.is_download_action()
+    /// Whether this only saves the image to a file, rather than writing any device.
+    pub(crate) fn is_download(&self) -> bool {
+        self.selected_dests
+            .iter()
+            .all(helpers::Destination::is_download_action)
     }
 }
 
@@ -548,7 +577,7 @@ impl ReviewState {
                 is_download: ctx.is_download(),
                 board: ctx.selected_board.name.clone(),
                 image: ctx.selected_image.1.to_string().into(),
-                destinations: [ctx.selected_destination().into()].into(),
+                destinations: ctx.selected_destinations(),
                 modifications: ctx.customization.modifications(),
                 has_customization: ctx.has_customization,
             },
@@ -584,7 +613,7 @@ pub(crate) struct FlashingState {
 }
 
 impl FlashingState {
-    pub(crate) fn progress_update(&mut self, u: bb_flasher::DownloadFlashingStatus) {
+    pub(crate) fn progress_update(&mut self, idx: usize, u: bb_flasher::DownloadFlashingStatus) {
         // Required for better time estimate.
         match u {
             bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
@@ -596,7 +625,53 @@ impl FlashingState {
             _ => {}
         }
 
-        self.state.progress = progress_from(u);
+        if let Some(dest) = self.state.dests.get_mut(idx) {
+            dest.progress = progress_from(u);
+        }
+    }
+
+    pub(crate) fn dest_done(&mut self, idx: usize, res: Result<(), String>) {
+        if let Some(dest) = self.state.dests.get_mut(idx) {
+            dest.result = Some(res.map_err(Into::into));
+        }
+    }
+
+    /// Destinations that did not finish successfully, with their errors.
+    fn failures(&self) -> impl Iterator<Item = (&helpers::Destination, &str)> {
+        self.ctx
+            .selected_dests
+            .iter()
+            .zip(self.state.dests.iter())
+            .filter_map(|(d, p)| match &p.result {
+                Some(Ok(())) => None,
+                Some(Err(e)) => Some((d, e.as_ref())),
+                None => Some((d, "Did not finish")),
+            })
+    }
+
+    pub(crate) fn fail_notification(&self) -> String {
+        let total = self.ctx.selected_dests.len();
+        if total > 1 {
+            format!(
+                "Flashing failed for {} of {total} destinations",
+                self.failures().count()
+            )
+        } else if self.ctx.is_download() {
+            "Download failed".to_string()
+        } else {
+            "Flashing failed".to_string()
+        }
+    }
+
+    pub(crate) fn success_notification(&self) -> String {
+        let total = self.ctx.selected_dests.len();
+        if total > 1 {
+            format!("Flashed {total} destinations successfully")
+        } else if self.ctx.is_download() {
+            "Download finished successfully".to_string()
+        } else {
+            "Flashing finished successfully".to_string()
+        }
     }
 }
 
@@ -628,7 +703,7 @@ impl From<FlashingState> for FlashingSuccessState {
             state: bb_imager_ui::flash_success::State {
                 board: value.ctx.selected_board.name.clone(),
                 image: value.ctx.selected_image.1.to_string().into(),
-                destinations: [value.ctx.selected_destination().into()].into(),
+                destinations: value.ctx.selected_destinations(),
                 modifications: value.ctx.customization.modifications(),
                 has_customization: value.ctx.has_customization,
             },
@@ -660,6 +735,8 @@ impl From<FlashingState> for FlashingCancelState {
 pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
+    /// The destinations that failed, which are all a retry writes again.
+    pub(crate) retry_dests: Box<[helpers::Destination]>,
     pub(crate) state: bb_imager_ui::flash_fail::State,
 }
 
@@ -672,12 +749,36 @@ impl FlashingFailState {
         logs.perform(widget::text_editor::Action::Move(
             widget::text_editor::Motion::DocumentEnd,
         ));
+        let total = state.ctx.selected_dests.len();
+        let mut retry_dests = Vec::new();
+        let mut details = Vec::new();
+        for (d, e) in state.failures() {
+            retry_dests.push(d.clone());
+            details.push(format!("{}: {e}", d.label()).into());
+        }
+
+        // A single destination's error is already the reason.
+        let details = if total > 1 {
+            details.push(
+                format!(
+                    "{} of {total} destinations succeeded",
+                    total - retry_dests.len()
+                )
+                .into(),
+            );
+            details.into()
+        } else {
+            Box::default()
+        };
+
         Self {
             state: bb_imager_ui::flash_fail::State {
                 reason: err.into(),
+                details,
                 logs,
                 has_customization: state.ctx.has_customization,
             },
+            retry_dests: retry_dests.into(),
             common: state.common,
             ctx: state.ctx,
         }

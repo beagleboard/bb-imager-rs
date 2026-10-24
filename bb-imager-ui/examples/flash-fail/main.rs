@@ -9,6 +9,10 @@ impl State {
         logs.perform(Action::Move(Motion::DocumentEnd));
         let res = State(flash_fail::State {
             reason: "Fail Reason for Testing".into(),
+            details: Box::new([
+                "SD Card 2 (32.00 GiB): Fail Reason for Testing".into(),
+                "1 of 2 destinations succeeded".into(),
+            ]),
             logs,
             has_customization: true,
         });

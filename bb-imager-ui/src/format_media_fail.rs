@@ -18,6 +18,7 @@ pub fn view(state: &State) -> Element<'_, Message> {
         fail_info_view(
             format!("Format Failed: {}", state.reason),
             "Formatting the device failed. The device might be in an unusable state at present.",
+            &[],
             &state.logs,
         ),
         [
