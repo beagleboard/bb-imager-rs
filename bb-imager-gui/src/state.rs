@@ -393,8 +393,8 @@ impl ChooseDestState {
     }
 
     /// Record `dest` as the selection, both for the flow and for the page.
-    pub(crate) fn select_dest(&mut self, dest: bb_imager_ui::destination_selection::DestId) {
-        self.state.selected = Some(dest);
+    pub(crate) fn toggle_dest(&mut self, dest: bb_imager_ui::destination_selection::DestId) {
+        self.state.selected = vec![dest];
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -409,7 +409,7 @@ impl From<CustomizeState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.select_dest(value.ctx.selected_dest.into());
+        res.toggle_dest(value.ctx.selected_dest.into());
         res
     }
 }
@@ -421,7 +421,7 @@ impl From<ReviewState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.select_dest(value.ctx.selected_dest.into());
+        res.toggle_dest(value.ctx.selected_dest.into());
         res
     }
 }
