@@ -41,7 +41,7 @@ pub struct State {
     /// Enumerated devices only. The "Save To File" row is derived from
     /// [`State::image_file_name`] at render time, so no host update can drop it.
     pub destinations: Box<[DestinationItem]>,
-    pub selected: Option<DestId>,
+    pub selected: Vec<DestId>,
     pub filter_destination: bool,
     /// Only here so the search box can show what was typed; the host does the
     /// filtering and hands back a new [`State::destinations`].
@@ -58,7 +58,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             destinations: Box::default(),
-            selected: None,
+            selected: Vec::new(),
             // Hand-written rather than derived: destinations start filtered.
             filter_destination: true,
             search: "".into(),
@@ -69,15 +69,18 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
+    let next_btn = widget::button("NEXT").on_press_maybe(if state.selected.is_empty() {
+        None
+    } else {
+        Some(Message::Next)
+    });
+
     if let Some(instr) = state.instruction.as_ref() {
         page_type1(
             SidebarEntry::Storage,
             dest_list_pane(state, &scroll_id),
             instr_view_pane(instr, &scroll_id),
-            [
-                widget::button("NEXT")
-                    .on_press_maybe(state.selected.as_ref().map(|_| Message::Next)),
-            ],
+            [next_btn],
         )
     } else {
         page_type2(
@@ -85,10 +88,7 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
             false,
             false,
             dest_list_pane(state, &scroll_id),
-            [
-                widget::button("NEXT")
-                    .on_press_maybe(state.selected.as_ref().map(|_| Message::Next)),
-            ],
+            [next_btn],
         )
     }
 }
@@ -98,10 +98,13 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
         .destinations
         .iter()
         .map(|dest| {
-            let is_selected = match state.selected.as_ref() {
-                Some(DestId::Device(sel)) => sel.as_ref() == dest.id.as_ref(),
-                _ => false,
-            };
+            let is_selected = state.selected.iter().any(|x| {
+                if let DestId::Device(ident) = x {
+                    dest.id.as_ref() == ident.as_ref()
+                } else {
+                    false
+                }
+            });
 
             let label: Element<'_, _> = match dest.subtitle.as_ref() {
                 Some(x) => widget::column![text(dest.label.as_ref()).size(18), text(x.as_ref())]
@@ -122,7 +125,10 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
     // leaves the device list unchanged cannot drop it.
     let save_to_file: Vec<Element<Message>> = match state.image_file_name.as_ref() {
         Some(name) => {
-            let is_selected = matches!(state.selected, Some(DestId::SaveToFile(_)));
+            let is_selected = state
+                .selected
+                .iter()
+                .any(|x| matches!(x, DestId::SaveToFile(_)));
 
             vec![
                 list_item(

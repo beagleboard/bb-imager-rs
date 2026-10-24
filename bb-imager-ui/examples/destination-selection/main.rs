@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use bb_imager_ui::{Message, destination_selection};
+use bb_imager_ui::{
+    Message,
+    destination_selection::{self, DestId},
+};
 
 /// Stands in for the hardware enumeration the real app re-runs every second.
 const DEVICES: [(&str, &str, u64); 4] = [
@@ -54,6 +57,18 @@ impl State {
     fn refresh(&mut self) {
         self.inner.destinations = devices(self.inner.filter_destination, &self.inner.search);
     }
+
+    fn toggle(&mut self, id: DestId) {
+        let same = |x: &DestId| {
+            matches!((x, &id), (DestId::SaveToFile(_), DestId::SaveToFile(_))) || *x == id
+        };
+        match self.inner.selected.iter().position(same) {
+            Some(i) => {
+                self.inner.selected.remove(i);
+            }
+            None => self.inner.selected.push(id),
+        }
+    }
 }
 
 fn devices(filter: bool, search: &str) -> Box<[destination_selection::DestinationItem]> {
@@ -75,10 +90,6 @@ fn devices(filter: bool, search: &str) -> Box<[destination_selection::Destinatio
         .collect()
 }
 
-fn select(ident: &str) -> Option<destination_selection::DestId> {
-    Some(destination_selection::DestId::Device(ident.into()))
-}
-
 fn main() {
     let app = iced::application(
         State::new,
@@ -92,12 +103,9 @@ fn main() {
                     s.inner.filter_destination = x;
                     s.refresh();
                 }
-                Message::SelectDest(ident) => s.inner.selected = select(&ident),
+                Message::SelectDest(ident) => s.toggle(DestId::Device(ident)),
                 Message::SelectFileDest(x) => {
-                    // The host opens a save dialog here; pretend it was accepted.
-                    s.inner.selected = Some(destination_selection::DestId::SaveToFile(
-                        PathBuf::from(x.as_ref()).into(),
-                    ));
+                    s.toggle(DestId::SaveToFile(PathBuf::from(x.as_ref()).into()));
                 }
                 _ => {}
             }

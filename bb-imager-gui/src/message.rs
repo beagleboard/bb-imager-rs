@@ -300,7 +300,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
         }
         BBImagerMessage::SelectDest(x) => match state {
-            BBImager::ChooseDest(inner) => inner.select_dest(x),
+            BBImager::ChooseDest(inner) => inner.toggle_dest(x),
             _ => panic!("Unexpected message"),
         },
         BBImagerMessage::UiState(Message::SelectDest(ident)) => match state {
@@ -313,7 +313,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     .iter()
                     .any(|x| x.identifier().as_ref() == ident.as_ref())
                 {
-                    inner.select_dest(bb_imager_ui::destination_selection::DestId::Device(ident));
+                    inner.toggle_dest(bb_imager_ui::destination_selection::DestId::Device(ident));
                 } else {
                     tracing::warn!("Destination {ident} is gone; ignoring selection")
                 }

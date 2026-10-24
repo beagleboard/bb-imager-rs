@@ -454,7 +454,7 @@ impl BBImager {
                 )
             }
             Self::ChooseDest(inner) => {
-                let selected_dest = match inner.state.selected.unwrap() {
+                let selected_dest = match inner.state.selected.into_iter().next().unwrap() {
                     bb_imager_ui::destination_selection::DestId::Device(ident) => inner
                         .destinations
                         .iter()
