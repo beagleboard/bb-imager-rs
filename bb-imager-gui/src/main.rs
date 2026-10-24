@@ -462,7 +462,7 @@ impl BBImager {
                         .cloned()
                         .unwrap(),
                     bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
-                        helpers::Destination::LocalFile(path.into())
+                        helpers::Destination::LocalFile(path)
                     }
                 };
 

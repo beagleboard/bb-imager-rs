@@ -270,7 +270,7 @@ pub(crate) fn flash(
                 img.into_image_fn(),
                 bootfs.map(|x| x.into_archive_fn(None)),
                 bmap.map(|x| x.into_fn()),
-                f,
+                f.into(),
                 customization.sd_customization(),
             )
             .flash(Some(chan), Some(cancel_sync))
@@ -318,7 +318,7 @@ pub(crate) fn flash(
             });
             bb_flasher::sd::UpdateBootFlasher::with_file_dest(
                 img.into_archive_fn(Some(tx)),
-                t,
+                t.into(),
                 Some(cancel_sync),
             )
             .flash()
@@ -361,7 +361,7 @@ pub(crate) fn flash(
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum Destination {
-    LocalFile(PathBuf),
+    LocalFile(Box<std::path::Path>),
     #[cfg(feature = "sd")]
     SdCard(bb_flasher::sd::Target),
     #[cfg(feature = "bcf_cc1352p7")]
@@ -607,7 +607,7 @@ pub(crate) fn dest_item(
 impl From<Destination> for bb_imager_ui::destination_selection::DestId {
     fn from(value: Destination) -> Self {
         match value {
-            Destination::LocalFile(x) => Self::SaveToFile(x.into()),
+            Destination::LocalFile(x) => Self::SaveToFile(x),
             _ => Self::Device(value.identifier().into()),
         }
     }

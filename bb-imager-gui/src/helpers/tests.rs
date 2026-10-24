@@ -299,7 +299,7 @@ fn board_image_local_reads_file_metadata() {
 
 #[test]
 fn destination_local_file_behaviour() {
-    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img").into());
     assert!(dst.is_download_action());
     assert_eq!(dst.size(), None);
     assert_eq!(dst.to_string(), "Save To File");
@@ -307,7 +307,7 @@ fn destination_local_file_behaviour() {
 
 #[test]
 fn dest_item_projects_a_row() {
-    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img"));
+    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img").into());
     let item = dest_item(&dst);
 
     assert_eq!(item.label.as_ref(), "Save To File");
@@ -324,13 +324,13 @@ fn dest_item_projects_a_row() {
 /// would never highlight the row it came from.
 #[test]
 fn dest_item_and_details_agree_on_identity() {
-    let p = PathBuf::from("/tmp/os.img");
+    let p = PathBuf::from("/tmp/os.img").into_boxed_path();
     let dst = Destination::LocalFile(p.clone());
     let details = bb_imager_ui::destination_selection::DestId::from(dst.clone());
 
     // A `LocalFile` only ever reaches the detail pane, never the device list,
     // so its details carry the file identity while a row carries the raw id.
-    assert_eq!(details, DestId::SaveToFile(p.into()));
+    assert_eq!(details, DestId::SaveToFile(p));
     assert_eq!(dest_item(&dst).id, dst.identifier().as_ref().into());
 }
 
@@ -338,8 +338,8 @@ fn dest_item_and_details_agree_on_identity() {
 /// carries, and the list it indexes is re-enumerated every second.
 #[test]
 fn destination_identifiers_are_stable_and_distinct() {
-    let a = Destination::LocalFile(PathBuf::from("/tmp/a.img"));
-    let b = Destination::LocalFile(PathBuf::from("/tmp/b.img"));
+    let a = Destination::LocalFile(PathBuf::from("/tmp/a.img").into());
+    let b = Destination::LocalFile(PathBuf::from("/tmp/b.img").into());
 
     assert_eq!(a.identifier(), a.identifier());
     assert_ne!(a.identifier(), b.identifier());
@@ -391,7 +391,7 @@ async fn flash_local_image(
         0,
         local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
-        Destination::LocalFile(dst.path().to_path_buf()),
+        Destination::LocalFile(dst.path().into()),
         crate::db::Db::new().unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
