@@ -1,7 +1,7 @@
 use std::io;
 use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
-use crate::img::{RemoteImage, RemoteItem};
+use crate::img::RemoteSource;
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
 use bb_config::config;
 #[cfg(feature = "sd")]
@@ -173,7 +173,7 @@ pub(crate) fn default_user() -> &'static str {
 #[derive(Debug, Clone)]
 pub(crate) enum SelectedImage {
     LocalImage(bb_flasher::LocalImage),
-    RemoteImage(RemoteImage),
+    RemoteImage(RemoteSource),
 }
 
 impl SelectedImage {
@@ -196,8 +196,8 @@ impl SelectedImage {
     }
 }
 
-impl From<RemoteImage> for SelectedImage {
-    fn from(value: RemoteImage) -> Self {
+impl From<RemoteSource> for SelectedImage {
+    fn from(value: RemoteSource) -> Self {
         Self::RemoteImage(value)
     }
 }
@@ -233,8 +233,8 @@ pub(crate) fn flash(
             .board_by_id(board)?
             .bootfs
             .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
-        Some(RemoteItem::new(
-            Box::new(bootfs.url),
+        Some(RemoteSource::new(
+            bootfs.url,
             bootfs.image_download_sha256,
             bootfs.image_download_size,
             downloader.clone(),
@@ -247,7 +247,7 @@ pub(crate) fn flash(
         BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
         BoardImage::Remote { id, .. } => {
             let image = db.os_image_by_id(id)?;
-            let img = RemoteImage::new(&image, downloader.clone(), flasher);
+            let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
             #[cfg(feature = "sd")]
             let bmap = image.bmap.map(|url| crate::img::Bmap { url, downloader });
             #[cfg(not(feature = "sd"))]

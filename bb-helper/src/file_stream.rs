@@ -84,6 +84,7 @@ impl Drop for WriterFileStream {
 ///
 /// Reads data from the same temporary file as the writer. While the writer
 /// is active, reading will block until data is available or the writer closes.
+#[derive(Debug)]
 pub struct ReaderFileStream {
     file: std::fs::File,
     writing: SharedState,
