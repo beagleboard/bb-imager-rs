@@ -69,7 +69,12 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    let next_btn = widget::button("NEXT").on_press_maybe(if state.selected.is_empty() {
+    let label = match state.selected.len() {
+        n @ 2.. => text(format!("NEXT ({n})")),
+        _ => text("NEXT"),
+    };
+
+    let next_btn = widget::button(label).on_press_maybe(if state.selected.is_empty() {
         None
     } else {
         Some(Message::Next)
