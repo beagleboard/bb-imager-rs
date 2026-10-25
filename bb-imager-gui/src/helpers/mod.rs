@@ -212,7 +212,7 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 ///
 /// A remote image's download details are looked up in `db` here rather than
 /// carried through the pages.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn flash(
     board: i64,
     img: BoardImage,
@@ -258,6 +258,29 @@ pub(crate) fn flash(
     #[cfg(not(feature = "sd"))]
     let _: Option<()> = bmap;
 
+    flash_inner(
+        img,
+        customization,
+        dst,
+        flasher,
+        bootfs,
+        bmap,
+        chan,
+        cancel_sync,
+    )
+}
+
+#[expect(clippy::too_many_arguments)]
+fn flash_inner(
+    img: SelectedImage,
+    customization: FlashingCustomization,
+    dst: Destination,
+    flasher: config::Flasher,
+    bootfs: Option<RemoteSource>,
+    bmap: Option<crate::img::Bmap>,
+    chan: mpsc::SyncSender<DownloadFlashingStatus>,
+    cancel_sync: bb_helper::cancel::CancellationToken,
+) -> anyhow::Result<()> {
     match (img, customization, dst) {
         #[cfg(feature = "sd")]
         (img, customization, Destination::LocalFile(f))
