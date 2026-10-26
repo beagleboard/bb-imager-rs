@@ -362,7 +362,7 @@ impl BBImager {
             let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
             let cancel_child = cancel.clone();
-            let flash_task = blocking_future(move || {
+            let flash_task = tokio::spawn(async move {
                 helpers::flash(
                     board,
                     img,
@@ -373,6 +373,7 @@ impl BBImager {
                     tx,
                     cancel_child,
                 )
+                .await
             });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {

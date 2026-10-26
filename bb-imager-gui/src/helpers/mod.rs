@@ -213,7 +213,7 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 /// A remote image's download details are looked up in `db` here rather than
 /// carried through the pages.
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn flash(
+pub(crate) async fn flash(
     board: i64,
     img: BoardImage,
     customization: FlashingCustomization,
@@ -229,8 +229,9 @@ pub(crate) fn flash(
     // their own may have it written over their boot partition.
     #[cfg(feature = "sd")]
     let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
-        let bootfs = db
-            .board_by_id(board)?
+        let db = db.clone();
+        let bootfs = blocking_future(move || db.board_by_id(board))
+            .await?
             .bootfs
             .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
         Some(RemoteSource::new(
@@ -246,28 +247,35 @@ pub(crate) fn flash(
     let (img, bmap) = match img {
         BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
         BoardImage::Remote { id, .. } => {
-            let image = db.os_image_by_id(id)?;
-            let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
-            #[cfg(feature = "sd")]
-            let bmap = image.bmap.map(|url| crate::img::Bmap { url, downloader });
-            #[cfg(not(feature = "sd"))]
-            let bmap = None;
-            (img.into(), bmap)
+            blocking_future(move || {
+                let image = db.os_image_by_id(id)?;
+                let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
+                #[cfg(feature = "sd")]
+                let bmap = image.bmap.map(|url| crate::img::Bmap { url, downloader });
+                #[cfg(not(feature = "sd"))]
+                let bmap = None;
+
+                Ok::<(_, _), rusqlite::Error>((img.into(), bmap))
+            })
+            .await?
         }
     };
     #[cfg(not(feature = "sd"))]
     let _: Option<()> = bmap;
 
-    flash_inner(
-        img,
-        customization,
-        dst,
-        flasher,
-        bootfs,
-        bmap,
-        chan,
-        cancel_sync,
-    )
+    blocking_future(move || {
+        flash_inner(
+            img,
+            customization,
+            dst,
+            flasher,
+            bootfs,
+            bmap,
+            chan,
+            cancel_sync,
+        )
+    })
+    .await
 }
 
 #[expect(clippy::too_many_arguments)]

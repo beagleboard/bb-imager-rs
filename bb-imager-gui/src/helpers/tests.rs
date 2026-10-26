@@ -396,7 +396,8 @@ async fn flash_local_image(
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
-    );
+    )
+    .await;
 
     (res, dst, data)
 }
