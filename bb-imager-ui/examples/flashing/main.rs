@@ -46,16 +46,15 @@ impl State {
 
         self.inner.progress = match self.step {
             s if s < 1.0 => flashing::Progress::Preparing,
-            s if s < 2.0 => flashing::Progress::Downloading(s - 1.0),
-            s if s < 3.0 => flashing::Progress::Flashing(s - 2.0),
-            s if s < 3.5 => flashing::Progress::Verifying,
+            s if s < 2.0 => flashing::Progress::Writing(s - 1.0),
+            s if s < 3.0 => flashing::Progress::Verifying,
             _ => flashing::Progress::Customizing,
         };
 
         // The host stamps this on the first byte-moving update; mimic that so
         // the ETA has an elapsed time to extrapolate from.
         match self.inner.progress {
-            flashing::Progress::Downloading(_) | flashing::Progress::Flashing(_) => {
+            flashing::Progress::Writing(_) => {
                 self.inner.start_timestamp.get_or_insert_with(Instant::now);
             }
             flashing::Progress::Preparing => self.inner.start_timestamp = None,
