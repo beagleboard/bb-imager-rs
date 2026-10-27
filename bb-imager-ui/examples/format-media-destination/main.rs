@@ -44,6 +44,15 @@ impl State {
     fn refresh(&mut self) {
         self.inner.destinations = devices(self.inner.filter_destination, &self.inner.search);
     }
+
+    fn toggle(&mut self, id: Box<str>) {
+        match self.inner.selected.iter().position(|x| *x == id) {
+            Some(i) => {
+                self.inner.selected.remove(i);
+            }
+            None => self.inner.selected.push(id),
+        }
+    }
 }
 
 fn devices(filter: bool, search: &str) -> Box<[format_media_destination::DestinationItem]> {
@@ -78,6 +87,7 @@ fn main() {
                     s.inner.filter_destination = x;
                     s.refresh();
                 }
+                Message::SelectDest(ident) => s.toggle(ident),
                 _ => {}
             }
             iced::Task::none()

@@ -12,7 +12,7 @@ use bb_imager_ui::image_selection::ImageId;
 use crate::BBImager;
 use crate::helpers::{self, blocking_future};
 #[cfg(feature = "sd")]
-use crate::state::{FormatMediaFailState, FormatMediaReviewState, FormatMediaState};
+use crate::state::{FormatMediaFailState, FormatMediaState};
 use crate::state::{OverlayData, OverlayState};
 
 #[derive(Debug, Clone)]
@@ -320,24 +320,14 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
             #[cfg(feature = "sd")]
             BBImager::FormatMedia(inner) => {
-                match inner
+                if inner
                     .destinations
                     .iter()
-                    .find(|x| x.identifier().as_ref() == ident.as_ref())
-                    .cloned()
+                    .any(|x| x.identifier().as_ref() == ident.as_ref())
                 {
-                    Some(dest) => {
-                        let BBImager::FormatMedia(inner) = std::mem::take(state) else {
-                            unreachable!()
-                        };
-                        *state = BBImager::FormatMediaReview(FormatMediaReviewState::new(
-                            inner.common,
-                            dest,
-                        ));
-
-                        return state.scroll_reset();
-                    }
-                    None => tracing::warn!("Destination {ident} is gone; ignoring selection"),
+                    inner.toggle_dest(ident);
+                } else {
+                    tracing::warn!("Destination {ident} is gone; ignoring selection")
                 }
             }
             _ => panic!("Unexpected message"),

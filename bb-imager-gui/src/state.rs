@@ -902,6 +902,11 @@ impl FormatMediaState {
         self.destinations = destinations;
     }
 
+    /// Record `ident` as the selection. Formatting handles one card for now.
+    pub(crate) fn toggle_dest(&mut self, ident: Box<str>) {
+        self.state.selected = vec![ident];
+    }
+
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
         self.state.search = search;
     }

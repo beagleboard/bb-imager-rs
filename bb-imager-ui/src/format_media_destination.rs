@@ -4,7 +4,7 @@ use iced::Element;
 use iced::widget::{self, text};
 
 use crate::helpers::{
-    SidebarEntry, list_item, list_label, list_pane, list_separator, page_type4, svg_icon_style,
+    SidebarEntry, list_item, list_label, list_pane, list_separator, page_type2, svg_icon_style,
 };
 use crate::{Message, constants};
 
@@ -23,6 +23,8 @@ pub struct DestinationItem {
 #[derive(Debug)]
 pub struct State {
     pub destinations: Box<[DestinationItem]>,
+    /// Identifiers of the selected devices.
+    pub selected: Vec<Box<str>>,
     pub filter_destination: bool,
     /// Only here so the search box can show what was typed; the host does the
     /// filtering and hands back a new [`State::destinations`].
@@ -33,6 +35,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             destinations: Box::default(),
+            selected: Vec::new(),
             // Hand-written rather than derived: destinations start filtered.
             filter_destination: true,
             search: "".into(),
@@ -41,10 +44,23 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    page_type4(
+    let label = match state.selected.len() {
+        n @ 2.. => text(format!("NEXT ({n})")),
+        _ => text("NEXT"),
+    };
+
+    let next_btn = widget::button(label).on_press_maybe(if state.selected.is_empty() {
+        None
+    } else {
+        Some(Message::Next)
+    });
+
+    page_type2(
         SidebarEntry::FormatMedia,
         false,
+        false,
         dest_list_pane(state, &scroll_id),
+        [next_btn],
     )
 }
 
@@ -53,6 +69,11 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
         .destinations
         .iter()
         .map(|dest| {
+            let is_selected = state
+                .selected
+                .iter()
+                .any(|x| x.as_ref() == dest.id.as_ref());
+
             let label: Element<'_, _> = match dest.subtitle.as_ref() {
                 Some(x) => widget::column![text(dest.label.as_ref()).size(18), text(x.as_ref())]
                     .width(iced::Length::Fill)
@@ -62,7 +83,7 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
 
             list_item(
                 [sized_icon(constants::USB_ICON.clone()), label],
-                false,
+                is_selected,
                 Message::SelectDest(dest.id.clone()),
             )
         })
