@@ -608,8 +608,8 @@ const fn progress_from(
 
     match value {
         bb_flasher::DownloadFlashingStatus::Preparing => Progress::Preparing,
-        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x) => Progress::Downloading(x),
-        bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => Progress::Flashing(x),
+        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x)
+        | bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => Progress::Writing(x),
         bb_flasher::DownloadFlashingStatus::Verifying => Progress::Verifying,
         bb_flasher::DownloadFlashingStatus::Customizing => Progress::Customizing,
     }

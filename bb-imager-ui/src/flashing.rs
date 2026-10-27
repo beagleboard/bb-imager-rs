@@ -12,8 +12,7 @@ use crate::{Message, constants};
 pub enum Progress {
     #[default]
     Preparing,
-    Downloading(f32),
-    Flashing(f32),
+    Writing(f32),
     Verifying,
     Customizing,
 }
@@ -45,7 +44,7 @@ fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
             widget::text("Preparing..."),
             widget::progress_bar(0.0..=1.0, 0.0),
         ),
-        Progress::Flashing(f) | Progress::Downloading(f) => (
+        Progress::Writing(f) => (
             widget::text(format!("Writing... ({}%)", (f * 100.0) as u8)),
             widget::progress_bar(0.0..=1.0, f),
         ),
@@ -98,7 +97,7 @@ fn time_remaining_from(progress: Progress, elapsed: Option<Duration>) -> Option<
     const THRESHOLD: f32 = 0.02;
 
     match progress {
-        Progress::Flashing(x) | Progress::Downloading(x) => {
+        Progress::Writing(x) => {
             if x < THRESHOLD {
                 None
             } else {
@@ -131,21 +130,13 @@ mod tests {
     fn eta_scales_linearly_with_remaining_fraction() {
         // At 50% after 10s, the remaining half should take another ~10s.
         assert_eq!(
-            time_remaining_from(Progress::Flashing(0.5), Some(Duration::from_secs(10))),
+            time_remaining_from(Progress::Writing(0.5), Some(Duration::from_secs(10))),
             Some(Duration::from_secs(10))
         );
         // At 25% after 10s, the remaining 75% extrapolates to 30s.
         assert_eq!(
-            time_remaining_from(Progress::Flashing(0.25), Some(Duration::from_secs(10))),
+            time_remaining_from(Progress::Writing(0.25), Some(Duration::from_secs(10))),
             Some(Duration::from_secs(30))
-        );
-    }
-
-    #[test]
-    fn eta_uses_the_same_math_for_downloads() {
-        assert_eq!(
-            time_remaining_from(Progress::Downloading(0.5), Some(Duration::from_secs(4))),
-            Some(Duration::from_secs(4))
         );
     }
 
@@ -153,7 +144,7 @@ mod tests {
     fn eta_suppressed_below_threshold() {
         // Below 2% the estimate is too noisy, so no ETA is reported.
         assert_eq!(
-            time_remaining_from(Progress::Flashing(0.01), Some(Duration::from_secs(10))),
+            time_remaining_from(Progress::Writing(0.01), Some(Duration::from_secs(10))),
             None
         );
     }
@@ -161,14 +152,14 @@ mod tests {
     #[test]
     fn eta_requires_a_start_timestamp() {
         // Past the threshold but with no elapsed time recorded yet.
-        assert_eq!(time_remaining_from(Progress::Flashing(0.5), None), None);
+        assert_eq!(time_remaining_from(Progress::Writing(0.5), None), None);
     }
 
     #[test]
     fn eta_clamps_progress_above_one() {
         // A progress value >1.0 clamps to 1.0, yielding a zero remainder.
         assert_eq!(
-            time_remaining_from(Progress::Flashing(1.5), Some(Duration::from_secs(10))),
+            time_remaining_from(Progress::Writing(1.5), Some(Duration::from_secs(10))),
             Some(Duration::ZERO)
         );
     }
