@@ -251,7 +251,7 @@ pub(crate) async fn flash(
                 let image = db.os_image_by_id(id)?;
                 let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
                 #[cfg(feature = "sd")]
-                let bmap = image.bmap.map(|url| crate::img::Bmap { url, downloader });
+                let bmap = image.bmap.map(|url| crate::img::Bmap::new(*url, downloader));
                 #[cfg(not(feature = "sd"))]
                 let bmap = None;
 
