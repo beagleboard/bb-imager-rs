@@ -28,7 +28,7 @@ rustls = ["reqwest/rustls"]
 
 [dev-dependencies]
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
-httpmock = "0.8"
+httpmock = "0.9"
 tempfile = "3.27"
 
 [target.'cfg(not(windows))'.dependencies]
