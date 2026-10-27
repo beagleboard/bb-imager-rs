@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "sd")]
+use bb_flasher::BBFlasherTarget;
 use constants::PACKAGE_QUALIFIER;
 use iced::{Subscription, Task, futures::SinkExt, widget};
 use message::BBImagerMessage;
@@ -538,8 +540,34 @@ impl BBImager {
                 (Self::ChooseBoard(state), Task::batch([task, task2]))
             }
             #[cfg(feature = "sd")]
-            Self::FormatMedia(_)
-            | Self::FormatMediaReview(_)
+            Self::FormatMedia(inner) => {
+                let ident = inner
+                    .state
+                    .selected
+                    .first()
+                    .expect("Destination should already be selected");
+
+                match inner
+                    .destinations
+                    .iter()
+                    .find(|x| x.identifier().as_ref() == ident.as_ref())
+                    .cloned()
+                {
+                    Some(dest) => (
+                        Self::FormatMediaReview(state::FormatMediaReviewState::new(
+                            inner.common,
+                            dest,
+                        )),
+                        Task::none(),
+                    ),
+                    None => {
+                        tracing::warn!("Destination {ident} is gone; staying on the page");
+                        (Self::FormatMedia(inner), Task::none())
+                    }
+                }
+            }
+            #[cfg(feature = "sd")]
+            Self::FormatMediaReview(_)
             | Self::FormatMediaProgress(_)
             | Self::FormatMediaSuccess(_)
             | Self::FormatMediaFail(_) => {
