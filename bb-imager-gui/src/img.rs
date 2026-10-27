@@ -1,23 +1,34 @@
-use std::{io, sync::Arc};
-
 use bb_flasher::img::{OsArchive, OsImage};
 use bb_helper::file_stream::ReaderFileStream;
+#[cfg(feature = "sd")]
+use std::sync::LazyLock;
+use std::{io, sync::Arc};
 use tokio_util::task::AbortOnDropHandle;
 
 #[cfg(feature = "sd")]
+type BmapFetch = Box<dyn FnOnce() -> Option<Box<str>> + Send>;
+
+#[cfg(feature = "sd")]
 #[derive(Debug, Clone)]
-pub(crate) struct Bmap {
-    pub(crate) url: Box<url::Url>,
-    pub(crate) downloader: bb_downloader::Downloader,
-}
+pub(crate) struct Bmap(Arc<LazyLock<Option<Box<str>>, BmapFetch>>);
 
 #[cfg(feature = "sd")]
 impl Bmap {
-    pub(crate) fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
+    pub(crate) fn new(url: url::Url, downloader: bb_downloader::Downloader) -> Self {
         let rt = tokio::runtime::Handle::current();
+        Self(Arc::new(LazyLock::new(Box::new(move || {
+            rt.block_on(async move { downloader.download(url).await })
+                .and_then(std::fs::read_to_string)
+                .map(Into::into)
+                .ok()
+        }))))
+    }
+
+    pub(crate) fn into_fn(self) -> impl FnOnce() -> io::Result<Box<str>> {
         move || {
-            let res = rt.block_on(async move { self.downloader.download(*self.url).await })?;
-            std::fs::read_to_string(res).map(Into::into)
+            LazyLock::force(&self.0)
+                .clone()
+                .ok_or(io::Error::other("Failed to download bmap"))
         }
     }
 }
