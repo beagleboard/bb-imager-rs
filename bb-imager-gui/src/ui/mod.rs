@@ -41,7 +41,7 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         }
         #[cfg(feature = "sd")]
         BBImager::FormatMediaProgress(inner) => {
-            bb_imager_ui::format_media_progress::view(&inner.state)
+            bb_imager_ui::format_media_progress::view(&inner.state, inner.common.scroll_id.clone())
         }
         #[cfg(feature = "sd")]
         BBImager::FormatMediaSuccess(inner) => {

@@ -251,7 +251,9 @@ pub(crate) async fn flash(
                 let image = db.os_image_by_id(id)?;
                 let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
                 #[cfg(feature = "sd")]
-                let bmap = image.bmap.map(|url| crate::img::Bmap::new(*url, downloader));
+                let bmap = image
+                    .bmap
+                    .map(|url| crate::img::Bmap::new(*url, downloader));
                 #[cfg(not(feature = "sd"))]
                 let bmap = None;
 
@@ -844,4 +846,8 @@ where
     T: Send + 'static,
 {
     tokio::task::spawn_blocking(f).await.unwrap()
+}
+
+pub(crate) fn sd_card_label(x: &bb_flasher::sd::Target) -> Box<str> {
+    format!("{} ({})", x, pretty_bytes(x.size())).into()
 }

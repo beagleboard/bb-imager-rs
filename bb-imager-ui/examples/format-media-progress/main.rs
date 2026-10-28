@@ -5,7 +5,11 @@ struct State(format_media_progress::State);
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
         let res = State(format_media_progress::State {
-            destination: "Test SD Card (32 GB)".into(),
+            destinations: [
+                "Test SD Card (32 GB)".into(),
+                "Test USB Drive (64 GB)".into(),
+            ]
+            .into(),
         });
 
         (res, iced::Task::none())
@@ -18,5 +22,5 @@ fn main() {
 }
 
 fn view(s: &State) -> iced::Element<'_, Message> {
-    format_media_progress::view(&s.0)
+    format_media_progress::view(&s.0, iced::widget::Id::unique())
 }
