@@ -902,9 +902,14 @@ impl FormatMediaState {
         self.destinations = destinations;
     }
 
-    /// Record `ident` as the selection. Formatting handles one card for now.
+    /// Select `ident`, or deselect it if already selected.
     pub(crate) fn toggle_dest(&mut self, ident: Box<str>) {
-        self.state.selected = vec![ident];
+        match self.state.selected.iter().position(|x| *x == ident) {
+            Some(i) => {
+                self.state.selected.remove(i);
+            }
+            None => self.state.selected.push(ident),
+        }
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -942,7 +947,7 @@ impl FormatMediaReviewState {
 #[derive(Debug)]
 pub(crate) struct FormatMediaProgressState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) selected_dest: bb_flasher::sd::Target,
+    pub(crate) selected_dest: Box<[bb_flasher::sd::Target]>,
     pub(crate) state: bb_imager_ui::format_media_progress::State,
 }
 
@@ -951,21 +956,23 @@ impl From<FormatMediaReviewState> for FormatMediaProgressState {
     fn from(value: FormatMediaReviewState) -> Self {
         Self {
             common: value.common,
-            // TODO: This is temporary.
-            selected_dest: value.selected_dest.into_iter().next().unwrap(),
+            selected_dest: value.selected_dest,
             state: bb_imager_ui::format_media_progress::State {
-                // TODO: Properly implement this at some point.
                 destinations: value.state.destinations,
             },
         }
     }
 }
 
-/// Retry with the same card.
+/// Retry the cards that failed.
 #[cfg(feature = "sd")]
 impl From<FormatMediaFailState> for FormatMediaProgressState {
     fn from(value: FormatMediaFailState) -> Self {
-        let destinations = Vec::from([crate::helpers::sd_card_label(&value.selected_dest)]).into();
+        let destinations = value
+            .selected_dest
+            .iter()
+            .map(helpers::sd_card_label)
+            .collect();
 
         Self {
             common: value.common,
@@ -997,8 +1004,8 @@ impl From<FormatMediaProgressState> for FormatMediaSuccessState {
 #[cfg(feature = "sd")]
 pub(crate) struct FormatMediaFailState {
     pub(crate) common: BBImagerCommon,
-    /// Kept for Retry.
-    pub(crate) selected_dest: bb_flasher::sd::Target,
+    /// The cards that failed, kept for Retry.
+    pub(crate) selected_dest: Box<[bb_flasher::sd::Target]>,
     pub(crate) state: bb_imager_ui::format_media_fail::State,
 }
 
@@ -1006,26 +1013,28 @@ pub(crate) struct FormatMediaFailState {
 impl FormatMediaFailState {
     pub(crate) fn new(
         state: FormatMediaProgressState,
-        err: String,
+        failures: Box<[(bb_flasher::sd::Target, Box<str>)]>,
         mut logs: widget::text_editor::Content,
     ) -> Self {
         logs.perform(widget::text_editor::Action::Move(
             widget::text_editor::Motion::DocumentEnd,
         ));
 
-        // Only one card is formatted for now, so every listed card shares the error.
-        let err: Box<str> = err.into();
-        let failures = state
-            .state
-            .destinations
+        let (selected_dest, failures): (Vec<_>, Vec<_>) = failures
             .into_iter()
-            .map(|x| (x, err.clone()))
-            .collect();
+            .map(|(dest, err)| {
+                let label = (helpers::sd_card_label(&dest), err);
+                (dest, label)
+            })
+            .unzip();
 
         Self {
             common: state.common,
-            selected_dest: state.selected_dest,
-            state: bb_imager_ui::format_media_fail::State { failures, logs },
+            selected_dest: selected_dest.into(),
+            state: bb_imager_ui::format_media_fail::State {
+                failures: failures.into(),
+                logs,
+            },
         }
     }
 }
