@@ -8,7 +8,22 @@ impl State {
         let mut logs = iced::widget::text_editor::Content::with_text(LOGS.trim());
         logs.perform(Action::Move(Motion::DocumentEnd));
         let res = State(format_media_fail::State {
-            reason: "Fail Reason for Testing".into(),
+            failures: [
+                (
+                    "Test SD Card (32 GB)".into(),
+                    "Failed to open destination".into(),
+                ),
+                ("Test USB Drive (64 GB)".into(), "Permission denied".into()),
+                (
+                    "Test USB Drive 2 (64 GB)".into(),
+                    "Permission denied".into(),
+                ),
+                (
+                    "Test USB Drive 3 (64 GB)".into(),
+                    "Permission denied".into(),
+                ),
+            ]
+            .into(),
             logs,
         });
 
@@ -34,7 +49,7 @@ fn main() {
 }
 
 fn view(s: &State) -> iced::Element<'_, Message> {
-    format_media_fail::view(&s.0)
+    format_media_fail::view(&s.0, iced::widget::Id::unique())
 }
 
 const LOGS: &str = r#"

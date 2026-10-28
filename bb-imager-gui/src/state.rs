@@ -1012,13 +1012,20 @@ impl FormatMediaFailState {
         logs.perform(widget::text_editor::Action::Move(
             widget::text_editor::Motion::DocumentEnd,
         ));
+
+        // Only one card is formatted for now, so every listed card shares the error.
+        let err: Box<str> = err.into();
+        let failures = state
+            .state
+            .destinations
+            .into_iter()
+            .map(|x| (x, err.clone()))
+            .collect();
+
         Self {
             common: state.common,
             selected_dest: state.selected_dest,
-            state: bb_imager_ui::format_media_fail::State {
-                reason: err.into(),
-                logs,
-            },
+            state: bb_imager_ui::format_media_fail::State { failures, logs },
         }
     }
 }
