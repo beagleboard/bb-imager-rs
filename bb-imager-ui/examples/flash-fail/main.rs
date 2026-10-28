@@ -35,7 +35,7 @@ fn main() {
 }
 
 fn view(s: &State) -> iced::Element<'_, Message> {
-    flash_fail::view(&s.0)
+    flash_fail::view(&s.0, iced::widget::Id::unique())
 }
 
 const LOGS: &str = r#"

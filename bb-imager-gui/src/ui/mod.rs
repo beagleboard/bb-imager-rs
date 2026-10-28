@@ -27,14 +27,17 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
         BBImager::FlashingCancel(inner) => {
             bb_imager_ui::flash_cancel::view(&inner.state, inner.common.scroll_id.clone())
         }
-        BBImager::FlashingFail(inner) => bb_imager_ui::flash_fail::view(&inner.state),
+        BBImager::FlashingFail(inner) => {
+            bb_imager_ui::flash_fail::view(&inner.state, inner.common.scroll_id.clone())
+        }
         BBImager::FlashingSuccess(inner) => {
             bb_imager_ui::flash_success::view(&inner.state, inner.common.scroll_id.clone())
         }
         #[cfg(feature = "sd")]
-        BBImager::FormatMedia(inner) => {
-            bb_imager_ui::format_media_destination::view(&inner.state, inner.common.scroll_id.clone())
-        }
+        BBImager::FormatMedia(inner) => bb_imager_ui::format_media_destination::view(
+            &inner.state,
+            inner.common.scroll_id.clone(),
+        ),
         #[cfg(feature = "sd")]
         BBImager::FormatMediaReview(inner) => {
             bb_imager_ui::format_media_review::view(&inner.state, inner.common.scroll_id.clone())
@@ -48,7 +51,9 @@ pub(crate) fn view(state: &BBImager) -> iced::Element<'_, BBImagerMessage> {
             bb_imager_ui::format_media_success::view(&inner.state, inner.common.scroll_id.clone())
         }
         #[cfg(feature = "sd")]
-        BBImager::FormatMediaFail(inner) => bb_imager_ui::format_media_fail::view(&inner.state),
+        BBImager::FormatMediaFail(inner) => {
+            bb_imager_ui::format_media_fail::view(&inner.state, inner.common.scroll_id.clone())
+        }
         BBImager::AppInfo(inner) => {
             bb_imager_ui::app_info::view(&inner.state, inner.common().scroll_id.clone())
         }
