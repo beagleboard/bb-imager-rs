@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
 use iced::{Element, widget};
@@ -8,7 +9,10 @@ use crate::{Message, constants};
 /// How far along the flash is.
 ///
 /// Mirrors the flasher's own status enum; the host converts.
-#[derive(Clone, Copy, Debug, Default)]
+///
+/// Ordered by how far along it is: variants in declaration order, then the
+/// fraction written.
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub enum Progress {
     #[default]
     Preparing,
@@ -19,7 +23,8 @@ pub enum Progress {
 
 #[derive(Debug)]
 pub struct State {
-    pub progress: Progress,
+    /// Each destination's label and how far along its flash is.
+    pub destinations: Box<[(Box<str>, Progress)]>,
     /// Stamped by the host on the first byte-moving update; the ETA is
     /// extrapolated from how long has elapsed since.
     pub start_timestamp: Option<Instant>,
@@ -39,7 +44,42 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
 }
 
 fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
-    let (progress_label, progress_bar) = match state.progress {
+    let time_remaining = match time_remaining(
+        &state.destinations,
+        state.start_timestamp.map(|t| t.elapsed()),
+    ) {
+        Some(x) => widget::span::<'_, (), _>(pretty_duration(x)),
+        None => widget::span("Calculating"),
+    };
+
+    widget::scrollable(
+        widget::column![
+            widget::text("Writing Image")
+                .font(constants::FONT_BOLD)
+                .size(26),
+            widget::text("Do not disconnect the storage device!").style(widget::text::danger),
+            widget::rule::horizontal(2),
+        ]
+        .extend(
+            state
+                .destinations
+                .iter()
+                .map(|(dest, progress)| progress_row(dest, *progress)),
+        )
+        .push(widget::rich_text![
+            widget::span("Time Remaining: ").font(constants::FONT_BOLD),
+            time_remaining
+        ])
+        .padding(VIEW_COL_PADDING)
+        .spacing(16),
+    )
+    .id(scroll_id)
+    .into()
+}
+
+/// One destination's label, current phase and progress bar.
+fn progress_row(dest: &str, progress: Progress) -> Element<'_, Message> {
+    let (progress_label, progress_bar) = match progress {
         Progress::Preparing => (
             widget::text("Preparing..."),
             widget::progress_bar(0.0..=1.0, 0.0),
@@ -58,37 +98,31 @@ fn progress_view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
         ),
     };
 
-    let time_remaining =
-        match time_remaining_from(state.progress, state.start_timestamp.map(|t| t.elapsed())) {
-            Some(x) => widget::span::<'_, (), _>(pretty_duration(x)),
-            None => widget::span("Calculating"),
-        };
-
-    widget::scrollable(
-        widget::column![
-            widget::text("Writing Image")
-                .font(constants::FONT_BOLD)
-                .size(26),
-            widget::text("Do not disconnect the storage device!").style(widget::text::danger),
-            widget::rule::horizontal(2),
-            progress_label
-                .font(constants::FONT_BOLD)
-                .style(widget::text::secondary),
-            progress_bar,
-            widget::rich_text![
-                widget::span("Time Remaining: ").font(constants::FONT_BOLD),
-                time_remaining
-            ]
-        ]
-        .padding(VIEW_COL_PADDING)
-        .spacing(16),
-    )
-    .id(scroll_id)
+    widget::column![
+        widget::text(dest).font(constants::FONT_BOLD),
+        progress_label.style(widget::text::secondary),
+        progress_bar,
+    ]
+    .spacing(8)
     .into()
 }
 
-/// Estimate the remaining flashing time from the current `progress` and how
-/// much time has `elapsed` since the first progress update.
+/// Estimate the remaining time for the whole run. Every destination shares
+/// `elapsed`, so the least-progressed one is also the slowest.
+fn time_remaining(
+    destinations: &[(Box<str>, Progress)],
+    elapsed: Option<Duration>,
+) -> Option<Duration> {
+    destinations
+        .iter()
+        .map(|(_, progress)| *progress)
+        // `Progress` holds an `f32`, so no `Ord` for `min`; only NaN is unordered.
+        .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+        .and_then(|least| time_remaining_from(least, elapsed))
+}
+
+/// Estimate one destination's remaining flashing time from its `progress` and
+/// how much time has `elapsed` since the first progress update.
 ///
 /// Split out of [`progress_view`] so the ETA math is testable without an
 /// `Instant` clock: a linear extrapolation `elapsed * (1 - x) / x`, suppressed
@@ -169,6 +203,41 @@ mod tests {
         assert_eq!(
             time_remaining_from(Progress::Customizing, None),
             Some(Duration::from_secs(1))
+        );
+    }
+
+    #[test]
+    fn eta_follows_slowest_destination() {
+        let dests = [
+            ("A".into(), Progress::Writing(0.5)),
+            ("B".into(), Progress::Writing(0.25)),
+        ];
+        assert_eq!(
+            time_remaining(&dests, Some(Duration::from_secs(10))),
+            Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn eta_waits_for_every_destination() {
+        // One destination still preparing means the run has no estimate yet.
+        let dests = [
+            ("A".into(), Progress::Writing(0.5)),
+            ("B".into(), Progress::Preparing),
+        ];
+        assert_eq!(time_remaining(&dests, Some(Duration::from_secs(10))), None);
+    }
+
+    #[test]
+    fn eta_ignores_destinations_further_along() {
+        // Verifying has no estimate of its own; the one still writing decides.
+        let dests = [
+            ("A".into(), Progress::Writing(0.5)),
+            ("B".into(), Progress::Verifying),
+        ];
+        assert_eq!(
+            time_remaining(&dests, Some(Duration::from_secs(10))),
+            Some(Duration::from_secs(10))
         );
     }
 
