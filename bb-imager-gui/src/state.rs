@@ -584,7 +584,8 @@ pub(crate) struct FlashingState {
 }
 
 impl FlashingState {
-    pub(crate) fn progress_update(&mut self, u: bb_flasher::DownloadFlashingStatus) {
+    /// Record `u` as the progress of the `id`th destination.
+    pub(crate) fn progress_update(&mut self, id: usize, u: bb_flasher::DownloadFlashingStatus) {
         // Required for better time estimate.
         match u {
             bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
@@ -596,7 +597,7 @@ impl FlashingState {
             _ => {}
         }
 
-        self.state.progress = progress_from(u);
+        self.state.destinations[id].1 = progress_from(u);
     }
 }
 

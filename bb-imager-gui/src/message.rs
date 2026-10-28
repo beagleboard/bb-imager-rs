@@ -500,12 +500,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
         }
+        // TODO: per-destination progress once flash() reports it.
         BBImagerMessage::FlashProgress(x) => match state {
             BBImager::Flashing(inner) => {
-                inner.progress_update(x);
+                inner.progress_update(0, x);
             }
             BBImager::AppInfo(inner) => match &mut inner.page {
-                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(x),
+                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(0, x),
                 _ => panic!("Unexpected message"),
             },
             // Debug build can be slow.
