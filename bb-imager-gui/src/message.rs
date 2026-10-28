@@ -52,6 +52,9 @@ pub(crate) enum BBImagerMessage {
     FlashProgress(bb_flasher::DownloadFlashingStatus),
     FlashSuccess,
     FlashFail(String),
+    /// Each card that failed to format, with its error.
+    #[cfg(feature = "sd")]
+    FormatFail(Box<[(bb_flasher::sd::Target, Box<str>)]>),
 
     // Download images which have not already been downloaded
     FilterResolveImages(Vec<Arc<url::Url>>),
@@ -433,11 +436,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
                     BBImager::FlashingFail(crate::state::FlashingFailState::new(inner, err, logs))
                 }
-                #[cfg(feature = "sd")]
-                BBImager::FormatMediaProgress(inner) => {
-                    msg = "Formatting failed";
-                    BBImager::FormatMediaFail(FormatMediaFailState::new(inner, err, logs))
-                }
                 BBImager::AppInfo(inner) => {
                     match inner.page {
                         OverlayData::Flashing(flashing_state) => {
@@ -452,25 +450,55 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                                 ..inner
                             })
                         }
-                        #[cfg(feature = "sd")]
-                        OverlayData::FormatMediaProgress(format_state) => {
-                            msg = "Formatting failed";
-                            BBImager::AppInfo(OverlayState {
-                                page: OverlayData::FormatMediaFail(FormatMediaFailState::new(
-                                    format_state,
-                                    err,
-                                    logs,
-                                )),
-                                ..inner
-                            })
-                        }
                         _ => panic!("Unexpected message"),
                     }
                 }
                 _ => panic!("Unexpected message"),
             };
 
-            return show_notification(msg.to_string());
+            // Under App Options the fail page is not on screen; leave that page's scroll alone.
+            let scroll = if matches!(state, BBImager::AppInfo(_)) {
+                Task::none()
+            } else {
+                state.scroll_reset()
+            };
+
+            return Task::batch([show_notification(msg.to_string()), scroll]);
+        }
+        #[cfg(feature = "sd")]
+        BBImagerMessage::FormatFail(failures) => {
+            let logs =
+                std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
+            let logs = iced::widget::text_editor::Content::with_text(&logs);
+
+            *state = match std::mem::take(state) {
+                BBImager::FormatMediaProgress(inner) => {
+                    BBImager::FormatMediaFail(FormatMediaFailState::new(inner, failures, logs))
+                }
+                BBImager::AppInfo(inner) => match inner.page {
+                    OverlayData::FormatMediaProgress(format_state) => {
+                        BBImager::AppInfo(OverlayState {
+                            page: OverlayData::FormatMediaFail(FormatMediaFailState::new(
+                                format_state,
+                                failures,
+                                logs,
+                            )),
+                            ..inner
+                        })
+                    }
+                    _ => panic!("Unexpected message"),
+                },
+                _ => panic!("Unexpected message"),
+            };
+
+            // Under App Options the fail page is not on screen; leave that page's scroll alone.
+            let scroll = if matches!(state, BBImager::AppInfo(_)) {
+                Task::none()
+            } else {
+                state.scroll_reset()
+            };
+
+            return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
         }
         BBImagerMessage::FlashProgress(x) => match state {
             BBImager::Flashing(inner) => {

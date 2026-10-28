@@ -306,30 +306,49 @@ impl BBImager {
 
     #[cfg(feature = "sd")]
     fn start_format(&mut self) -> Task<BBImagerMessage> {
-        // Retrying from the failure page re-runs with the same card.
+        // Retrying from the failure page re-runs the cards that failed.
         let inner: state::FormatMediaProgressState = match std::mem::take(self) {
             Self::FormatMediaReview(inner) => inner.into(),
             Self::FormatMediaFail(inner) => inner.into(),
             _ => panic!("Unexpected page"),
         };
 
-        let dst = inner.selected_dest.clone();
+        let dsts = inner.selected_dest.clone();
 
         tracing::info!("Starting Format Process");
-        tracing::info!("Selected Destination: {:#?}", dst);
+        tracing::info!("Selected Destinations: {:#?}", dsts);
 
         *self = Self::FormatMediaProgress(inner);
 
         Task::perform(
-            blocking_future(move || bb_flasher::sd::FormatFlasher::new(dst).flash()),
-            |res| match res {
-                Ok(()) => {
+            async move {
+                let mut set = tokio::task::JoinSet::new();
+
+                for d in dsts {
+                    set.spawn_blocking(move || {
+                        let res = bb_flasher::sd::FormatFlasher::new(d.clone()).flash();
+                        (d, res)
+                    });
+                }
+
+                let mut failures = Vec::new();
+
+                while let Some(res) = set.join_next().await {
+                    let (d, res) = res.unwrap();
+                    if let Err(e) = res {
+                        tracing::error!("Formatting {d} failed with error: {e:#?}");
+                        failures.push((d, e.to_string().into()));
+                    }
+                }
+
+                failures
+            },
+            |failures| {
+                if failures.is_empty() {
                     tracing::info!("Formatting Successfull");
                     BBImagerMessage::FlashSuccess
-                }
-                Err(e) => {
-                    tracing::error!("Formatting failed with error: {:#?}", e);
-                    BBImagerMessage::FlashFail(e.to_string())
+                } else {
+                    BBImagerMessage::FormatFail(failures.into())
                 }
             },
         )
