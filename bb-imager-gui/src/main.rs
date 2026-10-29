@@ -355,7 +355,8 @@ impl BBImager {
     }
 
     fn start_flashing(&mut self) -> Task<BBImagerMessage> {
-        // Retrying from the failure page re-runs with the same choices.
+        // Retrying from the failure page re-runs with the same choices, on the destinations that
+        // failed.
         let (common, ctx) = match std::mem::take(self) {
             Self::Review(inner) => (inner.common, inner.ctx),
             Self::FlashingFail(inner) => (inner.common, inner.ctx),
@@ -365,12 +366,12 @@ impl BBImager {
         let customization = ctx.customization.clone();
         let board = ctx.selected_board.id;
         let img = ctx.selected_image.1.clone();
-        let dst = ctx.selected_dest.clone();
+        let dsts = ctx.selected_dests.clone();
 
         tracing::info!("Starting Flashing Process");
         tracing::info!("Selected Board: {:#?}", ctx.selected_board);
         tracing::info!("Selected Image: {:#?}", img);
-        tracing::info!("Selected Destination: {:#?}", dst);
+        tracing::info!("Selected Destinations: {:#?}", dsts);
         tracing::info!("Selected Customization: {:#?}", customization);
 
         let db = common.db.clone();
@@ -382,33 +383,38 @@ impl BBImager {
 
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {
-                while let Ok(progress) = rx.recv() {
-                    let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(progress));
+                while let Ok((i, progress)) = rx.recv() {
+                    let _ = chan_clone.try_send(BBImagerMessage::FlashProgress(i, progress));
                 }
             });
             let _guard = cancel.drop_guard();
 
-            let res = helpers::flash(
+            let failures = match helpers::flash(
                 board,
                 img,
                 customization,
-                dst,
+                dsts.clone(),
                 db,
                 downloader,
                 tx,
                 cancel.clone(),
             )
-            .await;
-
-            let res = match res {
-                Ok(_) => {
-                    tracing::info!("Flashing Successfull");
-                    BBImagerMessage::FlashSuccess
-                }
+            .await
+            {
+                Ok(x) => x,
                 Err(e) => {
-                    tracing::error!("Flashing failed with error: {:#?}", e);
-                    BBImagerMessage::FlashFail(e.to_string())
+                    tracing::error!("Failed to open the image: {:#?}", e);
+                    dsts.into_iter()
+                        .map(|d| (d, e.to_string().into()))
+                        .collect()
                 }
+            };
+
+            let res = if failures.is_empty() {
+                tracing::info!("Flashing Successfull");
+                BBImagerMessage::FlashSuccess
+            } else {
+                BBImagerMessage::FlashFail(failures.into())
             };
 
             let _ = chan.send(res).await;
@@ -422,7 +428,11 @@ impl BBImager {
             cancel_flashing: h,
             // Built before `ctx` is moved in below.
             state: Box::new(bb_imager_ui::flashing::State {
-                destinations: [(ctx.selected_destination().into(), Default::default())].into(),
+                destinations: ctx
+                    .selected_dests
+                    .iter()
+                    .map(|x| (x.label(), Default::default()))
+                    .collect(),
                 start_timestamp: None,
             }),
             ctx,
@@ -472,49 +482,61 @@ impl BBImager {
                 )
             }
             Self::ChooseDest(inner) => {
-                let selected_dest = match inner.state.selected.into_iter().next().unwrap() {
-                    bb_imager_ui::destination_selection::DestId::Device(ident) => inner
-                        .destinations
-                        .iter()
-                        .find(|x| x.identifier().as_ref() == ident.as_ref())
-                        .cloned()
-                        .unwrap(),
-                    bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
-                        helpers::Destination::LocalFile(path)
-                    }
-                };
+                let dests: Box<_> = inner
+                    .state
+                    .selected
+                    .iter()
+                    .map(|id| match id {
+                        bb_imager_ui::destination_selection::DestId::Device(ident) => {
+                            inner.find_dest_by_id(ident).cloned()
+                        }
+                        bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
+                            Some(helpers::Destination::LocalFile(path.clone()))
+                        }
+                    })
+                    .collect();
 
-                let flasher = inner.selected_image.1.flasher();
+                if dests.iter().any(|x| x.is_none()) {
+                    tracing::warn!(
+                        "Some selected destinations ({:?}) are gone; staying on the page",
+                        dests
+                    );
+                    (Self::ChooseDest(inner), Task::none())
+                } else {
+                    let selected_dests = dests.into_iter().flatten().collect();
 
-                // A flasher with nothing to configure skips the Customize page.
-                let (customization, has_customization) =
-                    match helpers::no_customization(flasher, &inner.selected_image.1) {
-                        Some(c) => (c, false),
-                        None => (
-                            helpers::FlashingCustomization::new(
-                                flasher,
-                                &inner.selected_image.1,
-                                &inner.common.app_config,
+                    let flasher = inner.selected_image.1.flasher();
+
+                    // A flasher with nothing to configure skips the Customize page.
+                    let (customization, has_customization) =
+                        match helpers::no_customization(flasher, &inner.selected_image.1) {
+                            Some(c) => (c, false),
+                            None => (
+                                helpers::FlashingCustomization::new(
+                                    flasher,
+                                    &inner.selected_image.1,
+                                    &inner.common.app_config,
+                                ),
+                                true,
                             ),
-                            true,
-                        ),
+                        };
+
+                    let ctx = state::FlashingContext {
+                        selected_board: inner.selected_board,
+                        selected_image: inner.selected_image,
+                        selected_dests,
+                        customization,
+                        has_customization,
                     };
 
-                let ctx = state::FlashingContext {
-                    selected_board: inner.selected_board,
-                    selected_image: inner.selected_image,
-                    selected_dest,
-                    customization,
-                    has_customization,
-                };
+                    let temp = if has_customization {
+                        Self::Customize(state::CustomizeState::new(inner.common, ctx))
+                    } else {
+                        Self::Review(state::ReviewState::new(inner.common, ctx))
+                    };
 
-                let temp = if has_customization {
-                    Self::Customize(state::CustomizeState::new(inner.common, ctx))
-                } else {
-                    Self::Review(state::ReviewState::new(inner.common, ctx))
-                };
-
-                (temp, Task::none())
+                    (temp, Task::none())
+                }
             }
             Self::Customize(mut inner) => {
                 // The page edits its own state, so the context only catches up

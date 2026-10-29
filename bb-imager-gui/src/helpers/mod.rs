@@ -208,21 +208,25 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
     }
 }
 
-/// `bootfs` is the selected board's bootfs archive, if it has one.
+/// Flash every destination, reporting each one's progress on `chan`, tagged with its index in
+/// `dsts`.
 ///
-/// A remote image's download details are looked up in `db` here rather than
-/// carried through the pages.
+/// A remote image is downloaded once, with every destination streaming from the same download.
+/// Its download details are looked up in `db` here rather than carried through the pages.
+///
+/// Returns each destination that failed, with its error. Fails as a whole only if the image
+/// could not be opened.
 #[expect(clippy::too_many_arguments)]
 pub(crate) async fn flash(
     board: i64,
     img: BoardImage,
     customization: FlashingCustomization,
-    dst: Destination,
+    dsts: Box<[Destination]>,
     db: crate::db::Db,
     downloader: bb_downloader::Downloader,
-    chan: mpsc::SyncSender<DownloadFlashingStatus>,
+    chan: mpsc::SyncSender<(usize, DownloadFlashingStatus)>,
     cancel_sync: bb_helper::cancel::CancellationToken,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<(Destination, Box<str>)>> {
     let flasher = img.flasher();
 
     // Every SD flash is handed the board's archive; only images that carry no bootloader of
@@ -265,19 +269,49 @@ pub(crate) async fn flash(
     #[cfg(not(feature = "sd"))]
     let _: Option<()> = bmap;
 
-    blocking_future(move || {
-        flash_inner(
-            img,
-            customization,
-            dst,
-            flasher,
-            bootfs,
-            bmap,
-            chan,
-            cancel_sync,
-        )
-    })
-    .await
+    let mut set = tokio::task::JoinSet::new();
+    for (i, dst) in dsts.into_iter().enumerate() {
+        let (tx, rx) = mpsc::sync_channel(2);
+        let chan = chan.clone();
+        // Tags this destination's progress; ends once its flash drops `tx`.
+        tokio::task::spawn_blocking(move || {
+            while let Ok(x) = rx.recv() {
+                let _ = chan.try_send((i, x));
+            }
+        });
+
+        let img = img.clone();
+        let customization = customization.clone();
+        let bootfs = bootfs.clone();
+        let bmap = bmap.clone();
+        let cancel_sync = cancel_sync.clone();
+
+        set.spawn_blocking(move || {
+            let res = flash_inner(
+                img,
+                customization,
+                dst.clone(),
+                flasher,
+                bootfs,
+                bmap,
+                tx,
+                cancel_sync,
+            );
+            (dst, res)
+        });
+    }
+
+    let mut failures = Vec::new();
+
+    while let Some(res) = set.join_next().await {
+        let (d, res) = res.unwrap();
+        if let Err(e) = res {
+            tracing::error!("Flashing {} failed with error: {e:#?}", d.label());
+            failures.push((d, e.to_string().into()));
+        }
+    }
+
+    Ok(failures)
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -434,6 +468,14 @@ impl Destination {
     /// Download instead of flashing
     pub(crate) const fn is_download_action(&self) -> bool {
         matches!(self, Self::LocalFile(_))
+    }
+
+    /// What the summary pages call this destination: its name, with the size where there is one.
+    pub(crate) fn label(&self) -> Box<str> {
+        match self.size() {
+            Some(x) => format!("{} ({})", self, pretty_bytes(x)).into(),
+            None => self.to_string().into(),
+        }
     }
 
     /// Stable identity of this destination, used to match a click back to a

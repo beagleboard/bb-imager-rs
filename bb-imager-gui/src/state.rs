@@ -8,6 +8,7 @@ use iced::{Task, widget};
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
 use bb_imager_ui::SidebarEntry;
+use bb_imager_ui::destination_selection::DestId;
 use bb_imager_ui::image_selection::ImageId;
 
 use crate::{
@@ -392,9 +393,38 @@ impl ChooseDestState {
         self.destinations = destinations;
     }
 
-    /// Record `dest` as the selection, both for the flow and for the page.
-    pub(crate) fn toggle_dest(&mut self, dest: bb_imager_ui::destination_selection::DestId) {
-        self.state.selected = vec![dest];
+    /// Select `dest`, or deselect it if already selected.
+    pub(crate) fn toggle_dest(&mut self, dest: DestId) {
+        match self.state.selected.iter().position(|x| *x == dest) {
+            Some(i) => {
+                self.state.selected.remove(i);
+            }
+            None => self.state.selected.push(dest),
+        }
+    }
+
+    /// Deselect "Save To File".
+    pub(crate) fn remove_file_dest(&mut self) {
+        self.state
+            .selected
+            .retain(|x| !matches!(x, DestId::SaveToFile(_)));
+    }
+
+    pub(crate) fn find_dest_by_id(&self, id: &str) -> Option<&helpers::Destination> {
+        self.destinations
+            .iter()
+            .find(|x| x.identifier().as_ref() == id)
+    }
+
+    pub(crate) fn has_file_dest(&self) -> bool {
+        self.state
+            .selected
+            .iter()
+            .any(|x| matches!(x, DestId::SaveToFile(_)))
+    }
+
+    fn select_dests(&mut self, dests: impl IntoIterator<Item = helpers::Destination>) {
+        self.state.selected = dests.into_iter().map(Into::into).collect();
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -409,7 +439,7 @@ impl From<CustomizeState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.toggle_dest(value.ctx.selected_dest.into());
+        res.select_dests(value.ctx.selected_dests);
         res
     }
 }
@@ -421,7 +451,7 @@ impl From<ReviewState> for ChooseDestState {
             value.ctx.selected_board,
             value.ctx.selected_image,
         );
-        res.toggle_dest(value.ctx.selected_dest.into());
+        res.select_dests(value.ctx.selected_dests);
         res
     }
 }
@@ -452,7 +482,8 @@ impl From<FlashingCancelState> for ChooseDestState {
 pub(crate) struct FlashingContext {
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    pub(crate) selected_dest: helpers::Destination,
+    /// Never empty, and unique.
+    pub(crate) selected_dests: Box<[helpers::Destination]>,
     pub(crate) customization: helpers::FlashingCustomization,
     /// Whether the Customize page is part of this flow.
     ///
@@ -463,15 +494,19 @@ pub(crate) struct FlashingContext {
 }
 
 impl FlashingContext {
-    pub(crate) fn selected_destination(&self) -> String {
-        match self.selected_dest.size() {
-            Some(x) => format!("{} ({})", self.selected_dest, helpers::pretty_bytes(x)),
-            None => self.selected_dest.to_string(),
-        }
+    /// One label per destination.
+    pub(crate) fn selected_destinations(&self) -> Box<[Box<str>]> {
+        self.selected_dests
+            .iter()
+            .map(helpers::Destination::label)
+            .collect()
     }
 
-    pub(crate) const fn is_download(&self) -> bool {
-        self.selected_dest.is_download_action()
+    /// Whether this only saves the image to a file, rather than writing any device.
+    pub(crate) fn is_download(&self) -> bool {
+        self.selected_dests
+            .iter()
+            .all(helpers::Destination::is_download_action)
     }
 }
 
@@ -548,7 +583,7 @@ impl ReviewState {
                 is_download: ctx.is_download(),
                 board: ctx.selected_board.name.clone(),
                 image: ctx.selected_image.1.to_string().into(),
-                destinations: [ctx.selected_destination().into()].into(),
+                destinations: ctx.selected_destinations(),
                 modifications: ctx.customization.modifications(),
                 has_customization: ctx.has_customization,
             },
@@ -629,7 +664,7 @@ impl From<FlashingState> for FlashingSuccessState {
             state: bb_imager_ui::flash_success::State {
                 board: value.ctx.selected_board.name.clone(),
                 image: value.ctx.selected_image.1.to_string().into(),
-                destinations: [value.ctx.selected_destination().into()].into(),
+                destinations: value.ctx.selected_destinations(),
                 modifications: value.ctx.customization.modifications(),
                 has_customization: value.ctx.has_customization,
             },
@@ -660,6 +695,7 @@ impl From<FlashingState> for FlashingCancelState {
 
 pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
+    /// Its destinations are only the ones that failed, kept for Retry.
     pub(crate) ctx: FlashingContext,
     pub(crate) state: bb_imager_ui::flash_fail::State,
 }
@@ -667,30 +703,32 @@ pub(crate) struct FlashingFailState {
 impl FlashingFailState {
     pub(crate) fn new(
         state: FlashingState,
-        err: String,
+        failures: Box<[(helpers::Destination, Box<str>)]>,
         mut logs: widget::text_editor::Content,
     ) -> Self {
         logs.perform(widget::text_editor::Action::Move(
             widget::text_editor::Motion::DocumentEnd,
         ));
 
-        // flash() reports one error for the whole run for now, so every listed destination shares it.
-        let err: Box<str> = err.into();
-        let failures = state
-            .state
-            .destinations
-            .iter()
-            .map(|(x, _)| (x.clone(), err.clone()))
-            .collect();
+        let (selected_dests, failures): (Vec<_>, Vec<_>) = failures
+            .into_iter()
+            .map(|(dest, err)| {
+                let label = (dest.label(), err);
+                (dest, label)
+            })
+            .unzip();
 
         Self {
             state: bb_imager_ui::flash_fail::State {
-                failures,
+                failures: failures.into(),
                 logs,
                 has_customization: state.ctx.has_customization,
             },
             common: state.common,
-            ctx: state.ctx,
+            ctx: FlashingContext {
+                selected_dests: selected_dests.into(),
+                ..state.ctx
+            },
         }
     }
 }
