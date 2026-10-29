@@ -380,20 +380,6 @@ impl BBImager {
         let s = iced::stream::channel(2, async move |mut chan| {
             let (tx, rx) = std::sync::mpsc::sync_channel(2);
 
-            let cancel_child = cancel.clone();
-            let flash_task = tokio::spawn(async move {
-                helpers::flash(
-                    board,
-                    img,
-                    customization,
-                    dst,
-                    db,
-                    downloader,
-                    tx,
-                    cancel_child,
-                )
-                .await
-            });
             let mut chan_clone = chan.clone();
             let progress_task = tokio::task::spawn_blocking(move || {
                 while let Ok(progress) = rx.recv() {
@@ -402,7 +388,19 @@ impl BBImager {
             });
             let _guard = cancel.drop_guard();
 
-            let res = match flash_task.await {
+            let res = helpers::flash(
+                board,
+                img,
+                customization,
+                dst,
+                db,
+                downloader,
+                tx,
+                cancel.clone(),
+            )
+            .await;
+
+            let res = match res {
                 Ok(_) => {
                     tracing::info!("Flashing Successfull");
                     BBImagerMessage::FlashSuccess

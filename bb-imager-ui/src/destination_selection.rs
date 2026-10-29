@@ -11,7 +11,7 @@ use crate::{Message, constants};
 
 const ICON_WIDTH: u32 = 60;
 
-/// Identifies the current selection.
+/// Identifies the a selected destination.
 ///
 /// Devices are keyed by their stable hardware identifier rather than by
 /// position: the host re-enumerates every second, so an index could resolve to
