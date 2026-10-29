@@ -673,9 +673,19 @@ impl FlashingFailState {
         logs.perform(widget::text_editor::Action::Move(
             widget::text_editor::Motion::DocumentEnd,
         ));
+
+        // flash() reports one error for the whole run for now, so every listed destination shares it.
+        let err: Box<str> = err.into();
+        let failures = state
+            .state
+            .destinations
+            .iter()
+            .map(|(x, _)| (x.clone(), err.clone()))
+            .collect();
+
         Self {
             state: bb_imager_ui::flash_fail::State {
-                reason: err.into(),
+                failures,
                 logs,
                 has_customization: state.ctx.has_customization,
             },

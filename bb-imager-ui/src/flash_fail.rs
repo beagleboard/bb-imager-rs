@@ -5,7 +5,8 @@ use crate::{Message, constants};
 
 #[derive(Debug)]
 pub struct State {
-    pub reason: Box<str>,
+    /// Each failed device's label paired with why it failed.
+    pub failures: Box<[(Box<str>, Box<str>)]>,
     pub logs: widget::text_editor::Content,
     /// Whether this run has a Modify step.
     pub has_customization: bool,
@@ -17,9 +18,9 @@ pub fn view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
         state.has_customization,
         false,
         fail_info_view(
-            format!("Write Failed: {}", state.reason),
+            "Write Failed".to_string(),
             "Writing to the device faild. The device might be in an unusable state at present.",
-            &[],
+            &state.failures,
             &state.logs,
             scroll_id,
         ),
