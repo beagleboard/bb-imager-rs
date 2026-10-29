@@ -7,81 +7,104 @@ use std::path::{Path, PathBuf};
 use std::{
     collections::HashMap,
     os::fd::{FromRawFd, IntoRawFd},
+    sync::{LazyLock, Mutex, PoisonError},
 };
 
+/// The one udisks2 connection, with the runtime that drives it.
+///
+/// polkit's agent shows one authentication dialog at a time, and a request made while one is up
+/// fails rather than waiting. Every udisks2 call takes this lock for its whole duration, so
+/// writing several cards at once asks for each in turn (usually once, as udisks2 keeps it).
+///
+/// The runtime is kept because the connection's reader task lives on it.
 #[cfg(feature = "udev")]
-pub(crate) fn format(dst: &Path) -> Result<()> {
-    async fn format_inner(dst: &Path) -> io::Result<()> {
-        let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
+struct Udisks {
+    rt: tokio::runtime::Runtime,
+    client: udisks2::Client,
+}
 
-        let devs = dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", dst.to_str().unwrap().into())]),
-                HashMap::new(),
-            )
-            .await
-            .map_err(io::Error::other)?;
+#[cfg(feature = "udev")]
+impl Udisks {
+    fn connect() -> std::result::Result<Self, String> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .map_err(|e| e.to_string())?;
+        let client = rt
+            .block_on(udisks2::Client::new())
+            .map_err(|e| e.to_string())?;
+        Ok(Self { rt, client })
+    }
+}
 
-        let block = devs
-            .first()
-            .ok_or(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Block device not found",
-            ))?
-            .to_owned();
+/// Connected on first use. Without a system bus, connecting fails for good, so the failure is
+/// kept and every call reports it.
+#[cfg(feature = "udev")]
+static UDISKS: LazyLock<Mutex<std::result::Result<Udisks, String>>> =
+    LazyLock::new(|| Mutex::new(Udisks::connect()));
 
-        let obj = dbus_client
-            .object(block)
-            .expect("Unexpected error")
-            .block()
-            .await
-            .map_err(io::Error::other)?;
+/// Run `f` with the shared client, after any other udisks2 call has finished.
+#[cfg(feature = "udev")]
+fn with_udisks<T>(f: impl AsyncFnOnce(&udisks2::Client) -> io::Result<T>) -> io::Result<T> {
+    let guard = UDISKS.lock().unwrap_or_else(PoisonError::into_inner);
+    let Udisks { rt, client } = guard.as_ref().map_err(|e| io::Error::other(e.clone()))?;
+    rt.block_on(f(client))
+}
 
-        obj.format(
-            "vfat",
-            HashMap::from([("update-partition-type", true.into())]),
+/// The udisks2 block device for `dst`.
+#[cfg(feature = "udev")]
+async fn block_for(
+    client: &udisks2::Client,
+    dst: &Path,
+) -> io::Result<udisks2::block::BlockProxy<'static>> {
+    let devs = client
+        .manager()
+        .resolve_device(
+            HashMap::from([("path", dst.to_str().unwrap().into())]),
+            HashMap::new(),
         )
         .await
         .map_err(io::Error::other)?;
 
-        Ok(())
-    }
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_io()
-        .build()
-        .unwrap();
-    rt.block_on(async move { format_inner(dst).await })
-        .map_err(|source| Error::FailedToFormat { source })
+    let block = devs
+        .first()
+        .ok_or(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Block device not found",
+        ))?
+        .to_owned();
+
+    client
+        .object(block)
+        .expect("Unexpected error")
+        .block()
+        .await
+        .map_err(io::Error::other)
+}
+
+#[cfg(feature = "udev")]
+pub(crate) fn format(dst: &Path) -> Result<()> {
+    with_udisks(async |client| {
+        block_for(client, dst)
+            .await?
+            .format(
+                "vfat",
+                HashMap::from([("update-partition-type", true.into())]),
+            )
+            .await
+            .map_err(io::Error::other)
+    })
+    .map_err(|source| Error::FailedToFormat { source })
 }
 
 #[cfg(feature = "udev")]
 pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
-    async fn open_inner(dst: &Path) -> anyhow::Result<LinuxDrive> {
-        let dbus_client = udisks2::Client::new().await?;
-
-        let devs = dbus_client
-            .manager()
-            .resolve_device(
-                HashMap::from([("path", dst.to_str().unwrap().into())]),
-                HashMap::new(),
-            )
-            .await?;
-
-        let block = devs
-            .first()
-            .ok_or(anyhow::anyhow!("Block device not found",))?
-            .to_owned();
-
-        let obj = dbus_client
-            .object(block)
-            .expect("Unexpected error")
-            .block()
-            .await?;
-
-        let fd = obj
+    with_udisks(async |client| {
+        let fd = block_for(client, dst)
+            .await?
             .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
-            .await?;
+            .await
+            .map_err(io::Error::other)?;
         let file =
             unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
 
@@ -89,14 +112,8 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
             file,
             drive: dst.to_path_buf(),
         })
-    }
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_io()
-        .build()
-        .unwrap();
-    rt.block_on(async move { open_inner(dst).await })
-        .map_err(|e| Error::FailedToOpenDestination { source: e })
+    })
+    .map_err(|e| Error::FailedToOpenDestination { source: e.into() })
 }
 
 #[cfg(not(feature = "udev"))]
@@ -137,57 +154,28 @@ pub(crate) struct LinuxDrive {
 #[cfg(feature = "udev")]
 impl Eject for LinuxDrive {
     fn eject(self) -> io::Result<()> {
-        async fn inner(dst: PathBuf) -> io::Result<()> {
-            let dbus_client = udisks2::Client::new().await.map_err(io::Error::other)?;
+        let _ = self.file.sync_all();
+        let dst = self.drive.clone();
 
-            let devs = dbus_client
-                .manager()
-                .resolve_device(
-                    HashMap::from([("path", dst.to_str().unwrap().into())]),
-                    HashMap::new(),
-                )
+        std::mem::drop(self);
+
+        with_udisks(async |client| {
+            let drive = block_for(client, &dst)
+                .await?
+                .drive()
                 .await
                 .map_err(io::Error::other)?;
 
-            let obj_path = devs
-                .first()
-                .ok_or(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Block device not found",
-                ))?
-                .to_owned();
-
-            let block = dbus_client
-                .object(obj_path)
-                .expect("Unexpected error")
-                .block()
-                .await
-                .map_err(io::Error::other)?;
-
-            dbus_client
-                .object(block.drive().await.map_err(io::Error::other)?)
+            client
+                .object(drive)
                 .expect("Unexpected error")
                 .drive()
                 .await
                 .map_err(io::Error::other)?
                 .eject(HashMap::new())
                 .await
-                .map_err(io::Error::other)?;
-
-            Ok(())
-        }
-
-        let _ = self.file.sync_all();
-        let dst = self.drive.clone();
-
-        std::mem::drop(self);
-
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_io()
-            .build()
-            .unwrap();
-        rt.block_on(async move { inner(dst).await })
-            .map_err(io::Error::other)
+                .map_err(io::Error::other)
+        })
     }
 }
 
