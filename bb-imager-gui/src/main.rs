@@ -389,26 +389,17 @@ impl BBImager {
             });
             let _guard = cancel.drop_guard();
 
-            let failures = match helpers::flash(
+            let failures = helpers::flash(
                 board,
                 img,
                 customization,
-                dsts.clone(),
+                dsts,
                 db,
                 downloader,
                 tx,
                 cancel.clone(),
             )
-            .await
-            {
-                Ok(x) => x,
-                Err(e) => {
-                    tracing::error!("Failed to open the image: {:#?}", e);
-                    dsts.into_iter()
-                        .map(|d| (d, e.to_string().into()))
-                        .collect()
-                }
-            };
+            .await;
 
             let res = if failures.is_empty() {
                 tracing::info!("Flashing Successfull");

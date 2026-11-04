@@ -377,7 +377,11 @@ fn no_bootloader_flasher_behaves_like_sd_card() {
 #[cfg(feature = "sd")]
 async fn flash_local_image(
     flasher: config::Flasher,
-) -> (anyhow::Result<()>, tempfile::NamedTempFile, Vec<u8>) {
+) -> (
+    Vec<(Destination, Box<str>)>,
+    tempfile::NamedTempFile,
+    Vec<u8>,
+) {
     use std::io::Write;
 
     let data: Vec<u8> = (0..4096u32).map(|x| (x % 251) as u8).collect();
@@ -387,7 +391,7 @@ async fn flash_local_image(
 
     let dst = tempfile::NamedTempFile::new().unwrap();
     let cache = tempfile::tempdir().unwrap();
-    let res = flash(
+    let failures = flash(
         0,
         local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
@@ -397,13 +401,9 @@ async fn flash_local_image(
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
     )
-    .await
-    .and_then(|failures| match failures.into_iter().next() {
-        Some((_, e)) => Err(anyhow::anyhow!("{e}")),
-        None => Ok(()),
-    });
+    .await;
 
-    (res, dst, data)
+    (failures, dst, data)
 }
 
 /// One flash writes every destination in full.
@@ -434,8 +434,7 @@ async fn flash_writes_every_destination() {
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
     )
-    .await
-    .unwrap();
+    .await;
     assert!(failures.is_empty());
 
     for dst in &dsts {
@@ -449,8 +448,11 @@ async fn flash_writes_every_destination() {
 #[cfg(feature = "sd")]
 #[tokio::test]
 async fn plain_sd_image_ignores_the_boards_bootfs() {
-    let (res, dst, data) = flash_local_image(config::Flasher::SdCard).await;
+    let (failures, dst, data) = flash_local_image(config::Flasher::SdCard).await;
 
-    res.expect("a plain SD image must not pick up the board's bootfs");
+    assert!(
+        failures.is_empty(),
+        "a plain SD image must not pick up the board's bootfs: {failures:?}"
+    );
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);
 }
