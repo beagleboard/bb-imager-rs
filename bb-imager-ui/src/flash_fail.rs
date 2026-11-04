@@ -18,8 +18,8 @@ pub fn view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
         state.has_customization,
         false,
         fail_info_view(
-            "Write Failed".to_string(),
-            "Writing to the device faild. The device might be in an unusable state at present.",
+            "Write Failed",
+            "Writing to the device failed. The device might be in an unusable state at present.",
             &state.failures,
             &state.logs,
             scroll_id,
@@ -35,13 +35,13 @@ pub fn view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
     )
 }
 
-/// Failure reason, then each failed device with its own reason, followed by
+/// Heading, then each failed device with its own reason, followed by
 /// the run's logs. Shared with [`crate::format_media_fail`].
 ///
 /// `failures` pairs a device label with why it failed; when empty, no
 /// per-device section is shown.
 pub(crate) fn fail_info_view<'a>(
-    heading: String,
+    heading: &'static str,
     desc: &'static str,
     failures: &'a [(Box<str>, Box<str>)],
     logs: &'a widget::text_editor::Content,
