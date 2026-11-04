@@ -2,7 +2,7 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, little_endian};
 
 use crate::{Error, Result};
 
-const CRC_ALGO: crc_fast::CrcAlgorithm = crc_fast::CrcAlgorithm::Crc32Jamcrc;
+// The BSL uses JAMCRC: CRC-32 without the final XOR, hence `!finalize()`.
 
 // Bootloader Core Commands
 const COMMAND_UNLOCK_BOOTLOADER: u8 = 0x21;
@@ -31,9 +31,7 @@ const STANDALONE_VERIFICATION: u8 = 0x32;
 const OPERATION_SUCCESSFUL: u8 = 0x00;
 
 pub(crate) fn crc(buf: &[u8]) -> little_endian::U32 {
-    u32::try_from(crc_fast::checksum(CRC_ALGO, buf))
-        .unwrap()
-        .into()
+    (!crc32fast::hash(buf)).into()
 }
 
 #[derive(FromBytes, IntoBytes, Immutable, Debug, Clone, Copy)]
@@ -162,7 +160,7 @@ impl BSLMsg for BSLUnlockBslReqPkt {}
 
 impl BSLUnlockBslReqPkt {
     fn new(password: [u8; 32]) -> Self {
-        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+        let mut crc = crc32fast::Hasher::new();
 
         crc.update(&[COMMAND_UNLOCK_BOOTLOADER]);
         crc.update(&password);
@@ -170,7 +168,7 @@ impl BSLUnlockBslReqPkt {
         Self {
             head: BSLPktHead::new_req(Self::LEN, COMMAND_UNLOCK_BOOTLOADER),
             password,
-            tail: u32::try_from(crc.finalize()).unwrap().into(),
+            tail: (!crc.finalize()).into(),
         }
     }
 }
@@ -194,7 +192,7 @@ impl BSLMsg for BSLStandaloneVerificationReqPkt {}
 
 impl BSLStandaloneVerificationReqPkt {
     fn new(size: u32) -> Self {
-        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+        let mut crc = crc32fast::Hasher::new();
 
         crc.update(&[COMMAND_STANDALONE_VERIFICATION]);
         crc.update(&0u32.to_le_bytes());
@@ -204,7 +202,7 @@ impl BSLStandaloneVerificationReqPkt {
             head: BSLPktHead::new_req(Self::LEN, COMMAND_STANDALONE_VERIFICATION),
             address: 0.into(),
             size: size.into(),
-            tail: u32::try_from(crc.finalize()).unwrap().into(),
+            tail: (!crc.finalize()).into(),
         }
     }
 }
@@ -266,7 +264,7 @@ impl BSLMsg for BSLChageBaudRatePkt {}
 
 impl BSLChageBaudRatePkt {
     fn new(rate: u8) -> Self {
-        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+        let mut crc = crc32fast::Hasher::new();
 
         crc.update(&[COMMAND_CHANGE_BAUD_RATE]);
         crc.update(&[rate]);
@@ -274,7 +272,7 @@ impl BSLChageBaudRatePkt {
         Self {
             head: BSLPktHead::new_req(Self::LEN, COMMAND_CHANGE_BAUD_RATE),
             rate,
-            tail: u32::try_from(crc.finalize()).unwrap().into(),
+            tail: (!crc.finalize()).into(),
         }
     }
 }
@@ -417,7 +415,7 @@ where
     pub(crate) fn program_data(&mut self, address: u32, data: &[u8]) -> Result<()> {
         assert!(data.len() <= self.program_data_max_len());
 
-        let mut crc = crc_fast::Digest::new(CRC_ALGO);
+        let mut crc = crc32fast::Hasher::new();
 
         crc.update(&[COMMAND_PROGRAM_DATA]);
 
@@ -429,7 +427,7 @@ where
         crc.update(data);
         self.port.write_all(data)?;
 
-        let msg_crc = u32::try_from(crc.finalize()).unwrap();
+        let msg_crc = !crc.finalize();
         self.port.write_all(&msg_crc.to_le_bytes())?;
 
         self.wait_for_ack()?;
@@ -444,6 +442,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn crc_is_jamcrc() {
+        // JAMCRC check value from the CRC catalogue.
+        assert_eq!(crc(b"123456789").get(), 0x340B_C6D9);
+    }
+
+    #[test]
     fn unlock_req_test() {
         let cmd = BSLUnlockBslReqPkt::default();
         assert_eq!(
@@ -454,5 +458,25 @@ mod tests {
                 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0xAA, 0xF0, 0x3D
             ]
         );
+    }
+
+    #[test]
+    fn standalone_verification_req_test() {
+        let cmd = BSLStandaloneVerificationReqPkt::new(0xc00);
+        assert_eq!(
+            cmd.as_bytes(),
+            &[
+                0x80, 0x09, 0, 0x26, 0, 0, 0, 0, 0, 0x0C, 0, 0, 0x1C, 0xE9, 0x07, 0xE1
+            ]
+        )
+    }
+
+    #[test]
+    fn bsl_change_req_test() {
+        let cmd = BSLChageBaudRatePkt::new(3);
+        assert_eq!(
+            cmd.as_bytes(),
+            &[0x80, 0x02, 0, 0x52, 0x03, 0x6C, 0x83, 0xA2, 0xAF]
+        )
     }
 }
