@@ -186,7 +186,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             size,
         } => match state {
             BBImager::ChooseOs(inner) => inner.select_local_image(path, flasher, size),
-            _ => panic!("Unexpected message"),
+            BBImager::AppInfo(overlay_state) => {
+                if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
+                    inner.select_local_image(path, flasher, size);
+                }
+            }
+            // The dialog isn't modal; the user may have left the page meanwhile.
+            _ => {}
         },
         BBImagerMessage::UiState(Message::OpenUrl(x)) => {
             return Task::future(async move {
@@ -307,7 +313,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::SelectDest(x) => match state {
             BBImager::ChooseDest(inner) => inner.toggle_dest(x),
-            _ => panic!("Unexpected message"),
+            BBImager::AppInfo(overlay_state) => {
+                if let OverlayData::ChooseDest(inner) = &mut overlay_state.page {
+                    inner.toggle_dest(x);
+                }
+            }
+            // The dialog isn't modal; the user may have left the page meanwhile.
+            _ => {}
         },
         BBImagerMessage::UiState(Message::SelectDest(ident)) => match state {
             // Resolved by identity rather than position: the list is
