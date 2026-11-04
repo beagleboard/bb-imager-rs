@@ -527,14 +527,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
         }
         BBImagerMessage::FlashProgress(i, x) => match state {
-            BBImager::Flashing(inner) => {
-                inner.progress_update(i, x);
-            }
-            BBImager::AppInfo(inner) => match &mut inner.page {
-                OverlayData::Flashing(flashing_state) => flashing_state.progress_update(i, x),
-                _ => panic!("Unexpected message"),
-            },
-            // Debug build can be slow.
+            BBImager::Flashing(inner)
+            | BBImager::AppInfo(OverlayState {
+                page: OverlayData::Flashing(inner),
+                ..
+            }) => inner.progress_update(i, x),
+            // The relay doesn't wait for the last update before reporting the result, so
+            // one can land after the flash has ended or been cancelled.
             _ => {}
         },
         #[cfg(feature = "sd")]
