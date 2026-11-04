@@ -214,8 +214,8 @@ impl From<bb_flasher::LocalImage> for SelectedImage {
 /// A remote image is downloaded once, with every destination streaming from the same download.
 /// Its download details are looked up in `db` here rather than carried through the pages.
 ///
-/// Returns each destination that failed, with its error. Fails as a whole only if the image
-/// could not be opened.
+/// Returns each destination that failed, with its error. If the image cannot be opened, every
+/// destination fails with that error.
 #[expect(clippy::too_many_arguments)]
 pub(crate) async fn flash(
     board: i64,
@@ -226,44 +226,58 @@ pub(crate) async fn flash(
     downloader: bb_downloader::Downloader,
     chan: mpsc::SyncSender<(usize, DownloadFlashingStatus)>,
     cancel_sync: bb_helper::cancel::CancellationToken,
-) -> anyhow::Result<Vec<(Destination, Box<str>)>> {
+) -> Vec<(Destination, Box<str>)> {
     let flasher = img.flasher();
 
-    // Every SD flash is handed the board's archive; only images that carry no bootloader of
-    // their own may have it written over their boot partition.
-    #[cfg(feature = "sd")]
-    let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
-        let db = db.clone();
-        let bootfs = blocking_future(move || db.board_by_id(board))
-            .await?
-            .bootfs
-            .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
-        Some(RemoteSource::new(
-            bootfs.url,
-            bootfs.image_download_sha256,
-            bootfs.image_download_size,
-            downloader.clone(),
-        ))
-    } else {
-        None
-    };
+    let opened = async {
+        // Every SD flash is handed the board's archive; only images that carry no bootloader of
+        // their own may have it written over their boot partition.
+        #[cfg(feature = "sd")]
+        let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
+            let db = db.clone();
+            let bootfs = blocking_future(move || db.board_by_id(board))
+                .await?
+                .bootfs
+                .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
+            Some(RemoteSource::new(
+                bootfs.url,
+                bootfs.image_download_sha256,
+                bootfs.image_download_size,
+                downloader.clone(),
+            ))
+        } else {
+            None
+        };
 
-    let (img, bmap) = match img {
-        BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
-        BoardImage::Remote { id, .. } => {
-            blocking_future(move || {
-                let image = db.os_image_by_id(id)?;
-                let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
-                #[cfg(feature = "sd")]
-                let bmap = image
-                    .bmap
-                    .map(|url| crate::img::Bmap::new(*url, downloader));
-                #[cfg(not(feature = "sd"))]
-                let bmap = None;
+        let (img, bmap) = match img {
+            BoardImage::Local { img, .. } => (SelectedImage::from(img), None),
+            BoardImage::Remote { id, .. } => {
+                blocking_future(move || {
+                    let image = db.os_image_by_id(id)?;
+                    let img = RemoteSource::from_img(&image, downloader.clone(), flasher);
+                    #[cfg(feature = "sd")]
+                    let bmap = image
+                        .bmap
+                        .map(|url| crate::img::Bmap::new(*url, downloader));
+                    #[cfg(not(feature = "sd"))]
+                    let bmap = None;
 
-                Ok::<(_, _), rusqlite::Error>((img.into(), bmap))
-            })
-            .await?
+                    Ok::<(_, _), rusqlite::Error>((img.into(), bmap))
+                })
+                .await?
+            }
+        };
+
+        Ok::<_, anyhow::Error>((bootfs, img, bmap))
+    }
+    .await;
+
+    let (bootfs, img, bmap) = match opened {
+        Ok(x) => x,
+        Err(e) => {
+            tracing::error!("Failed to open the image: {e:#?}");
+            let e: Box<str> = e.to_string().into();
+            return dsts.into_iter().map(|d| (d, e.clone())).collect();
         }
     };
     #[cfg(not(feature = "sd"))]
@@ -311,7 +325,7 @@ pub(crate) async fn flash(
         }
     }
 
-    Ok(failures)
+    failures
 }
 
 #[expect(clippy::too_many_arguments)]

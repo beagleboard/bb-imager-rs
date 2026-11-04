@@ -123,10 +123,6 @@ fn time_remaining(
 
 /// Estimate one destination's remaining flashing time from its `progress` and
 /// how much time has `elapsed` since the first progress update.
-///
-/// Split out of [`progress_view`] so the ETA math is testable without an
-/// `Instant` clock: a linear extrapolation `elapsed * (1 - x) / x`, suppressed
-/// until progress clears a small threshold to avoid wild early estimates.
 fn time_remaining_from(progress: Progress, elapsed: Option<Duration>) -> Option<Duration> {
     const THRESHOLD: f32 = 0.02;
 
