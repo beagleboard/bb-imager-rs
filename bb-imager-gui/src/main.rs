@@ -482,7 +482,7 @@ impl BBImager {
                 )
             }
             Self::ChooseDest(inner) => {
-                let dests: Box<_> = inner
+                let Some(selected_dests) = inner
                     .state
                     .selected
                     .iter()
@@ -494,49 +494,47 @@ impl BBImager {
                             Some(helpers::Destination::LocalFile(path.clone()))
                         }
                     })
-                    .collect();
-
-                if dests.iter().any(|x| x.is_none()) {
+                    .collect()
+                else {
                     tracing::warn!(
                         "Some selected destinations ({:?}) are gone; staying on the page",
-                        dests
+                        inner.state.selected
                     );
-                    (Self::ChooseDest(inner), Task::none())
-                } else {
-                    let selected_dests = dests.into_iter().flatten().collect();
+                    *self = Self::ChooseDest(inner);
+                    return self.scroll_reset();
+                };
 
-                    let flasher = inner.selected_image.1.flasher();
+                let flasher = inner.selected_image.1.flasher();
 
-                    // A flasher with nothing to configure skips the Customize page.
-                    let (customization, has_customization) =
-                        match helpers::no_customization(flasher, &inner.selected_image.1) {
-                            Some(c) => (c, false),
-                            None => (
-                                helpers::FlashingCustomization::new(
-                                    flasher,
-                                    &inner.selected_image.1,
-                                    &inner.common.app_config,
-                                ),
-                                true,
+                // A flasher with nothing to configure skips the Customize page.
+                let (customization, has_customization) =
+                    match helpers::no_customization(flasher, &inner.selected_image.1) {
+                        Some(c) => (c, false),
+                        None => (
+                            helpers::FlashingCustomization::new(
+                                flasher,
+                                &inner.selected_image.1,
+                                &inner.common.app_config,
                             ),
-                        };
-
-                    let ctx = state::FlashingContext {
-                        selected_board: inner.selected_board,
-                        selected_image: inner.selected_image,
-                        selected_dests,
-                        customization,
-                        has_customization,
+                            true,
+                        ),
                     };
 
-                    let temp = if has_customization {
-                        Self::Customize(state::CustomizeState::new(inner.common, ctx))
-                    } else {
-                        Self::Review(state::ReviewState::new(inner.common, ctx))
-                    };
+                let ctx = state::FlashingContext {
+                    selected_board: inner.selected_board,
+                    selected_image: inner.selected_image,
+                    selected_dests,
+                    customization,
+                    has_customization,
+                };
 
-                    (temp, Task::none())
-                }
+                let temp = if has_customization {
+                    Self::Customize(state::CustomizeState::new(inner.common, ctx))
+                } else {
+                    Self::Review(state::ReviewState::new(inner.common, ctx))
+                };
+
+                (temp, Task::none())
             }
             Self::Customize(mut inner) => {
                 // The page edits its own state, so the context only catches up
@@ -578,29 +576,28 @@ impl BBImager {
             }
             #[cfg(feature = "sd")]
             Self::FormatMedia(inner) => {
-                let dests: Box<_> = inner
+                let Some(dests) = inner
                     .state
                     .selected
                     .iter()
-                    .map(|id| inner.find_target_by_id(id.as_ref()))
-                    .collect();
-
-                if dests.iter().any(|x| x.is_none()) {
+                    .map(|id| inner.find_target_by_id(id.as_ref()).cloned())
+                    .collect()
+                else {
                     tracing::warn!(
-                        "Some destinations from list ({:?}) is gone; staying on the page",
-                        dests
+                        "Some selected destinations ({:?}) are gone; staying on the page",
+                        inner.state.selected
                     );
-                    (Self::FormatMedia(inner), Task::none())
-                } else {
-                    let dests = dests.into_iter().flatten().cloned().collect();
-                    (
-                        Self::FormatMediaReview(state::FormatMediaReviewState::new(
-                            inner.common,
-                            dests,
-                        )),
-                        Task::none(),
-                    )
-                }
+                    *self = Self::FormatMedia(inner);
+                    return self.scroll_reset();
+                };
+
+                (
+                    Self::FormatMediaReview(state::FormatMediaReviewState::new(
+                        inner.common,
+                        dests,
+                    )),
+                    Task::none(),
+                )
             }
             #[cfg(feature = "sd")]
             Self::FormatMediaReview(_)
