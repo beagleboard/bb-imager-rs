@@ -97,7 +97,14 @@ impl BBImager {
     }
 
     fn new() -> (Self, Task<BBImagerMessage>) {
-        let app_config = persistance::GuiConfiguration::load().unwrap_or_default();
+        let app_config = persistance::GuiConfiguration::load()
+            .inspect_err(|e| {
+                // A missing file is just a first run.
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!("Failed to load GUI configuration, using defaults: {e}");
+                }
+            })
+            .unwrap_or_default();
 
         let downloader = bb_downloader::Downloader::new(
             directories::ProjectDirs::from(
