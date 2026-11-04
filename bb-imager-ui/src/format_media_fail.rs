@@ -17,7 +17,7 @@ pub fn view(state: &State, scroll_id: widget::Id) -> Element<'_, Message> {
         false,
         false,
         fail_info_view(
-            "Format Failed".to_string(),
+            "Format Failed",
             "Formatting failed. The device might be in an unusable state at present.",
             &state.failures,
             &state.logs,
