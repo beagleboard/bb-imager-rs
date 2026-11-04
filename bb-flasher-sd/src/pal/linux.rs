@@ -113,7 +113,7 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
             drive: dst.to_path_buf(),
         })
     })
-    .map_err(|e| Error::FailedToOpenDestination { source: e.into() })
+    .map_err(|source| Error::FailedToOpenDestination { source })
 }
 
 #[cfg(not(feature = "udev"))]
