@@ -710,12 +710,9 @@ impl FlashingFailState {
             widget::text_editor::Motion::DocumentEnd,
         ));
 
-        let (selected_dests, failures): (Vec<_>, Vec<_>) = failures
+        let (failures, selected_dests): (Vec<_>, Vec<_>) = failures
             .into_iter()
-            .map(|(dest, err)| {
-                let label = (dest.label(), err);
-                (dest, label)
-            })
+            .map(|(dest, err)| ((dest.label(), err), dest))
             .unzip();
 
         Self {
@@ -1069,12 +1066,9 @@ impl FormatMediaFailState {
             widget::text_editor::Motion::DocumentEnd,
         ));
 
-        let (selected_dest, failures): (Vec<_>, Vec<_>) = failures
+        let (failures, selected_dest): (Vec<_>, Vec<_>) = failures
             .into_iter()
-            .map(|(dest, err)| {
-                let label = (helpers::sd_card_label(&dest), err);
-                (dest, label)
-            })
+            .map(|(dest, err)| ((helpers::sd_card_label(&dest), err), dest))
             .unzip();
 
         Self {
