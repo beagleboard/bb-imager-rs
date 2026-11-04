@@ -1,6 +1,6 @@
 //! This module contains persistance for configuration
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,13 +18,10 @@ pub(crate) struct GuiConfiguration {
 
 impl GuiConfiguration {
     pub(crate) fn load() -> std::io::Result<Self> {
-        let mut data = Vec::with_capacity(512);
-        let config_p = Self::config_path().unwrap();
-
-        let mut config = std::fs::File::open(config_p)?;
-        config.read_to_end(&mut data)?;
-
-        Ok(serde_json::from_slice(&data).unwrap())
+        let config_p = Self::config_path().ok_or(std::io::ErrorKind::NotFound)?;
+        let data = std::fs::read(config_p)?;
+        // `serde_json::Error` converts into `io::Error` (as `InvalidData`).
+        Ok(serde_json::from_slice(&data)?)
     }
 
     pub(crate) fn save(&self) -> std::io::Result<()> {
