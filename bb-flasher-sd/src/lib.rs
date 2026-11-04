@@ -66,7 +66,7 @@ pub enum Error {
     #[error("Failed to open SD Card.")]
     FailedToOpenDestination {
         #[source]
-        source: anyhow::Error,
+        source: io::Error,
     },
     #[error("Invalid bmap for the image.")]
     InvalidBmap,

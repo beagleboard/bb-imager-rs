@@ -66,7 +66,7 @@ fn check_dst(dst: &Path) -> Result<()> {
     match std::fs::exists(dst) {
         Ok(true) => Ok(()),
         _ => Err(Error::FailedToOpenDestination {
-            source: anyhow::anyhow!("Drive not found"),
+            source: io::Error::new(io::ErrorKind::NotFound, "Drive not found"),
         }),
     }
 }
@@ -83,7 +83,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
         .write(true)
         .create(false)
         .open(dst)
-        .map_err(|e| Error::FailedToOpenDestination { source: e.into() })?;
+        .map_err(|source| Error::FailedToOpenDestination { source })?;
 
     Ok(MacOSFile {
         inner: f,
@@ -93,7 +93,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
 #[cfg(feature = "macos_authopen")]
 pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
-    fn inner(dst: PathBuf) -> anyhow::Result<File> {
+    fn inner(dst: PathBuf) -> io::Result<File> {
         use nix::cmsg_space;
         use nix::sys::socket::{ControlMessageOwned, MsgFlags};
         use security_framework::authorization::{
@@ -172,13 +172,13 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
         let _ = cmd.wait();
 
-        Err(anyhow::anyhow!("Authopen failed to open the SD Card"))
+        Err(io::Error::other("Authopen failed to open the SD Card"))
     }
 
     check_dst(dst)?;
     let p = dst.to_owned();
     let _ = unmount_disk(dst.to_str().unwrap());
-    let f = inner(p).map_err(|e| Error::FailedToOpenDestination { source: e })?;
+    let f = inner(p).map_err(|source| Error::FailedToOpenDestination { source })?;
 
     Ok(MacOSFile {
         inner: f,

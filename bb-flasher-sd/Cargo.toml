@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-sd"
-version = "3.0.0"
+version = "4.0.0"
 description = "A library to flash OS images to SD Card"
 edition.workspace = true
 authors.workspace = true
@@ -20,7 +20,6 @@ mbrman = "0.6"
 gptman = "3"
 bb-bmap-parser = { version = "0.1", path = "../bb-bmap-parser" }
 tokio = { version = "1.52", optional = true, default-features = false, features = ["rt", "signal"] }
-anyhow = "1.0"
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel"] }
 tempfile = { version = "3.27", optional = true }
 
