@@ -2,8 +2,6 @@
 
 use std::collections::VecDeque;
 
-const CRC_ALGO: crc_fast::CrcAlgorithm = crc_fast::CrcAlgorithm::Crc32Jamcrc;
-
 const CONNECTION_REQ: &[u8] = &[0x80, 0x01, 0, 0x12, 0x3A, 0x61, 0x44, 0xDE];
 const DEVICE_INFO_REQ: &[u8] = &[0x80, 0x01, 0, 0x19, 0xB2, 0xB8, 0x96, 0x49];
 const UNLOCK_REQ: &[u8] = &[
@@ -20,8 +18,10 @@ enum State {
     Waiting,
     Connected,
     Unlocked,
-    WaitingForData((usize, crc_fast::Digest)),
-    WaitingForCrc(crc_fast::Digest),
+    /// The running CRC-32 so far, resumed with `Hasher::new_with_initial`; the BSL's
+    /// JAMCRC is its complement.
+    WaitingForData((usize, u32)),
+    WaitingForCrc(u32),
 }
 
 pub(crate) struct MockBsl {
@@ -97,9 +97,7 @@ impl std::io::Write for MockBsl {
                     if self.flash.is_empty() {
                         self.start_crc
                     } else {
-                        let mut crc = crc_fast::Digest::new(CRC_ALGO);
-                        crc.update(&self.flash);
-                        u32::try_from(crc.finalize()).unwrap()
+                        !crc32fast::hash(&self.flash)
                     }
                 };
 
@@ -107,10 +105,10 @@ impl std::io::Write for MockBsl {
                 self.tx_data.write_all(&flash_crc.to_le_bytes()).unwrap();
 
                 let msg_crc = {
-                    let mut crc = crc_fast::Digest::new(CRC_ALGO);
+                    let mut crc = crc32fast::Hasher::new();
                     crc.update(&[0x32]);
                     crc.update(&flash_crc.to_le_bytes());
-                    u32::try_from(crc.finalize()).unwrap()
+                    !crc.finalize()
                 };
 
                 self.tx_data.write_all(&msg_crc.to_le_bytes()).unwrap();
@@ -125,15 +123,15 @@ impl std::io::Write for MockBsl {
 
                 self.flash.resize(addr as usize, 0xff);
 
-                let mut crc = crc_fast::Digest::new(CRC_ALGO);
-
-                crc.update(&buf[3..]);
+                let crc = crc32fast::hash(&buf[3..]);
 
                 self.state = State::WaitingForData((data_len, crc));
             }
-            (_, State::WaitingForData((x, mut crc))) => {
+            (_, State::WaitingForData((x, crc))) => {
                 self.flash.extend(buf);
-                crc.update(buf);
+                let mut hasher = crc32fast::Hasher::new_with_initial(crc);
+                hasher.update(buf);
+                let crc = hasher.finalize();
                 let left = x - buf.len();
                 if left == 0 {
                     self.state = State::WaitingForCrc(crc)
@@ -142,7 +140,7 @@ impl std::io::Write for MockBsl {
                 }
             }
             (_, State::WaitingForCrc(crc)) => {
-                let expected_crc = u32::try_from(crc.finalize()).unwrap();
+                let expected_crc = !crc;
                 assert_eq!(buf.len(), 4);
                 let got_crc = u32::from_le_bytes(buf.try_into().unwrap());
 
