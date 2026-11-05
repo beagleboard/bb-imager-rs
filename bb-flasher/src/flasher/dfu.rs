@@ -131,7 +131,7 @@ where
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    ) -> crate::Result<()> {
         std::thread::scope(|s| {
             let c = if let Some(c) = chan {
                 let (tx, rx) = mpsc::sync_channel(2);

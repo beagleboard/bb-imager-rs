@@ -535,9 +535,8 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
- "anyhow",
  "bb-flasher-bcf",
  "bb-flasher-dfu",
  "bb-flasher-mspm0",
@@ -650,7 +649,6 @@ dependencies = [
 name = "bb-imager-cli"
 version = "1.0.20"
 dependencies = [
- "anyhow",
  "bb-flasher",
  "bb-flasher-sd",
  "clap",

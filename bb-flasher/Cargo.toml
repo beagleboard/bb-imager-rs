@@ -1,7 +1,7 @@
 [package]
 name = "bb-flasher"
 description = "Library providing flashing capabilities for BeagleBoard.org boards"
-version = "0.1.0"
+version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -25,7 +25,6 @@ tokio-util = { version = "0.7", optional = true, features = ["rt"] }
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel"] }
 rc-zip-sync = { version = "4.4", default-features = false, features = ["deflate"] }
 bb-flasher-dfu = { version = "0.1", path = "../bb-flasher-dfu", optional = true }
-anyhow = "1.0"
 bb-flasher-mspm0 = { version = "0.1.1", path = "../bb-flasher-mspm0", optional = true }
 tar = { version = "0.4", optional = true }
 

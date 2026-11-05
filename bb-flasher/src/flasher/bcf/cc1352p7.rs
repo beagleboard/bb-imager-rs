@@ -83,7 +83,7 @@ where
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    ) -> crate::Result<()> {
         let port = self.port;
         let verify = self.verify;
         let img = crate::common::resolve_img(self.img)?;

@@ -267,10 +267,8 @@ fn flash_propagates_bootfs_resolver_error() {
     .expect_err("a failing bootfs resolver should fail the flash");
 
     assert!(
-        err.downcast_ref::<bb_flasher_sd::Error>().is_some_and(|e| {
-            matches!(e, bb_flasher_sd::Error::IoError { source }
-                if source.kind() == std::io::ErrorKind::NotFound)
-        }),
+        matches!(&err, bb_flasher::Error::Sd(bb_flasher_sd::Error::IoError { source })
+            if source.kind() == std::io::ErrorKind::NotFound),
         "expected the resolver's io error, got: {err:?}"
     );
 }

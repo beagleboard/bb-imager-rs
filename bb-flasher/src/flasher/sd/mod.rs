@@ -184,7 +184,7 @@ impl FormatFlasher {
     }
 
     /// Format the SD Card.
-    pub fn flash(self) -> anyhow::Result<()> {
+    pub fn flash(self) -> crate::Result<()> {
         bb_flasher_sd::format(self.0.as_path()).map_err(Into::into)
     }
 }
@@ -268,7 +268,7 @@ where
         self,
         chan: Option<std::sync::mpsc::SyncSender<DownloadFlashingStatus>>,
         cancel: Option<CancellationToken>,
-    ) -> anyhow::Result<()> {
+    ) -> crate::Result<()> {
         let is_file_dest = self.is_file_dest();
         let customization = if self.customization.0.is_empty() {
             vec![]
@@ -352,7 +352,7 @@ where
     }
 
     /// Update the boot partition.
-    pub fn flash(self) -> anyhow::Result<()> {
+    pub fn flash(self) -> crate::Result<()> {
         bb_flasher_sd::bootfs_update::flash(self.img, self.dst, self.cancel).map_err(Into::into)
     }
 }

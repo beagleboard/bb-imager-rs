@@ -75,18 +75,16 @@ where
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    ) -> crate::Result<()> {
         let img = self.img;
         let img = crate::common::resolve_img(img)?;
-        let img = String::from_utf8(img).map_err(|_| {
-            crate::common::FlasherError::ImageResolvingError {
-                source: std::io::Error::other("Expected utf8"),
-            }
+        let img = String::from_utf8(img).map_err(|_| crate::Error::Image {
+            source: std::io::Error::other("Expected utf8"),
         })?;
         let bin = img
             .parse()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid firmware"))
-            .map_err(|source| crate::common::FlasherError::ImageResolvingError { source })?;
+            .map_err(|source| crate::Error::Image { source })?;
 
         flash(bin, chan, self.persist_eeprom).map_err(Into::into)
     }
