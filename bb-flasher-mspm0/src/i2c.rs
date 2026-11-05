@@ -77,11 +77,12 @@ pub fn ports() -> impl Iterator<Item = PathBuf> {
         .into_iter()
         .flatten()
         .filter_map(|x| x.ok())
-        .filter(|x| {
-            matches!(
-                x.metadata().map(|m| nix::sys::stat::major(m.rdev()) == 89),
-                Ok(true)
-            )
-        })
         .map(|x| x.path())
+        .filter(|x| matches!(is_i2c_dev(x), Ok(true)))
+}
+
+/// Whether `path` is an I2C bus character device (`/dev/i2c-*`, major 89).
+pub fn is_i2c_dev(path: impl AsRef<Path>) -> std::io::Result<bool> {
+    let meta = std::fs::metadata(path)?;
+    Ok(nix::sys::stat::major(meta.rdev()) == 89)
 }

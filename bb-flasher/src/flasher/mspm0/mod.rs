@@ -218,12 +218,7 @@ impl From<bb_flasher_mspm0::Status> for DownloadFlashingStatus {
 }
 
 #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
-fn is_i2c_dev(p: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
-    use std::os::unix::fs::MetadataExt;
-
-    let meta = std::fs::metadata(p)?;
-    Ok(nix::sys::stat::major(meta.rdev()) == 89)
-}
+use bb_flasher_mspm0::i2c::is_i2c_dev;
 
 #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
 fn is_i2c_dev(_: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
