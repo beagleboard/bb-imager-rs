@@ -730,131 +730,16 @@ impl FlashingFailState {
     }
 }
 
-// State for Pages that can be opened from any of the normal pages but are not part of normal flow.
-// Eg: Application info
-pub(crate) enum OverlayData {
-    ChooseBoard(ChooseBoardState),
-    ChooseOs(ChooseOsState),
-    ChooseDest(ChooseDestState),
-    Customize(CustomizeState),
-    Review(ReviewState),
-    Flashing(FlashingState),
-    FlashingCancel(FlashingCancelState),
-    FlashingFail(FlashingFailState),
-    FlashingSuccess(FlashingSuccessState),
-    #[cfg(feature = "sd")]
-    FormatMediaProgress(FormatMediaProgressState),
-    #[cfg(feature = "sd")]
-    FormatMediaSuccess(FormatMediaSuccessState),
-    #[cfg(feature = "sd")]
-    FormatMediaFail(FormatMediaFailState),
-}
-
-impl OverlayData {
-    pub(crate) const fn common_mut(&mut self) -> &mut BBImagerCommon {
-        match self {
-            Self::ChooseBoard(x) => &mut x.common,
-            Self::ChooseOs(x) => &mut x.common,
-            Self::ChooseDest(x) => &mut x.common,
-            Self::Customize(x) => &mut x.common,
-            Self::Review(x) => &mut x.common,
-            Self::Flashing(x) => &mut x.common,
-            Self::FlashingCancel(x) => &mut x.common,
-            Self::FlashingFail(x) => &mut x.common,
-            Self::FlashingSuccess(x) => &mut x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaProgress(x) => &mut x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaSuccess(x) => &mut x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaFail(x) => &mut x.common,
-        }
-    }
-
-    pub(crate) const fn common(&self) -> &BBImagerCommon {
-        match self {
-            Self::ChooseBoard(x) => &x.common,
-            Self::ChooseOs(x) => &x.common,
-            Self::ChooseDest(x) => &x.common,
-            Self::Customize(x) => &x.common,
-            Self::Review(x) => &x.common,
-            Self::Flashing(x) => &x.common,
-            Self::FlashingCancel(x) => &x.common,
-            Self::FlashingFail(x) => &x.common,
-            Self::FlashingSuccess(x) => &x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaProgress(x) => &x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaSuccess(x) => &x.common,
-            #[cfg(feature = "sd")]
-            Self::FormatMediaFail(x) => &x.common,
-        }
-    }
-}
-
-impl TryFrom<BBImager> for OverlayData {
-    type Error = ();
-
-    fn try_from(value: BBImager) -> Result<Self, Self::Error> {
-        match value {
-            BBImager::ChooseBoard(x) => Ok(Self::ChooseBoard(x)),
-            BBImager::ChooseOs(x) => Ok(Self::ChooseOs(x)),
-            BBImager::ChooseDest(x) => Ok(Self::ChooseDest(x)),
-            BBImager::Customize(x) => Ok(Self::Customize(x)),
-            BBImager::Review(x) => Ok(Self::Review(x)),
-            BBImager::Flashing(x) => Ok(Self::Flashing(x)),
-            BBImager::FlashingCancel(x) => Ok(Self::FlashingCancel(x)),
-            BBImager::FlashingFail(x) => Ok(Self::FlashingFail(x)),
-            BBImager::FlashingSuccess(x) => Ok(Self::FlashingSuccess(x)),
-            // Doesn't make sense to try preserve FormatMedia state
-            #[cfg(feature = "sd")]
-            BBImager::FormatMedia(x) => Ok(Self::ChooseBoard(ChooseBoardState::new(x.common))),
-            #[cfg(feature = "sd")]
-            BBImager::FormatMediaReview(x) => {
-                Ok(Self::ChooseBoard(ChooseBoardState::new(x.common)))
-            }
-            // A running format is kept, and so is its outcome, since it may
-            // land while App Options is open.
-            #[cfg(feature = "sd")]
-            BBImager::FormatMediaProgress(x) => Ok(Self::FormatMediaProgress(x)),
-            #[cfg(feature = "sd")]
-            BBImager::FormatMediaSuccess(x) => Ok(Self::FormatMediaSuccess(x)),
-            #[cfg(feature = "sd")]
-            BBImager::FormatMediaFail(x) => Ok(Self::FormatMediaFail(x)),
-            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::SandboxNotice(_) => Err(()),
-        }
-    }
-}
-
-impl From<OverlayData> for BBImager {
-    fn from(value: OverlayData) -> Self {
-        match value {
-            OverlayData::ChooseBoard(x) => Self::ChooseBoard(x),
-            OverlayData::ChooseOs(x) => Self::ChooseOs(x),
-            OverlayData::ChooseDest(x) => Self::ChooseDest(x),
-            OverlayData::Customize(x) => Self::Customize(x),
-            OverlayData::Review(x) => Self::Review(x),
-            OverlayData::Flashing(x) => Self::Flashing(x),
-            OverlayData::FlashingCancel(x) => Self::FlashingCancel(x),
-            OverlayData::FlashingFail(x) => Self::FlashingFail(x),
-            OverlayData::FlashingSuccess(x) => Self::FlashingSuccess(x),
-            #[cfg(feature = "sd")]
-            OverlayData::FormatMediaProgress(x) => Self::FormatMediaProgress(x),
-            #[cfg(feature = "sd")]
-            OverlayData::FormatMediaSuccess(x) => Self::FormatMediaSuccess(x),
-            #[cfg(feature = "sd")]
-            OverlayData::FormatMediaFail(x) => Self::FormatMediaFail(x),
-        }
-    }
-}
-
+/// App Options, shown over the page it was opened from. That page stays live underneath, so a
+/// running flash or format still gets its messages (see `BBImager::active_mut`).
 pub(crate) struct OverlayState {
-    pub(crate) page: OverlayData,
+    pub(crate) page: Box<BBImager>,
     pub(crate) state: bb_imager_ui::app_info::State,
 }
 
 impl OverlayState {
-    pub(crate) fn new(page: OverlayData) -> Self {
+    /// `page` must come from [`BBImager::into_overlay_base`].
+    pub(crate) fn new(page: BBImager) -> Self {
         let log_path = helpers::log_file_path().to_string_lossy().to_string();
         let license = widget::text_editor::Content::with_text(constants::APP_LINCESE);
         let cache_dir = helpers::project_dirs()
@@ -865,29 +750,31 @@ impl OverlayState {
         // Step of the page beneath, and whether its run has Modify. That is not
         // decided before Customize, and Modify cannot be reached from there.
         let (previous, has_customization) = match &page {
-            OverlayData::ChooseBoard(_) => (SidebarEntry::Hardware, false),
-            OverlayData::ChooseOs(_) => (SidebarEntry::Software, false),
-            OverlayData::ChooseDest(_) => (SidebarEntry::Storage, false),
-            OverlayData::Customize(_) => (SidebarEntry::Modify, true),
-            OverlayData::Review(x) => (SidebarEntry::Review, x.ctx.has_customization),
-            OverlayData::Flashing(x) => (SidebarEntry::Write, x.ctx.has_customization),
-            OverlayData::FlashingFail(x) => (SidebarEntry::Write, x.ctx.has_customization),
-            OverlayData::FlashingSuccess(x) => (SidebarEntry::Write, x.ctx.has_customization),
-            OverlayData::FlashingCancel(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            BBImager::ChooseBoard(_) => (SidebarEntry::Hardware, false),
+            BBImager::ChooseOs(_) => (SidebarEntry::Software, false),
+            BBImager::ChooseDest(_) => (SidebarEntry::Storage, false),
+            BBImager::Customize(_) => (SidebarEntry::Modify, true),
+            BBImager::Review(x) => (SidebarEntry::Review, x.ctx.has_customization),
+            BBImager::Flashing(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            BBImager::FlashingFail(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            BBImager::FlashingSuccess(x) => (SidebarEntry::Write, x.ctx.has_customization),
+            BBImager::FlashingCancel(x) => (SidebarEntry::Write, x.ctx.has_customization),
             #[cfg(feature = "sd")]
-            OverlayData::FormatMediaProgress(_)
-            | OverlayData::FormatMediaSuccess(_)
-            | OverlayData::FormatMediaFail(_) => (SidebarEntry::FormatMedia, false),
-        };
-        let is_flashing = match &page {
-            OverlayData::Flashing(_) => true,
+            BBImager::FormatMediaProgress(_)
+            | BBImager::FormatMediaSuccess(_)
+            | BBImager::FormatMediaFail(_) => (SidebarEntry::FormatMedia, false),
             #[cfg(feature = "sd")]
-            OverlayData::FormatMediaProgress(_) => true,
-            _ => false,
+            BBImager::FormatMedia(_) | BBImager::FormatMediaReview(_) => {
+                panic!("invalid page under App Options")
+            }
+            BBImager::Dummy | BBImager::AppInfo(_) | BBImager::SandboxNotice(_) => {
+                panic!("invalid page under App Options")
+            }
         };
+        let is_flashing = page.is_running();
 
         Self {
-            page,
+            page: Box::new(page),
             state: bb_imager_ui::app_info::State {
                 app_name: constants::APP_NAME,
                 app_release: constants::APP_RELEASE,
@@ -904,11 +791,11 @@ impl OverlayState {
         }
     }
 
-    pub(crate) const fn common(&self) -> &BBImagerCommon {
+    pub(crate) fn common(&self) -> &BBImagerCommon {
         self.page.common()
     }
 
-    pub(crate) const fn common_mut(&mut self) -> &mut BBImagerCommon {
+    pub(crate) fn common_mut(&mut self) -> &mut BBImagerCommon {
         self.page.common_mut()
     }
 }
