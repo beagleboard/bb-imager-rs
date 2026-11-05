@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use bb_helper::cancel::CancellationToken;
 use std::sync::mpsc;
 
-pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<f32>>, msg: f32) {
+pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<crate::Status>>, msg: crate::Status) {
     if let Some(c) = chan {
         let _ = c.try_send(msg);
     }

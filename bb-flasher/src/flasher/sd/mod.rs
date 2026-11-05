@@ -294,12 +294,17 @@ where
                     // Should run until tx is dropped, i.e. flasher task is done.
                     // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
                     while let Ok(x) = rx.recv() {
-                        let _ = chan.try_send(if x == 0.0 {
-                            DownloadFlashingStatus::Preparing
-                        } else if is_file_dest {
-                            DownloadFlashingStatus::DownloadingProgress(x)
-                        } else {
-                            DownloadFlashingStatus::FlashingProgress(x)
+                        let _ = chan.try_send(match x {
+                            bb_flasher_sd::Status::Preparing => DownloadFlashingStatus::Preparing,
+                            bb_flasher_sd::Status::Flashing(x) if is_file_dest => {
+                                DownloadFlashingStatus::DownloadingProgress(x)
+                            }
+                            bb_flasher_sd::Status::Flashing(x) => {
+                                DownloadFlashingStatus::FlashingProgress(x)
+                            }
+                            bb_flasher_sd::Status::Customizing => {
+                                DownloadFlashingStatus::Customizing
+                            }
                         });
                     }
                 });
