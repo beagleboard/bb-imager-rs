@@ -546,7 +546,6 @@ dependencies = [
  "bb-helper",
  "bin_file",
  "liblzma",
- "nix 0.31.3",
  "qcow2-core",
  "rc-zip-sync",
  "serde",
@@ -586,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-mspm0"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bb-helper",
  "bin_file",

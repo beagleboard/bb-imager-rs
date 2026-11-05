@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-mspm0"
-version = "0.1.0"
+version = "0.1.1"
 description = "A library to flash the MSPM0 co-processor over its UART/I2C bootloader (BSL)"
 edition.workspace = true
 authors.workspace = true
