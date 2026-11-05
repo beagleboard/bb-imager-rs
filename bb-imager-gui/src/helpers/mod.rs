@@ -355,6 +355,7 @@ fn flash_inner(
                 customization.sd_customization(),
             )
             .flash(Some(chan), Some(cancel_sync))
+            .map_err(Into::into)
         }
         #[cfg(feature = "sd")]
         (img, customization, Destination::SdCard(t))
@@ -373,6 +374,7 @@ fn flash_inner(
                 false,
             )
             .flash(Some(chan), Some(cancel_sync))
+            .map_err(Into::into)
         }
         #[cfg(feature = "sd")]
         (img, _, Destination::SdCard(t)) if flasher == config::Flasher::SdCardBootfs => {
@@ -388,6 +390,7 @@ fn flash_inner(
                 Some(cancel_sync),
             )
             .flash()
+            .map_err(Into::into)
         }
         #[cfg(feature = "sd")]
         (img, _, Destination::LocalFile(t)) if flasher == config::Flasher::SdCardBootfs => {
@@ -403,20 +406,25 @@ fn flash_inner(
                 Some(cancel_sync),
             )
             .flash()
+            .map_err(Into::into)
         }
         #[cfg(feature = "bcf_cc1352p7")]
         (img, FlashingCustomization::Bcf, Destination::BeagleConnectFreedom(t)) => {
             bb_flasher::bcf::cc1352p7::Flasher::new(img.into_image_fn(), t, true, Some(cancel_sync))
                 .flash(Some(chan))
+                .map_err(Into::into)
         }
         #[cfg(feature = "bcf_msp430")]
         (img, FlashingCustomization::Msp430, Destination::Msp430(t)) => {
-            bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t).flash(Some(chan))
+            bb_flasher::bcf::msp430::Flasher::new(img.into_image_fn(), t)
+                .flash(Some(chan))
+                .map_err(Into::into)
         }
         #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
         (img, FlashingCustomization::Zepto, Destination::Mspm0(t)) => {
             bb_flasher::mspm0::Flasher::no_prep(img.into_image_fn(), t, true, Some(cancel_sync))
                 .flash(Some(chan))
+                .map_err(Into::into)
         }
         (img, _, Destination::LocalFile(t)) => {
             let cb = img.into_image_fn();

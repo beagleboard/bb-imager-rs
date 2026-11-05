@@ -168,7 +168,7 @@ where
     pub fn flash(
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
-    ) -> anyhow::Result<()> {
+    ) -> crate::Result<()> {
         let port = self.port;
         let verify = self.verify;
         let img = self.img;
@@ -186,7 +186,7 @@ where
                     .map_err(Into::into)
             }
             #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
-            Target::I2c(_) => Err(anyhow::anyhow!("Unsupported Os")),
+            Target::I2c(_) => Err(crate::Error::UnsupportedOs),
         };
 
         std::thread::scope(|s| {

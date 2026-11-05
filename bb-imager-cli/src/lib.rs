@@ -111,7 +111,7 @@ fn flash(target: TargetCommands, quite: bool) {
 fn flash_internal(
     target: TargetCommands,
     chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
-) -> anyhow::Result<()> {
+) -> bb_flasher::Result<()> {
     match target {
         TargetCommands::Sd {
             dst,
