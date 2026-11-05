@@ -69,16 +69,7 @@ impl Default for State {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    let label = match state.selected.len() {
-        n @ 2.. => text(format!("NEXT ({n})")),
-        _ => text("NEXT"),
-    };
-
-    let next_btn = widget::button(label).on_press_maybe(if state.selected.is_empty() {
-        None
-    } else {
-        Some(Message::Next)
-    });
+    let next_btn = next_button(state.selected.len());
 
     if let Some(instr) = state.instruction.as_ref() {
         page_type1(
@@ -98,34 +89,58 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
     }
 }
 
+/// "NEXT", or "NEXT (n)" for several; disabled while nothing is selected.
+pub(crate) fn next_button<'a>(selected: usize) -> widget::Button<'a, Message> {
+    let label = match selected {
+        n @ 2.. => text(format!("NEXT ({n})")),
+        _ => text("NEXT"),
+    };
+
+    widget::button(label).on_press_maybe((selected != 0).then_some(Message::Next))
+}
+
+/// Device rows, the "Show all destinations" toggle and the search box. `extra` rows go
+/// after the devices.
+pub(crate) fn device_list_pane<'a>(
+    devices: &'a [DestinationItem],
+    is_selected: impl Fn(&str) -> bool,
+    filter_destination: bool,
+    search: &'a str,
+    scroll_id: &widget::Id,
+    extra: impl IntoIterator<Item = Element<'a, Message>>,
+) -> Element<'a, Message> {
+    let items = devices.iter().map(|dest| {
+        let label: Element<'_, _> = match dest.subtitle.as_ref() {
+            Some(x) => widget::column![text(dest.label.as_ref()).size(18), text(x.as_ref())]
+                .width(iced::Length::Fill)
+                .into(),
+            None => list_label(dest.label.as_ref()).into(),
+        };
+
+        list_item(
+            [sized_icon(constants::USB_ICON.clone()), label],
+            is_selected(&dest.id),
+            Message::SelectDest(dest.id.clone()),
+        )
+        .into()
+    });
+
+    let filter_toggle = widget::container(
+        widget::toggler(!filter_destination)
+            .label("Show all destinations")
+            .on_toggle(|x| Message::DestinationFilter(!x)),
+    )
+    .padding(16);
+
+    list_pane(
+        search,
+        scroll_id,
+        [filter_toggle.into(), list_separator()],
+        items.chain(extra),
+    )
+}
+
 fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, Message> {
-    let items = state
-        .destinations
-        .iter()
-        .map(|dest| {
-            let is_selected = state.selected.iter().any(|x| {
-                if let DestId::Device(ident) = x {
-                    dest.id.as_ref() == ident.as_ref()
-                } else {
-                    false
-                }
-            });
-
-            let label: Element<'_, _> = match dest.subtitle.as_ref() {
-                Some(x) => widget::column![text(dest.label.as_ref()).size(18), text(x.as_ref())]
-                    .width(iced::Length::Fill)
-                    .into(),
-                None => list_label(dest.label.as_ref()).into(),
-            };
-
-            list_item(
-                [device_icon(), label],
-                is_selected,
-                Message::SelectDest(dest.id.clone()),
-            )
-        })
-        .map(Into::into);
-
     // Derived here rather than pushed in by the host, so that a refresh which
     // leaves the device list unchanged cannot drop it.
     let save_to_file: Vec<Element<Message>> = match state.image_file_name.as_ref() {
@@ -150,23 +165,19 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
         None => Vec::new(),
     };
 
-    let filter_toggle = widget::container(
-        widget::toggler(!state.filter_destination)
-            .label("Show all destinations")
-            .on_toggle(|x| Message::DestinationFilter(!x)),
-    )
-    .padding(16);
-
-    list_pane(
+    device_list_pane(
+        &state.destinations,
+        |id| {
+            state
+                .selected
+                .iter()
+                .any(|x| matches!(x, DestId::Device(ident) if ident.as_ref() == id))
+        },
+        state.filter_destination,
         &state.search,
         scroll_id,
-        [filter_toggle.into(), list_separator()],
-        items.chain(save_to_file),
+        save_to_file,
     )
-}
-
-fn device_icon<'a>() -> Element<'a, Message> {
-    sized_icon(constants::USB_ICON.clone())
 }
 
 fn sized_icon<'a>(handle: widget::svg::Handle) -> Element<'a, Message> {
