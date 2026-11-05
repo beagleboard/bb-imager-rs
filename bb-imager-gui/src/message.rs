@@ -11,9 +11,9 @@ use bb_imager_ui::image_selection::ImageId;
 
 use crate::BBImager;
 use crate::helpers::{self, blocking_future};
+use crate::state::OverlayState;
 #[cfg(feature = "sd")]
 use crate::state::{FormatMediaFailState, FormatMediaState};
-use crate::state::{OverlayData, OverlayState};
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
@@ -86,37 +86,19 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         }
         BBImagerMessage::UpdateBoardList(boards) => {
             // Update board list only if still on that page
-            match state {
-                BBImager::ChooseBoard(x) => {
-                    x.state.boards = boards;
-                }
-                BBImager::AppInfo(overlay_state) => {
-                    if let OverlayData::ChooseBoard(x) = &mut overlay_state.page {
-                        x.state.boards = boards
-                    }
-                }
-                _ => {}
+            if let BBImager::ChooseBoard(x) = state.active_mut() {
+                x.state.boards = boards;
             }
         }
-        BBImagerMessage::SelectBoard(b) => match state {
-            BBImager::ChooseBoard(inner) => inner.select_board(b),
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseBoard(inner) = &mut overlay_state.page {
-                    inner.select_board(b)
-                }
+        BBImagerMessage::SelectBoard(b) => {
+            if let BBImager::ChooseBoard(inner) = state.active_mut() {
+                inner.select_board(b)
             }
-            _ => {}
-        },
+        }
         BBImagerMessage::UpdateOsList((imgs, pos)) => {
-            match state {
-                BBImager::ChooseOs(inner) => inner.update_images(imgs, pos),
-                BBImager::AppInfo(overlay_state) => {
-                    if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
-                        inner.update_images(imgs, pos)
-                    }
-                }
-                _ => {}
-            };
+            if let BBImager::ChooseOs(inner) = state.active_mut() {
+                inner.update_images(imgs, pos)
+            }
         }
         BBImagerMessage::UiState(Message::SelectOs(id)) => match state {
             BBImager::ChooseOs(inner) => match id {
@@ -169,31 +151,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             },
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::SelectRemoteOs((image, flasher)) => match state {
-            BBImager::ChooseOs(inner) => {
+        BBImagerMessage::SelectRemoteOs((image, flasher)) => {
+            if let BBImager::ChooseOs(inner) = state.active_mut() {
                 inner.select_remote_image(image, flasher);
             }
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
-                    inner.select_remote_image(image, flasher);
-                }
-            }
-            _ => {}
-        },
+        }
         BBImagerMessage::SelectLocalOs {
             path,
             flasher,
             size,
-        } => match state {
-            BBImager::ChooseOs(inner) => inner.select_local_image(path, flasher, size),
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseOs(inner) = &mut overlay_state.page {
-                    inner.select_local_image(path, flasher, size);
-                }
-            }
+        } => {
             // The dialog isn't modal; the user may have left the page meanwhile.
-            _ => {}
-        },
+            if let BBImager::ChooseOs(inner) = state.active_mut() {
+                inner.select_local_image(path, flasher, size);
+            }
+        }
         BBImagerMessage::UiState(Message::OpenUrl(x)) => {
             return Task::future(async move {
                 let res = webbrowser::open(x.as_str());
@@ -311,16 +283,12 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 inner.update_destinations(x);
             }
         }
-        BBImagerMessage::SelectDest(x) => match state {
-            BBImager::ChooseDest(inner) => inner.toggle_dest(x),
-            BBImager::AppInfo(overlay_state) => {
-                if let OverlayData::ChooseDest(inner) = &mut overlay_state.page {
-                    inner.toggle_dest(x);
-                }
-            }
+        BBImagerMessage::SelectDest(x) => {
             // The dialog isn't modal; the user may have left the page meanwhile.
-            _ => {}
-        },
+            if let BBImager::ChooseDest(inner) = state.active_mut() {
+                inner.toggle_dest(x);
+            }
+        }
         BBImagerMessage::UiState(Message::SelectDest(ident)) => match state {
             // Resolved by identity rather than position: the list is
             // re-enumerated every second, so a click landing after a refresh
@@ -413,7 +381,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::FlashCancel) => {
             let mut msg = "Flashing cancelled by user";
 
-            *state = match std::mem::take(state) {
+            let page = state.active_mut();
+            *page = match std::mem::take(page) {
                 BBImager::Flashing(inner) => {
                     inner.cancel_flashing.abort();
 
@@ -422,21 +391,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     }
                     BBImager::FlashingCancel(inner.into())
                 }
-                BBImager::AppInfo(inner) => match inner.page {
-                    OverlayData::Flashing(flashing_state) => {
-                        flashing_state.cancel_flashing.abort();
-
-                        if flashing_state.ctx.is_download() {
-                            msg = "Download cancelled by user";
-                        }
-
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FlashingCancel(flashing_state.into()),
-                            ..inner
-                        })
-                    }
-                    _ => panic!("Unexpected message"),
-                },
                 _ => panic!("Unexpected message"),
             };
 
@@ -452,7 +406,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
             let logs = iced::widget::text_editor::Content::with_text(&logs);
 
-            *state = match std::mem::take(state) {
+            let page = state.active_mut();
+            *page = match std::mem::take(page) {
                 BBImager::Flashing(inner) => {
                     if inner.ctx.is_download() {
                         msg = "Download failed";
@@ -462,23 +417,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         inner, failures, logs,
                     ))
                 }
-                BBImager::AppInfo(inner) => match inner.page {
-                    OverlayData::Flashing(flashing_state) => {
-                        if flashing_state.ctx.is_download() {
-                            msg = "Download failed";
-                        }
-
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FlashingFail(crate::state::FlashingFailState::new(
-                                flashing_state,
-                                failures,
-                                logs,
-                            )),
-                            ..inner
-                        })
-                    }
-                    _ => panic!("Unexpected message"),
-                },
                 _ => panic!("Unexpected message"),
             };
 
@@ -497,23 +435,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
             let logs = iced::widget::text_editor::Content::with_text(&logs);
 
-            *state = match std::mem::take(state) {
+            let page = state.active_mut();
+            *page = match std::mem::take(page) {
                 BBImager::FormatMediaProgress(inner) => {
                     BBImager::FormatMediaFail(FormatMediaFailState::new(inner, failures, logs))
                 }
-                BBImager::AppInfo(inner) => match inner.page {
-                    OverlayData::FormatMediaProgress(format_state) => {
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FormatMediaFail(FormatMediaFailState::new(
-                                format_state,
-                                failures,
-                                logs,
-                            )),
-                            ..inner
-                        })
-                    }
-                    _ => panic!("Unexpected message"),
-                },
                 _ => panic!("Unexpected message"),
             };
 
@@ -526,16 +452,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
             return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
         }
-        BBImagerMessage::FlashProgress(i, x) => match state {
-            BBImager::Flashing(inner)
-            | BBImager::AppInfo(OverlayState {
-                page: OverlayData::Flashing(inner),
-                ..
-            }) => inner.progress_update(i, x),
+        BBImagerMessage::FlashProgress(i, x) => {
             // The relay doesn't wait for the last update before reporting the result, so
             // one can land after the flash has ended or been cancelled.
-            _ => {}
-        },
+            if let BBImager::Flashing(inner) = state.active_mut() {
+                inner.progress_update(i, x)
+            }
+        }
         #[cfg(feature = "sd")]
         BBImagerMessage::UiState(Message::FlashStart | Message::Retry)
             if matches!(
@@ -552,7 +475,8 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::FlashSuccess => {
             let mut msg = "Flashing finished successfully";
 
-            *state = match std::mem::take(state) {
+            let page = state.active_mut();
+            *page = match std::mem::take(page) {
                 BBImager::Flashing(inner) => {
                     if inner.ctx.is_download() {
                         msg = "Download finished successfully";
@@ -564,27 +488,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     msg = "Formatting finished successfully";
                     BBImager::FormatMediaSuccess(inner.into())
                 }
-                BBImager::AppInfo(inner) => match inner.page {
-                    OverlayData::Flashing(flashing_state) => {
-                        if flashing_state.ctx.is_download() {
-                            msg = "Download finished successfully";
-                        }
-
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FlashingSuccess(flashing_state.into()),
-                            ..inner
-                        })
-                    }
-                    #[cfg(feature = "sd")]
-                    OverlayData::FormatMediaProgress(format_state) => {
-                        msg = "Formatting finished successfully";
-                        BBImager::AppInfo(OverlayState {
-                            page: OverlayData::FormatMediaSuccess(format_state.into()),
-                            ..inner
-                        })
-                    }
-                    _ => panic!("Unexpected message"),
-                },
                 _ => panic!("Unexpected message"),
             };
 
@@ -607,13 +510,15 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             let BBImager::AppInfo(inner) = std::mem::take(state) else {
                 unreachable!()
             };
-            *state = inner.page.into();
+            *state = *inner.page;
 
             return update(state, BBImagerMessage::UiState(Message::Goto(target)));
         }
         BBImagerMessage::UiState(Message::Goto(SidebarEntry::AppOptions)) => {
-            *state = BBImager::AppInfo(crate::state::OverlayState::new(
-                std::mem::take(state).try_into().expect("Unexpected page"),
+            *state = BBImager::AppInfo(OverlayState::new(
+                std::mem::take(state)
+                    .into_overlay_base()
+                    .expect("Unexpected page"),
             ));
 
             return state.scroll_reset();

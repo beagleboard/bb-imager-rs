@@ -92,6 +92,37 @@ impl BBImager {
         Self::ChooseBoard(state::ChooseBoardState::new(common))
     }
 
+    /// The page messages act on: the one beneath App Options when it is open.
+    fn active_mut(&mut self) -> &mut Self {
+        match self {
+            Self::AppInfo(o) => {
+                assert!(
+                    !matches!(
+                        *o.page,
+                        Self::Dummy | Self::AppInfo(_) | Self::SandboxNotice(_)
+                    ),
+                    "invalid page under App Options"
+                );
+                &mut o.page
+            }
+            x => x,
+        }
+    }
+
+    /// The page to keep beneath App Options, or `None` if it cannot be opened from here.
+    fn into_overlay_base(self) -> Option<Self> {
+        match self {
+            // Doesn't make sense to try to preserve FormatMedia state. A running format is
+            // kept, and so is its outcome, since it may land while App Options is open.
+            #[cfg(feature = "sd")]
+            Self::FormatMedia(x) => Some(Self::choose_board(x.common)),
+            #[cfg(feature = "sd")]
+            Self::FormatMediaReview(x) => Some(Self::choose_board(x.common)),
+            Self::Dummy | Self::AppInfo(_) | Self::SandboxNotice(_) => None,
+            x => Some(x),
+        }
+    }
+
     const fn sandbox_notice(common: BBImagerCommon) -> Self {
         Self::SandboxNotice(state::SandboxNoticeState::new(common))
     }
