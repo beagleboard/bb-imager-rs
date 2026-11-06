@@ -763,6 +763,18 @@ pub(crate) fn log_file_path() -> PathBuf {
     ))
 }
 
+/// The session log, for the fail pages. On error, a line saying why it could not be read.
+pub(crate) async fn read_logs() -> Box<str> {
+    let path = log_file_path();
+    tokio::fs::read(&path).await.map_or_else(
+        |e| {
+            tracing::warn!("Failed to read logs at {}: {e}", path.display());
+            format!("Failed to read the log file {}: {e}", path.display()).into()
+        },
+        |x| String::from_utf8_lossy(&x).into(),
+    )
+}
+
 pub(crate) fn pretty_bytes(bytes: u64) -> String {
     const UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
 

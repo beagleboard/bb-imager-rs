@@ -54,10 +54,18 @@ pub(crate) enum BBImagerMessage {
     /// Every destination succeeded.
     FlashSuccess,
     /// Each destination that failed to flash, with its error.
-    FlashFail(Box<[(helpers::Destination, Box<str>)]>),
+    FlashFail {
+        failures: Box<[(helpers::Destination, Box<str>)]>,
+        /// The session log, read off the UI thread.
+        logs: Box<str>,
+    },
     /// Each card that failed to format, with its error.
     #[cfg(feature = "sd")]
-    FormatFail(Box<[(bb_flasher::sd::Target, Box<str>)]>),
+    FormatFail {
+        failures: Box<[(bb_flasher::sd::Target, Box<str>)]>,
+        /// The session log, read off the UI thread.
+        logs: Box<str>,
+    },
 
     // Download images which have not already been downloaded
     FilterResolveImages(Vec<Arc<url::Url>>),
@@ -399,11 +407,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::Restart) => {
             return state.restart();
         }
-        BBImagerMessage::FlashFail(failures) => {
+        BBImagerMessage::FlashFail { failures, logs } => {
             let mut msg = "Flashing failed";
 
-            let logs =
-                std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
             let logs = iced::widget::text_editor::Content::with_text(&logs);
 
             let page = state.active_mut();
@@ -430,9 +436,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return Task::batch([show_notification(msg.to_string()), scroll]);
         }
         #[cfg(feature = "sd")]
-        BBImagerMessage::FormatFail(failures) => {
-            let logs =
-                std::fs::read_to_string(helpers::log_file_path()).expect("Failed to read logs");
+        BBImagerMessage::FormatFail { failures, logs } => {
             let logs = iced::widget::text_editor::Content::with_text(&logs);
 
             let page = state.active_mut();
