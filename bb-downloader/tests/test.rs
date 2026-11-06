@@ -116,3 +116,21 @@ async fn test_download_json_no_cache_rejects_malformed_json() {
     assert!(result.is_err(), "malformed JSON body should surface an error");
     mock.assert_calls(1);
 }
+
+#[tokio::test]
+async fn test_download_rejects_url_without_extension() {
+    let server = MockServer::start();
+    let tmp_dir = TempDir::new().unwrap();
+    let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+    let download_mock = server.mock(|when, then| {
+        when.method(GET).path("/file");
+        then.status(200).body("no extension");
+    });
+
+    let err = downloader.download(server.url("/file")).await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+
+    // Rejected before any request is made.
+    download_mock.assert_calls(0);
+}
