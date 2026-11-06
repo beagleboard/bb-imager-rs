@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "bb-drivelist"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "objc2 0.6.5",
  "objc2-core-foundation",
