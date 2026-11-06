@@ -198,7 +198,11 @@ fn flash_internal(
             }
             .flash(chan, None)
         }
-        TargetCommands::SdBootUpdate { img, dst } => {
+        TargetCommands::SdBootUpdate {
+            img,
+            dst,
+            file_destination,
+        } => {
             std::thread::scope(|s| {
                 let tx = if let Some(chan) = chan {
                     let (tx, rx) = mpsc::sync_channel(4);
@@ -217,11 +221,12 @@ fn flash_internal(
                     None
                 };
 
-                bb_flasher::sd::UpdateBootFlasher::with_file_dest(
-                    LocalImage::new(img).into_archive_fn(tx),
-                    dst,
-                    None,
-                )
+                let img = LocalImage::new(img).into_archive_fn(tx);
+                if file_destination {
+                    bb_flasher::sd::UpdateBootFlasher::with_file_dest(img, dst, None)
+                } else {
+                    bb_flasher::sd::UpdateBootFlasher::new(img, dst.try_into().unwrap(), None)
+                }
                 .flash()
             })
         }

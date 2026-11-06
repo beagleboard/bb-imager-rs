@@ -161,6 +161,10 @@ pub enum TargetCommands {
 
         /// The destination device (e.g., `/dev/sdX` or specific device identifiers).
         dst: PathBuf,
+
+        /// The destination is a file instead of SD Card
+        #[arg(long)]
+        file_destination: bool,
     },
     /// Flash MSP430 on BeagleConnectFreedom.
     #[cfg(feature = "bcf_msp430")]
@@ -479,10 +483,37 @@ mod tests {
         .expect("valid sd-boot-update");
         match opt.command {
             Commands::Flash { target, .. } => match *target {
-                TargetCommands::SdBootUpdate { img, dst } => {
+                TargetCommands::SdBootUpdate {
+                    img,
+                    dst,
+                    file_destination,
+                } => {
                     assert_eq!(img.as_ref(), Path::new("boot.tar"));
                     assert_eq!(dst, PathBuf::from("/dev/sdX"));
+                    assert!(!file_destination);
                 }
+                other => panic!("expected SdBootUpdate, got {other:?}"),
+            },
+            other => panic!("expected Flash, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sd_boot_update_parses_file_destination() {
+        let opt = Opt::try_parse_from([
+            "bb-imager-cli",
+            "flash",
+            "sd-boot-update",
+            "boot.tar",
+            "boot.img",
+            "--file-destination",
+        ])
+        .expect("valid sd-boot-update with --file-destination");
+        match opt.command {
+            Commands::Flash { target, .. } => match *target {
+                TargetCommands::SdBootUpdate {
+                    file_destination, ..
+                } => assert!(file_destination),
                 other => panic!("expected SdBootUpdate, got {other:?}"),
             },
             other => panic!("expected Flash, got {other:?}"),
