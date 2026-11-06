@@ -121,10 +121,15 @@ impl Downloader {
     ///
     /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
     /// file is known in advance.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`io::ErrorKind::InvalidInput`] if the URL path has no file extension, since the
+    /// cached file keeps it.
     pub async fn download<U: reqwest::IntoUrl>(&self, url: U) -> io::Result<PathBuf> {
         let url = url.into_url().map_err(io::Error::other)?;
 
-        let file_path = self.path_from_url(&url);
+        let file_path = self.path_from_url(&url)?;
 
         // Check cache
         if file_path.exists() {
@@ -212,15 +217,20 @@ impl Downloader {
         writer.persist(&file_path).await
     }
 
-    fn path_from_url(&self, url: &reqwest::Url) -> PathBuf {
-        let fext = Path::new(url.path()).extension().expect("Invalid URL");
+    fn path_from_url(&self, url: &reqwest::Url) -> io::Result<PathBuf> {
+        let fext = Path::new(url.path()).extension().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("URL has no file extension: {url}"),
+            )
+        })?;
         let file_name: [u8; 32] = Sha256::new()
             .chain_update(url.as_str())
             .finalize()
             .as_slice()
             .try_into()
             .expect("SHA-256 is 32 bytes");
-        self.path_from_sha(file_name).with_extension(fext)
+        Ok(self.path_from_sha(file_name).with_extension(fext))
     }
 
     fn path_from_sha(&self, sha256: [u8; 32]) -> PathBuf {
@@ -281,5 +291,28 @@ mod tests {
             !expected_path.exists(),
             "Corrupted cache file should be scrubbed from disk"
         );
+    }
+
+    #[test]
+    fn path_from_url_keeps_extension() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+        let url = reqwest::Url::parse("https://example.com/a/icon.svg").unwrap();
+        let path = downloader.path_from_url(&url).unwrap();
+        assert_eq!(path.extension().unwrap(), "svg");
+        assert_eq!(path.parent().unwrap(), tmp_dir.path());
+    }
+
+    #[test]
+    fn path_from_url_rejects_missing_extension() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+        for url in ["https://example.com/a/icon", "https://example.com/"] {
+            let url = reqwest::Url::parse(url).unwrap();
+            let err = downloader.path_from_url(&url).unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "{url}");
+        }
     }
 }
