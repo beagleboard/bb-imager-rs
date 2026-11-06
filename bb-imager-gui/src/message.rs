@@ -115,15 +115,19 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
 
                     return Task::perform(
                         async move {
-                            let fpath = rfd::AsyncFileDialog::new()
+                            let fpath: Box<std::path::Path> = rfd::AsyncFileDialog::new()
                                 .add_filter("image", extensions)
                                 .pick_file()
                                 .await
                                 .map(|x| x.inner().to_path_buf().into())?;
 
-                            let size = tokio::fs::metadata(&fpath).await.unwrap().len();
-
-                            Some((fpath, size))
+                            match tokio::fs::metadata(&fpath).await {
+                                Ok(m) => Some((fpath, m.len())),
+                                Err(e) => {
+                                    tracing::error!("Failed to read {}: {e}", fpath.display());
+                                    None
+                                }
+                            }
                         },
                         move |x| match x {
                             Some((path, size)) => BBImagerMessage::SelectLocalOs {
