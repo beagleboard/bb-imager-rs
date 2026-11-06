@@ -640,6 +640,7 @@ fn sd_boot_update_writes_archive_into_boot_partition() {
         "sd-boot-update",
         archive.path().to_str().unwrap(),
         mock.path().to_str().unwrap(),
+        "--file-destination",
     ]);
 
     assert_eq!(mock.boot_file("extlinux.conf").unwrap(), "LABEL Linux\n");
@@ -660,6 +661,7 @@ fn sd_boot_update_writes_archive_into_gpt_boot_partition() {
         "sd-boot-update",
         archive.path().to_str().unwrap(),
         mock.path().to_str().unwrap(),
+        "--file-destination",
     ]);
 
     assert_eq!(mock.boot_file("extlinux.conf").unwrap(), "LABEL Linux\n");
@@ -679,6 +681,7 @@ fn sd_boot_update_renders_progress_when_not_quiet() {
         "sd-boot-update",
         archive.path().to_str().unwrap(),
         mock.path().to_str().unwrap(),
+        "--file-destination",
     ]);
 
     assert_eq!(mock.boot_file("uEnv.txt").unwrap(), "console=ttyS2\n");
@@ -696,5 +699,6 @@ fn sd_boot_update_missing_archive_fails() {
         "sd-boot-update",
         "/nonexistent/boot.tar",
         mock.path().to_str().unwrap(),
+        "--file-destination",
     ]);
 }
