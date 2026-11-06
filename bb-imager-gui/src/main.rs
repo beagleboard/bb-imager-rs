@@ -379,15 +379,21 @@ impl BBImager {
                     }
                 }
 
-                failures
-            },
-            |failures| {
                 if failures.is_empty() {
+                    Ok(())
+                } else {
+                    Err((failures, helpers::read_logs().await))
+                }
+            },
+            |x| match x {
+                Ok(_) => {
                     tracing::info!("Formatting Successfull");
                     BBImagerMessage::FlashSuccess
-                } else {
-                    BBImagerMessage::FormatFail(failures.into())
                 }
+                Err((failures, logs)) => BBImagerMessage::FormatFail {
+                    failures: failures.into(),
+                    logs,
+                },
             },
         )
     }
@@ -443,7 +449,10 @@ impl BBImager {
                 tracing::info!("Flashing Successfull");
                 BBImagerMessage::FlashSuccess
             } else {
-                BBImagerMessage::FlashFail(failures.into())
+                BBImagerMessage::FlashFail {
+                    failures: failures.into(),
+                    logs: helpers::read_logs().await,
+                }
             };
 
             let _ = chan.send(res).await;
