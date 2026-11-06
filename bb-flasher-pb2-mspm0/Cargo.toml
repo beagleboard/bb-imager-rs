@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-pb2-mspm0"
-version = "0.1.0"
+version = "0.1.1"
 description = "A library to flash MSPM0 co-processor in PocketBeagle 2"
 edition.workspace = true
 authors.workspace = true

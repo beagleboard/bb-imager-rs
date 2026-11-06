@@ -12,6 +12,8 @@ const DEVICE: &str = "mspm0l1105";
 const PATH: &str = "/sys/class/firmware/mspm0l1105/";
 const EEPROM: &str = "/sys/bus/i2c/devices/0-0050/eeprom";
 const FIRMWARE_SIZE: usize = 32 * 1024;
+/// How often the driver's upload status is polled. fw_upload has no change notification.
+const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
 
 #[derive(Error, Debug)]
 /// Errors for this crate
@@ -66,7 +68,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 ///
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
 pub fn flash(firmware: &[u8], chan: mpsc::SyncSender<Status>, persist_eeprom: bool) -> Result<()> {
-    if firmware.len() > FIRMWARE_SIZE {
+    if firmware.is_empty() || firmware.len() > FIRMWARE_SIZE {
         return Err(Error::InvalidFirmware);
     }
 
@@ -223,9 +225,7 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
                     })?;
 
                 if let Ok(p) = prog.trim().parse::<usize>() {
-                    let _ = chan.try_send(Status::Flashing(
-                        (firmware.len() - p) as f32 / firmware.len() as f32,
-                    ));
+                    let _ = chan.try_send(Status::Flashing(upload_progress(firmware.len(), p)));
                 }
             }
             "programming" => {
@@ -233,6 +233,8 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
             }
             _ => {}
         }
+
+        std::thread::sleep(POLL_INTERVAL);
     }
 
     // Check for error
@@ -267,6 +269,11 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
     }
 
     Ok(())
+}
+
+/// Fraction of `total` bytes sent, given the driver's `remaining` count. Clamped to `0.0..=1.0`.
+fn upload_progress(total: usize, remaining: usize) -> f32 {
+    total.saturating_sub(remaining) as f32 / total as f32
 }
 
 /// Get PocketBeagle 2 MSPM0 [`Device`] information.
@@ -377,6 +384,22 @@ mod tests {
             }
             other => panic!("expected FlashingError, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn upload_progress_is_clamped() {
+        assert_eq!(upload_progress(100, 100), 0.0);
+        assert_eq!(upload_progress(100, 25), 0.75);
+        assert_eq!(upload_progress(100, 0), 1.0);
+        // The driver reporting more than was written used to underflow.
+        assert_eq!(upload_progress(100, 150), 0.0);
+    }
+
+    #[test]
+    fn flash_rejects_empty_firmware() {
+        // Rejected before any sysfs access, so this runs without the driver.
+        let (tx, _rx) = mpsc::sync_channel(1);
+        assert!(matches!(flash(&[], tx, false), Err(Error::InvalidFirmware)));
     }
 
     #[test]
