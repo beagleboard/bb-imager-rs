@@ -6,7 +6,7 @@ use bb_helper::cancel::CancellationToken;
 
 use crate::customization::Customization;
 use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_cancel, progress};
-use crate::{ContentType, Result};
+use crate::{ContentType, Result, Status};
 
 #[cfg(test)]
 mod tests;
@@ -46,7 +46,7 @@ fn reader_task(
 fn writer_task_bmap(
     bmap: bb_bmap_parser::Bmap,
     mut sd: impl Write + Seek,
-    mut chan: Option<mpsc::SyncSender<f32>>,
+    mut chan: Option<mpsc::SyncSender<Status>>,
     buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
@@ -74,7 +74,10 @@ fn writer_task_bmap(
             pos += count as u64;
             // Clippy warning is simply wrong here
             #[allow(clippy::option_map_or_none)]
-            chan_send(chan.as_mut(), progress(bytes_written, img_size));
+            chan_send(
+                chan.as_mut(),
+                Status::Flashing(progress(bytes_written, img_size)),
+            );
             check_cancel(cancel.as_ref())?;
 
             match buf_rx.recv() {
@@ -94,7 +97,7 @@ fn writer_task_bmap(
 fn writer_task(
     img_size: u64,
     mut sd: impl Write + Seek,
-    mut chan: Option<mpsc::SyncSender<f32>>,
+    mut chan: Option<mpsc::SyncSender<Status>>,
     buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
@@ -109,7 +112,7 @@ fn writer_task(
         pos += count as u64;
         // Clippy warning is simply wrong here
         #[allow(clippy::option_map_or_none)]
-        chan_send(chan.as_mut(), progress(pos, img_size));
+        chan_send(chan.as_mut(), Status::Flashing(progress(pos, img_size)));
 
         let _ = buf_tx.send(buf);
         check_cancel(cancel.as_ref())?;
@@ -146,7 +149,7 @@ fn write_sd(
     img_size: u64,
     bmap: Option<bb_bmap_parser::Bmap>,
     sd: impl Write + Seek,
-    chan: Option<mpsc::SyncSender<f32>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     cancel: Option<CancellationToken>,
 ) -> Result<()> {
     const NUM_BUFFERS: usize = 4;
@@ -200,7 +203,7 @@ pub struct Flasher<I, B, M, C> {
     bootfs: Option<B>,
     bmap: Option<M>,
     customizations: C,
-    chan: Option<mpsc::SyncSender<f32>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     cancel: Option<CancellationToken>,
 }
 
@@ -219,7 +222,7 @@ where
         bootfs: Option<B>,
         bmap: Option<M>,
         customizations: C,
-        chan: Option<mpsc::SyncSender<f32>>,
+        chan: Option<mpsc::SyncSender<Status>>,
         cancel: Option<CancellationToken>,
     ) -> Self {
         Self {
@@ -281,10 +284,23 @@ where
         tracing::info!("Resolving Image");
         let (img, img_size) = (self.img)()?;
 
-        chan_send(self.chan.as_mut(), 0.0);
+        chan_send(self.chan.as_mut(), Status::Preparing);
 
         tracing::info!("Writing to SD Card");
-        write_sd(img, img_size, bmap, &mut sd, self.chan, self.cancel.clone())?;
+        write_sd(
+            img,
+            img_size,
+            bmap,
+            &mut sd,
+            self.chan.clone(),
+            self.cancel.clone(),
+        )?;
+
+        let mut customizations = self.customizations.peekable();
+        if self.bootfs.is_some() || customizations.peek().is_some() || sd_size_for_resize.is_some()
+        {
+            chan_send(self.chan.as_mut(), Status::Customizing);
+        }
 
         if let Some(boot_cb) = self.bootfs {
             tracing::info!("Applying bootfs updates");
@@ -298,7 +314,7 @@ where
 
         tracing::info!("Applying customization");
         let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
-        for c in self.customizations {
+        for c in customizations {
             check_cancel(self.cancel.as_ref())?;
             c.customize(&mut sd, None)?;
         }

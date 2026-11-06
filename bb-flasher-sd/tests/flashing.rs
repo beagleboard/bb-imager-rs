@@ -3,7 +3,7 @@ use std::{
     sync::mpsc,
 };
 
-use bb_flasher_sd::{ContentType, Customization, Destination, flashing::NO_BOOTFS};
+use bb_flasher_sd::{ContentType, Customization, Destination, Status, flashing::NO_BOOTFS};
 use tempfile::NamedTempFile;
 
 fn test_file(len: usize) -> std::io::Cursor<Box<[u8]>> {
@@ -69,9 +69,11 @@ fn test_public_flash_with_temp_file() {
     assert_eq!(written_bytes, expected_bytes.into_vec());
 
     // 8. Verify progress track completeness
-    let progress_updates: Vec<f32> = rx.try_iter().collect();
+    let progress_updates: Vec<Status> = rx.try_iter().collect();
     assert!(!progress_updates.is_empty());
-    assert_eq!(*progress_updates.last().unwrap(), 1.0);
+    assert_eq!(*progress_updates.last().unwrap(), Status::Flashing(1.0));
+    // Nothing runs after the write, so Customizing is not reported.
+    assert!(!progress_updates.contains(&Status::Customizing));
 }
 
 #[test]

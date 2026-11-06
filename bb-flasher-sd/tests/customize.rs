@@ -11,7 +11,7 @@ use std::io::{Cursor, Read, Seek, Write};
 
 use bb_flasher_sd::flashing::NO_BOOTFS;
 use bb_flasher_sd::mock_sd::{MockArchive, MockContent, MockSd};
-use bb_flasher_sd::{ContentType, Customization, Destination, ParitionType};
+use bb_flasher_sd::{ContentType, Customization, Destination, ParitionType, Status};
 use tempfile::NamedTempFile;
 
 #[test]
@@ -40,18 +40,32 @@ fn flash_applies_customization_through_public_api() {
         content,
     };
 
-    // Progress-to-completion is covered by tests/flashing.rs; this test focuses
-    // on the customization loop, so it flashes without a progress channel.
+    // Drained on a thread: `try_send` drops updates on a full channel, and the
+    // last one is what this test checks.
+    let (tx, rx) = std::sync::mpsc::sync_channel(32);
+    let statuses = std::thread::spawn(move || rx.iter().collect::<Vec<Status>>());
+
     bb_flasher_sd::flashing::Flasher::new(
         img_resolver,
         NO_BOOTFS,
         bmap,
         std::iter::once(customization),
-        None,
+        Some(tx),
         None,
     )
     .flash(Destination::File(mock.path().into()), false)
     .expect("flash with customization should succeed");
+
+    // Customizing is reported once the image is written.
+    let statuses = statuses.join().unwrap();
+    assert_eq!(statuses.last(), Some(&Status::Customizing));
+    let customizing = statuses.len() - 1;
+    assert!(
+        statuses[..customizing]
+            .iter()
+            .all(|x| matches!(x, Status::Preparing | Status::Flashing(_))),
+        "unexpected status order: {statuses:?}"
+    );
 
     // The customization file should now exist in the boot partition.
     let fs = mock.open_boot();
