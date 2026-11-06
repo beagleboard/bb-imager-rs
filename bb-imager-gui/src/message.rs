@@ -386,7 +386,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             }
             _ => panic!("Unexpected message"),
         },
-        BBImagerMessage::UiState(Message::FlashCancel) => {
+        BBImagerMessage::UiState(Message::FlashCancel)
+            if matches!(state.active(), BBImager::Flashing(_)) =>
+        {
             let mut msg = "Flashing cancelled by user";
 
             let page = state.active_mut();
@@ -399,7 +401,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     }
                     BBImager::FlashingCancel(inner.into())
                 }
-                _ => panic!("Unexpected message"),
+                _ => unreachable!(),
             };
 
             return show_notification(msg.to_string());
@@ -407,7 +409,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::Restart) => {
             return state.restart();
         }
-        BBImagerMessage::FlashFail { failures, logs } => {
+        BBImagerMessage::FlashFail { failures, logs }
+            if matches!(state.active(), BBImager::Flashing(_)) =>
+        {
             let mut msg = "Flashing failed";
 
             let logs = iced::widget::text_editor::Content::with_text(&logs);
@@ -423,7 +427,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                         inner, failures, logs,
                     ))
                 }
-                _ => panic!("Unexpected message"),
+                _ => unreachable!(),
             };
 
             // Under App Options the fail page is not on screen; leave that page's scroll alone.
@@ -436,7 +440,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return Task::batch([show_notification(msg.to_string()), scroll]);
         }
         #[cfg(feature = "sd")]
-        BBImagerMessage::FormatFail { failures, logs } => {
+        BBImagerMessage::FormatFail { failures, logs }
+            if matches!(state.active(), BBImager::FormatMediaProgress(_)) =>
+        {
             let logs = iced::widget::text_editor::Content::with_text(&logs);
 
             let page = state.active_mut();
@@ -444,7 +450,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 BBImager::FormatMediaProgress(inner) => {
                     BBImager::FormatMediaFail(FormatMediaFailState::new(inner, failures, logs))
                 }
-                _ => panic!("Unexpected message"),
+                _ => unreachable!(),
             };
 
             // Under App Options the fail page is not on screen; leave that page's scroll alone.
@@ -476,7 +482,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         | BBImagerMessage::UiState(Message::Retry) => {
             return state.start_flashing();
         }
-        BBImagerMessage::FlashSuccess => {
+        BBImagerMessage::FlashSuccess if state.active().is_running() => {
             let mut msg = "Flashing finished successfully";
 
             let page = state.active_mut();
@@ -492,10 +498,21 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     msg = "Formatting finished successfully";
                     BBImager::FormatMediaSuccess(inner.into())
                 }
-                _ => panic!("Unexpected message"),
+                _ => unreachable!(),
             };
 
             return show_notification(msg.to_string());
+        }
+        // The flash ended before this was handled: Cancel and the task's result race, and
+        // either may land after the other (or after a restart). The winner's page stays.
+        BBImagerMessage::UiState(Message::FlashCancel)
+        | BBImagerMessage::FlashFail { .. }
+        | BBImagerMessage::FlashSuccess => {
+            tracing::debug!("Ignoring a flash result or cancel after the flash ended");
+        }
+        #[cfg(feature = "sd")]
+        BBImagerMessage::FormatFail { .. } => {
+            tracing::debug!("Ignoring a format failure after the format ended");
         }
         BBImagerMessage::UiState(Message::EditorEvent(evt)) => match evt {
             iced::widget::text_editor::Action::Edit(_) => {}

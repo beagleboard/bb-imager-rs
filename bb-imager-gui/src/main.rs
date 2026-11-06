@@ -93,7 +93,24 @@ impl BBImager {
     }
 
     /// The page messages act on: the one beneath App Options when it is open.
-    fn active_mut(&mut self) -> &mut Self {
+    const fn active(&self) -> &Self {
+        match self {
+            Self::AppInfo(o) => {
+                assert!(
+                    !matches!(
+                        *o.page,
+                        Self::Dummy | Self::AppInfo(_) | Self::SandboxNotice(_)
+                    ),
+                    "invalid page under App Options"
+                );
+                &o.page
+            }
+            x => x,
+        }
+    }
+
+    /// The page messages act on: the one beneath App Options when it is open.
+    const fn active_mut(&mut self) -> &mut Self {
         match self {
             Self::AppInfo(o) => {
                 assert!(
