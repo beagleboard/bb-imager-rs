@@ -248,7 +248,9 @@ impl BBImager {
     }
 
     fn image_cache_insert(&mut self, k: Arc<url::Url>, v: std::path::PathBuf) {
-        self.common_mut().img_handle_cache.insert(k, v)
+        if let Err(e) = self.common_mut().img_handle_cache.insert(k.clone(), v) {
+            tracing::warn!("Failed to load image {k}: {e}");
+        }
     }
 
     /// Whether a flash or format is running, which must not be left.

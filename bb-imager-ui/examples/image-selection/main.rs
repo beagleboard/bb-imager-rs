@@ -164,7 +164,7 @@ fn main() {
         |s: &mut State, msg| {
             match msg {
                 Message::UpdateSearchText(search) => s.inner.search = search,
-                Message::ResolveImage(u, p) => s.cache.insert(u, p),
+                Message::ResolveImage(u, p) => s.cache.insert(u, p).expect("Failed to load icon"),
                 Message::SelectOs(image_selection::ImageId::OsSublist((id, _))) => s.goto(Some(id)),
                 Message::SelectOs(id) => s.inner.selected = s.select(id),
                 Message::GotoOsListParent => {
