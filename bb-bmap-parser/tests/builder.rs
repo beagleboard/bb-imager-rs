@@ -184,3 +184,58 @@ fn from_xml_rejects_unknown_checksum_type() {
     // error rather than `XmlError::UnknownChecksumType` (which is unused).
     assert!(matches!(err, XmlError::XmlParsError(_)), "got {err:?}");
 }
+
+#[test]
+fn from_xml_rejects_unparsable_range() {
+    // An empty element has no text at all and fails deserialization instead.
+    let xml = minimal_xml("sha256", VALID_SHA, "");
+    let err = Bmap::from_xml(&xml).expect_err("empty range");
+    assert!(matches!(err, XmlError::XmlParsError(_)), "got {err:?}");
+
+    for range in ["1a", "0-", "-1"] {
+        let xml = minimal_xml("sha256", VALID_SHA, range);
+        let err = Bmap::from_xml(&xml).expect_err(range);
+        assert!(
+            matches!(err, XmlError::InvalidRange(_)),
+            "{range:?}: got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn from_xml_rejects_reversed_range() {
+    let xml = minimal_xml("sha256", VALID_SHA, "1-0");
+    let err = Bmap::from_xml(&xml).expect_err("end before start");
+    assert!(matches!(err, XmlError::InvalidRange(_)), "got {err:?}");
+}
+
+#[test]
+fn from_xml_rejects_range_past_image() {
+    for range in ["2", "18446744073709551615"] {
+        let xml = minimal_xml("sha256", VALID_SHA, range);
+        let err = Bmap::from_xml(&xml).expect_err(range);
+        assert!(
+            matches!(err, XmlError::InvalidRange(_)),
+            "{range:?}: got {err:?}"
+        );
+    }
+}
+
+/// A range that starts inside the image but runs past its end is clamped to
+/// the image, not rejected.
+#[test]
+fn from_xml_accepts_range_clamped_to_image() {
+    let xml = minimal_xml("sha256", VALID_SHA, "1-5");
+    let bmap = Bmap::from_xml(&xml).expect("range starting inside the image");
+    let range = bmap.block_map().next().unwrap();
+    assert_eq!(range.offset(), 4096);
+    assert_eq!(range.length(), 4096);
+}
+
+#[test]
+fn from_xml_rejects_zero_block_size() {
+    let xml = minimal_xml("sha256", VALID_SHA, "0")
+        .replace("<BlockSize>4096</BlockSize>", "<BlockSize>0</BlockSize>");
+    let err = Bmap::from_xml(&xml).expect_err("zero block size");
+    assert!(matches!(err, XmlError::InvalidBlockSize(0)), "got {err:?}");
+}
