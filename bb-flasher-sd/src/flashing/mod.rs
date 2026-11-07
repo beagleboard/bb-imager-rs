@@ -252,8 +252,7 @@ where
                 let sd = crate::pal::open(&path)?;
                 let sd = crate::helpers::SdCardWrapper::new(sd);
                 let resize_size = if resize {
-                    let temp = bb_drivelist::drive_list()
-                        .unwrap()
+                    let temp = bb_drivelist::drive_list()?
                         .into_iter()
                         .find(|x| *x.raw == *path)
                         .and_then(|x| x.size)
