@@ -72,7 +72,9 @@ pub(crate) fn drive_list() -> crate::Result<Vec<DeviceDescriptor>> {
                 ..Default::default()
             };
 
-            get_detail_data(&mut item, h_device_info, &device_info_data).unwrap();
+            if let Err(err) = get_detail_data(&mut item, h_device_info, &device_info_data) {
+                item.error = Some(err.to_string());
+            }
 
             let bt = item.bus_type.clone().unwrap_or("UNKNOWN".to_string());
             item.is_card = ["SDCARD", "MMC"].contains(&bt.as_str());
@@ -152,8 +154,8 @@ fn is_usb_drive(enumerator_name: &str) -> bool {
 }
 
 fn is_removable(h_dev_info: HDEVINFO, device_info_data: &SP_DEVINFO_DATA) -> bool {
-    let res = unsafe {
-        let mut result = [0u8; 4];
+    let mut result = [0u8; 4];
+    let read = unsafe {
         SetupDiGetDeviceRegistryPropertyW(
             h_dev_info,
             device_info_data,
@@ -162,10 +164,11 @@ fn is_removable(h_dev_info: HDEVINFO, device_info_data: &SP_DEVINFO_DATA) -> boo
             Some(&mut result),
             None,
         )
-        .unwrap();
-
-        u32::from_ne_bytes(result)
     };
+    if read.is_err() {
+        return false;
+    }
+    let res = u32::from_ne_bytes(result);
 
     res == CM_REMOVAL_POLICY_EXPECT_SURPRISE_REMOVAL.0
         || res == CM_REMOVAL_POLICY_EXPECT_ORDERLY_REMOVAL.0
@@ -173,7 +176,9 @@ fn is_removable(h_dev_info: HDEVINFO, device_info_data: &SP_DEVINFO_DATA) -> boo
 
 fn is_system_device(device: &DeviceDescriptor) -> bool {
     for key in ["windir", "ProgramFiles"] {
-        let val = std::env::var(key).unwrap();
+        let Ok(val) = std::env::var(key) else {
+            continue;
+        };
 
         for mp in device.mountpoints.iter() {
             if val.contains(&mp.path) {
@@ -208,13 +213,25 @@ fn get_detail_data(
             break;
         }
 
-        let p = get_device_path(h_dev_info, &device_interface_data).unwrap();
+        let p = match get_device_path(h_dev_info, &device_interface_data) {
+            Ok(p) => p,
+            Err(err) => {
+                device.error = Some(format!("Couldn't get device path: Error {err}"));
+                break;
+            }
+        };
 
-        let h_device = std::fs::OpenOptions::new()
+        let h_device = match std::fs::OpenOptions::new()
             .access_mode(0)
             .share_mode(FILE_SHARE_READ.0)
             .open(&p)
-            .unwrap();
+        {
+            Ok(h) => h,
+            Err(err) => {
+                device.error = Some(format!("Couldn't open device: Error {err}"));
+                break;
+            }
+        };
         let Some(device_number) = get_device_number(HANDLE(h_device.as_raw_handle())) else {
             device.error = Some("Couldn't get device number".to_string());
             break;
@@ -228,11 +245,17 @@ fn get_detail_data(
             break;
         }
 
-        let h_physical = std::fs::OpenOptions::new()
+        let h_physical = match std::fs::OpenOptions::new()
             .access_mode(0)
             .share_mode(FILE_SHARE_READ.0)
             .open(&device.device)
-            .unwrap();
+        {
+            Ok(h) => h,
+            Err(err) => {
+                device.error = Some(format!("Couldn't open {}: Error {err}", device.device));
+                break;
+            }
+        };
         if let Err(err) = get_device_size(device, HANDLE(h_physical.as_raw_handle())) {
             device.error = Some(format!("Couldn't get device size: Error {err}"));
             break;
@@ -548,7 +571,9 @@ fn get_device_path(
             None,
         )
     };
-    assert!(len != 0);
+    if len == 0 {
+        return Err(windows::core::Error::from_thread().into());
+    }
 
     let mut buf: Vec<u8> = vec![0u8; len as usize];
     let device_iface_detail: *mut SP_DEVICE_INTERFACE_DETAIL_DATA_W = buf.as_mut_ptr().cast();
