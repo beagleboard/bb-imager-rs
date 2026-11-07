@@ -145,15 +145,16 @@ where
         self.wait_for_ack()?;
 
         self.port.read_exact(&mut cmd)?;
-        assert_eq!(cmd[0], 6);
+        if cmd[0] != 6 {
+            return Err(Error::UnknownResponse);
+        }
 
         let checksum = cmd[1];
 
         self.port.read_exact(&mut cmd_data)?;
-        assert_eq!(
-            checksum,
-            cmd_data.iter().fold(0u8, |acc, x| acc.wrapping_add(*x))
-        );
+        if checksum != cmd_data.iter().fold(0u8, |acc, x| acc.wrapping_add(*x)) {
+            return Err(Error::UnknownResponse);
+        }
 
         self.send_ack()?;
 
@@ -193,9 +194,9 @@ where
 
         match resp[0] {
             0x40 => Ok(()),
-            0x41 => panic!("Unknown Command"),
-            0x42 => panic!("Invalid Command"),
-            0x43 => panic!("Invalid Address"),
+            0x41 | 0x42 => Err(Error::UnknownResponse),
+            // The firmware has data outside flash.
+            0x43 => Err(Error::InvalidImage),
             0x44 => Err(Error::FlashFail),
             _ => Err(Error::UnknownResponse),
         }

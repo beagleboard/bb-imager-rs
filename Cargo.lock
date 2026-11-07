@@ -560,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-bcf"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "bb-helper",
  "bin_file",
