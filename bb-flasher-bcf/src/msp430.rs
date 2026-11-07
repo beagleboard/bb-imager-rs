@@ -100,7 +100,11 @@ impl MSP430 {
 
         let _ = self.0.read(&mut ans)?;
 
-        assert_eq!(ans[0], USB_MSG_HEADER);
+        if ans[0] != USB_MSG_HEADER {
+            return Err(hidapi::HidError::IoError {
+                error: std::io::Error::other("Invalid response"),
+            });
+        }
         let length = ans[1];
 
         Ok(ans[2..(2 + length as usize)].to_vec())
@@ -118,8 +122,9 @@ impl MSP430 {
             )
             .map_err(|_| Error::MassEraseFail)?;
 
-        assert_eq!(ans.len(), 2);
-        assert_ne!(ans[1], 0);
+        if ans.len() != 2 || ans[1] == 0 {
+            return Err(Error::MassEraseFail);
+        }
 
         Ok(())
     }
@@ -129,8 +134,9 @@ impl MSP430 {
             .cmd(CMD_RX_PASSWORD, &[0xffu8; 32])
             .map_err(|_| Error::UnlockFail)?;
 
-        assert_eq!(ans.len(), 2);
-        assert_eq!(ans[1], 0);
+        if ans.len() != 2 || ans[1] != 0 {
+            return Err(Error::UnlockFail);
+        }
 
         Ok(())
     }
@@ -145,8 +151,9 @@ impl MSP430 {
             .cmd(CMD_TX_BSL_VERSION, &[])
             .map_err(|_| Error::BslVersionFail)?;
 
-        assert_eq!(resp[0], 0x3a);
-        assert_eq!(resp[1..], BSL_VERSION);
+        if resp.first() != Some(&0x3a) || resp[1..] != BSL_VERSION {
+            return Err(Error::BslVersionFail);
+        }
 
         Ok(())
     }
