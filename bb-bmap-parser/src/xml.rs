@@ -69,6 +69,7 @@ struct Bmap {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum XmlError {
     #[error("Failed to parse bmap XML: {0}")]
     XmlParsError(#[from] DeError),
@@ -78,6 +79,10 @@ pub enum XmlError {
     UnknownChecksumType(String),
     #[error("Invalid checksum: {0}")]
     InvalidChecksum(String),
+    #[error("Invalid block size: {0}")]
+    InvalidBlockSize(u64),
+    #[error("Invalid block range: {0}")]
+    InvalidRange(String),
 }
 
 const fn hexdigit_to_u8(c: u8) -> Option<u8> {
@@ -114,8 +119,35 @@ fn str_to_digest(s: String, digest: &mut [u8]) -> Result<(), XmlError> {
     Ok(())
 }
 
+/// Parses `start-end` or `start` (in blocks), checking it lies inside the image
+/// so that `BmapBuilder::add_block_range` cannot overflow.
+fn parse_range(range: &str, block_size: u64, image_size: u64) -> Result<(u64, u64), XmlError> {
+    let invalid = || XmlError::InvalidRange(range.into());
+    let (start, end) = range.split_once('-').unwrap_or((range, range));
+    let start: u64 = start.parse().map_err(|_| invalid())?;
+    let end: u64 = end.parse().map_err(|_| invalid())?;
+
+    let starts_in_image = start
+        .checked_mul(block_size)
+        .is_some_and(|offset| offset < image_size);
+    let length_fits = end
+        .checked_sub(start)
+        .and_then(|x| x.checked_add(1))
+        .and_then(|x| x.checked_mul(block_size))
+        .is_some();
+
+    if starts_in_image && length_fits {
+        Ok((start, end))
+    } else {
+        Err(invalid())
+    }
+}
+
 pub(crate) fn from_xml(xml: &str) -> Result<crate::bmap::Bmap, XmlError> {
     let b: Bmap = from_str(xml)?;
+    if b.block_size == 0 {
+        return Err(XmlError::InvalidBlockSize(b.block_size));
+    }
     let mut builder = BmapBuilder::default();
     let hash_type = b.checksum_type;
     builder
@@ -126,15 +158,7 @@ pub(crate) fn from_xml(xml: &str) -> Result<crate::bmap::Bmap, XmlError> {
         .mapped_blocks(b.mapped_blocks_count);
 
     for range in b.block_map.ranges {
-        let mut split = range.range.trim().splitn(2, '-');
-        let start = match split.next() {
-            Some(s) => s.parse().unwrap(),
-            None => unimplemented!("woops"),
-        };
-        let end = match split.next() {
-            Some(s) => s.parse().unwrap(),
-            None => start,
-        };
+        let (start, end) = parse_range(&range.range, b.block_size, b.image_size)?;
 
         let checksum = match hash_type {
             HashType::Sha256 => {
