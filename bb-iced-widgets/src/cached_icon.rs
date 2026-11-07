@@ -16,8 +16,9 @@ impl<K: Eq + Hash> Cache<K> {
         self.0.get(u)?.as_ref()
     }
 
-    pub fn insert(&mut self, u: K, path: PathBuf) {
-        self.0.insert(u, Some(path.into()));
+    pub fn insert(&mut self, u: K, path: PathBuf) -> std::io::Result<()> {
+        self.0.insert(u, Some(path.try_into()?));
+        Ok(())
     }
 
     pub fn mark_fetching(&mut self, u: K) {

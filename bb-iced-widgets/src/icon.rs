@@ -8,17 +8,16 @@ pub enum Handle {
     Img(widget::image::Handle),
 }
 
-impl From<PathBuf> for Handle {
-    fn from(value: PathBuf) -> Self {
+impl TryFrom<PathBuf> for Handle {
+    type Error = std::io::Error;
+
+    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
         let mut magic = [0u8; 32];
-        {
-            let mut f = std::fs::File::open(&value).expect("Failed to open image");
-            f.read_exact(&mut magic).unwrap();
-        };
-        match image::guess_format(&magic) {
+        std::fs::File::open(&value)?.read_exact(&mut magic)?;
+        Ok(match image::guess_format(&magic) {
             Ok(_) => widget::image::Handle::from_path(value).into(),
             Err(_) => widget::svg::Handle::from_path(value).into(),
-        }
+        })
     }
 }
 
