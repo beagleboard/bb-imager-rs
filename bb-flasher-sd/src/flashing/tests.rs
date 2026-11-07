@@ -193,3 +193,96 @@ fn test_cancellation_token() {
     // Should return an error variant associated with cancellation
     assert!(result.is_err());
 }
+
+/// A bmap over `blocks` blocks of [`BUFFER_SIZE`] bytes, with `mapped` blocks
+/// in the map.
+fn test_bmap(blocks: u64, mapped: &[u64]) -> bb_bmap_parser::Bmap {
+    let mut bmap = bb_bmap_parser::Bmap::builder();
+    bmap.image_size(blocks * BUFFER_SIZE as u64)
+        .block_size(BUFFER_SIZE as u64)
+        .blocks(blocks)
+        .mapped_blocks(mapped.len() as u64)
+        .checksum_type(bb_bmap_parser::HashType::Sha256);
+
+    for i in mapped {
+        bmap.add_block_range(
+            *i,
+            *i,
+            bb_bmap_parser::HashValue::Sha256(Default::default()),
+        );
+    }
+
+    bmap.build().unwrap()
+}
+
+#[test]
+fn sd_write_bmap_empty_image() {
+    let mut sd = Cursor::new(vec![0u8; 4 * BUFFER_SIZE]);
+
+    write_sd(
+        test_file(0),
+        0,
+        Some(test_bmap(4, &[0, 3])),
+        &mut sd,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert!(sd.get_ref().iter().all(|x| *x == 0));
+}
+
+#[test]
+fn sd_write_bmap_reports_reader_error() {
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("corrupt image"))
+        }
+    }
+
+    let mut sd = Cursor::new(vec![0u8; 4 * BUFFER_SIZE]);
+
+    let err = write_sd(
+        FailingReader,
+        (4 * BUFFER_SIZE) as u64,
+        Some(test_bmap(4, &[0, 3])),
+        &mut sd,
+        None,
+        None,
+    )
+    .unwrap_err();
+
+    assert!(
+        matches!(&err, crate::Error::IoError { source } if source.to_string() == "corrupt image"),
+        "expected the reader's error, got: {err:?}"
+    );
+}
+
+/// The image ends before the bmap does. Nothing may be written for the ranges
+/// past its end; block 4 directly follows the range the image ends in.
+#[test]
+fn sd_write_bmap_short_image_no_stale_writes() {
+    const IMAGE_BLOCKS: usize = 4;
+    const BLOCKS: u64 = 8;
+
+    let mut sd = Cursor::new(vec![0u8; BLOCKS as usize * BUFFER_SIZE]);
+
+    write_sd(
+        test_file(IMAGE_BLOCKS * BUFFER_SIZE),
+        (IMAGE_BLOCKS * BUFFER_SIZE) as u64,
+        Some(test_bmap(BLOCKS, &[0, 3, 4])),
+        &mut sd,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert!(
+        sd.get_ref()[IMAGE_BLOCKS * BUFFER_SIZE..]
+            .iter()
+            .all(|x| *x == 0),
+        "data was written past the end of the image"
+    );
+}
