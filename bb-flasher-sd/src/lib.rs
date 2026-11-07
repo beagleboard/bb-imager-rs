@@ -85,16 +85,22 @@ pub enum Error {
     WriterClosed,
     #[error("Destination is not valid")]
     InvalidDestionation,
+    #[error("Failed to list drives.")]
+    DriveList {
+        #[from]
+        source: bb_drivelist::Error,
+    },
 
     #[cfg(windows)]
     #[error("Failed to clear SD Card.")]
     WindowsCleanError(std::process::Output),
 }
 
-/// Enumerate all SD Cards in system
+/// Enumerate all SD Cards in system. Returns nothing if drives cannot be enumerated.
 pub fn devices(filter: bool) -> impl Iterator<Item = Device> {
     bb_drivelist::drive_list()
-        .expect("Unsupported OS for Sd Card")
+        .inspect_err(|e| tracing::warn!("Failed to enumerate SD cards: {e}"))
+        .unwrap_or_default()
         .into_iter()
         .filter(move |x| {
             if filter {
