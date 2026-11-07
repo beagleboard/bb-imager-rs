@@ -54,7 +54,11 @@ fn writer_task_bmap(
     tracing::info!("Writing with bmap file.");
 
     let mut pos = 0;
-    let (mut buf, mut count) = buf_rx.recv().unwrap();
+    // The reader closes the channel once it is done, successfully or not.
+    // `write_sd` reports its result through `join`.
+    let Ok((mut buf, mut count)) = buf_rx.recv() else {
+        return Ok(());
+    };
     let img_size = bmap.total_mapped_size();
     let mut bytes_written = 0u64;
 
@@ -86,7 +90,8 @@ fn writer_task_bmap(
                     buf = x;
                     count = y;
                 }
-                Err(_) => break,
+                // No more image data: the remaining ranges have nothing to write.
+                Err(_) => return sd.flush().map_err(Into::into),
             }
         }
     }
@@ -312,7 +317,7 @@ where
         }
 
         tracing::info!("Applying customization");
-        let mut sd = crate::helpers::DeviceWrapper::new(sd).unwrap();
+        let mut sd = crate::helpers::DeviceWrapper::new(sd)?;
         for c in customizations {
             check_cancel(self.cancel.as_ref())?;
             c.customize(&mut sd, None)?;
