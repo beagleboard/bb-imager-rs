@@ -207,16 +207,6 @@ where
     }
 }
 
-impl From<bb_flasher_mspm0::Status> for DownloadFlashingStatus {
-    fn from(value: bb_flasher_mspm0::Status) -> Self {
-        match value {
-            bb_flasher_mspm0::Status::Preparing => Self::Preparing,
-            bb_flasher_mspm0::Status::Flashing(x) => Self::Writing(x),
-            bb_flasher_mspm0::Status::Verifying => Self::Verifying,
-        }
-    }
-}
-
 #[cfg(all(feature = "mspm0_i2c", target_os = "linux"))]
 use bb_flasher_mspm0::i2c::is_i2c_dev;
 

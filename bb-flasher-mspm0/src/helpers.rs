@@ -117,7 +117,7 @@ where
         }
     }
 
-    chan_send(chan.as_mut(), Status::Flashing(0.0));
+    chan_send(chan.as_mut(), Status::Writing(0.0));
     check_token(cancel.as_ref())?;
     mspm0.mass_erase()?;
 
@@ -132,13 +132,13 @@ where
     {
         chan_send(
             chan.as_mut(),
-            Status::Flashing(addr as f32 / firmware.max_addr() as f32),
+            Status::Writing(addr as f32 / firmware.max_addr() as f32),
         );
         mspm0.program_data(addr as u32, &data)?;
         tracing::debug!("Cur address: {}", addr);
     }
 
-    chan_send(chan.as_mut(), Status::Flashing(1.0));
+    chan_send(chan.as_mut(), Status::Writing(1.0));
 
     if verify {
         chan_send(chan.as_mut(), Status::Verifying);
@@ -260,8 +260,8 @@ mod tests {
 
         // Should prepare, flash at 0.0, progress through chunks, and hit 1.0 (no verification status)
         assert!(status.contains(&Status::Preparing));
-        assert!(status.contains(&Status::Flashing(0.0)));
-        assert!(status.contains(&Status::Flashing(1.0)));
+        assert!(status.contains(&Status::Writing(0.0)));
+        assert!(status.contains(&Status::Writing(1.0)));
         assert!(!status.contains(&Status::Verifying));
     }
 
@@ -291,7 +291,7 @@ mod tests {
 
         assert!(status.contains(&Status::Preparing));
         // It should NOT contain flashing statuses because it returns early
-        assert!(!status.iter().any(|s| matches!(s, Status::Flashing(_))));
+        assert!(!status.iter().any(|s| matches!(s, Status::Writing(_))));
     }
 
     #[test]
@@ -368,11 +368,11 @@ mod tests {
         // Ensure it started with preparing
         assert_eq!(status[0], Status::Preparing);
 
-        // Filter out just the Flashing progress values to verify graduation
+        // Filter out just the Writing progress values to verify graduation
         let progress_updates: Vec<f32> = status
             .iter()
             .filter_map(|s| match s {
-                Status::Flashing(p) => Some(*p),
+                Status::Writing(p) => Some(*p),
                 _ => None,
             })
             .collect();
