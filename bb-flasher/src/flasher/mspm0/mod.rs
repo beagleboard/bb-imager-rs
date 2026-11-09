@@ -174,7 +174,7 @@ where
         let img = self.img;
         let img = crate::common::resolve_img(img)?;
 
-        let curry = move |chan| match port {
+        match port {
             #[cfg(feature = "mspm0_uart")]
             Target::Uart(x) => {
                 bb_flasher_mspm0::uart::flash(&img, &x, verify, chan, self.cancel, self.prep_hook)
@@ -187,23 +187,7 @@ where
             }
             #[cfg(all(feature = "mspm0_i2c", not(target_os = "linux")))]
             Target::I2c(_) => Err(crate::Error::UnsupportedOs),
-        };
-
-        std::thread::scope(|s| {
-            if let Some(chan) = chan {
-                let (tx, rx) = mpsc::sync_channel::<bb_flasher_mspm0::Status>(2);
-
-                s.spawn(move || {
-                    while let Ok(x) = rx.recv() {
-                        let _ = chan.try_send(x.into());
-                    }
-                });
-
-                curry(Some(tx))
-            } else {
-                curry(None)
-            }
-        })
+        }
     }
 }
 
