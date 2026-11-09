@@ -59,6 +59,17 @@ pub enum DownloadFlashingStatus {
     Customizing,
 }
 
+impl From<bb_helper::status::Status> for DownloadFlashingStatus {
+    fn from(value: bb_helper::status::Status) -> Self {
+        match value {
+            bb_helper::status::Status::Preparing => Self::Preparing,
+            bb_helper::status::Status::Writing(x) => Self::Writing(x),
+            bb_helper::status::Status::Verifying => Self::Verifying,
+            bb_helper::status::Status::Customizing => Self::Customizing,
+        }
+    }
+}
+
 /// A trait for modeling flasher targets.
 ///
 /// Some flashers have a single target (for example a subprocessor in SBC).
