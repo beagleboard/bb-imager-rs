@@ -698,16 +698,21 @@ pub(crate) struct FlashingFailState {
     pub(crate) state: bb_imager_ui::flash_fail::State,
 }
 
+/// A fail page's log view, scrolled to the end, where the error is.
+fn log_view(logs: &str) -> widget::text_editor::Content {
+    let mut content = widget::text_editor::Content::with_text(logs);
+    content.perform(widget::text_editor::Action::Move(
+        widget::text_editor::Motion::DocumentEnd,
+    ));
+    content
+}
+
 impl FlashingFailState {
     pub(crate) fn new(
         state: FlashingState,
         failures: Box<[(helpers::Destination, Box<str>)]>,
-        mut logs: widget::text_editor::Content,
+        logs: &str,
     ) -> Self {
-        logs.perform(widget::text_editor::Action::Move(
-            widget::text_editor::Motion::DocumentEnd,
-        ));
-
         let (failures, selected_dests): (Vec<_>, Vec<_>) = failures
             .into_iter()
             .map(|(dest, err)| ((dest.label(), err), dest))
@@ -716,7 +721,7 @@ impl FlashingFailState {
         Self {
             state: bb_imager_ui::flash_fail::State {
                 failures: failures.into(),
-                logs,
+                logs: log_view(logs),
                 has_customization: state.ctx.has_customization,
             },
             common: state.common,
@@ -945,12 +950,8 @@ impl FormatMediaFailState {
     pub(crate) fn new(
         state: FormatMediaProgressState,
         failures: Box<[(bb_flasher::sd::Target, Box<str>)]>,
-        mut logs: widget::text_editor::Content,
+        logs: &str,
     ) -> Self {
-        logs.perform(widget::text_editor::Action::Move(
-            widget::text_editor::Motion::DocumentEnd,
-        ));
-
         let (failures, selected_dest): (Vec<_>, Vec<_>) = failures
             .into_iter()
             .map(|(dest, err)| ((helpers::sd_card_label(&dest), err), dest))
@@ -961,7 +962,7 @@ impl FormatMediaFailState {
             selected_dest: selected_dest.into(),
             state: bb_imager_ui::format_media_fail::State {
                 failures: failures.into(),
-                logs,
+                logs: log_view(logs),
             },
         }
     }
