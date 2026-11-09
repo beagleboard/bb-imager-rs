@@ -32,7 +32,7 @@ std::thread::spawn(move || {
 });
 
 // Flash the firmware while preserving the EEPROM contents.
-flash(&firmware, tx, true).unwrap();
+flash(&firmware, Some(tx), true).unwrap();
 ```
 
 # Helpful Links

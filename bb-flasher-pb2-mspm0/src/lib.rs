@@ -61,13 +61,17 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Flash firmware to MSPM0. Also provides live [`Status`] using a channel.
+/// Flash firmware to MSPM0. Optionally provides live [`Status`] using a channel.
 ///
 /// [PocketBeagle 2] also uses MSPM0 as an EEPROM. Hence provide optional persistence support for
 /// EEPROM contents.
 ///
 /// [PocketBeagle 2]: https://www.beagleboard.org/boards/pocketbeagle-2
-pub fn flash(firmware: &[u8], chan: mpsc::SyncSender<Status>, persist_eeprom: bool) -> Result<()> {
+pub fn flash(
+    firmware: &[u8],
+    chan: Option<mpsc::SyncSender<Status>>,
+    persist_eeprom: bool,
+) -> Result<()> {
     if firmware.is_empty() || firmware.len() > FIRMWARE_SIZE {
         return Err(Error::InvalidFirmware);
     }
@@ -88,7 +92,7 @@ pub fn flash(firmware: &[u8], chan: mpsc::SyncSender<Status>, persist_eeprom: bo
             })?;
     }
 
-    flash_fw_api(Path::new(PATH), firmware, &chan)?;
+    flash_fw_api(Path::new(PATH), firmware, chan.as_ref())?;
 
     // Write back EEPROM contents
     if persist_eeprom {
@@ -141,7 +145,17 @@ fn check_file(fname: &'static str, path: &Path) -> Result<()> {
     }
 }
 
-fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -> Result<()> {
+fn chan_send(chan: Option<&mpsc::SyncSender<Status>>, msg: Status) {
+    if let Some(c) = chan {
+        let _ = c.try_send(msg);
+    }
+}
+
+fn flash_fw_api(
+    base: &Path,
+    firmware: &[u8],
+    chan: Option<&mpsc::SyncSender<Status>>,
+) -> Result<()> {
     let loading_path = base.join("loading");
     let data_path = base.join("data");
     let status_path = base.join("status");
@@ -208,7 +222,7 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
         match inp.trim() {
             "idle" => break,
             "preparing" => {
-                let _ = chan.try_send(Status::Preparing);
+                chan_send(chan, Status::Preparing);
             }
             "transferring" => {
                 let mut prog = String::with_capacity(3);
@@ -225,11 +239,11 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
                     })?;
 
                 if let Ok(p) = prog.trim().parse::<usize>() {
-                    let _ = chan.try_send(Status::Writing(upload_progress(firmware.len(), p)));
+                    chan_send(chan, Status::Writing(upload_progress(firmware.len(), p)));
                 }
             }
             "programming" => {
-                let _ = chan.try_send(Status::Verifying);
+                chan_send(chan, Status::Verifying);
             }
             _ => {}
         }
@@ -325,7 +339,7 @@ mod tests {
         let (tx, _rx) = mpsc::sync_channel(4);
         const FW: &[u8] = b"firmware-bytes";
 
-        flash_fw_api(dir.path(), FW, &tx).unwrap();
+        flash_fw_api(dir.path(), FW, Some(&tx)).unwrap();
 
         // The payload is written verbatim to the `data` entry...
         assert_eq!(std::fs::read(dir.path().join("data")).unwrap(), FW);
@@ -336,8 +350,7 @@ mod tests {
     #[test]
     fn flash_fw_api_empty_error_is_success() {
         let dir = fake_sysfs("");
-        let (tx, _rx) = mpsc::sync_channel(1);
-        flash_fw_api(dir.path(), b"x", &tx).unwrap();
+        flash_fw_api(dir.path(), b"x", None).unwrap();
     }
 
     #[test]
@@ -345,16 +358,14 @@ mod tests {
         // The driver reports this when the same image is already present; the
         // flasher treats it as a successful skip, not a failure.
         let dir = fake_sysfs("preparing:firmware-invalid");
-        let (tx, _rx) = mpsc::sync_channel(1);
-        flash_fw_api(dir.path(), b"x", &tx).unwrap();
+        flash_fw_api(dir.path(), b"x", None).unwrap();
     }
 
     #[test]
     fn flash_fw_api_surfaces_flashing_error() {
         let dir = fake_sysfs("write:0x1234");
-        let (tx, _rx) = mpsc::sync_channel(1);
 
-        match flash_fw_api(dir.path(), b"x", &tx).unwrap_err() {
+        match flash_fw_api(dir.path(), b"x", None).unwrap_err() {
             Error::FlashingError { stage, code } => {
                 assert_eq!(stage, "write");
                 assert_eq!(code, "0x1234");
@@ -366,9 +377,8 @@ mod tests {
     #[test]
     fn flash_fw_api_malformed_error_does_not_panic() {
         let dir = fake_sysfs("garbage");
-        let (tx, _rx) = mpsc::sync_channel(1);
 
-        match flash_fw_api(dir.path(), b"x", &tx).unwrap_err() {
+        match flash_fw_api(dir.path(), b"x", None).unwrap_err() {
             Error::FlashingError { stage, code } => {
                 assert_eq!(stage, "unknown");
                 assert_eq!(code, "garbage");
@@ -389,8 +399,10 @@ mod tests {
     #[test]
     fn flash_rejects_empty_firmware() {
         // Rejected before any sysfs access, so this runs without the driver.
-        let (tx, _rx) = mpsc::sync_channel(1);
-        assert!(matches!(flash(&[], tx, false), Err(Error::InvalidFirmware)));
+        assert!(matches!(
+            flash(&[], None, false),
+            Err(Error::InvalidFirmware)
+        ));
     }
 
     #[test]
@@ -398,10 +410,9 @@ mod tests {
         // `sysfs_w_open` uses create(false); a missing `loading` entry must
         // surface as FailedToOpen rather than silently creating the file.
         let dir = tempfile::tempdir().unwrap();
-        let (tx, _rx) = mpsc::sync_channel(1);
 
         assert!(matches!(
-            flash_fw_api(dir.path(), b"x", &tx).unwrap_err(),
+            flash_fw_api(dir.path(), b"x", None).unwrap_err(),
             Error::FailedToOpen {
                 fname: "loading",
                 ..
