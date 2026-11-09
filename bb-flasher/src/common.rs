@@ -51,10 +51,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum DownloadFlashingStatus {
     /// Preparing for flashing.
     Preparing,
-    /// Downloading the image.
-    DownloadingProgress(f32),
-    /// Writing the image to the target.
-    FlashingProgress(f32),
+    /// Writing the image to the destination.
+    Writing(f32),
     /// Verifying the written image.
     Verifying,
     /// Applying post-install customization.

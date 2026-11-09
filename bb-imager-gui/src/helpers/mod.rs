@@ -381,7 +381,7 @@ fn flash_inner(
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
             std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
-                    let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                    let _ = chan.try_send(DownloadFlashingStatus::Writing(msg));
                 }
             });
             bb_flasher::sd::UpdateBootFlasher::new(
@@ -397,7 +397,7 @@ fn flash_inner(
             let (tx, rx) = std::sync::mpsc::sync_channel(4);
             std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
-                    let _ = chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                    let _ = chan.try_send(DownloadFlashingStatus::Writing(msg));
                 }
             });
             bb_flasher::sd::UpdateBootFlasher::with_file_dest(
@@ -434,7 +434,7 @@ fn flash_inner(
             let (tx, rx) = mpsc::sync_channel(4);
             std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
-                    let _ = chan.try_send(DownloadFlashingStatus::DownloadingProgress(msg));
+                    let _ = chan.try_send(DownloadFlashingStatus::Writing(msg));
                 }
             });
 

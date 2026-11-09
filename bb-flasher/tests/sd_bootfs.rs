@@ -237,8 +237,8 @@ fn flash_reports_progress_with_bootfs() {
     assert!(
         progress
             .iter()
-            .any(|x| matches!(x, DownloadFlashingStatus::DownloadingProgress(_))),
-        "file destinations should report download progress: {progress:?}"
+            .any(|x| matches!(x, DownloadFlashingStatus::Writing(_))),
+        "file destinations should report write progress: {progress:?}"
     );
 
     handle.join().unwrap();

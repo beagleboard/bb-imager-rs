@@ -668,7 +668,7 @@ fn sd_boot_update_writes_archive_into_gpt_boot_partition() {
 }
 
 /// The non-quiet path for `sd-boot-update` runs its own progress-forwarding
-/// thread (which rewrites archive progress into `FlashingProgress`), so it
+/// thread (which rewrites archive progress into `Writing`), so it
 /// needs separate coverage from the quiet path.
 #[test]
 fn sd_boot_update_renders_progress_when_not_quiet() {

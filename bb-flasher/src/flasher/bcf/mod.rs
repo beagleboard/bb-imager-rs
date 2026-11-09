@@ -14,7 +14,7 @@ impl From<bb_flasher_bcf::Status> for crate::common::DownloadFlashingStatus {
     fn from(value: bb_flasher_bcf::Status) -> Self {
         match value {
             bb_flasher_bcf::Status::Preparing => Self::Preparing,
-            bb_flasher_bcf::Status::Flashing(x) => Self::FlashingProgress(x),
+            bb_flasher_bcf::Status::Flashing(x) => Self::Writing(x),
             bb_flasher_bcf::Status::Verifying => Self::Verifying,
         }
     }

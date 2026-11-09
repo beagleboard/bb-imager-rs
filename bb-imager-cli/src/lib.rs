@@ -57,18 +57,13 @@ fn flash(target: TargetCommands, quite: bool) {
                     match (progress, last_state) {
                         // Take care when just progress needs to be updated
                         (
-                            DownloadFlashingStatus::DownloadingProgress(p),
-                            DownloadFlashingStatus::DownloadingProgress(_),
-                        )
-                        | (
-                            DownloadFlashingStatus::FlashingProgress(p),
-                            DownloadFlashingStatus::FlashingProgress(_),
+                            DownloadFlashingStatus::Writing(p),
+                            DownloadFlashingStatus::Writing(_),
                         ) => {
                             last_bar.as_ref().unwrap().set_position((p * 100.0) as u64);
                         }
                         // Create new bar when stage has changed
-                        (DownloadFlashingStatus::DownloadingProgress(p), _)
-                        | (DownloadFlashingStatus::FlashingProgress(p), _) => {
+                        (DownloadFlashingStatus::Writing(p), _) => {
                             if let Some(b) = last_bar.take() {
                                 b.finish();
                             }
@@ -211,8 +206,7 @@ fn flash_internal(
                         while let Ok(msg) = rx.recv() {
                             // Safeguard for initial rewinds
                             if msg > 0.01 {
-                                let _ =
-                                    chan.try_send(DownloadFlashingStatus::FlashingProgress(msg));
+                                let _ = chan.try_send(DownloadFlashingStatus::Writing(msg));
                             }
                         }
                     });
@@ -588,8 +582,7 @@ fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: boo
 const fn progress_msg(status: DownloadFlashingStatus) -> &'static str {
     match status {
         DownloadFlashingStatus::Preparing => "Preparing  ",
-        DownloadFlashingStatus::DownloadingProgress(_) => "Downloading",
-        DownloadFlashingStatus::FlashingProgress(_) => "Flashing",
+        DownloadFlashingStatus::Writing(_) => "Writing",
         DownloadFlashingStatus::Verifying => "Verifying",
         DownloadFlashingStatus::Customizing => "Customizing",
     }
@@ -617,12 +610,8 @@ mod tests {
             "Preparing  "
         );
         assert_eq!(
-            progress_msg(DownloadFlashingStatus::DownloadingProgress(0.5)),
-            "Downloading"
-        );
-        assert_eq!(
-            progress_msg(DownloadFlashingStatus::FlashingProgress(0.5)),
-            "Flashing"
+            progress_msg(DownloadFlashingStatus::Writing(0.5)),
+            "Writing"
         );
         assert_eq!(progress_msg(DownloadFlashingStatus::Verifying), "Verifying");
         assert_eq!(

@@ -37,7 +37,7 @@ impl From<bb_flasher_pb2_mspm0::Status> for DownloadFlashingStatus {
     fn from(value: bb_flasher_pb2_mspm0::Status) -> Self {
         match value {
             bb_flasher_pb2_mspm0::Status::Preparing => Self::Preparing,
-            bb_flasher_pb2_mspm0::Status::Flashing(x) => Self::FlashingProgress(x),
+            bb_flasher_pb2_mspm0::Status::Flashing(x) => Self::Writing(x),
             bb_flasher_pb2_mspm0::Status::Verifying => Self::Verifying,
         }
     }
