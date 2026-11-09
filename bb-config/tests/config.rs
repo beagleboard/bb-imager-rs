@@ -73,7 +73,10 @@ fn full_config_round_trip() {
     let serialized = serde_json::to_string(&first).expect("serialize");
     let second: Config = serde_json::from_str(&serialized).expect("re-parse");
 
-    assert_eq!(first, second, "config should survive a serialize round-trip");
+    assert_eq!(
+        first, second,
+        "config should survive a serialize round-trip"
+    );
 
     // Spot-check that the interesting fields actually populated.
     assert_eq!(first.os_list.len(), 3);
@@ -83,10 +86,7 @@ fn full_config_round_trip() {
     // `specification` is (de)serialized as a map via `serde_with::Map`, preserving insertion order.
     assert_eq!(
         device.specification,
-        vec![
-            ("ram".into(), "4GB".into()),
-            ("cpu".into(), "arm".into()),
-        ]
+        vec![("ram".into(), "4GB".into()), ("cpu".into(), "arm".into()),]
     );
 }
 

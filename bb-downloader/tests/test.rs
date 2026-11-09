@@ -111,9 +111,14 @@ async fn test_download_json_no_cache_rejects_malformed_json() {
             .body("{ this is not valid json ");
     });
 
-    let result: io::Result<TestData> = downloader.download_json_no_cache(&server.url("/api/bad")).await;
+    let result: io::Result<TestData> = downloader
+        .download_json_no_cache(&server.url("/api/bad"))
+        .await;
 
-    assert!(result.is_err(), "malformed JSON body should surface an error");
+    assert!(
+        result.is_err(),
+        "malformed JSON body should surface an error"
+    );
     mock.assert_calls(1);
 }
 
