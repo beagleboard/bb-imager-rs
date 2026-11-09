@@ -6,6 +6,8 @@
 
 use std::io::{self, Read, Write};
 use std::{fs::File, path::Path, sync::mpsc};
+
+use bb_helper::status::send as chan_send;
 use thiserror::Error;
 
 const DEVICE: &str = "mspm0l1105";
@@ -142,12 +144,6 @@ fn check_file(fname: &'static str, path: &Path) -> Result<()> {
             fname,
             source: io::Error::new(io::ErrorKind::NotFound, "sysfs file not found"),
         })
-    }
-}
-
-fn chan_send(chan: Option<&mpsc::SyncSender<Status>>, msg: Status) {
-    if let Some(c) = chan {
-        let _ = c.try_send(msg);
     }
 }
 

@@ -15,10 +15,9 @@ use std::sync::mpsc;
 use thiserror::Error;
 use tracing::{error, info, warn};
 
-use crate::{
-    Status,
-    helpers::{chan_send, parse_bin},
-};
+use bb_helper::status::send as chan_send;
+
+use crate::{Status, helpers::parse_bin};
 
 const ACK: u8 = 0xcc;
 const NACK: u8 = 0x33;

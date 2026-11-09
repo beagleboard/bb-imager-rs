@@ -2,10 +2,10 @@ use std::io::{Read, Seek, Write};
 use std::sync::mpsc;
 use std::time::Instant;
 
-use bb_helper::cancel::CancellationToken;
+use bb_helper::{cancel::CancellationToken, status::send as chan_send};
 
 use crate::customization::Customization;
-use crate::helpers::{DirectIoBuffer, Eject, chan_send, check_cancel, progress};
+use crate::helpers::{DirectIoBuffer, Eject, check_cancel, progress};
 use crate::{ContentType, Result, Status};
 
 #[cfg(test)]
@@ -46,7 +46,7 @@ fn reader_task(
 fn writer_task_bmap(
     bmap: bb_bmap_parser::Bmap,
     mut sd: impl Write + Seek,
-    mut chan: Option<mpsc::SyncSender<Status>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
@@ -79,7 +79,7 @@ fn writer_task_bmap(
             // Clippy warning is simply wrong here
             #[allow(clippy::option_map_or_none)]
             chan_send(
-                chan.as_mut(),
+                chan.as_ref(),
                 Status::Writing(progress(bytes_written, img_size)),
             );
             check_cancel(cancel.as_ref())?;
@@ -102,7 +102,7 @@ fn writer_task_bmap(
 fn writer_task(
     img_size: u64,
     mut sd: impl Write + Seek,
-    mut chan: Option<mpsc::SyncSender<Status>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     buf_rx: mpsc::Receiver<(Box<DirectIoBuffer<BUFFER_SIZE>>, usize)>,
     buf_tx: mpsc::SyncSender<Box<DirectIoBuffer<BUFFER_SIZE>>>,
     cancel: Option<CancellationToken>,
@@ -117,7 +117,7 @@ fn writer_task(
         pos += count as u64;
         // Clippy warning is simply wrong here
         #[allow(clippy::option_map_or_none)]
-        chan_send(chan.as_mut(), Status::Writing(progress(pos, img_size)));
+        chan_send(chan.as_ref(), Status::Writing(progress(pos, img_size)));
 
         let _ = buf_tx.send(buf);
         check_cancel(cancel.as_ref())?;
@@ -274,7 +274,7 @@ where
     }
 
     fn flash_internal(
-        mut self,
+        self,
         mut sd: impl Read + Write + Seek + Eject,
         sd_size_for_resize: Option<u64>,
     ) -> Result<()> {
@@ -288,7 +288,7 @@ where
         tracing::info!("Resolving Image");
         let (img, img_size) = (self.img)()?;
 
-        chan_send(self.chan.as_mut(), Status::Preparing);
+        chan_send(self.chan.as_ref(), Status::Preparing);
 
         tracing::info!("Writing to SD Card");
         write_sd(
@@ -303,7 +303,7 @@ where
         let mut customizations = self.customizations.peekable();
         if self.bootfs.is_some() || customizations.peek().is_some() || sd_size_for_resize.is_some()
         {
-            chan_send(self.chan.as_mut(), Status::Customizing);
+            chan_send(self.chan.as_ref(), Status::Customizing);
         }
 
         if let Some(boot_cb) = self.bootfs {

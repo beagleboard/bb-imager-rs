@@ -1,5 +1,7 @@
 //! Progress reported by the flashers.
 
+use std::sync::mpsc::SyncSender;
+
 /// Flashing status.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Status {
@@ -11,4 +13,14 @@ pub enum Status {
     Verifying,
     /// Applying post-install customization.
     Customizing,
+}
+
+/// Report `msg` on `chan` without blocking.
+///
+/// Progress is lossy by design: if the receiver is slow or gone, the message is dropped
+/// rather than stalling the flash.
+pub fn send(chan: Option<&SyncSender<Status>>, msg: Status) {
+    if let Some(c) = chan {
+        let _ = c.try_send(msg);
+    }
 }
