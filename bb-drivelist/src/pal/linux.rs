@@ -54,12 +54,11 @@ impl Device {
             self.vendor.as_deref().unwrap_or_default(),
             self.model.as_deref().unwrap_or_default(),
         ]
+        .map(str::trim)
         .into_iter()
         .filter(|x| !x.is_empty())
-        .fold(String::new(), |mut acc, x| {
-            acc.push_str(x);
-            acc
-        })
+        .collect::<Vec<_>>()
+        .join(" ")
     }
 
     fn is_virtual(&self) -> bool {
@@ -280,7 +279,8 @@ mod tests {
 
     /// A removable USB device: `rm` + a `usb`/`scsi` subsystem string. It should
     /// be classified removable (not system), the bus type upper-cased, and the
-    /// description built from label+vendor+model with empty parts dropped.
+    /// description built from label+vendor+model, space separated, with empty
+    /// parts dropped and lsblk's padding trimmed.
     #[test]
     fn usb_removable_disk_classification() {
         let d = &descriptors(
@@ -289,7 +289,7 @@ mod tests {
                 "size":32000000000,"tran":"usb",
                 "subsystems":"block:scsi:usb:pci","ro":false,
                 "phy-sec":512,"log-sec":512,"rm":true,"hotplug":false,
-                "pttype":"gpt","label":"BOOT","vendor":"Kingston","model":"DataTraveler"
+                "pttype":"gpt","label":"BOOT","vendor":"Kingston ","model":"DataTraveler"
             }]"#,
         )[0];
 
@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(d.block_size, 512);
         assert_eq!(d.logical_block_size, 512);
         assert_eq!(d.partition_table_type.as_deref(), Some("gpt"));
-        assert_eq!(d.description, "BOOTKingstonDataTraveler");
+        assert_eq!(d.description, "BOOT Kingston DataTraveler");
     }
 
     /// An internal NVMe disk: no `usb`, not `rm`/`hotplug`, and `block` present.
