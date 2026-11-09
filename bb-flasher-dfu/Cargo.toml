@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-dfu"
-version = "0.1.0"
+version = "0.2.0"
 description = "A library to flash BeagleBoard devices over USB DFU"
 edition.workspace = true
 authors.workspace = true
@@ -15,7 +15,7 @@ dfu-libusb = "0.6"
 rusb = "0.9"
 thiserror = "2.0"
 tracing = "0.1"
-bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel", "reader_progress"] }
+bb-helper = { version = "0.1.1", path = "../bb-helper", features = ["cancel", "reader_progress", "status"] }
 
 [lints]
 workspace = true

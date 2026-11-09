@@ -16,6 +16,8 @@ use helpers::{check_token, is_dfu_device};
 
 use bb_helper::{cancel::CancellationToken, reader_progress::ReaderWithProgress};
 
+pub use bb_helper::status::Status;
+
 /// Result type for this crate.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -126,7 +128,8 @@ pub fn devices(filter: bool) -> Vec<Device> {
 /// - `imgs`: `(name, opener)` pairs, flashed in order. `name` selects the DFU interface (by its
 ///   interface string) to download to. `opener` returns a reader for the image and its size.
 /// - `vendor_id`, `product_id`, `bus_num`, `port_num`: identify the device, see [`Device`].
-/// - `chan`: optional channel for overall progress across all images, in `0.0..=1.0`.
+/// - `chan`: optional channel for overall progress across all images, sent as
+///   [`Status::Writing`] in `0.0..=1.0`.
 /// - `cancel`: optional token to abort between images.
 pub fn flash<R, I>(
     imgs: Vec<(String, R)>,
@@ -134,7 +137,7 @@ pub fn flash<R, I>(
     product_id: u16,
     bus_num: u8,
     port_num: u8,
-    chan: Option<mpsc::SyncSender<f32>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     cancel: Option<CancellationToken>,
 ) -> Result<()>
 where
@@ -159,8 +162,7 @@ where
                     let offset = idx as f32 * partition;
 
                     while let Ok(x) = rx.recv() {
-                        let res = offset + x * partition;
-                        let _ = c.try_send(res);
+                        let _ = c.try_send(Status::Writing(offset + x * partition));
                     }
                 });
 

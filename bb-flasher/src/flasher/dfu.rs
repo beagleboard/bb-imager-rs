@@ -134,13 +134,13 @@ where
     ) -> crate::Result<()> {
         std::thread::scope(|s| {
             let c = if let Some(c) = chan {
-                let (tx, rx) = mpsc::sync_channel(2);
+                let (tx, rx) = mpsc::sync_channel::<bb_flasher_dfu::Status>(2);
 
                 s.spawn(move || {
                     // Should run until tx is dropped, i.e. flasher task is done.
                     // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
                     while let Ok(x) = rx.recv() {
-                        let _ = c.try_send(DownloadFlashingStatus::Writing(x));
+                        let _ = c.try_send(x.into());
                     }
                 });
 
