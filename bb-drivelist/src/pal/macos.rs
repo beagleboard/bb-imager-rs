@@ -1,7 +1,7 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ffi::{CStr, c_char, c_void};
 use std::ptr::NonNull;
-use std::borrow::Cow;
 
 use crate::MountPoint;
 use crate::device::DeviceDescriptor;
