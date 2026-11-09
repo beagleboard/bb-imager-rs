@@ -6,7 +6,7 @@ A library to flash BeagleBoard devices over [USB DFU](https://www.usb.org/sites/
 
 ```toml
 [dependencies]
-bb-flasher-dfu = "0.1"
+bb-flasher-dfu = "0.2"
 ```
 
 ```rust,no_run
@@ -32,8 +32,10 @@ let imgs: Vec<_> = ["tiboot3.bin", "tispl.bin", "u-boot.img"]
 
 let (tx, rx) = mpsc::sync_channel(8);
 std::thread::spawn(move || {
-    for p in rx {
-        println!("Progress: {:.0}%", p * 100.0);
+    for status in rx {
+        if let bb_flasher_dfu::Status::Writing(p) = status {
+            println!("Progress: {:.0}%", p * 100.0);
+        }
     }
 });
 
