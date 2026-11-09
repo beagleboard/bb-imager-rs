@@ -88,20 +88,6 @@ where
         let verify = self.verify;
         let img = crate::common::resolve_img(self.img)?;
 
-        if let Some(chan) = chan {
-            std::thread::scope(|s| {
-                let (tx, rx) = mpsc::sync_channel::<bb_flasher_bcf::Status>(2);
-                s.spawn(move || {
-                    while let Ok(x) = rx.recv() {
-                        let _ = chan.try_send(x.into());
-                    }
-                });
-
-                bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, Some(tx), self.cancel)
-            })
-        } else {
-            bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, None, self.cancel)
-        }
-        .map_err(Into::into)
+        bb_flasher_bcf::cc1352p7::flash(&img, &port, verify, chan, self.cancel).map_err(Into::into)
     }
 }

@@ -44,31 +44,7 @@ pub enum Error {
 /// Result type for flashing.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Enum to denote the Flashing progress.
-///
-/// The progress is denoted by [f32] between 0 and 1
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum DownloadFlashingStatus {
-    /// Preparing for flashing.
-    Preparing,
-    /// Writing the image to the destination.
-    Writing(f32),
-    /// Verifying the written image.
-    Verifying,
-    /// Applying post-install customization.
-    Customizing,
-}
-
-impl From<bb_helper::status::Status> for DownloadFlashingStatus {
-    fn from(value: bb_helper::status::Status) -> Self {
-        match value {
-            bb_helper::status::Status::Preparing => Self::Preparing,
-            bb_helper::status::Status::Writing(x) => Self::Writing(x),
-            bb_helper::status::Status::Verifying => Self::Verifying,
-            bb_helper::status::Status::Customizing => Self::Customizing,
-        }
-    }
-}
+pub use bb_helper::status::Status as DownloadFlashingStatus;
 
 /// A trait for modeling flasher targets.
 ///

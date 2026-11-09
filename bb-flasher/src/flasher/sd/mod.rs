@@ -282,28 +282,12 @@ where
         }
         .into_iter();
 
-        let tx = match chan {
-            Some(chan) => {
-                let (tx, rx) = std::sync::mpsc::sync_channel::<bb_flasher_sd::Status>(2);
-                std::thread::spawn(move || {
-                    // Should run until tx is dropped, i.e. flasher task is done.
-                    // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                    while let Ok(x) = rx.recv() {
-                        let _ = chan.try_send(x.into());
-                    }
-                });
-
-                Some(tx)
-            }
-            None => None,
-        };
-
         bb_flasher_sd::flashing::Flasher::new(
             self.img,
             self.bootfs,
             self.bmap,
             customization,
-            tx,
+            chan,
             cancel,
         )
         .flash(self.dst, self.resize)

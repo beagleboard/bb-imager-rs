@@ -132,33 +132,15 @@ where
         self,
         chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     ) -> crate::Result<()> {
-        std::thread::scope(|s| {
-            let c = if let Some(c) = chan {
-                let (tx, rx) = mpsc::sync_channel::<bb_flasher_dfu::Status>(2);
-
-                s.spawn(move || {
-                    // Should run until tx is dropped, i.e. flasher task is done.
-                    // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
-                    while let Ok(x) = rx.recv() {
-                        let _ = c.try_send(x.into());
-                    }
-                });
-
-                Some(tx)
-            } else {
-                None
-            };
-
-            bb_flasher_dfu::flash(
-                self.imgs,
-                self.vendor_id,
-                self.product_id,
-                self.bus_num,
-                self.port_num,
-                c,
-                self.cancel,
-            )
-            .map_err(Into::into)
-        })
+        bb_flasher_dfu::flash(
+            self.imgs,
+            self.vendor_id,
+            self.product_id,
+            self.bus_num,
+            self.port_num,
+            chan,
+            self.cancel,
+        )
+        .map_err(Into::into)
     }
 }
