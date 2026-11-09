@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use bb_helper::cancel::CancellationToken;
+use bb_helper::{cancel::CancellationToken, status::send as chan_send};
 
 use crate::{Status, bsl::Mspm0};
 
@@ -73,17 +73,11 @@ pub(crate) fn check_token(cancel: Option<&CancellationToken>) -> crate::Result<(
     }
 }
 
-pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<Status>>, msg: Status) {
-    if let Some(c) = chan {
-        let _ = c.try_send(msg);
-    }
-}
-
 pub fn flash<P, D, B>(
     firmware: &[u8],
     port_open: P,
     verify: bool,
-    mut chan: Option<mpsc::SyncSender<Status>>,
+    chan: Option<mpsc::SyncSender<Status>>,
     cancel: Option<CancellationToken>,
     prep_hook: B,
 ) -> crate::Result<()>
@@ -92,7 +86,7 @@ where
     D: std::io::Read + std::io::Write,
     B: FnOnce() -> crate::Result<()>,
 {
-    chan_send(chan.as_mut(), Status::Preparing);
+    chan_send(chan.as_ref(), Status::Preparing);
 
     prep_hook()?;
 
@@ -117,7 +111,7 @@ where
         }
     }
 
-    chan_send(chan.as_mut(), Status::Writing(0.0));
+    chan_send(chan.as_ref(), Status::Writing(0.0));
     check_token(cancel.as_ref())?;
     mspm0.mass_erase()?;
 
@@ -131,17 +125,17 @@ where
         .unwrap()
     {
         chan_send(
-            chan.as_mut(),
+            chan.as_ref(),
             Status::Writing(addr as f32 / firmware.max_addr() as f32),
         );
         mspm0.program_data(addr as u32, &data)?;
         tracing::debug!("Cur address: {}", addr);
     }
 
-    chan_send(chan.as_mut(), Status::Writing(1.0));
+    chan_send(chan.as_ref(), Status::Writing(1.0));
 
     if verify {
-        chan_send(chan.as_mut(), Status::Verifying);
+        chan_send(chan.as_ref(), Status::Verifying);
         let cur_crc = mspm0.standalone_verification(firmware.max_addr().try_into().unwrap())?;
         if cur_crc != firmware.crc() {
             tracing::error!("Invalid CRC32 in Flash. The flashed image might be corrupted");

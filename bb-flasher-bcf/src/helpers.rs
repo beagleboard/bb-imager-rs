@@ -1,13 +1,3 @@
-use std::sync::mpsc;
-
-use crate::Status;
-
-pub(crate) fn chan_send(chan: Option<&mpsc::SyncSender<Status>>, msg: Status) {
-    if let Some(c) = chan {
-        let _ = c.try_send(msg);
-    }
-}
-
 pub(crate) fn parse_bin(data: &[u8]) -> Result<bin_file::BinFile, bin_file::Error> {
     const THRESHOLD: usize = 20;
 

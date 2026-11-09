@@ -15,10 +15,9 @@ use std::{ffi::CString, time::Duration};
 use std::sync::mpsc;
 use thiserror::Error;
 
-use crate::{
-    Status,
-    helpers::{chan_send, parse_bin},
-};
+use bb_helper::status::send as chan_send;
+
+use crate::{Status, helpers::parse_bin};
 
 const VID: u16 = 0x2047;
 const PID: u16 = 0x0200;

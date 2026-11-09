@@ -1,13 +1,6 @@
 use std::io::{self, Write};
 
 use bb_helper::cancel::CancellationToken;
-use std::sync::mpsc;
-
-pub(crate) fn chan_send(chan: Option<&mut mpsc::SyncSender<crate::Status>>, msg: crate::Status) {
-    if let Some(c) = chan {
-        let _ = c.try_send(msg);
-    }
-}
 
 pub(crate) const fn progress(pos: u64, img_size: u64) -> f32 {
     pos as f32 / img_size as f32
