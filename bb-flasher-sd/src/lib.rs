@@ -34,16 +34,7 @@ pub use customization::{ContentType, Customization, ParitionType};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Flashing status
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Status {
-    /// Opening the destination and resolving the image.
-    Preparing,
-    /// The image is being written. Progress is in `0.0..=1.0`.
-    Flashing(f32),
-    /// Applying bootfs updates, customization and resize after the write.
-    Customizing,
-}
+pub use bb_helper::status::Status;
 
 #[derive(Error, Debug)]
 /// Errors for this crate

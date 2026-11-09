@@ -63,7 +63,7 @@ fn flash_applies_customization_through_public_api() {
     assert!(
         statuses[..customizing]
             .iter()
-            .all(|x| matches!(x, Status::Preparing | Status::Flashing(_))),
+            .all(|x| matches!(x, Status::Preparing | Status::Writing(_))),
         "unexpected status order: {statuses:?}"
     );
 
