@@ -1,6 +1,6 @@
 [package]
 name = "bb-helper"
-version = "0.1.0"
+version = "0.1.1"
 description = "Small helper utilities shared across the BeagleBoard.org imaging tools"
 edition.workspace = true
 authors.workspace = true
@@ -21,6 +21,7 @@ tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 file_stream = ["tokio/fs", "tokio/io-util", "dep:tempfile"]
 reader_progress = []
 cancel = []
+status = []
 
 [package.metadata.docs.rs]
 all-features = true
