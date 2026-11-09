@@ -13,7 +13,7 @@ On Linux, `bsl_gpio_cdev_by_name` returns a prep hook that puts MSPM0 into BSL m
 
 ```toml
 [dependencies]
-bb-flasher-mspm0 = "0.1"
+bb-flasher-mspm0 = "0.2"
 ```
 
 ```rust,no_run
@@ -29,8 +29,9 @@ std::thread::spawn(move || {
     for status in rx {
         match status {
             Status::Preparing => println!("Preparing"),
-            Status::Flashing(p) => println!("Flashing: {:.0}%", p * 100.0),
+            Status::Writing(p) => println!("Writing: {:.0}%", p * 100.0),
             Status::Verifying => println!("Verifying"),
+            Status::Customizing => {}
         }
     }
 });

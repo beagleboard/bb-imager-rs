@@ -86,16 +86,7 @@ pub enum Error {
     ChangeBaudRate,
 }
 
-/// Flashing status
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Status {
-    /// Preparing the device for flashing.
-    Preparing,
-    /// Firmware is being written. Progress is in `0.0..=1.0`.
-    Flashing(f32),
-    /// Verifying the flashed firmware.
-    Verifying,
-}
+pub use bb_helper::status::Status;
 
 /// Returns a `prep_hook` that puts MSPM0 into BSL mode using GPIO lines found by name.
 ///
