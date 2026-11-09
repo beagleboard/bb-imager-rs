@@ -6,7 +6,7 @@ A library to flash MSPM0 co-processor in [PocketBeagle 2](https://www.beagleboar
 
 ```toml
 [dependencies]
-bb-flasher-pb2-mspm0 = "0.1"
+bb-flasher-pb2-mspm0 = "0.2"
 ```
 
 ```rust,no_run
@@ -24,8 +24,9 @@ std::thread::spawn(move || {
     for status in rx {
         match status {
             Status::Preparing => println!("Preparing"),
-            Status::Flashing(p) => println!("Flashing: {:.0}%", p * 100.0),
+            Status::Writing(p) => println!("Writing: {:.0}%", p * 100.0),
             Status::Verifying => println!("Verifying"),
+            Status::Customizing => {}
         }
     }
 });

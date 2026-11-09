@@ -225,7 +225,7 @@ fn flash_fw_api(base: &Path, firmware: &[u8], chan: &mpsc::SyncSender<Status>) -
                     })?;
 
                 if let Ok(p) = prog.trim().parse::<usize>() {
-                    let _ = chan.try_send(Status::Flashing(upload_progress(firmware.len(), p)));
+                    let _ = chan.try_send(Status::Writing(upload_progress(firmware.len(), p)));
                 }
             }
             "programming" => {
@@ -287,16 +287,7 @@ pub fn device() -> Device {
     }
 }
 
-/// Flashing status
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Status {
-    /// Driver is preparing for the firmware upload.
-    Preparing,
-    /// Firmware is being transferred. Progress is in `0.0..=1.0`.
-    Flashing(f32),
-    /// Driver is programming and verifying the firmware.
-    Verifying,
-}
+pub use bb_helper::status::Status;
 
 /// PocketBeagle 2 MSPM0 information.
 #[derive(Debug, Clone, PartialEq, Eq)]
