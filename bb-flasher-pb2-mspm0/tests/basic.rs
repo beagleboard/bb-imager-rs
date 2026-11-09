@@ -5,9 +5,7 @@
 //! against a temp-dir fixture. Covered here: the oversize-firmware guard
 //! (which returns before touching sysfs) and the pure `device()` accessor.
 
-use std::sync::mpsc;
-
-use bb_flasher_pb2_mspm0::{Error, Status, device, flash};
+use bb_flasher_pb2_mspm0::{Error, device, flash};
 
 #[test]
 fn flash_rejects_oversize_firmware() {
@@ -15,9 +13,7 @@ fn flash_rejects_oversize_firmware() {
     // before any sysfs/EEPROM access, so this is safe to run without hardware.
     let flash_size = device().flash_size;
     let firmware = vec![0u8; flash_size + 1];
-    let (tx, _rx) = mpsc::sync_channel::<Status>(1);
-
-    let result = flash(&firmware, tx, false);
+    let result = flash(&firmware, None, false);
     assert!(
         matches!(result, Err(Error::InvalidFirmware)),
         "expected InvalidFirmware, got {result:?}"

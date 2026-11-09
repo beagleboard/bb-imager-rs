@@ -14,21 +14,23 @@ pub(crate) fn flash(
     chan: Option<mpsc::SyncSender<DownloadFlashingStatus>>,
     persist_eeprom: bool,
 ) -> Result<(), Error> {
-    std::thread::scope(|s| {
-        let d = bb_flasher_pb2_mspm0::device();
-        let firmware = img
-            .to_bytes(0..d.flash_size, None)
-            .map_err(|_| Error::InvalidFirmware)?;
+    let d = bb_flasher_pb2_mspm0::device();
+    let firmware = img
+        .to_bytes(0..d.flash_size, None)
+        .map_err(|_| Error::InvalidFirmware)?;
 
-        let (tx, rx) = mpsc::sync_channel::<bb_flasher_pb2_mspm0::Status>(2);
-        if let Some(chan) = chan {
+    if let Some(chan) = chan {
+        std::thread::scope(|s| {
+            let (tx, rx) = mpsc::sync_channel::<bb_flasher_pb2_mspm0::Status>(2);
             s.spawn(move || {
-                while let Ok(s) = rx.recv() {
-                    let _ = chan.try_send(s.into());
+                while let Ok(x) = rx.recv() {
+                    let _ = chan.try_send(x.into());
                 }
             });
-        }
 
-        bb_flasher_pb2_mspm0::flash(&firmware, tx, persist_eeprom)
-    })
+            bb_flasher_pb2_mspm0::flash(&firmware, Some(tx), persist_eeprom)
+        })
+    } else {
+        bb_flasher_pb2_mspm0::flash(&firmware, None, persist_eeprom)
+    }
 }
