@@ -1,6 +1,6 @@
 [package]
 name = "bb-flasher-pb2-mspm0"
-version = "0.1.1"
+version = "0.2.0"
 description = "A library to flash MSPM0 co-processor in PocketBeagle 2"
 edition.workspace = true
 authors.workspace = true
@@ -11,6 +11,7 @@ keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
 categories = ["embedded", "hardware-support", "os::linux-apis"]
 
 [dependencies]
+bb-helper = { version = "0.1.1", path = "../bb-helper", features = ["status"] }
 thiserror = "2.0"
 
 [dev-dependencies]

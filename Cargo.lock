@@ -600,8 +600,9 @@ dependencies = [
 
 [[package]]
 name = "bb-flasher-pb2-mspm0"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
+ "bb-helper",
  "tempfile",
  "thiserror 2.0.21",
 ]
