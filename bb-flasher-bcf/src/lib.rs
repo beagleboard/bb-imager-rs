@@ -11,9 +11,4 @@ pub(crate) mod helpers;
 #[cfg(feature = "msp430")]
 pub mod msp430;
 
-/// Flashing status
-pub enum Status {
-    Preparing,
-    Flashing(f32),
-    Verifying,
-}
+pub use bb_helper::status::Status;

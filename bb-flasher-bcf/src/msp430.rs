@@ -240,7 +240,7 @@ pub fn flash(
 
     std::thread::sleep(Duration::from_secs(1));
 
-    chan_send(chan.as_ref(), Status::Flashing(0.5));
+    chan_send(chan.as_ref(), Status::Writing(0.5));
 
     let msp430 = MSP430(open_hidraw(dst)?);
 

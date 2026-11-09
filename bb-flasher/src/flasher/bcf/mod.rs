@@ -9,13 +9,3 @@
 pub mod cc1352p7;
 #[cfg(feature = "bcf_msp430")]
 pub mod msp430;
-
-impl From<bb_flasher_bcf::Status> for crate::common::DownloadFlashingStatus {
-    fn from(value: bb_flasher_bcf::Status) -> Self {
-        match value {
-            bb_flasher_bcf::Status::Preparing => Self::Preparing,
-            bb_flasher_bcf::Status::Flashing(x) => Self::Writing(x),
-            bb_flasher_bcf::Status::Verifying => Self::Verifying,
-        }
-    }
-}

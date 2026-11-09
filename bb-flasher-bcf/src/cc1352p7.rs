@@ -318,7 +318,7 @@ pub fn flash(
     info!("BeagleConnectFreedom Connected");
 
     check_token(cancel.as_ref())?;
-    chan_send(chan.as_ref(), Status::Flashing(0.0));
+    chan_send(chan.as_ref(), Status::Writing(0.0));
 
     let img_crc32 = crc32fast::hash(
         &firmware_bin
@@ -349,7 +349,7 @@ pub fn flash(
 
             chan_send(
                 chan.as_ref(),
-                Status::Flashing(progress(start_address + offset)),
+                Status::Writing(progress(start_address + offset)),
             );
             check_token(cancel.as_ref())?;
         }
