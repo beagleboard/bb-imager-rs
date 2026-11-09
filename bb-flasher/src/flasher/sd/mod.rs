@@ -250,10 +250,6 @@ impl<I, B, T> Flasher<I, B, T> {
             resize: false,
         }
     }
-
-    const fn is_file_dest(&self) -> bool {
-        matches!(self.dst, bb_flasher_sd::Destination::File(_))
-    }
 }
 
 impl<I, B, T> Flasher<I, B, T>
@@ -269,7 +265,6 @@ where
         chan: Option<std::sync::mpsc::SyncSender<DownloadFlashingStatus>>,
         cancel: Option<CancellationToken>,
     ) -> crate::Result<()> {
-        let is_file_dest = self.is_file_dest();
         let customization = if self.customization.0.is_empty() {
             vec![]
         } else {
@@ -296,11 +291,8 @@ where
                     while let Ok(x) = rx.recv() {
                         let _ = chan.try_send(match x {
                             bb_flasher_sd::Status::Preparing => DownloadFlashingStatus::Preparing,
-                            bb_flasher_sd::Status::Flashing(x) if is_file_dest => {
-                                DownloadFlashingStatus::DownloadingProgress(x)
-                            }
                             bb_flasher_sd::Status::Flashing(x) => {
-                                DownloadFlashingStatus::FlashingProgress(x)
+                                DownloadFlashingStatus::Writing(x)
                             }
                             bb_flasher_sd::Status::Customizing => {
                                 DownloadFlashingStatus::Customizing

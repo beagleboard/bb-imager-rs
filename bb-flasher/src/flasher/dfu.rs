@@ -140,7 +140,7 @@ where
                     // Should run until tx is dropped, i.e. flasher task is done.
                     // If it is aborted, then cancel should be dropped, thereby signaling the flasher task to abort
                     while let Ok(x) = rx.recv() {
-                        let _ = c.try_send(DownloadFlashingStatus::FlashingProgress(x));
+                        let _ = c.try_send(DownloadFlashingStatus::Writing(x));
                     }
                 });
 

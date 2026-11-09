@@ -623,8 +623,7 @@ impl FlashingState {
     pub(crate) fn progress_update(&mut self, id: usize, u: bb_flasher::DownloadFlashingStatus) {
         // Required for better time estimate.
         match u {
-            bb_flasher::DownloadFlashingStatus::DownloadingProgress(_)
-            | bb_flasher::DownloadFlashingStatus::FlashingProgress(_)
+            bb_flasher::DownloadFlashingStatus::Writing(_)
                 if self.state.start_timestamp.is_none() =>
             {
                 self.state.start_timestamp = Some(Instant::now())
@@ -644,8 +643,7 @@ const fn progress_from(
 
     match value {
         bb_flasher::DownloadFlashingStatus::Preparing => Progress::Preparing,
-        bb_flasher::DownloadFlashingStatus::DownloadingProgress(x)
-        | bb_flasher::DownloadFlashingStatus::FlashingProgress(x) => Progress::Writing(x),
+        bb_flasher::DownloadFlashingStatus::Writing(x) => Progress::Writing(x),
         bb_flasher::DownloadFlashingStatus::Verifying => Progress::Verifying,
         bb_flasher::DownloadFlashingStatus::Customizing => Progress::Customizing,
     }
