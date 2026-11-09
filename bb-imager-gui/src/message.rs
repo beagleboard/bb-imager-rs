@@ -418,8 +418,6 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         {
             let mut msg = "Flashing failed";
 
-            let logs = iced::widget::text_editor::Content::with_text(&logs);
-
             let page = state.active_mut();
             *page = match std::mem::take(page) {
                 BBImager::Flashing(inner) => {
@@ -428,43 +426,33 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     }
 
                     BBImager::FlashingFail(crate::state::FlashingFailState::new(
-                        inner, failures, logs,
+                        inner, failures, &logs,
                     ))
                 }
                 _ => unreachable!(),
             };
 
-            // Under App Options the fail page is not on screen; leave that page's scroll alone.
-            let scroll = if matches!(state, BBImager::AppInfo(_)) {
-                Task::none()
-            } else {
-                state.scroll_reset()
-            };
-
-            return Task::batch([show_notification(msg.to_string()), scroll]);
+            return Task::batch([
+                show_notification(msg.to_string()),
+                state.scroll_reset_unless_overlay(),
+            ]);
         }
         #[cfg(feature = "sd")]
         BBImagerMessage::FormatFail { failures, logs }
             if matches!(state.active(), BBImager::FormatMediaProgress(_)) =>
         {
-            let logs = iced::widget::text_editor::Content::with_text(&logs);
-
             let page = state.active_mut();
             *page = match std::mem::take(page) {
                 BBImager::FormatMediaProgress(inner) => {
-                    BBImager::FormatMediaFail(FormatMediaFailState::new(inner, failures, logs))
+                    BBImager::FormatMediaFail(FormatMediaFailState::new(inner, failures, &logs))
                 }
                 _ => unreachable!(),
             };
 
-            // Under App Options the fail page is not on screen; leave that page's scroll alone.
-            let scroll = if matches!(state, BBImager::AppInfo(_)) {
-                Task::none()
-            } else {
-                state.scroll_reset()
-            };
-
-            return Task::batch([show_notification("Formatting failed".to_string()), scroll]);
+            return Task::batch([
+                show_notification("Formatting failed".to_string()),
+                state.scroll_reset_unless_overlay(),
+            ]);
         }
         BBImagerMessage::FlashProgress(i, x) => {
             // The relay doesn't wait for the last update before reporting the result, so

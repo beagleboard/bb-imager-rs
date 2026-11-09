@@ -505,6 +505,15 @@ impl BBImager {
         )
     }
 
+    /// [`Self::scroll_reset`], except under App Options, where the page beneath is not on screen.
+    fn scroll_reset_unless_overlay(&self) -> Task<BBImagerMessage> {
+        if matches!(self, Self::AppInfo(_)) {
+            Task::none()
+        } else {
+            self.scroll_reset()
+        }
+    }
+
     fn next(&mut self) -> Task<BBImagerMessage> {
         let (state, task) = match std::mem::take(self) {
             Self::ChooseBoard(inner) => {
