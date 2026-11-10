@@ -121,32 +121,6 @@ fn sysfs_w_open(path: &Path) -> io::Result<File> {
         .open(path)
 }
 
-/// Check if the proper fw upload entries are present
-pub fn check() -> Result<()> {
-    const FW_ENTRIES: &[&str] = &["loading", "status", "remaining_size"];
-
-    let fw_dir = Path::new(PATH);
-
-    for file in FW_ENTRIES {
-        check_file(file, &fw_dir.join(file))?;
-    }
-
-    Ok(())
-}
-
-fn check_file(fname: &'static str, path: &Path) -> Result<()> {
-    let temp = std::fs::exists(path).map_err(|source| Error::FailedToOpen { source, fname })?;
-
-    if temp {
-        Ok(())
-    } else {
-        Err(Error::FailedToOpen {
-            fname,
-            source: io::Error::new(io::ErrorKind::NotFound, "sysfs file not found"),
-        })
-    }
-}
-
 fn flash_fw_api(
     base: &Path,
     firmware: &[u8],
