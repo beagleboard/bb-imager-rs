@@ -118,9 +118,6 @@ fn builder_missing_field_matrix() {
             "missing {label} should yield {expected:?}, got {err:?}",
         );
     }
-    // NOTE: `BmapBuilderError::NoBlockRanges` is defined but never produced by
-    // `build()` (it does not validate that the block map is non-empty), so it
-    // cannot be exercised through the public API.
 }
 
 fn minimal_xml(checksum_type: &str, chksum: &str, range: &str) -> String {
@@ -156,7 +153,7 @@ fn from_xml_single_block_range() {
 #[test]
 fn from_xml_rejects_malformed_xml() {
     let err = Bmap::from_xml("this is not xml <<<").expect_err("garbage input");
-    assert!(matches!(err, XmlError::XmlParsError(_)), "got {err:?}");
+    assert!(matches!(err, XmlError::XmlParseError(_)), "got {err:?}");
 }
 
 #[test]
@@ -180,9 +177,8 @@ fn from_xml_rejects_non_hex_checksum() {
 fn from_xml_rejects_unknown_checksum_type() {
     let xml = minimal_xml("md5", VALID_SHA, "0");
     let err = Bmap::from_xml(&xml).expect_err("unknown checksum type");
-    // The unknown type fails during deserialization, so it surfaces as a parse
-    // error rather than `XmlError::UnknownChecksumType` (which is unused).
-    assert!(matches!(err, XmlError::XmlParsError(_)), "got {err:?}");
+    // The unknown type fails during deserialization, so it surfaces as a parse error.
+    assert!(matches!(err, XmlError::XmlParseError(_)), "got {err:?}");
 }
 
 #[test]
@@ -190,7 +186,7 @@ fn from_xml_rejects_unparsable_range() {
     // An empty element has no text at all and fails deserialization instead.
     let xml = minimal_xml("sha256", VALID_SHA, "");
     let err = Bmap::from_xml(&xml).expect_err("empty range");
-    assert!(matches!(err, XmlError::XmlParsError(_)), "got {err:?}");
+    assert!(matches!(err, XmlError::XmlParseError(_)), "got {err:?}");
 
     for range in ["1a", "0-", "-1"] {
         let xml = minimal_xml("sha256", VALID_SHA, range);
