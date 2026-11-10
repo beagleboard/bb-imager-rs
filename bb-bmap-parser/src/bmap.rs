@@ -111,8 +111,6 @@ pub enum BmapBuilderError {
     MissingMappedBlocks,
     #[error("Checksum type missing")]
     MissingChecksumType,
-    #[error("No block ranges")]
-    NoBlockRanges,
 }
 
 #[derive(Clone, Debug, Default)]

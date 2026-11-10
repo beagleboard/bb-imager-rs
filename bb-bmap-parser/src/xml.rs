@@ -72,11 +72,9 @@ struct Bmap {
 #[non_exhaustive]
 pub enum XmlError {
     #[error("Failed to parse bmap XML: {0}")]
-    XmlParsError(#[from] DeError),
+    XmlParseError(#[from] DeError),
     #[error("Invalid bmap file: {0}")]
-    InvalidFIleError(#[from] BmapBuilderError),
-    #[error("Unknown checksum type: {0}")]
-    UnknownChecksumType(String),
+    InvalidFileError(#[from] BmapBuilderError),
     #[error("Invalid checksum: {0}")]
     InvalidChecksum(String),
     #[error("Invalid block size: {0}")]
