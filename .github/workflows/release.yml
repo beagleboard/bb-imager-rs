@@ -200,7 +200,7 @@ jobs:
       with:
         lfs: true
 
-    - uses: microsoft/setup-WinAppCli@v0.2
+    - uses: microsoft/setup-WinAppCli@v0.3
 
     - name: Setup rust toolchain
       run: |
