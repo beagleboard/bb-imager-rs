@@ -54,7 +54,7 @@ where
     tracing::info!("Starting bootfs update");
     let mut sd = crate::helpers::DeviceWrapper::new(sd)?;
     let customization = crate::Customization {
-        partition: crate::ParitionType::Boot,
+        partition: crate::PartitionType::Boot,
         content: imgs,
     };
 
@@ -90,7 +90,7 @@ mod test {
         internal((&archive).into_iter(), &mut sd, None).unwrap();
         sd.rewind().unwrap();
 
-        let boot_part = crate::customization::ParitionType::Boot.open(sd).unwrap();
+        let boot_part = crate::customization::PartitionType::Boot.open(sd).unwrap();
         let root = boot_part.root_dir();
 
         let mut checked = 0;

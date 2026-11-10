@@ -76,8 +76,6 @@ fn writer_task_bmap(
             }
 
             pos += count as u64;
-            // Clippy warning is simply wrong here
-            #[allow(clippy::option_map_or_none)]
             chan_send(
                 chan.as_ref(),
                 Status::Writing(progress(bytes_written, img_size)),
@@ -115,8 +113,6 @@ fn writer_task(
         sd.write_all(&buf.as_slice()[..count])?;
 
         pos += count as u64;
-        // Clippy warning is simply wrong here
-        #[allow(clippy::option_map_or_none)]
         chan_send(chan.as_ref(), Status::Writing(progress(pos, img_size)));
 
         let _ = buf_tx.send(buf);
@@ -169,8 +165,8 @@ fn write_sd(
     }
 
     std::thread::scope(|s| {
-        let cancle_clone = cancel.clone();
-        let handle = s.spawn(move || reader_task(img, rx1, tx2, cancle_clone));
+        let cancel_clone = cancel.clone();
+        let handle = s.spawn(move || reader_task(img, rx1, tx2, cancel_clone));
 
         match bmap {
             Some(x) => writer_task_bmap(x, sd, chan, rx2, tx1, cancel),
@@ -261,7 +257,7 @@ where
                         .into_iter()
                         .find(|x| *x.raw == *path)
                         .and_then(|x| x.size)
-                        .ok_or(crate::Error::InvalidDestionation)?;
+                        .ok_or(crate::Error::InvalidDestination)?;
 
                     Some(temp)
                 } else {

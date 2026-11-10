@@ -276,7 +276,7 @@ where
                 (p, d.map_or(ContentType::Dir, ContentType::DataAppend))
             });
             vec![bb_flasher_sd::Customization {
-                partition: bb_flasher_sd::ParitionType::Boot,
+                partition: bb_flasher_sd::PartitionType::Boot,
                 content,
             }]
         }

@@ -12,7 +12,7 @@ use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 
 use bb_flasher_sd::mock_sd::{MockArchive, MockContent, MockSd};
-use bb_flasher_sd::{ContentType, Customization, Destination, ParitionType};
+use bb_flasher_sd::{ContentType, Customization, Destination, PartitionType};
 
 const DIR: &str = "bootfs_dir";
 const READER_PATH: &str = "bootfs_dir/reader.txt";
@@ -125,7 +125,7 @@ fn flash_applies_bootfs_before_customizations() {
         Some(move || Ok(archive)),
         no_bmap(),
         std::iter::once(Customization {
-            partition: ParitionType::Boot,
+            partition: PartitionType::Boot,
             content,
         }),
         None,

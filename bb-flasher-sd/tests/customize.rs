@@ -11,7 +11,7 @@ use std::io::{Cursor, Read, Seek, Write};
 
 use bb_flasher_sd::flashing::NO_BOOTFS;
 use bb_flasher_sd::mock_sd::{MockArchive, MockContent, MockSd};
-use bb_flasher_sd::{ContentType, Customization, Destination, ParitionType, Status};
+use bb_flasher_sd::{ContentType, Customization, Destination, PartitionType, Status};
 use tempfile::NamedTempFile;
 
 #[test]
@@ -36,7 +36,7 @@ fn flash_applies_customization_through_public_api() {
         .into_iter()
         .map(|(name, data): (Box<str>, Box<[u8]>)| (name, ContentType::DataAppend(data)));
     let customization = Customization {
-        partition: ParitionType::Boot,
+        partition: PartitionType::Boot,
         content,
     };
 
@@ -94,7 +94,7 @@ fn flash_applies_customization_to_gpt_image() {
         .into_iter()
         .map(|(name, data): (Box<str>, Box<[u8]>)| (name, ContentType::DataAppend(data)));
     let customization = Customization {
-        partition: ParitionType::Boot,
+        partition: PartitionType::Boot,
         content,
     };
 
