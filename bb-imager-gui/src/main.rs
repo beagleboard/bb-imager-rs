@@ -406,7 +406,7 @@ impl BBImager {
             },
             |x| match x {
                 Ok(_) => {
-                    tracing::info!("Formatting Successfull");
+                    tracing::info!("Formatting Successful");
                     BBImagerMessage::FlashSuccess
                 }
                 Err((failures, logs)) => BBImagerMessage::FormatFail {
@@ -465,7 +465,7 @@ impl BBImager {
             .await;
 
             let res = if failures.is_empty() {
-                tracing::info!("Flashing Successfull");
+                tracing::info!("Flashing Successful");
                 BBImagerMessage::FlashSuccess
             } else {
                 BBImagerMessage::FlashFail {
@@ -520,7 +520,7 @@ impl BBImager {
                 let selected_board = inner
                     .state
                     .selected
-                    .expect("Board should alread have been selected");
+                    .expect("Board should already have been selected");
                 let board_id = selected_board.id;
 
                 let temp = state::ChooseOsState::new(inner.common, selected_board.into());

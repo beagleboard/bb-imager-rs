@@ -13,7 +13,7 @@ pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
     env!("CARGO_PKG_VERSION")
 };
 pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
-pub(crate) const APP_LINCESE: &str = include_str!("../../LICENSE");
+pub(crate) const APP_LICENSE: &str = include_str!("../../LICENSE");
 
 pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
     "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",

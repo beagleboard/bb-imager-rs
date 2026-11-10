@@ -118,12 +118,6 @@ impl ChooseBoardState {
     }
 }
 
-impl From<ChooseOsState> for ChooseBoardState {
-    fn from(value: ChooseOsState) -> Self {
-        Self::new(value.common)
-    }
-}
-
 impl From<Board> for bb_imager_ui::board_selection::BoardDetails {
     fn from(value: Board) -> Self {
         let mut btns = Vec::with_capacity(2);
@@ -744,7 +738,7 @@ impl OverlayState {
     /// `page` must come from [`BBImager::into_overlay_base`].
     pub(crate) fn new(page: BBImager) -> Self {
         let log_path = helpers::log_file_path().to_string_lossy().to_string();
-        let license = widget::text_editor::Content::with_text(constants::APP_LINCESE);
+        let license = widget::text_editor::Content::with_text(constants::APP_LICENSE);
         let cache_dir = helpers::project_dirs()
             .unwrap()
             .cache_dir()

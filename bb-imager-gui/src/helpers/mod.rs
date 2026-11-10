@@ -370,7 +370,7 @@ fn flash_inner(
                 bmap.map(|x| x.into_fn()),
                 t,
                 customization.sd_customization(),
-                // TODO: Impl proerly
+                // TODO: Impl properly
                 false,
             )
             .flash(Some(chan), Some(cancel_sync))
