@@ -254,15 +254,15 @@ impl BSLProgramDataReqHeadPkt {
 
 #[derive(IntoBytes, Immutable)]
 #[repr(C, packed)]
-struct BSLChageBaudRatePkt {
+struct BSLChangeBaudRatePkt {
     head: BSLPktHead,
     rate: u8,
     tail: BSLPktCrc32,
 }
 
-impl BSLMsg for BSLChageBaudRatePkt {}
+impl BSLMsg for BSLChangeBaudRatePkt {}
 
-impl BSLChageBaudRatePkt {
+impl BSLChangeBaudRatePkt {
     fn new(rate: u8) -> Self {
         let mut crc = crc32fast::Hasher::new();
 
@@ -300,7 +300,7 @@ where
 
         tracing::info!("Switching to faster baud rate");
 
-        BSLChageBaudRatePkt::new(BSL_UPDATED_BAUD_RATE_ID).write_to_io(&mut self.port)?;
+        BSLChangeBaudRatePkt::new(BSL_UPDATED_BAUD_RATE_ID).write_to_io(&mut self.port)?;
         Self::wait_for_ack_inner(&mut self.port)?;
 
         self.port
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn bsl_change_req_test() {
-        let cmd = BSLChageBaudRatePkt::new(3);
+        let cmd = BSLChangeBaudRatePkt::new(3);
         assert_eq!(
             cmd.as_bytes(),
             &[0x80, 0x02, 0, 0x52, 0x03, 0x6C, 0x83, 0xA2, 0xAF]
