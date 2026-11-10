@@ -10,11 +10,11 @@ const GPT_BIOS_ATTR: u64 = 1 << 2;
 const SECTOR_SIZE: u32 = 512;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ParitionType {
+pub enum PartitionType {
     Boot,
 }
 
-impl ParitionType {
+impl PartitionType {
     pub(crate) fn open<T>(&self, dst: T) -> Result<FileSystem<BufStream<StreamSlice<T>>>>
     where
         T: Write + Seek + Read,
@@ -123,7 +123,7 @@ impl<'a> From<Box<std::path::Path>> for ContentType<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Customization<I> {
-    pub partition: ParitionType,
+    pub partition: PartitionType,
     pub content: I,
 }
 
@@ -295,7 +295,7 @@ mod tests {
 
         // Only the table is resized, so the filesystem is still readable.
         sd.rewind().unwrap();
-        ParitionType::Boot.open(&mut sd).unwrap();
+        PartitionType::Boot.open(&mut sd).unwrap();
     }
 
     /// Flashed onto a card exactly as big as the image: there is nothing to grow
@@ -415,7 +415,7 @@ mod tests {
 
         // Only the table is resized, so the filesystem is still readable.
         sd.rewind().unwrap();
-        ParitionType::Boot.open(&mut sd).unwrap();
+        PartitionType::Boot.open(&mut sd).unwrap();
     }
 
     /// The usable area is bounded by the backup header, which sits in the last
