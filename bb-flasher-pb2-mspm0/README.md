@@ -12,12 +12,9 @@ bb-flasher-pb2-mspm0 = "0.2"
 ```rust,no_run
 use std::sync::mpsc;
 
-use bb_flasher_pb2_mspm0::{Status, check, flash};
+use bb_flasher_pb2_mspm0::{Status, flash};
 
 let firmware = std::fs::read("firmware.bin").unwrap();
-
-// Ensure the firmware upload sysfs entries are present.
-check().unwrap();
 
 let (tx, rx) = mpsc::sync_channel(8);
 std::thread::spawn(move || {
