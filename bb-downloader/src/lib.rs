@@ -34,8 +34,8 @@ pub use reqwest::IntoUrl;
 ///
 /// # Invalidate Cache
 ///
-/// Using SHA256 should be prefered when it is known in advance since it allows performing SHA256
-/// verficiation on the downloaded file. Additionally, it also adds capability to invalidate cached
+/// Using SHA256 should be preferred when it is known in advance since it allows performing SHA256
+/// verification on the downloaded file. Additionally, it also adds capability to invalidate cached
 /// file.
 ///
 /// Files downloaded with just URL cannot be invalidated without changing the URL, or deleting the
@@ -119,7 +119,7 @@ impl Downloader {
     /// Checks if the file is present in cache. If the file is present, returns path to it. Else
     /// downloads the file.
     ///
-    /// [`download_with_sha`](Self::download_with_sha) should be prefered when the SHA256 of the
+    /// [`download_with_sha`](Self::download_with_sha) should be preferred when the SHA256 of the
     /// file is known in advance.
     ///
     /// # Errors
@@ -213,7 +213,7 @@ impl Downloader {
             file.flush().await?;
         }
 
-        tracing::info!("Saving donwloaded file to disk");
+        tracing::info!("Saving downloaded file to disk");
         writer.persist(&file_path).await
     }
 
