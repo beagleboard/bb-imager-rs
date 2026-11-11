@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 iced = { version = "0.14.0", features = ["tokio"] }
-rfd = { version = "0.17.2", features = ["file-handle-inner"] }
+rfd = { version = "0.18.0", features = ["file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher", features = ["piped_image"], version = "0.2" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
