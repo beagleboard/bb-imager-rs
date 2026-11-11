@@ -314,3 +314,28 @@ jobs:
           git add .SRCINFO PKGBUILD
           git commit -m "Update to $VERSION"
           git push
+
+  publish-crates:
+    name: Publish crates
+    runs-on: ubuntu-latest
+    needs:
+      - release
+    if: github.ref_type == 'tag'
+    environment: release  # Optional: for enhanced security
+    permissions:
+      id-token: write     # Required for OIDC token exchange
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        lfs: true
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Install cargo-release
+      uses: taiki-e/install-action@v1
+      with:
+        tool: cargo-release
+    - uses: rust-lang/crates-io-auth-action@v1
+      id: auth
+    - run: cargo release publish --workspace --execute
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
