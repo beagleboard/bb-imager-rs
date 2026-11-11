@@ -319,15 +319,6 @@ package-cli-pacman: build-cli
 	cd bb-imager-cli/dist && tar --zstd -cvf bb-imager-cli_${VERSION}_${_ARCH}.tar.zst bb-imager-cli
 	rm -rf bb-imager-cli/dist/bb-imager-cli
 
-package-gui-deb: build-gui
-	$(CARGO_PATH) packager -p bb-imager-gui --target $(TARGET) ${_PACKAGER_ARGS} -f deb
-
-package-gui-pacman: build-gui
-	mkdir -p bb-imager-gui/dist/bb-imager-gui
-	$(MAKE) install-gui DESTDIR=bb-imager-gui/dist/bb-imager-gui  PREFIX=/usr
-	cd bb-imager-gui/dist && tar --zstd -cvf bb-imager-gui_${VERSION}_${_ARCH}.tar.zst bb-imager-gui
-	rm -rf bb-imager-gui/dist/bb-imager-gui
-
 package-gui-appimage: build-gui
 	mkdir -p bb-imager-gui/dist
 	$(MAKE) _install_gui PREFIX=/usr DESTDIR=bb-imager-gui/dist/org.beagleboard.imagingutility.AppDir GUI_NAME=org.beagleboard.imagingutility
@@ -347,7 +338,6 @@ package-gui-wix: build-gui
 
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(MAKE) package-gui-pacman package-gui-deb TARGET=$(1) SYSTEM_DEPS=1
 	$(MAKE) package-gui-appimage TARGET=$(1) UPDATER=1
 endef
 

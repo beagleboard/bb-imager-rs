@@ -22,16 +22,8 @@ make setup-packaging-deps
 
 == Deb Package
 
-* CLI
-
 ....
 make package-cli-deb
-....
-
-* GUI
-
-....
-make package-gui-deb
 ....
 
 The target platform can be specified with `+TARGET+` environment
@@ -65,14 +57,6 @@ Compilation]
 
 Just a tarball of everything. Useful for creating packages that need to
 be maintained out of tree.
-
-* GUI
-
-....
-make package-gui-pacman
-....
-
-* CLI
 
 ....
 make package-cli-pacman
