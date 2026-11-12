@@ -53,6 +53,39 @@ jobs:
           bb-imager-gui/dist/*
           bb-imager-cli/dist/*
 
+  linux-gui-native-job:
+    strategy:
+      matrix:
+        platform: [ ubuntu-24.04, ubuntu-24.04-arm ]
+    name: Build GUI Native Packages - ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        lfs: true
+
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+
+    # Linked against system libraries, which 22.04 ships too old.
+    - name: Build packages
+      run: make setup-debian-deps setup-packaging-deps package-checks package-gui-pacman package-gui-deb SYSTEM_DEPS=1
+
+    # Do not do versioning for Pre-Release packages
+    - name: Rename Pre-Release Packages
+      if: github.ref_type != 'tag'
+      run: make package-rename
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: artifacts-gui-native-${{ matrix.platform }}
+        path: bb-imager-gui/dist/*
+
   linux-snap-job:
     strategy:
       matrix:
@@ -230,6 +263,7 @@ jobs:
     name: Upload Release artifacts
     needs:
       - linux-native-job
+      - linux-gui-native-job
       - linux-cross-job
       - linux-snap-job
       - macos-job
