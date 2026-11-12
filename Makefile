@@ -171,7 +171,21 @@ uninstall: uninstall-cli uninstall-gui
 ## housekeeping: help: Display this help message
 .PHONY: help
 help:
-	@python scripts/make_help.py Makefile
+	@echo "A list of available targets and variables"
+	@echo
+	@awk -F': ' ' \
+		/^## / { \
+			sub(/^## /, ""); \
+			g = $$1; \
+			if (!(g in seen)) { seen[g]; order[++n] = g } \
+			d = $$0; \
+			sub(/^[^:]*: [^:]*: /, "", d); \
+			out[g] = out[g] sprintf("    %-40s\033[34m# %s\033[0m\n", $$2, d) \
+		} \
+		END { \
+			for (i = 1; i <= n; i++) \
+				printf "    \033[33m[%s]\033[0m\n%s\n", order[i], out[order[i]] \
+		}' $(firstword $(MAKEFILE_LIST))
 
 ## housekeeping: clean: Clean the project files
 .PHONY: clean
