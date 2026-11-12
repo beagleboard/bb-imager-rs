@@ -77,8 +77,7 @@ SYSTEM_DEPS ?= 0
 SHARED_HIDRAW ?= 0
 ## variable: UPDATER: Enable updater feature in GUI.
 UPDATER ?= 0
-## variable: SANDBOXED: Build the GUI for a sandbox (Flatpak/snap), which shows
-## the first-run udev notice.
+## variable: SANDBOXED: Build the GUI for a sandbox (Flatpak/snap), which shows the first-run udev notice.
 SANDBOXED ?= 0
 ## variable: NOTIFY_RUST: Use notify-rust for notification. Not needed when using xdg-portal on linux.
 NOTIFY_RUST ?= 1
