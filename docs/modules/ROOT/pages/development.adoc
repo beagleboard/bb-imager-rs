@@ -132,13 +132,14 @@ changes are picked up but the application resets to the start screen, so `App` s
 
 == Building these docs
 
-The documentation is an https://antora.org/[Antora] component in `docs/`. Build it with Docker
-or Podman:
+The documentation is an https://antora.org/[Antora] component in `docs/`. Build and serve it
+at http://localhost:8000 with Podman (or Docker, via `CONTAINER=docker`):
 
 [source,shell]
 ----
-podman run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
-python -m http.server --directory build/site
+make docs-serve
 ----
+
+`make docs` only builds. Inside a git worktree, the docs are staged and built under `target/docs`.
 
 Screenshots in `docs/modules/ROOT/images` are a symlink to `assets/screenshots`.

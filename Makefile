@@ -17,6 +17,11 @@ _LDCONFIG_ARCH = $(if $(filter aarch64,$(APPIMAGE_ARCH)),AArch64,x86-64)
 _find_lib = $(or $(shell ldconfig -p | awk '$$1 == "$(1)" && /$(_LDCONFIG_ARCH)/ { print $$NF; exit }'),$(error $(1) not found in ldconfig cache))
 _DEST_VERSION = $(VERSION)
 _DIOXUS_CLI = $(shell which dx)
+_ANTORA_IMAGE = ghcr.io/beagleboard/antora-docker:main
+# Antora rejects a worktree's .git file, so worktrees build from a dereferenced
+# copy of the docs staged in its own git repo. Normal clones build in place.
+_DOCS_IN_WORKTREE = $(shell test -f .git && echo 1)
+_DOCS_DIR = $(if $(_DOCS_IN_WORKTREE),target/docs,.)
 
 _CLI_BIN = target/${TARGET}/release/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
@@ -88,6 +93,8 @@ NOTIFY_RUST ?= 1
 APPIMAGE_ARCH ?= $(_ARCH)
 ## variable: APPIMAGE_RELEASE_TAG: Release tag for update info
 APPIMAGE_RELEASE_TAG ?=
+## variable: CONTAINER: Container runtime used to build docs. podman if found, else docker.
+CONTAINER ?= $(or $(shell which podman 2>/dev/null),docker)
 
 # Allow skipping build step
 ifeq ($(NO_BUILD),1)
@@ -564,6 +571,25 @@ debug-gui:
 profile-gui:
 	$(RUST_BUILD) --profile profiling -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 	heaptrack target/${TARGET}/profiling/bb-imager-gui
+
+## docs: docs: Build the Antora docs site into build/site (target/docs/build/site in a worktree).
+.PHONY: docs
+docs:
+	$(info Build docs)
+ifeq ($(_DOCS_IN_WORKTREE),1)
+	rm -rf $(_DOCS_DIR)
+	mkdir -p $(_DOCS_DIR)
+	cp -rL docs antora-playbook-local.yml $(_DOCS_DIR)/
+	git -C $(_DOCS_DIR) init -q
+	git -C $(_DOCS_DIR) add -A
+	git -C $(_DOCS_DIR) -c user.name=docs -c user.email=docs@localhost commit -q -m docs
+endif
+	$(CONTAINER) run --rm -t -v $(abspath $(_DOCS_DIR)):/antora:Z $(_ANTORA_IMAGE) antora-playbook-local.yml --stacktrace
+
+## docs: docs-serve: Build and serve the docs site on localhost port 8000.
+.PHONY: docs-serve
+docs-serve: docs
+	python3 -m http.server --directory $(_DOCS_DIR)/build/site
 
 ## preview: preview-review: Preview Review page.
 preview-review:
