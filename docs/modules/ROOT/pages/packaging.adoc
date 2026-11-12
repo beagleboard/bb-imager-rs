@@ -158,6 +158,10 @@ variable. Supported values:
 - x86_64-pc-windows-msvc
 - aarch64-pc-windows-msvc
 
+On Linux, the GUI deb and generic tarball link against system libraries and are
+not included. Build them separately with
+`+make package-gui-deb package-gui-pacman SYSTEM_DEPS=1+`.
+
 == Cross Compilation
 
 Cross Compilation for linux is supported using

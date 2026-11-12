@@ -347,7 +347,6 @@ package-gui-wix: build-gui
 
 define package-linux-x86_64_aarch64
 	$(info Building packages for $(1))
-	$(MAKE) package-gui-pacman package-gui-deb TARGET=$(1) SYSTEM_DEPS=1
 	$(MAKE) package-gui-appimage TARGET=$(1) UPDATER=1
 endef
 
