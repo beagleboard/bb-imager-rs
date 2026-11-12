@@ -365,7 +365,7 @@ jobs:
     - name: Use caching
       uses: Swatinem/rust-cache@v2
     - name: Install cargo-release
-      uses: taiki-e/install-action@v1
+      uses: taiki-e/install-action@v2
       with:
         tool: cargo-release
     - uses: rust-lang/crates-io-auth-action@v1
