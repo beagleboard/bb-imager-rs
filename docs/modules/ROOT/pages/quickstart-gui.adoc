@@ -1,0 +1,115 @@
+= Flash Your First Board
+
+This guide walks through writing an operating system image to an SD card with the graphical
+BeagleBoard Imaging Utility. It takes about five minutes plus download and write time.
+
+.Before you start
+* Install the application. See xref:install-gui.adoc[].
+* Have a microSD card (8 GB or larger recommended) and a card reader.
+* Make sure the computer has internet access, unless you are flashing a local image file.
+
+WARNING: Flashing *erases everything* on the selected card. Back up anything you want to keep.
+
+The sidebar on the left tracks your progress: *Hardware → Software → Storage → Modify → Review →
+Write*. You can go back to an earlier step at any time before writing starts.
+
+== 1. Choose your board (Hardware)
+
+image::1_board_selection.webp[Board selection screen]
+
+Select your board from the list. The panel on the right shows its specifications and links to
+its documentation. Click *NEXT*.
+
+Not sure which boards are supported, or how each one is flashed? See
+xref:supported-hardware.adoc[].
+
+== 2. Choose an operating system (Software)
+
+image::2_image_selection.webp[Image selection screen]
+
+The list shows only the images recommended for the board you picked. Choose one, or pick the
+local file entry to flash an image you have already downloaded (compressed `.xz` or raw `.img`).
+
+For a local image, you can also pick an *Init Format*: the first-boot configuration format the
+image understands. Leave it at the default if you are unsure.
+
+== 3. Choose the destination (Storage)
+
+image::3_dest_selection.webp[Destination selection screen]
+
+Insert the SD card and select it. Check the name and size so you don't overwrite the wrong
+drive.
+
+* You can select more than one card to flash them all at once. The button then reads
+  *NEXT (n)*.
+* If your card does not appear, turn on *Show all destinations*. See also
+  xref:troubleshooting.adoc#drive-not-listed[Drive not listed].
+
+== 4. Customize the image (Modify)
+
+image::4_customization.webp[Customization screen]
+
+For supported images you can pre-configure the system so the board is ready on first boot,
+without a monitor or keyboard:
+
+[horizontal]
+Configure Username and Password:: Creates the default user. *Required to log in to the desktop
+session* on recent images. The username cannot be `root`.
+Configure Wireless LAN:: Wi-Fi network name (SSID) and password.
+Set Timezone:: For example `America/New_York`.
+Set Hostname:: The board's network name, for example `beaglebone`.
+Set Keymap:: Keyboard layout, for example `us`.
+SSH authorization public key:: Paste your public key (for example `~/.ssh/id_ed25519.pub`) to
+log in over SSH without a password.
+Enable USB DHCP:: Lets the board hand out an IP address over its USB network gadget, so you can
+reach it over the USB cable.
+
+*RESET* clears all customizations. Your choices are remembered for next time.
+
+== 5. Review
+
+image::5_review.webp[Review screen]
+
+Check the summary of board, image, destination, and modifications. Start writing when everything
+looks right. Your operating system may ask for permission to write to the disk.
+
+== 6. Write
+
+image::6_flashing.webp[Flashing screen]
+
+The image is downloaded (and cached for later) and written to the card. You can *Cancel* at
+any time, but a partly written card won't boot until you flash or format it again.
+
+image::7_sucess.webp[Write complete screen]
+
+*Write Complete* lists the modifications that were applied. Click *Flash Another* to write
+another card.
+
+If writing fails, the error screen shows the application logs. See
+xref:troubleshooting.adoc[] before reporting a bug.
+
+== 7. Boot your board
+
+. Eject the SD card safely and insert it into the board.
+. Connect power (and Ethernet, a display, or USB, depending on your board).
+. Follow your board's getting-started guide at https://docs.beagleboard.org/[docs.beagleboard.org].
+
+If you set a username and Wi-Fi network, you can log in over the network once the board has
+booted, for example `ssh <username>@<hostname>.local`.
+
+== Formatting an SD card
+
+To restore a card to normal use, for example after using it with a board, pick *Format Media* in
+the sidebar. Select the card, review, and confirm. Formatting erases the card.
+
+== Flashing other targets
+
+Boards such as BeagleConnect Freedom and BeagleConnect Zepto are flashed over a serial
+connection, not an SD card. The steps are the same, but on the Storage step you select the board's
+serial port. On Linux this usually needs extra permissions. See
+xref:install-gui.adoc#linux-serial[Enable Serial Flashing Support].
+
+== Next steps
+
+* Prefer the terminal or need scripting? See xref:cli-usage.adoc[].
+* Something went wrong? See xref:troubleshooting.adoc[].

@@ -1,0 +1,168 @@
+= Using the CLI
+
+`bb-imager-cli` provides everything the GUI does for flashing local image files, plus extra
+targets, and is suited to scripting and headless machines. To install it, see
+xref:install-cli.adoc[].
+
+Every command has built-in help:
+
+[source,shell]
+----
+bb-imager-cli --help
+bb-imager-cli flash --help
+bb-imager-cli flash sd --help
+----
+
+Global option: `--verbose` turns on more logging.
+
+NOTE: The CLI flashes *local* image files. Download the image for your board first, for example
+from https://www.beagleboard.org/distros[beagleboard.org/distros].
+
+== Flash an SD card
+
+=== 1. Find the destination
+
+[source,shell]
+----
+bb-imager-cli list-destinations sd
+----
+
+[horizontal]
+`--no-frills`:: Print only device paths, one per line. Useful in scripts.
+`--no-filter`:: Show every device without sanity filtering. Use this when your card is not listed
+because the OS reports it incorrectly. *Double-check the device*, since this also lists internal
+disks.
+
+=== 2. Flash
+
+[source,shell]
+----
+bb-imager-cli flash sd ./image.img.xz /dev/sdX
+----
+
+The image can be xz-compressed or uncompressed.
+
+WARNING: All data on the destination is erased. Make sure `/dev/sdX` is your SD card, not a system
+disk.
+
+Add `--quiet` (before the target, `flash --quiet sd ...`) to suppress progress output.
+
+=== Customize on first boot
+
+These options pre-configure supported images, like the GUI's *Modify* step:
+
+[cols="1,3",options="header"]
+|===
+| Option | Description
+
+| `--hostname <NAME>` | Hostname, e.g. `beaglebone`.
+| `--timezone <TZ>` | Timezone, e.g. `America/New_York`.
+| `--keymap <KEYMAP>` | Keyboard layout, e.g. `us`.
+| `--user-name <NAME>` `--user-password <PASS>` | Default user, used together. Cannot be `root`. Required to log in to the desktop session on recent images.
+| `--wifi-ssid <SSID>` `--wifi-password <PASS>` | Wi-Fi network, used together.
+| `--ssh-key <KEY>` | SSH public key to authorize.
+| `--usb-enable-dhcp` | Enable DHCP on the USB network interface.
+| `--sysconfig` | Write the configuration as sysconf. Currently sysconf is generated even without this flag; this will change, so set it explicitly.
+| `--cloud-init` | Write the configuration as cloud-init instead.
+|===
+
+Example:
+
+[source,shell]
+----
+bb-imager-cli flash sd ./image.img.xz /dev/sdX \
+  --sysconfig \
+  --hostname mybeagle \
+  --user-name debian --user-password 'change-me' \
+  --wifi-ssid MyNetwork --wifi-password 'secret' \
+  --ssh-key "$(cat ~/.ssh/id_ed25519.pub)"
+----
+
+=== Advanced options
+
+[cols="1,3",options="header"]
+|===
+| Option | Description
+
+| `--bmap <FILE>` | Use a bmap file to write only the used blocks. Faster for sparse images.
+| `--resizefs` | Grow the last partition to fill the card.
+| `--bootfs <ARCHIVE>` | Copy a boot-partition tarball after flashing. Useful for making Fedora and other distribution images bootable.
+| `--file-destination` | Treat the destination as a regular file instead of a device. Useful for preparing images.
+|===
+
+=== Update only the boot partition
+
+[source,shell]
+----
+bb-imager-cli flash sd-boot-update ./bootfs.tar.xz /dev/sdX
+----
+
+== Format an SD card
+
+[source,shell]
+----
+bb-imager-cli format /dev/sdX
+----
+
+== Other targets
+
+Some subcommands exist only when the CLI was built with the matching cargo feature. See
+xref:install-cli.adoc#_features[Features]. Run `bb-imager-cli list-destinations <target>` to find
+the port or device for each.
+
+[cols="2,3,2",options="header"]
+|===
+| Target | Command | Feature
+
+| BeagleConnect Freedom (CC1352P7)
+| `flash bcf <img> <port> [--no-verify]`
+| `bcf_cc1352p7` (default)
+
+| BeagleConnect Freedom (MSP430 USB-UART bridge)
+| `flash msp430 <img> <dst>`
+| `bcf_msp430`
+
+| BeagleConnect Zepto (MSPM0)
+| `flash zepto <img> <port> [--no-verify]`
+| `zepto_uart` (default), `zepto_i2c` (Linux)
+
+| PocketBeagle 2 MSPM0
+| `flash pb2-mspm0 <img> [--no-eeprom]`
+| `pb2_mspm0` (needs root)
+
+| USB DFU devices
+| `flash dfu <identifier> <name> <path>...`
+| `dfu` (default)
+|===
+
+Examples:
+
+[source,shell]
+----
+# BeagleConnect Freedom over its serial port
+bb-imager-cli flash bcf ./firmware.bin /dev/ttyACM0
+
+# BeagleConnect Zepto over I2C with explicit reset/BSL GPIOs (Linux)
+bb-imager-cli flash zepto ./firmware.hex /dev/i2c-1 --reset-gpio <gpio> --bsl-gpio <gpio>
+----
+
+For `dfu`, the identifier has the form `+{bus_num}:{address}:{vendor_id}:{product_id}+` (all hex), as
+printed by `list-destinations dfu`. Each firmware is given as a name followed by a path, and they
+are flashed in order.
+
+On Linux, serial and USB targets need device permissions. See
+xref:install-gui.adoc#linux-serial[Enable Serial Flashing Support].
+
+== Shell completion
+
+[source,shell]
+----
+# bash
+bb-imager-cli generate-completion bash > ~/.local/share/bash-completion/completions/bb-imager-cli
+# zsh (pick a directory on your $fpath)
+bb-imager-cli generate-completion zsh > ~/.zfunc/_bb-imager-cli
+# fish
+bb-imager-cli generate-completion fish > ~/.config/fish/completions/bb-imager-cli.fish
+----
+
+Supported shells: `bash`, `zsh`, `fish`, `elvish`, `powershell`.

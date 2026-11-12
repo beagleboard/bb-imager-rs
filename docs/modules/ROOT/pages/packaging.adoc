@@ -36,8 +36,11 @@ make package-gui-deb
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-unknown-linux-gnu - aarch64-unknown-linux-gnu -
-armv7-unknown-linux-gnueabihf
+been tested:
+
+* x86_64-unknown-linux-gnu
+* aarch64-unknown-linux-gnu
+* armv7-unknown-linux-gnueabihf
 
 [NOTE]
 ====
@@ -53,7 +56,10 @@ make package-gui-appimage
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-unknown-linux-gnu - aarch64-unknown-linux-gnu
+been tested:
+
+* x86_64-unknown-linux-gnu
+* aarch64-unknown-linux-gnu
 
 [NOTE]
 ====
@@ -80,8 +86,11 @@ make package-cli-pacman
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-unknown-linux-gnu - aarch64-unknown-linux-gnu -
-armv7-unknown-linux-gnueabihf
+been tested:
+
+* x86_64-unknown-linux-gnu
+* aarch64-unknown-linux-gnu
+* armv7-unknown-linux-gnueabihf
 
 [NOTE]
 ====
@@ -99,8 +108,11 @@ make package-gui-portable-exe
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-pc-windows-gnu - x86_64-pc-windows-msvc -
-aarch64-pc-windows-msvc
+been tested:
+
+* x86_64-pc-windows-gnu
+* x86_64-pc-windows-msvc
+* aarch64-pc-windows-msvc
 
 [NOTE]
 ====
@@ -118,7 +130,9 @@ make package-gui-wix
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-pc-windows-msvc
+been tested:
+
+* x86_64-pc-windows-msvc
 
 [NOTE]
 ====
@@ -136,7 +150,10 @@ make package-gui-dmg
 
 The target platform can be specified with `+TARGET+` environment
 variable. Defaults to host target. Currently, the following targets have
-been tested: - x86_64-apple-darwin - aarch64-apple-darwin
+been tested:
+
+* x86_64-apple-darwin
+* aarch64-apple-darwin
 
 MacOS Package cannot be built on a non-MacOS host.
 
@@ -151,12 +168,12 @@ make package-$(TARGET)
 The target platform can be specified with `+TARGET+` environment
 variable. Supported values:
 
-- x86_64-unknown-linux-gnu 
-- aarch64-unknown-linux-gnu
-- x86_64-apple-darwin
-- aarch64-apple-darwin
-- x86_64-pc-windows-msvc
-- aarch64-pc-windows-msvc
+* x86_64-unknown-linux-gnu
+* aarch64-unknown-linux-gnu
+* x86_64-apple-darwin
+* aarch64-apple-darwin
+* x86_64-pc-windows-msvc
+* aarch64-pc-windows-msvc
 
 On Linux, the GUI deb and generic tarball link against system libraries and are
 not included. Build them separately with

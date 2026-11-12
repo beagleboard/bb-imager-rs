@@ -1,0 +1,50 @@
+= Supported Hardware
+
+The board list in the GUI comes from a catalog downloaded at startup, so new boards and images can
+appear without updating the application.
+
+== Boards
+
+[cols="2,2,1,2",options="header"]
+|===
+| Board | Flashed via | GUI | CLI command
+
+| BeagleY-AI | SD card | Yes | `flash sd`
+| BeaglePlay | SD card | Yes | `flash sd`
+| BeagleBone AI-64 | SD card | Yes | `flash sd`
+| BeagleV-Fire | SD card, eMMC | Yes | `flash sd`
+| BeagleBone Black | SD card | Yes | `flash sd`
+| PocketBeagle 2 | SD card | Yes | `flash sd`
+| Generic Linux board | SD card | Yes | `flash sd`
+| BeagleConnect Freedom | Serial (USB) | Yes | `flash bcf`
+| BeagleConnect Zepto | Serial (UART), I2C on Linux | Yes | `flash zepto`
+|===
+
+The generic Linux board entry lets you flash any SD card image to any board.
+
+== Co-processors and other targets
+
+These are mostly useful for development and recovery, and are available in the CLI only:
+
+[cols="2,2,2",options="header"]
+|===
+| Target | CLI command | Notes
+
+| BeagleConnect Freedom MSP430 (USB-UART bridge) | `flash msp430` | Needs the `bcf_msp430` build feature.
+| PocketBeagle 2 MSPM0 | `flash pb2-mspm0` | Run on the PocketBeagle 2 itself. Needs the `pb2_mspm0` build feature and root.
+| USB DFU devices | `flash dfu` | Included by default.
+|===
+
+See xref:cli-usage.adoc#_other_targets[Other targets] for usage and
+xref:install-cli.adoc#_features[Features] for build features.
+
+== Platform notes
+
+* *SD cards* work out of the box on every platform and package format.
+* *Serial flashing on Linux* needs a udev rule for non-root access. See
+  xref:install-gui.adoc#linux-serial[Enable Serial Flashing Support]. This applies to Flatpak,
+  AppImage, and the CLI.
+* *Snap* supports SD cards, and serial flashing after
+  xref:install-gui.adoc#_enable_serial_flashing_e_g_beagleconnect_freedom[extra setup]. I2C
+  (BeagleConnect Zepto) and hidraw (MSP430) flashing are not available in the Snap.
+* *I2C* flashing of BeagleConnect Zepto is Linux-only.

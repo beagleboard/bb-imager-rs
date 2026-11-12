@@ -1,0 +1,70 @@
+= Troubleshooting
+
+== Log files
+
+The GUI writes a log file on every run. If flashing fails, the error screen shows its contents.
+The exact path is also shown under *App Options → Log File*.
+
+[cols="1,3",options="header"]
+|===
+| Platform | Log file
+
+| Linux | `$HOME/.cache/org.beagleboard.imagingutility.log`
+| Linux (Flatpak) | `$HOME/.var/app/org.beagleboard.imagingutility/org.beagleboard.imagingutility.log`
+| Windows | `%LOCALAPPDATA%\beagleboard\imagingutility\org.beagleboard.imagingutility.log`
+| macOS | `$HOME/Library/Caches/org.beagleboard.imagingutility.log`
+|===
+
+The log is overwritten each time the application starts, so copy it before relaunching.
+
+For the CLI, rerun the command with `--verbose` and save the output.
+
+[#drive-not-listed]
+== My SD card is not listed
+
+* Re-insert the card, or try another card reader. Some built-in readers only show up once a card
+  is inserted.
+* The list hides devices that don't look like removable media. In the GUI, turn on *Show all
+  destinations* on the Storage step. In the CLI, use
+  `bb-imager-cli list-destinations sd --no-filter`.
++
+WARNING: The unfiltered list includes internal disks. Check the size and name carefully.
+
+== Permission denied, or "Missing udev permissions" (Linux)
+
+Flashing over a serial port (BeagleConnect Freedom, BeagleConnect Zepto) needs access to the
+device node. Install the udev rule described in
+xref:install-gui.adoc#linux-serial[Enable Serial Flashing Support], then unplug and reconnect the
+board.
+
+The Flatpak and Snap show a one-time *Missing udev permissions* notice for this reason. The rule
+has to be installed on the host system. The Snap also needs the
+xref:install-gui.adoc#_enable_serial_flashing_e_g_beagleconnect_freedom[serial-port interface
+connected].
+
+SD card flashing does not need any of this.
+
+== Windows: UAC prompts or antivirus warnings
+
+Writing to raw disks requires administrator rights, so a User Account Control prompt is expected.
+Some antivirus software flags disk-writing tools. Only allow it if you downloaded the installer from
+the https://github.com/beagleboard/bb-imager-rs/releases[official releases page].
+
+== The board doesn't boot after flashing
+
+* Make sure you picked the image for *your* board on the Software step.
+* Re-flash the card. A cancelled or interrupted write leaves the card unbootable.
+* Some boards boot from on-board eMMC by default. Check your board's documentation at
+  https://docs.beagleboard.org/[docs.beagleboard.org] for how to boot from the SD card.
+* Can't log in to the desktop? Recent images require a user set on the *Modify* step (or with
+  `--user-name`/`--user-password` in the CLI).
+
+== Reporting a bug
+
+Open an issue at https://github.com/beagleboard/bb-imager-rs/issues[GitHub Issues] and include:
+
+* the application version (*App Options*, or `bb-imager-cli --version`)
+* your operating system and how you installed the application (Flatpak, Snap, AppImage, `.msi`,
+  `.dmg`, cargo, ...)
+* the board and image you were flashing
+* the log file (see <<Log files>>) or the CLI `--verbose` output

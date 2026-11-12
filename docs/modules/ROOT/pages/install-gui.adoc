@@ -134,6 +134,7 @@ chmod +x bb-imager-*.AppImage
 ./bb-imager-*.AppImage
 ----
 
+[#linux-serial]
 ==== Enable Serial Flashing Support (Optional)
 
 If you are using Linux and need to flash firmware to boards over a serial connection (such as the
@@ -163,3 +164,7 @@ include::example$10-beagle.rules[]
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 ----
+
+== Next Step
+
+You are ready to flash: xref:quickstart-gui.adoc[].

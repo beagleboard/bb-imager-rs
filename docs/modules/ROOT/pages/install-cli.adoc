@@ -65,3 +65,7 @@ The CLI supports optional build features:
 * `zepto_i2c`: Flash Zepto (MSPM0) over I2C (Linux only).
 * `pb2_mspm0`: Flash PocketBeagle 2 MSPM0 (requires root permissions).
 * `shared-hidraw`: Dynamically link hidraw instead of statically linking.
+
+== Next Step
+
+See xref:cli-usage.adoc[] to flash your first image.
