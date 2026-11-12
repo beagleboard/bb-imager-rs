@@ -1,0 +1,144 @@
+= Development Guide
+
+This page gets you from a fresh clone to a running build and a passing `make check`. When you are
+ready to submit, read the xref:contributing.adoc[].
+
+== Prerequisites
+
+. https://git-lfs.com/[git-lfs] (*mandatory*) +
+  Images, icons, and fonts are stored in Git LFS. Cloning without it gives confusing "missing
+  asset" errors at build time or runtime. If you already cloned without it, run
+  `git lfs install && git lfs pull`.
+
+. https://www.rust-lang.org/[Rust], stable toolchain (edition 2024) +
+  https://rustup.rs/[rustup] is the easiest way to get it. Nightly is not needed.
+
+. Platform libraries:
++
+.Ubuntu and other Debian-based distributions
+[source,shell]
+----
+make setup-debian-deps
+----
++
+.Fedora
+[source,shell]
+----
+make setup-fedora-deps
+----
+
+== Clone and run
+
+[source,shell]
+----
+git lfs install
+git clone https://github.com/beagleboard/bb-imager-rs.git
+cd bb-imager-rs
+
+cargo run -p bb-imager-gui
+cargo run -p bb-imager-cli -- --help
+----
+
+NOTE: When flashing real hardware or benchmarking, use a release build (`--release`).
+
+`make help` lists every Makefile target and tunable variable (`TARGET`, feature toggles such as
+`PB2_MSPM0`/`ZEPTO_I2C`/`UPDATER`, packaging variables).
+
+== Workspace layout
+
+The workspace is layered: *front-ends → `bb-flasher` → per-target flasher crates → support crates*.
+
+[cols="1,3",options="header"]
+|===
+| Crate | Purpose
+
+2+h| Front-ends
+| `bb-imager-gui` | The GUI, built with https://iced.rs/[Iced] (Elm architecture). The top-level `BBImager` enum in `main.rs` is both app state and the screen state machine. `message.rs` holds the global message enum, `state.rs` the per-screen state. Async work runs as `iced::Task`s.
+| `bb-imager-ui` | Screen views (one module per page) used by the GUI.
+| `bb-iced-widgets` | Reusable Iced widgets.
+| `bb-imager-cli` | The CLI, built with `clap` (derive). The command tree is in `src/cli.rs`.
+
+2+h| Flashing core
+| `bb-flasher` | The common façade both front-ends program against. Re-exports and feature-gates the concrete flashers below. Most capabilities are *off by default*.
+| `bb-flasher-sd` | OS images to SD cards (Linux udev, macOS authopen, Windows).
+| `bb-flasher-bcf` | BeagleConnect Freedom CC1352P7 and its MSP430 USB-UART bridge.
+| `bb-flasher-mspm0`, `bb-flasher-pb2-mspm0` | MSPM0 co-processors (BeagleConnect Zepto, PocketBeagle 2) over UART/I2C.
+| `bb-flasher-dfu` | USB DFU.
+
+2+h| Support
+| `bb-config` | Parses and generates the board/image catalog (`config.json`, `os_list.json`). See `config.json` at the repo root for an example.
+| `bb-downloader` | Async downloader with caching.
+| `bb-helper` | Shared utilities (cancellation, progress-reporting readers, file streaming).
+| `bb-drivelist` | Enumerates destination drives (Rust port of Balena's drivelist).
+| `bb-bmap-parser` | bmap parsing for sparse-image flashing.
+| `bb-os-list-generator` | Generates `os_list.json` catalogs.
+|===
+
+== Check and test: use the Makefile
+
+Large parts of the code are behind cargo features (per-board flashers, static vs. shared linking,
+platform SD backends). Plain `cargo check` / `cargo test` at the workspace root silently skips
+feature-gated modules. The Makefile passes the same feature sets as CI:
+
+[source,shell]
+----
+make check            # clippy (falls back to cargo check) over CLI, GUI and libraries
+make test             # same coverage, runs cargo test
+make check-cli        # or check-gui / test-cli / test-gui
+----
+
+To run a single test, target the crate and enable the features it needs:
+
+[source,shell]
+----
+cargo test -p bb-imager-gui <test_name>
+cargo test -p bb-flasher -F sd <test_name>
+----
+
+Run `cargo fmt` and make sure `make check` is clean before submitting. rustfmt and clippy are
+mandatory.
+
+=== Feature flags
+
+Features cascade from front-end → `bb-flasher` → flasher crates, so always build with the intended
+set:
+
+* The GUI links statically by default (`static`: bundled SQLite, rustls). `system-deps` switches to
+  system libraries and native TLS.
+* `static-hidraw` / `shared-hidraw` choose how USB HID is linked. The CLI defaults to static because
+  distribution hidraw is often too old.
+* Board support (`bcf_cc1352p7`, `bcf_msp430`, `pb2_mspm0`, `zepto_uart`, `zepto_i2c`, `dfu`) is
+  opt-in per binary. See xref:install-cli.adoc#_features[CLI features].
+* The `_check_common`, `_check_cli`, and `_check_gui` recipes in the `Makefile` define which
+  combinations must compile.
+
+== Debugging the GUI
+
+The GUI can run in a debug mode that exposes https://github.com/hecrj/comet[comet], Iced's
+inspector/debugger. Press `F12` in the running application to open it.
+
+This needs the https://dioxuslabs.com/learn/0.6/CLI/installation/[Dioxus CLI] (`dx`), since
+debug mode uses its `serve` command:
+
+[source,shell]
+----
+cargo install dioxus-cli
+make debug-gui
+----
+
+NOTE: Hot-reloading is meant to work in this mode but is currently unreliable. With `dx`, code
+changes are picked up but the application resets to the start screen, so `App` state is lost.
+`cargo-hot` does not work at all. Debugging with comet works regardless.
+
+== Building these docs
+
+The documentation is an https://antora.org/[Antora] component in `docs/`. Build it with Docker
+or Podman:
+
+[source,shell]
+----
+podman run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
+python -m http.server --directory build/site
+----
+
+Screenshots in `docs/modules/ROOT/images` are a symlink to `assets/screenshots`.

@@ -1,63 +1,6 @@
 = Contributing Guide
 
-== Development
-
-=== Dependencies
-
-The following dependencies are required to work with the codebase.
-
-. https://git-lfs.com/[git-lfs]  
-  Since this is a Git LFS repository, a lot of strange errors regarding missing assets will occur if the repository is cloned without installing `git-lfs`.
-
-. https://www.rust-lang.org/[Rust]  
-  I personally use https://rustup.rs/[rustup] to manage Rust versions, but development can also be done without rustup, since everything builds with stable Rust.
-
-==== Platform Dependencies
-
-===== Ubuntu and other Debian-based Linux distributions
-
-[source,shell]
-----
-make setup-debian-deps
-----
-
-===== Fedora
-
-[source,shell]
-----
-make setup-fedora-deps
-----
-
-=== Running the Project
-
-*Note:* When flashing hardware or running benchmarks, ensure that you are using a release build (`--release`).
-
-.GUI
-[source,shell]
-----
-cargo run -p bb-imager-gui
-----
-
-.CLI
-[source,shell]
-----
-make run-cli
-cargo run -p bb-imager-cli
-----
-
-=== Debugging the GUI
-
-The GUI can be run in a debug mode that exposes https://github.com/hecrj/comet[comet], Iced's inspector/debugger. Press `F12` in the running application to open it.
-
-This requires the https://dioxuslabs.com/learn/0.6/CLI/installation/[Dioxus CLI] (`dx`), since debug mode relies on its `serve` command:
-
-[source,shell]
-----
-cargo install dioxus-cli
-make debug-gui
-----
-
-*Note:* Hot-reloading is expected to work in this mode but currently does not behave reliably. With the `dx` CLI, code changes are picked up but the application resets to the start screen, so the `App` state is not preserved. `cargo-hot` does not work at all. Debugging via comet works regardless.
+To set up a development environment, build, and run the checks, see xref:development.adoc[].
 
 == Submitting Pull Requests
 

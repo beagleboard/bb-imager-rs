@@ -1,18 +1,44 @@
 = BeagleBoard Imaging Utility
 
-== Installation
+The *BeagleBoard Imaging Utility* (bb-imager) is the official BeagleBoard.org tool for getting an
+operating system onto your board. Pick your board, pick an image, pick your SD card. It downloads,
+customizes, and writes the image for you. It runs on Linux, Windows, and macOS.
 
-Choose between the graphical interface (GUI) or the command-line interface (CLI):
+image::1_board_selection.webp[BeagleBoard Imaging Utility board selection screen]
 
-* xref:install-gui.adoc[*Install GUI Application*] – Prebuilt packages for Linux (Flatpak, Snap, AppImage), Windows (`.msi`), and macOS (`.dmg`).
-* xref:install-cli.adoc[*Install CLI Application*] – Available via `cargo binstall bb-imager-cli` or `cargo install bb-imager-cli` on crates.io, and prebuilt binaries.
+== Start Here
+
+=== New to BeagleBoard? Use the GUI
+
+. xref:install-gui.adoc[Install the application]: Flatpak, Snap, AppImage, Windows installer, or
+  macOS disk image.
+. xref:quickstart-gui.adoc[Flash your first board]: a step-by-step walkthrough with screenshots.
+
+=== Prefer the terminal or need automation? Use the CLI
+
+. xref:install-cli.adoc[Install the CLI]: `cargo binstall bb-imager-cli`, `cargo install`, or
+  prebuilt binaries.
+. xref:cli-usage.adoc[Use the CLI]: flash SD cards, customize images, and flash serial/DFU targets.
+
+=== Want to contribute?
+
+. xref:development.adoc[Set up a development environment] and learn the codebase layout.
+. Read the xref:contributing.adoc[] before opening a pull request.
+. Packaging for a distribution? See xref:packaging.adoc[].
+
+== Reference
+
+* xref:supported-hardware.adoc[]: which boards are supported and how each is flashed.
+* xref:troubleshooting.adoc[]: log files, missing drives, permissions, and how to report a bug.
 
 == About
 
-The *BeagleBoard Imaging Utility* (bb-imager) is an official tool from BeagleBoard.org for preparing bootable storage media for BeagleBoard hardware. It simplifies the process of selecting, downloading, and flashing operating system images to SD cards and other removable devices.
+bb-imager works for new users and experienced developers alike. It handles device detection and
+image downloads, and guards against writing to the wrong disk.
 
-bb-imager is designed to work well for both new users and experienced developers. It provides a clean graphical interface for interactive use, as well as a command-line interface for automation, scripting, and headless workflows. The tool handles common tasks such as device detection, image verification, and safe flashing, reducing the chances of user error.
+Beyond writing images, it can pre-configure supported operating systems before first boot: user
+account, hostname, Wi-Fi, timezone, keyboard layout, and SSH key. A board can then come up
+ready to use without a monitor or keyboard.
 
-In addition to writing images, bb-imager supports basic pre-boot configuration for supported operating systems. This can include setting usernames and passwords, hostnames, and network configuration before the first boot, making it easier to get a board up and running quickly.
-
-Built in Rust, bb-imager is fast, reliable, and cross-platform, with support for Linux, Windows, and macOS. It plays a similar role to other popular imaging tools, but is tailored specifically for BeagleBoard platforms and the operating systems recommended by BeagleBoard.org.
+It is written in Rust and plays a similar role to other popular imaging tools, but is tailored to
+BeagleBoard hardware and the operating systems BeagleBoard.org recommends.

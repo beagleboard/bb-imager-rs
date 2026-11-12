@@ -1,4 +1,14 @@
+.Get started
 * xref:install-gui.adoc[]
+* xref:quickstart-gui.adoc[]
 * xref:install-cli.adoc[]
-* xref:packaging.adoc[]
+* xref:cli-usage.adoc[]
+
+.Reference
+* xref:supported-hardware.adoc[]
+* xref:troubleshooting.adoc[]
+
+.Developers
+* xref:development.adoc[]
 * xref:contributing.adoc[]
+* xref:packaging.adoc[]
