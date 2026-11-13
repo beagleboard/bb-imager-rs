@@ -1,14 +1,14 @@
-use crate::constants::DEFAULT_CONFIG;
-
-use super::*;
 use bb_config::Config;
+use bb_imager_db::{Db, ImageId};
+
+const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 
 /// This test verifies that database initialization correctly loads
 /// remote configuration URLs from DEFAULT_CONFIG.
 ///
 /// What this test checks:
 /// 1. DEFAULT_CONFIG can be parsed into bb_config::Config.
-/// 2. Db::new() creates a temporary SQLite database.
+/// 2. Db::new(|_| true) creates a temporary SQLite database.
 /// 3. Db::init() runs migrations and inserts DEFAULT_CONFIG data.
 /// 4. remote_configs() returns all unfetched remote config URLs.
 /// 5. Returned URLs match the ones defined in DEFAULT_CONFIG.
@@ -19,7 +19,7 @@ use bb_config::Config;
 /// - Ensures remote_configs() correctly reflects DEFAULT_CONFIG
 #[test]
 fn init_loads_all_default_remote_configs() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
 
     db.init().expect("DB initialization should succeed");
 
@@ -60,7 +60,7 @@ fn init_loads_all_default_remote_configs() {
 /// - Ensures DB properly merges multiple config sources
 #[test]
 fn add_config_inserts_new_remote_configs() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
 
     db.init().expect("DB initialization should succeed");
 
@@ -128,7 +128,7 @@ fn add_config_inserts_new_remote_configs() {
 /// - Ensures add_config() is safe for repeated ingestion
 #[test]
 fn add_config_does_not_duplicate_remote_configs() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
 
     db.init().expect("DB initialization should succeed");
 
@@ -182,7 +182,7 @@ fn add_config_does_not_duplicate_remote_configs() {
 /// - Verifies basic device storage pipeline
 #[test]
 fn add_config_inserts_device_into_board_list() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
 
     db.init().expect("DB initialization should succeed");
 
@@ -250,7 +250,7 @@ fn add_config_inserts_device_into_board_list() {
 /// - Ensures board_by_id() returns updated fields
 #[test]
 fn add_config_updates_existing_device_with_same_name() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
 
     db.init().expect("DB initialization should succeed");
 
@@ -370,7 +370,7 @@ fn add_config_updates_existing_device_with_same_name() {
 /// - UI would show empty OS list even with valid config.
 #[test]
 fn add_config_inserts_os_image_for_board() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -453,7 +453,7 @@ fn add_config_inserts_os_image_for_board() {
 /// - UI would receive incorrect OS metadata.
 #[test]
 fn os_image_by_id_returns_correct_data() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -508,9 +508,7 @@ fn os_image_by_id_returns_correct_data() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let bb_imager_gui_ui::image_selection::ImageId::OsImage(image_id) =
-        items.iter().find(|x| x.label == "Test OS").unwrap().id
-    else {
+    let ImageId::OsImage(image_id) = items.iter().find(|x| x.label == "Test OS").unwrap().id else {
         panic!("Incorrect ID");
     };
     let stored = db
@@ -555,7 +553,7 @@ fn os_image_by_id_returns_correct_data() {
 /// - OS hierarchy navigation would fail.
 #[test]
 fn add_config_inserts_os_sublist_for_board() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -641,7 +639,7 @@ fn add_config_inserts_os_sublist_for_board() {
 /// - Deep OS hierarchy navigation would break.
 #[test]
 fn nested_os_sublists_propagate_board_support() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -742,7 +740,7 @@ fn nested_os_sublists_propagate_board_support() {
 /// - Remote config fetching would break silently.
 #[test]
 fn remote_os_sublist_is_returned_for_board() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -828,7 +826,7 @@ fn remote_os_sublist_is_returned_for_board() {
 /// - UI would never show fetched OS lists.
 #[test]
 fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -935,7 +933,7 @@ fn remote_os_sublist_resolve_inserts_child_items_and_clears_url() {
 /// - DB integrity could break over time
 #[test]
 fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1047,7 +1045,7 @@ fn duplicate_remote_sublist_resolve_does_not_duplicate_os_items() {
 /// - UI board search would behave incorrectly.
 #[test]
 fn board_list_search_filters_boards_case_insensitive() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board1 = bb_config::config::Device {
@@ -1137,12 +1135,12 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
         .id
 }
 
-/// This test verifies that os_board_json_by_id() reconstructs the exact
+/// This test verifies that board_config_by_id() reconstructs the exact
 /// [`bb_config::config::Device`] that was inserted through add_config().
 ///
 /// What this test checks:
 /// 1. A device with every field populated is inserted.
-/// 2. os_board_json_by_id() returns a Device equal to the original.
+/// 2. board_config_by_id() returns a Device equal to the original.
 /// 3. Multi-entry tags and ordered specification pairs survive the round trip.
 ///
 /// Why this matters:
@@ -1152,8 +1150,8 @@ fn insert_board_helper(db: &Db, board: bb_config::config::Device) -> i64 {
 /// - The reconstructed Device is handed back to the flashing code, so any
 ///   missing field would silently change flashing behaviour.
 #[test]
-fn os_board_json_by_id_round_trips_device() {
-    let db = Db::new().expect("Failed to create DB");
+fn board_config_by_id_round_trips_device() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1175,18 +1173,18 @@ fn os_board_json_by_id_round_trips_device() {
     let id = insert_board_helper(&db, board.clone());
 
     let res = db
-        .os_board_json_by_id(id)
+        .board_config_by_id(id)
         .expect("Fetching board json should succeed");
 
     assert_eq!(res, board);
 }
 
-/// This test verifies that os_board_json_by_id() works for a board with no
+/// This test verifies that board_config_by_id() works for a board with no
 /// optional fields, no tags and an empty specification.
 ///
 /// What this test checks:
 /// 1. A device with all optional columns NULL is inserted.
-/// 2. os_board_json_by_id() returns it without error.
+/// 2. board_config_by_id() returns it without error.
 /// 3. Tags and specification come back empty instead of failing.
 ///
 /// Why this matters:
@@ -1195,8 +1193,8 @@ fn os_board_json_by_id_round_trips_device() {
 /// - A board without tags produces zero rows in board_tags, which must not be
 ///   treated as a missing board.
 #[test]
-fn os_board_json_by_id_handles_board_without_optional_fields() {
-    let db = Db::new().expect("Failed to create DB");
+fn board_config_by_id_handles_board_without_optional_fields() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1215,18 +1213,18 @@ fn os_board_json_by_id_handles_board_without_optional_fields() {
     let id = insert_board_helper(&db, board.clone());
 
     let res = db
-        .os_board_json_by_id(id)
+        .board_config_by_id(id)
         .expect("Fetching board json should succeed");
 
     assert_eq!(res, board);
 }
 
-/// This test verifies that os_board_json_by_id() reflects an updated board
+/// This test verifies that board_config_by_id() reflects an updated board
 /// instead of mixing old and new data.
 ///
 /// What this test checks:
 /// 1. A board is inserted and then re-inserted with the same name.
-/// 2. os_board_json_by_id() returns the updated fields.
+/// 2. board_config_by_id() returns the updated fields.
 /// 3. Tags from the first insertion are gone, not merged with the new ones.
 ///
 /// Why this matters:
@@ -1234,8 +1232,8 @@ fn os_board_json_by_id_handles_board_without_optional_fields() {
 ///   there would leave stale tags attached to the board.
 /// - Stale tags would also link the board to OS images it no longer supports.
 #[test]
-fn os_board_json_by_id_reflects_updated_board() {
-    let db = Db::new().expect("Failed to create DB");
+fn board_config_by_id_reflects_updated_board() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board_v1 = bb_config::config::Device {
@@ -1278,7 +1276,7 @@ fn os_board_json_by_id_reflects_updated_board() {
     };
 
     let res = db
-        .os_board_json_by_id(id)
+        .board_config_by_id(id)
         .expect("Fetching board json should succeed");
 
     assert_eq!(res, board_final);
@@ -1316,7 +1314,7 @@ fn insert_image_helper(
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let bb_imager_gui_ui::image_selection::ImageId::OsImage(image_id) = items
+    let ImageId::OsImage(image_id) = items
         .iter()
         .find(|x| x.label == name.as_ref())
         .expect("Inserted image should exist")
@@ -1328,12 +1326,12 @@ fn insert_image_helper(
     image_id
 }
 
-/// This test verifies that os_image_json_by_id() reconstructs the exact
+/// This test verifies that os_image_config_by_id() reconstructs the exact
 /// [`bb_config::config::OsImage`] that was inserted through add_config().
 ///
 /// What this test checks:
 /// 1. An image with every field populated is inserted for a board with one tag.
-/// 2. os_image_json_by_id() returns an OsImage equal to the original.
+/// 2. os_image_config_by_id() returns an OsImage equal to the original.
 /// 3. sha256, sizes, release date, urls and devices survive the round trip.
 ///
 /// Why this matters:
@@ -1342,8 +1340,8 @@ fn insert_image_helper(
 /// - The reconstructed OsImage describes what is actually being flashed, so a
 ///   missing field would misreport the flashing job.
 #[test]
-fn os_image_json_by_id_round_trips_image() {
-    let db = Db::new().expect("Failed to create DB");
+fn os_image_config_by_id_round_trips_image() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1383,25 +1381,25 @@ fn os_image_json_by_id_round_trips_image() {
     let id = insert_image_helper(&db, board, image.clone());
 
     let res = db
-        .os_image_json_by_id(id)
+        .os_image_config_by_id(id)
         .expect("Fetching image json should succeed");
 
     assert_eq!(res, image);
 }
 
-/// This test verifies that os_image_json_by_id() works for an image with none
+/// This test verifies that os_image_config_by_id() works for an image with none
 /// of the optional fields set.
 ///
 /// What this test checks:
 /// 1. An image without download size, bmap, info text and support url is inserted.
-/// 2. os_image_json_by_id() returns it without error.
+/// 2. os_image_config_by_id() returns it without error.
 ///
 /// Why this matters:
 /// - Those columns are nullable; reading them into non-Option types would only
 ///   fail for images that omit them.
 #[test]
-fn os_image_json_by_id_handles_image_without_optional_fields() {
-    let db = Db::new().expect("Failed to create DB");
+fn os_image_config_by_id_handles_image_without_optional_fields() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1437,27 +1435,27 @@ fn os_image_json_by_id_handles_image_without_optional_fields() {
     let id = insert_image_helper(&db, board, image.clone());
 
     let res = db
-        .os_image_json_by_id(id)
+        .os_image_config_by_id(id)
         .expect("Fetching image json should succeed");
 
     assert_eq!(res, image);
 }
 
-/// This test pins the known lossiness of os_image_json_by_id(): the returned
+/// This test pins the known lossiness of os_image_config_by_id(): the returned
 /// `devices` comes from the boards the image is linked to, not from the config.
 ///
 /// What this test checks:
 /// 1. A board carrying two tags is inserted.
 /// 2. An image referencing only one of those tags is inserted.
-/// 3. os_image_json_by_id() reports both tags in `devices`.
+/// 3. os_image_config_by_id() reports both tags in `devices`.
 ///
 /// Why this matters:
 /// - The original device list is not stored; only the board links are. Callers
 ///   must treat `devices` as "tags of the boards this image matched", and this
 ///   test documents that instead of leaving it to be discovered later.
 #[test]
-fn os_image_json_by_id_devices_come_from_linked_boards() {
-    let db = Db::new().expect("Failed to create DB");
+fn os_image_config_by_id_devices_come_from_linked_boards() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = bb_config::config::Device {
@@ -1493,7 +1491,7 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
     let id = insert_image_helper(&db, board, image);
 
     let res = db
-        .os_image_json_by_id(id)
+        .os_image_config_by_id(id)
         .expect("Fetching image json should succeed");
 
     // `devices` is now an ordered slice, but the query has no ORDER BY, so
@@ -1503,7 +1501,7 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
     assert_eq!(devices, ["test_board", "test_board_alt"]);
 }
 
-/// This test verifies that os_image_json_by_id() fails for an unknown image id.
+/// This test verifies that os_image_config_by_id() fails for an unknown image id.
 ///
 /// What this test checks:
 /// 1. An id that does not exist is queried.
@@ -1513,11 +1511,11 @@ fn os_image_json_by_id_devices_come_from_linked_boards() {
 /// - Returning a bogus image instead of an error would report the wrong image
 ///   for a flashing job.
 #[test]
-fn os_image_json_by_id_unknown_id_returns_no_rows() {
-    let db = Db::new().expect("Failed to create DB");
+fn os_image_config_by_id_unknown_id_returns_no_rows() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
-    let res = db.os_image_json_by_id(i64::MAX);
+    let res = db.os_image_config_by_id(i64::MAX);
 
     assert!(
         matches!(res, Err(rusqlite::Error::QueryReturnedNoRows)),
@@ -1525,7 +1523,7 @@ fn os_image_json_by_id_unknown_id_returns_no_rows() {
     );
 }
 
-/// This test verifies that os_board_json_by_id() fails for an unknown board id.
+/// This test verifies that board_config_by_id() fails for an unknown board id.
 ///
 /// What this test checks:
 /// 1. An id that does not exist is queried.
@@ -1535,11 +1533,11 @@ fn os_image_json_by_id_unknown_id_returns_no_rows() {
 /// - Callers pass board ids kept in UI state; returning a bogus board instead
 ///   of an error would flash a device with the wrong configuration.
 #[test]
-fn os_board_json_by_id_unknown_id_returns_no_rows() {
-    let db = Db::new().expect("Failed to create DB");
+fn board_config_by_id_unknown_id_returns_no_rows() {
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
-    let res = db.os_board_json_by_id(i64::MAX);
+    let res = db.board_config_by_id(i64::MAX);
 
     assert!(
         matches!(res, Err(rusqlite::Error::QueryReturnedNoRows)),
@@ -1610,7 +1608,7 @@ fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
 /// What this test checks:
 /// 1. A device with a bootfs is inserted.
 /// 2. board_by_id() returns all three of url, extract size and sha256.
-/// 3. os_board_json_by_id() reconstructs the same [`bb_config::config::Device`].
+/// 3. board_config_by_id() reconstructs the same [`bb_config::config::Device`].
 ///
 /// Why this matters:
 /// - The tarball is stored as three separate nullable columns; dropping one of
@@ -1619,7 +1617,7 @@ fn no_bootloader_sublist(tag: &str) -> bb_config::config::OsSubList {
 ///   after a full download.
 #[test]
 fn board_bootfs_round_trips() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let board = board_with_bootfs("Test Board", "test_board", Some(test_bootfs()));
@@ -1632,7 +1630,7 @@ fn board_bootfs_round_trips() {
         Some(test_bootfs())
     );
     assert_eq!(
-        db.os_board_json_by_id(id)
+        db.board_config_by_id(id)
             .expect("Fetching board json should succeed"),
         board
     );
@@ -1642,7 +1640,7 @@ fn board_bootfs_round_trips() {
 /// a half-built [`bb_config::config::Bootfs`].
 #[test]
 fn board_without_bootfs_reads_back_as_none() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     let id = insert_board_helper(&db, board_with_bootfs("Test Board", "test_board", None));
@@ -1669,7 +1667,7 @@ fn board_without_bootfs_reads_back_as_none() {
 ///   what keeps the combination unreachable.
 #[test]
 fn no_bootloader_sublist_is_listed_only_for_boards_with_bootfs() {
-    let db = Db::new().expect("Failed to create DB");
+    let db = Db::new(|_| true).expect("Failed to create DB");
     db.init().expect("DB init should succeed");
 
     db.add_config(

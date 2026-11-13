@@ -25,17 +25,19 @@ serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = { version = "1.0.150" }
 directories = "6.0.0"
 bb-downloader = { path = "../bb-downloader", default-features = false, features = ["json"] }
-bb-config = { path = "../bb-config", features = ["rusqlite"] }
+bb-config = { path = "../bb-config" }
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["file_stream", "cancel", "reader_progress"] }
 semver = "1.0.28"
 anyhow = "1.0"
-tempfile = "3.26"
 tokio-util = { version = "0.7", features = ["rt"] }
-rusqlite = { version = "0.42", features = ["url", "chrono"] }
 chrono = "0.4"
 chrono-tz = { version = "0.10", features = ["serde"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 bb-imager-gui-ui = { path = "../bb-imager-gui-ui" }
+bb-imager-db = { path = "../bb-imager-db" }
+
+[dev-dependencies]
+tempfile = "3.26"
 
 [build-dependencies]
 embed-resource = "3.0"
@@ -57,7 +59,7 @@ bcf_msp430 = ["bb-flasher/bcf_msp430", "bcf_cc1352p7"]
 updater = []
 # Built by the Flatpak/snap packages: show the first-run udev notice.
 sandboxed = []
-static = ["rusqlite/bundled", "bb-flasher/static", "bb-downloader/rustls"]
+static = ["bb-imager-db/static", "bb-flasher/static", "bb-downloader/rustls"]
 system-deps = ["bb-downloader/native-tls"]
 zepto_uart = ["bb-flasher/mspm0_uart"]
 zepto_i2c = ["bb-flasher/mspm0_i2c"]

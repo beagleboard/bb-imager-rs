@@ -34,7 +34,7 @@ pub(crate) enum BBImagerMessage {
 
     /// Select a board by index. Can only be used in Board selection page.
     UpdateBoardList(Box<[bb_imager_gui_ui::board_selection::Board]>),
-    SelectBoard(crate::db::Board),
+    SelectBoard(bb_imager_gui_ui::board_selection::BoardDetails),
 
     /// ChooseOs Page
     UpdateOsList(
@@ -48,7 +48,7 @@ pub(crate) enum BBImagerMessage {
         flasher: bb_config::config::Flasher,
         size: u64,
     },
-    SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
+    SelectRemoteOs((bb_imager_db::OsImage, bb_config::config::Flasher)),
 
     /// Choose Destination page. Toggles the destination in the selection.
     SelectDest(bb_imager_gui_ui::destination_selection::DestId),
@@ -93,7 +93,35 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::SelectBoardById(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
-                blocking_future(move || db.board_by_id(id).expect("Incorrect board id")),
+                blocking_future(move || {
+                    let board = db.board_by_id(id).expect("Incorrect board id");
+
+                    let mut btns = Vec::with_capacity(2);
+                    if let Some(x) = board.documentation.as_ref() {
+                        btns.push(("Documentation", x.clone()));
+                    }
+                    if let Some(x) = board.oshw.as_ref() {
+                        btns.push((
+                            "OSHW",
+                            url::Url::parse(&format!(
+                                "{}/{x}.html",
+                                crate::constants::OSHW_BASE_URL
+                            ))
+                            .unwrap(),
+                        ));
+                    }
+
+                    bb_imager_gui_ui::board_selection::BoardDetails {
+                        id: board.id,
+                        name: board.name,
+                        icon: board.icon,
+                        description: board.description,
+                        specification: board.specification.into(),
+                        buttons: btns.into(),
+                        flasher: board.flasher,
+                        instructions: board.instructions,
+                    }
+                }),
                 BBImagerMessage::SelectBoard,
             );
         }
@@ -277,7 +305,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 return Task::perform(
                     blocking_future(move || {
                         let id = db.os_sublist_parent(curpos).unwrap();
-                        let imgs = db.os_image_items(board_id, id).unwrap();
+                        let imgs = helpers::image_items(db.os_image_items(board_id, id).unwrap());
                         (imgs, id)
                     }),
                     BBImagerMessage::UpdateOsList,
@@ -652,7 +680,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::CopyBoardConfig(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
-                blocking_future(move || db.os_board_json_by_id(id)),
+                blocking_future(move || db.board_config_by_id(id)),
                 |x| match x {
                     Ok(b) => BBImagerMessage::CopyToClipboard(
                         serde_json::to_string_pretty(&b).expect("Device is always serializable"),
@@ -667,7 +695,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::CopyImageConfig(id)) => {
             let db = state.common().db.clone();
             return Task::perform(
-                blocking_future(move || db.os_image_json_by_id(id)),
+                blocking_future(move || db.os_image_config_by_id(id)),
                 |x| match x {
                     Ok(i) => BBImagerMessage::CopyToClipboard(
                         serde_json::to_string_pretty(&i).expect("OsImage is always serializable"),

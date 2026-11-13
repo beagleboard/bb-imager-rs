@@ -664,6 +664,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bb-imager-db"
+version = "1.0.21"
+dependencies = [
+ "bb-config",
+ "chrono",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "bb-imager-gui"
 version = "1.0.21"
 dependencies = [
@@ -674,6 +687,7 @@ dependencies = [
  "bb-flasher",
  "bb-helper",
  "bb-iced-widgets",
+ "bb-imager-db",
  "bb-imager-gui-ui",
  "chrono",
  "chrono-tz",
@@ -684,7 +698,6 @@ dependencies = [
  "image",
  "notify-rust",
  "rfd",
- "rusqlite",
  "semver",
  "serde",
  "serde_json",

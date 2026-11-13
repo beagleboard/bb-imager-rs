@@ -48,7 +48,7 @@ pub(crate) enum RemoteSource {
 
 impl RemoteSource {
     pub(crate) fn from_img(
-        img: &crate::db::OsImage,
+        img: &bb_imager_db::OsImage,
         downloader: bb_downloader::Downloader,
         flasher: bb_config::config::Flasher,
     ) -> Self {

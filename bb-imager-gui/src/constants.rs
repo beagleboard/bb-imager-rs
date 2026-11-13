@@ -5,7 +5,6 @@ pub(crate) const LATEST_RELEASE_URL: &str =
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
-pub(crate) const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
 pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
     "pre-release"

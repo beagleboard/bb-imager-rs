@@ -1,97 +1,29 @@
-//! This module handles interaction with sqlite db used for config.
-
 use std::sync::{Arc, Mutex};
 
 use bb_config::config;
 use rusqlite::Connection;
 use url::Url;
 
-#[cfg(test)]
-mod tests;
+use crate::types::{Board, BoardItem, ImageId, ImageItem, OsImage};
 
+/// Handle to the catalog database. Cloning is cheap and shares the same connection.
 #[derive(Debug, Clone)]
-pub(crate) struct Db {
+pub struct Db {
     _f: Arc<tempfile::NamedTempFile>,
     db: Arc<Mutex<Connection>>,
+    flasher_supported: fn(config::Flasher) -> bool,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Board {
-    pub(crate) id: i64,
-    pub(crate) name: Box<str>,
-    pub(crate) icon: Option<Arc<Url>>,
-    pub(crate) description: Arc<str>,
-    pub(crate) documentation: Option<Url>,
-    pub(crate) specification: Vec<(Box<str>, Box<str>)>,
-    pub(crate) oshw: Option<Box<str>>,
-    pub(crate) flasher: config::Flasher,
-    pub(crate) instructions: Option<Box<str>>,
-    pub(crate) bootfs: Option<config::Bootfs>,
-}
-
-impl Board {
-    fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        let spec: Vec<u8> = value.get("specification")?;
-        let bootfs: Option<Vec<u8>> = value.get("bootfs")?;
-
-        Ok(Self {
-            id: value.get("id")?,
-            name: value.get("name")?,
-            icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
-            description: value.get("description")?,
-            documentation: value.get("documentation")?,
-            specification: serde_json::from_slice(&spec).unwrap(),
-            oshw: value.get("oshw")?,
-            flasher: value.get("flasher")?,
-            instructions: value.get("instructions")?,
-            bootfs: bootfs.map(|x| serde_json::from_slice(&x).unwrap()),
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct OsImage {
-    pub(crate) id: i64,
-    pub(crate) name: Box<str>,
-    pub(crate) description: Box<str>,
-    pub(crate) icon: Arc<Url>,
-    pub(crate) url: Box<Url>,
-    pub(crate) image_download_size: i64,
-    pub(crate) image_download_sha256: [u8; 32],
-    pub(crate) extract_size: i64,
-    pub(crate) release_date: chrono::NaiveDate,
-    pub(crate) init_format: bb_config::config::InitFormat,
-    pub(crate) bmap: Option<Box<Url>>,
-    pub(crate) sbom: Option<Url>,
-    pub(crate) info_text: Option<Arc<str>>,
-    pub(crate) support: Option<Url>,
-}
-
-impl OsImage {
-    fn from_row(value: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        Ok(Self {
-            id: value.get("id")?,
-            name: value.get("name")?,
-            icon: Arc::new(value.get("icon")?),
-            description: value.get("description")?,
-            url: Box::new(value.get("url")?),
-            image_download_size: value.get("image_download_size")?,
-            image_download_sha256: value.get("image_download_sha256")?,
-            extract_size: value.get("extract_size")?,
-            release_date: value.get("release_date")?,
-            init_format: value.get("init_format")?,
-            bmap: value.get::<_, Option<Url>>("bmap")?.map(Box::new),
-            sbom: value.get::<_, Option<Url>>("sbom")?,
-            info_text: value.get("info_text")?,
-            support: value.get("support")?,
-        })
-    }
-}
-
-const MIGRATIONS: &str = include_str!("../../migrations/20260316134019_init.sql");
+const MIGRATIONS: &str = include_str!("../migrations/20260316134019_init.sql");
+const DEFAULT_CONFIG: &[u8] = include_bytes!("../../config.json");
 
 impl Db {
-    pub(crate) fn new() -> rusqlite::Result<Self> {
+    /// Create an empty database. Only boards, sublists and remote sublists whose flasher passes
+    /// `flasher_supported` are stored.
+    ///
+    /// Call [`Self::init`] before running any query. It is kept separate so callers can run the
+    /// slow part (migrations and loading the bundled config) off the UI thread.
+    pub fn new(flasher_supported: fn(config::Flasher) -> bool) -> rusqlite::Result<Self> {
         let f = tempfile::NamedTempFile::new().unwrap();
         tracing::info!("DB Path: {}", f.path().display());
         let db = Connection::open(f.path())?;
@@ -99,36 +31,38 @@ impl Db {
         Ok(Self {
             _f: Arc::new(f),
             db: Arc::new(Mutex::new(db)),
+            flasher_supported,
         })
     }
 
-    pub(crate) fn init(&self) -> rusqlite::Result<()> {
+    /// Create the schema and load the bundled `config.json`.
+    pub fn init(&self) -> rusqlite::Result<()> {
         // Populate initial data
-        let cfg =
-            serde_json::from_slice::<bb_config::config::Config>(crate::constants::DEFAULT_CONFIG)
-                .expect("Failed to parse config");
+        let cfg = serde_json::from_slice::<bb_config::config::Config>(DEFAULT_CONFIG)
+            .expect("Failed to parse config");
 
         let mut db = self.db.lock().unwrap();
 
         // Run migrations
         db.execute_batch(MIGRATIONS)?;
 
-        Self::add_config_internal(&mut db, cfg, None)
+        Self::add_config_internal(&mut db, cfg, None, self.flasher_supported)
     }
 
-    pub(crate) fn add_config(
+    pub fn add_config(
         &self,
         cfg: config::Config,
         remote_config_id: Option<i64>,
     ) -> rusqlite::Result<()> {
         let mut db = self.db.lock().unwrap();
-        Self::add_config_internal(&mut db, cfg, remote_config_id)
+        Self::add_config_internal(&mut db, cfg, remote_config_id, self.flasher_supported)
     }
 
     fn add_config_internal(
         db: &mut Connection,
         cfg: config::Config,
         remote_config_id: Option<i64>,
+        flasher_supported: fn(config::Flasher) -> bool,
     ) -> rusqlite::Result<()> {
         let tx = db.transaction()?;
 
@@ -142,12 +76,12 @@ impl Db {
             .imager
             .devices
             .iter()
-            .filter(|x| crate::helpers::flasher_supported(x.flasher))
+            .filter(|x| flasher_supported(x.flasher))
         {
             Self::insert_board(&tx, dev)?;
         }
 
-        Self::insert_os_list_items(&tx, &cfg.os_list, None, remote_config_id)?;
+        Self::insert_os_list_items(&tx, &cfg.os_list, None, remote_config_id, flasher_supported)?;
 
         tx.commit()
     }
@@ -177,7 +111,7 @@ impl Db {
     }
 
     // Not cached: runs exactly once per process, from the `DbInitSuccess` handler.
-    pub(crate) fn remote_configs(&self) -> rusqlite::Result<Vec<(i64, Url)>> {
+    pub fn remote_configs(&self) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
 
         let res = db
@@ -188,13 +122,12 @@ impl Db {
 
                 Ok((id, u))
             })?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_remote_sublist_resolve(
+    pub fn os_remote_sublist_resolve(
         &self,
         id: i64,
         subitems: &[bb_config::config::OsListItem],
@@ -208,7 +141,7 @@ impl Db {
             stmt.execute([id])?;
         }
 
-        Self::insert_os_list_items(&tx, subitems, Some(id), None)?;
+        Self::insert_os_list_items(&tx, subitems, Some(id), None, self.flasher_supported)?;
 
         tx.commit()
     }
@@ -218,6 +151,7 @@ impl Db {
         items: &[config::OsListItem],
         start_pid: Option<i64>,
         remote_config_id: Option<i64>,
+        flasher_supported: fn(config::Flasher) -> bool,
     ) -> rusqlite::Result<()> {
         let mut imgs = Vec::from_iter(items.iter().map(|x| (start_pid, x)));
 
@@ -230,13 +164,13 @@ impl Db {
                     }
                 }
                 config::OsListItem::SubList(os_sub_list) => {
-                    if crate::helpers::flasher_supported(os_sub_list.flasher) {
+                    if flasher_supported(os_sub_list.flasher) {
                         let id = Self::insert_sub_list(exec, os_sub_list, pid, remote_config_id)?;
                         imgs.extend(os_sub_list.subitems.iter().map(|x| (Some(id), x)));
                     }
                 }
                 config::OsListItem::RemoteSubList(os_remote_sub_list) => {
-                    if crate::helpers::flasher_supported(os_remote_sub_list.flasher) {
+                    if flasher_supported(os_remote_sub_list.flasher) {
                         let id = Self::insert_remote_image(
                             exec,
                             os_remote_sub_list,
@@ -397,9 +331,9 @@ impl Db {
             img.description,
             img.icon,
             img.url,
-            img.image_download_size as i64,
+            img.image_download_size,
             img.image_download_sha256,
-            i64::try_from(img.extract_size).unwrap(),
+            img.extract_size,
             img.release_date,
             img.init_format,
             img.bmap,
@@ -463,42 +397,31 @@ impl Db {
     }
 
     /// Get all board icons.
-    pub(crate) fn board_icons(&self) -> rusqlite::Result<Vec<Arc<Url>>> {
+    pub fn board_icons(&self) -> rusqlite::Result<Vec<Arc<Url>>> {
         let db = self.db.lock().unwrap();
         let mut stmt =
             db.prepare_cached("SELECT DISTINCT icon FROM boards WHERE icon IS NOT NULL")?;
         let res = stmt
-            .query_map([], |r| r.get(0))?
-            .map(|x| Arc::new(x.unwrap()))
-            .collect();
+            .query_map([], |r| r.get(0).map(Arc::new))?
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
     /// Get board list data. (ID, Icon, Name)
-    pub(crate) fn board_list(
-        &self,
-        search: &str,
-    ) -> rusqlite::Result<Box<[bb_imager_gui_ui::board_selection::Board]>> {
+    pub fn board_list(&self, search: &str) -> rusqlite::Result<Box<[BoardItem]>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             "SELECT id, icon, name FROM boards WHERE name LIKE $1 COLLATE NOCASE",
         )?;
         let res = stmt
-            .query_map([format!("%{}%", search)], |value| {
-                Ok(bb_imager_gui_ui::board_selection::Board {
-                    id: value.get("id")?,
-                    icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
-                    name: value.get("name")?,
-                })
-            })?
-            .map(|x| x.unwrap())
-            .collect();
+            .query_map([format!("%{search}%")], BoardItem::from_row)?
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn board_by_id(&self, id: i64) -> rusqlite::Result<Board> {
+    pub fn board_by_id(&self, id: i64) -> rusqlite::Result<Board> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -510,7 +433,7 @@ impl Db {
         stmt.query_row([id], Board::from_row)
     }
 
-    pub(crate) fn os_image_by_id(&self, id: i64) -> rusqlite::Result<OsImage> {
+    pub fn os_image_by_id(&self, id: i64) -> rusqlite::Result<OsImage> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -522,11 +445,11 @@ impl Db {
         stmt.query_row([id], OsImage::from_row)
     }
 
-    pub(crate) fn os_image_items(
+    pub fn os_image_items(
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<ImageItem>> {
         let a = self.os_images_by_board_id(board_id, parent_id)?;
         let b = self.os_sublists(board_id, parent_id)?;
 
@@ -537,7 +460,7 @@ impl Db {
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -552,15 +475,10 @@ impl Db {
             ORDER BY oi.remote_config_id NULLS LAST"#,
         )?;
         let res = stmt
-            .query_map(rusqlite::params![board_id, parent_id], |value| {
-                Ok(bb_imager_gui_ui::image_selection::ImageItem {
-                    id: bb_imager_gui_ui::image_selection::ImageId::OsImage(value.get("id")?),
-                    icon: Some(Arc::new(value.get("icon")?)),
-                    label: value.get::<_, String>("name")?.into(),
-                })
+            .query_map(rusqlite::params![board_id, parent_id], |r| {
+                ImageItem::from_row(r, ImageId::os_image_from_row)
             })?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
@@ -569,7 +487,7 @@ impl Db {
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -589,24 +507,14 @@ impl Db {
         let res = stmt
             .query_map(
                 rusqlite::params![board_id, parent_id, config::Flasher::SdCardNoBootloader],
-                |value| {
-                    Ok(bb_imager_gui_ui::image_selection::ImageItem {
-                        id: bb_imager_gui_ui::image_selection::ImageId::OsSublist((
-                            value.get("id")?,
-                            value.get("flasher")?,
-                        )),
-                        icon: Some(Arc::new(value.get("icon")?)),
-                        label: value.get::<_, String>("name")?.into(),
-                    })
-                },
+                |r| ImageItem::from_row(r, ImageId::os_sublist_from_row),
             )?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_remote_sublists(
+    pub fn os_remote_sublists(
         &self,
         board_id: i64,
         parent_id: Option<i64>,
@@ -632,22 +540,18 @@ impl Db {
                 rusqlite::params![board_id, parent_id, config::Flasher::SdCardNoBootloader],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_sublist_parent(&self, sublist_id: i64) -> rusqlite::Result<Option<i64>> {
+    pub fn os_sublist_parent(&self, sublist_id: i64) -> rusqlite::Result<Option<i64>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached("SELECT parent_id FROM os_sublists WHERE id = $1")?;
         stmt.query_row([sublist_id], |r| r.get(0))
     }
 
-    pub(crate) fn os_image_icons_by_board_id(
-        &self,
-        board_id: i64,
-    ) -> rusqlite::Result<Vec<Arc<Url>>> {
+    pub fn os_image_icons_by_board_id(&self, board_id: i64) -> rusqlite::Result<Vec<Arc<Url>>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -663,14 +567,13 @@ impl Db {
             WHERE sb.board_id = $1"#,
         )?;
         let res = stmt
-            .query_map([board_id], |r| r.get(0))?
-            .map(|x| Arc::new(x.unwrap()))
-            .collect();
+            .query_map([board_id], |r| r.get(0).map(Arc::new))?
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_remote_sublists_by_remote_config(
+    pub fn os_remote_sublists_by_remote_config(
         &self,
         board_id: i64,
         remote_config_id: i64,
@@ -687,16 +590,12 @@ impl Db {
         )?;
         let res = stmt
             .query_map([board_id, remote_config_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_remote_sublists_by_board(
-        &self,
-        board_id: i64,
-    ) -> rusqlite::Result<Vec<(i64, Url)>> {
+    pub fn os_remote_sublists_by_board(&self, board_id: i64) -> rusqlite::Result<Vec<(i64, Url)>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -707,17 +606,16 @@ impl Db {
         )?;
         let res = stmt
             .query_map([board_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .map(|x| x.unwrap())
-            .collect();
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
 
-    pub(crate) fn os_images_by_name(
+    pub fn os_images_by_name(
         &self,
         board_id: i64,
         search: &str,
-    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -727,18 +625,10 @@ impl Db {
             WHERE oib.board_id = $1 AND oi.name LIKE $2"#,
         )?;
         let res = stmt
-            .query_map(
-                rusqlite::params![board_id, format!("%{search}%")],
-                |value| {
-                    Ok(bb_imager_gui_ui::image_selection::ImageItem {
-                        id: bb_imager_gui_ui::image_selection::ImageId::OsImage(value.get("id")?),
-                        icon: Some(Arc::new(value.get("icon")?)),
-                        label: value.get::<_, String>("name")?.into(),
-                    })
-                },
-            )?
-            .map(|x| x.unwrap())
-            .collect();
+            .query_map(rusqlite::params![board_id, format!("%{search}%")], |r| {
+                ImageItem::from_row(r, ImageId::os_image_from_row)
+            })?
+            .collect::<rusqlite::Result<_>>()?;
 
         Ok(res)
     }
@@ -747,7 +637,7 @@ impl Db {
     ///
     /// Statements here are not cached: this only runs when the user copies a board to the
     /// clipboard, so a cache slot would be wasted on it.
-    pub(crate) fn os_board_json_by_id(&self, id: i64) -> rusqlite::Result<config::Device> {
+    pub fn board_config_by_id(&self, id: i64) -> rusqlite::Result<config::Device> {
         let db = self.db.lock().unwrap();
 
         let mut stmt = db.prepare("SELECT tag FROM board_tags WHERE board_id = $1")?;
@@ -786,8 +676,8 @@ impl Db {
     /// linked to, so it can contain more tags than the original config entry listed.
     ///
     /// Statements here are not cached, for the same reason as
-    /// [`Self::os_board_json_by_id`].
-    pub(crate) fn os_image_json_by_id(&self, id: i64) -> rusqlite::Result<config::OsImage> {
+    /// [`Self::board_config_by_id`].
+    pub fn os_image_config_by_id(&self, id: i64) -> rusqlite::Result<config::OsImage> {
         let db = self.db.lock().unwrap();
 
         let mut stmt = db.prepare(

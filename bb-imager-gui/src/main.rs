@@ -12,7 +12,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::{helpers::blocking_future, state::BBImagerCommon};
 
 mod constants;
-mod db;
 mod helpers;
 mod img;
 mod message;
@@ -166,7 +165,7 @@ impl BBImager {
         )
         .unwrap();
 
-        let db = crate::db::Db::new().unwrap();
+        let db = bb_imager_db::Db::new(helpers::flasher_supported).unwrap();
 
         let common = BBImagerCommon {
             app_config,
