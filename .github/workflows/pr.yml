@@ -65,20 +65,3 @@ jobs:
     - uses: EmbarkStudios/cargo-deny-action@v2
       with:
         command: check ${{ matrix.checks }}
-
-  build-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - name: Build preview
-        run: make docs CONTAINER=docker
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          # Upload public folder
-          path: './build/site'
