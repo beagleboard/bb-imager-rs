@@ -23,8 +23,11 @@ _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
 _CLI_COMP_ZSH = bb-imager-cli/dist/.target/shell-comp/_bb-imager-cli
 _CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
 # Man pages and shell completions are emitted by bb-imager-cli's build script into its OUT_DIR.
-# Locate that directory (feature-hash is not known ahead of time; scoped to TARGET + release).
-_CLI_OUT_DIR = $(shell ls -td target/$(TARGET)/release/build/bb-imager-cli-*/out 2>/dev/null | head -1)
+# The build-dir layout is not stable, and stale outputs from other feature sets linger, so take the
+# OUT_DIR Cargo reports for the last build. cross mounts the target dir at /target in its container.
+# Non-JSON lines are skipped: cross prints its own messages to stdout when verbose.
+_CLI_BUILD_JSON = target/$(TARGET)/bb-imager-cli-build.json
+_CLI_OUT_DIR = $(patsubst /target/%,target/%,$(shell jq -rR 'fromjson? | select(.reason == "build-script-executed" and (.package_id | contains("bb-imager-cli"))) | .out_dir' $(_CLI_BUILD_JSON) 2>/dev/null))
 
 _GUI_BIN = target/${TARGET}/release/bb-imager-gui
 _GUI_PORTABLE_EXE = bb-imager-gui/dist/bb-imager-gui_$(VERSION)_$(word 1,$(subst -, ,$(TARGET))).exe
@@ -259,13 +262,13 @@ test-gui:
 setup-debian-deps:
 	$(info "Installing Debian dependencies")
 	sudo apt-get update -y
-	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev desktop-file-utils libxkbcommon-x11-0
+	sudo apt-get install -y --no-install-recommends libudev-dev libssl-dev libsqlite3-dev liblzma-dev libhidapi-dev desktop-file-utils libxkbcommon-x11-0 jq
 
 ## setup: setup-fedora-deps: Install Fedora Linux dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-fedora-deps
 setup-fedora-deps:
 	$(info "Installing Fedora dependencies")
-	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon libxkbcommon-x11 hidapi-devel desktop-file-utils
+	sudo dnf install -y openssl-devel systemd-devel xz-devel clang sqlite-devel libxkbcommon libxkbcommon-x11 hidapi-devel desktop-file-utils jq
 
 ## setup: setup-packaging-deps: Install dependencies for generting packages.
 .PHONY: setup-packaging-deps
@@ -444,7 +447,8 @@ bloat:
 .PHONY: _build-cli-bin
 _build-cli-bin:
 	$(info Build CLI for $(TARGET))
-	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux)
+	mkdir -p $(dir $(_CLI_BUILD_JSON))
+	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) --message-format=json-render-diagnostics > $(_CLI_BUILD_JSON)
 
 .PHONY: _build-cli-comp
 _build-cli-comp: _build-cli-bin

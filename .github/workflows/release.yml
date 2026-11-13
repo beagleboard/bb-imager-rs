@@ -134,19 +134,22 @@ jobs:
     name: Build Artifacts - ${{matrix.platform}}
     runs-on: ubuntu-24.04
     env:
-      NO_BUILD: 1
+      RUST_BUILDER: cross
+      BCF_MSP430: 1
+      ZEPTO_I2C: 1
     steps:
     - name: Checkout
       uses: actions/checkout@v7
       with:
         lfs: true
 
-    - name: Build binary
-      uses: houseabsolute/actions-rust-cross@v1
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+
+    - name: Install cross
+      uses: taiki-e/install-action@v2
       with:
-        command: build
-        target: ${{matrix.platform}}
-        args: "--locked --release -F bcf_msp430,bcf_cc1352p7,dfu,zepto_uart,zepto_i2c -p bb-imager-cli"
+        tool: cross
 
     - name: Build packages
       run: make setup-packaging-deps package-${{matrix.platform}}
