@@ -4,23 +4,16 @@ Documentation for BeagleBoard Imaging Utility.
 
 == How to build docs
 
-The docs can be built using docker image.
+The docs are built with the `ghcr.io/beagleboard/antora-docker` container image, using Podman
+if it is installed and Docker otherwise:
 
-[source,text]
+[source,shell]
 ----
-docker run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
-----
-
-Alternately, you can use podman:
-
-[source,text]
-----
-podman run -v $PWD:/antora:Z --rm -it ghcr.io/beagleboard/antora-docker:main antora-playbook-local.yml
+make docs          # build into build/site
+make docs-serve    # build, then serve at http://localhost:8000
 ----
 
-Then test by serving the built docs:
+To force Docker, pass `CONTAINER=docker`.
 
-[source,text]
-----
-python -m http.server --directory build/site
-----
+Inside a git worktree, Antora cannot read the `.git` file, so the docs are copied (symlinks
+dereferenced) to `target/docs` and built there. The site is then at `target/docs/build/site`.
