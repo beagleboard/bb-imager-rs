@@ -54,7 +54,7 @@ The workspace is layered: *front-ends → `bb-flasher` → per-target flasher cr
 
 2+h| Front-ends
 | `bb-imager-gui` | The GUI, built with https://iced.rs/[Iced] (Elm architecture). The top-level `BBImager` enum in `main.rs` is both app state and the screen state machine. `message.rs` holds the global message enum, `state.rs` the per-screen state. Async work runs as `iced::Task`s.
-| `bb-imager-ui` | Screen views (one module per page) used by the GUI.
+| `bb-imager-gui-ui` | Screen views (one module per page) used by the GUI.
 | `bb-iced-widgets` | Reusable Iced widgets.
 | `bb-imager-cli` | The CLI, built with `clap` (derive). The command tree is in `src/cli.rs`.
 

@@ -72,7 +72,7 @@ pub(crate) struct SdSysconfCustomization {
     pub(crate) usb_enable_dhcp: Option<bool>,
 }
 
-impl From<SdSysconfCustomization> for bb_imager_ui::configuration::CloudInit {
+impl From<SdSysconfCustomization> for bb_imager_gui_ui::configuration::CloudInit {
     fn from(value: SdSysconfCustomization) -> Self {
         Self {
             hostname: value.hostname,
@@ -91,7 +91,7 @@ impl From<SdSysconfCustomization> for bb_imager_ui::configuration::CloudInit {
     }
 }
 
-impl From<SdSysconfCustomization> for bb_imager_ui::configuration::SysConfig {
+impl From<SdSysconfCustomization> for bb_imager_gui_ui::configuration::SysConfig {
     fn from(value: SdSysconfCustomization) -> Self {
         Self {
             usb_enable_dhcp: value.usb_enable_dhcp.unwrap_or_default(),
@@ -100,8 +100,8 @@ impl From<SdSysconfCustomization> for bb_imager_ui::configuration::SysConfig {
     }
 }
 
-impl From<&bb_imager_ui::configuration::CloudInit> for SdSysconfCustomization {
-    fn from(value: &bb_imager_ui::configuration::CloudInit) -> Self {
+impl From<&bb_imager_gui_ui::configuration::CloudInit> for SdSysconfCustomization {
+    fn from(value: &bb_imager_gui_ui::configuration::CloudInit) -> Self {
         Self {
             hostname: value.hostname.clone(),
             timezone: value.timezone,
@@ -123,8 +123,8 @@ impl From<&bb_imager_ui::configuration::CloudInit> for SdSysconfCustomization {
     }
 }
 
-impl From<&bb_imager_ui::configuration::SysConfig> for SdSysconfCustomization {
-    fn from(value: &bb_imager_ui::configuration::SysConfig) -> Self {
+impl From<&bb_imager_gui_ui::configuration::SysConfig> for SdSysconfCustomization {
+    fn from(value: &bb_imager_gui_ui::configuration::SysConfig) -> Self {
         Self {
             usb_enable_dhcp: Some(value.usb_enable_dhcp),
             ..(&value.common).into()

@@ -674,7 +674,7 @@ dependencies = [
  "bb-flasher",
  "bb-helper",
  "bb-iced-widgets",
- "bb-imager-ui",
+ "bb-imager-gui-ui",
  "chrono",
  "chrono-tz",
  "directories",
@@ -699,7 +699,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bb-imager-ui"
+name = "bb-imager-gui-ui"
 version = "1.0.21"
 dependencies = [
  "bb-config",

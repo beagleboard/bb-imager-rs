@@ -22,8 +22,8 @@ pub(crate) struct SelectedBoard {
     pub(crate) name: Box<str>,
 }
 
-impl From<bb_imager_ui::board_selection::BoardDetails> for SelectedBoard {
-    fn from(value: bb_imager_ui::board_selection::BoardDetails) -> Self {
+impl From<bb_imager_gui_ui::board_selection::BoardDetails> for SelectedBoard {
+    fn from(value: bb_imager_gui_ui::board_selection::BoardDetails) -> Self {
         Self {
             id: value.id,
             flasher: value.flasher,
@@ -92,10 +92,10 @@ impl std::fmt::Display for BoardImage {
     }
 }
 
-impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
-    fn from(value: bb_imager_ui::image_selection::ImageDetails) -> Self {
+impl From<bb_imager_gui_ui::image_selection::ImageDetails> for BoardImage {
+    fn from(value: bb_imager_gui_ui::image_selection::ImageDetails) -> Self {
         match value {
-            bb_imager_ui::image_selection::ImageDetails::Local {
+            bb_imager_gui_ui::image_selection::ImageDetails::Local {
                 flasher,
                 path,
                 init_format,
@@ -105,7 +105,7 @@ impl From<bb_imager_ui::image_selection::ImageDetails> for BoardImage {
                 flasher,
                 init_format,
             },
-            bb_imager_ui::image_selection::ImageDetails::Remote {
+            bb_imager_gui_ui::image_selection::ImageDetails::Remote {
                 id,
                 title,
                 file_name,
@@ -662,20 +662,20 @@ impl FlashingCustomization {
     }
 }
 
-impl From<&bb_imager_ui::configuration::Customization> for FlashingCustomization {
-    fn from(value: &bb_imager_ui::configuration::Customization) -> Self {
+impl From<&bb_imager_gui_ui::configuration::Customization> for FlashingCustomization {
+    fn from(value: &bb_imager_gui_ui::configuration::Customization) -> Self {
         match value {
-            bb_imager_ui::configuration::Customization::SysConfig(x) => {
+            bb_imager_gui_ui::configuration::Customization::SysConfig(x) => {
                 Self::LinuxSdSysconfig(x.into())
             }
-            bb_imager_ui::configuration::Customization::CloudInit(x) => {
+            bb_imager_gui_ui::configuration::Customization::CloudInit(x) => {
                 Self::LinuxSdCloudInit(x.into())
             }
         }
     }
 }
 
-impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization {
+impl From<FlashingCustomization> for bb_imager_gui_ui::configuration::Customization {
     fn from(value: FlashingCustomization) -> Self {
         match value {
             FlashingCustomization::LinuxSdSysconfig(x) => Self::SysConfig(x.into()),
@@ -693,15 +693,15 @@ impl From<FlashingCustomization> for bb_imager_ui::configuration::Customization 
 /// One row of the destination list, as the page renders it.
 pub(crate) fn dest_item(
     value: &Destination,
-) -> bb_imager_ui::destination_selection::DestinationItem {
-    bb_imager_ui::destination_selection::DestinationItem {
+) -> bb_imager_gui_ui::destination_selection::DestinationItem {
+    bb_imager_gui_ui::destination_selection::DestinationItem {
         id: value.identifier().into(),
         label: value.to_string().into(),
         subtitle: value.size().map(|x| pretty_bytes(x).into()),
     }
 }
 
-impl From<Destination> for bb_imager_ui::destination_selection::DestId {
+impl From<Destination> for bb_imager_gui_ui::destination_selection::DestId {
     fn from(value: Destination) -> Self {
         match value {
             Destination::LocalFile(x) => Self::SaveToFile(x),
@@ -852,7 +852,7 @@ pub(crate) fn fetch_images(
         iced::Task::perform(
             async move { downloader.download(target).await },
             move |p| match p {
-                Ok(p) => BBImagerMessage::UiState(bb_imager_ui::Message::ResolveImage(key, p)),
+                Ok(p) => BBImagerMessage::UiState(bb_imager_gui_ui::Message::ResolveImage(key, p)),
                 Err(_) => {
                     tracing::warn!("Failed to fetch image {}", icon);
                     BBImagerMessage::Null

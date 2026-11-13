@@ -479,14 +479,14 @@ impl Db {
     pub(crate) fn board_list(
         &self,
         search: &str,
-    ) -> rusqlite::Result<Box<[bb_imager_ui::board_selection::Board]>> {
+    ) -> rusqlite::Result<Box<[bb_imager_gui_ui::board_selection::Board]>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             "SELECT id, icon, name FROM boards WHERE name LIKE $1 COLLATE NOCASE",
         )?;
         let res = stmt
             .query_map([format!("%{}%", search)], |value| {
-                Ok(bb_imager_ui::board_selection::Board {
+                Ok(bb_imager_gui_ui::board_selection::Board {
                     id: value.get("id")?,
                     icon: value.get::<_, Option<Url>>("icon")?.map(Arc::new),
                     name: value.get("name")?,
@@ -526,7 +526,7 @@ impl Db {
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
         let a = self.os_images_by_board_id(board_id, parent_id)?;
         let b = self.os_sublists(board_id, parent_id)?;
 
@@ -537,7 +537,7 @@ impl Db {
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -553,8 +553,8 @@ impl Db {
         )?;
         let res = stmt
             .query_map(rusqlite::params![board_id, parent_id], |value| {
-                Ok(bb_imager_ui::image_selection::ImageItem {
-                    id: bb_imager_ui::image_selection::ImageId::OsImage(value.get("id")?),
+                Ok(bb_imager_gui_ui::image_selection::ImageItem {
+                    id: bb_imager_gui_ui::image_selection::ImageId::OsImage(value.get("id")?),
                     icon: Some(Arc::new(value.get("icon")?)),
                     label: value.get::<_, String>("name")?.into(),
                 })
@@ -569,7 +569,7 @@ impl Db {
         &self,
         board_id: i64,
         parent_id: Option<i64>,
-    ) -> rusqlite::Result<Vec<bb_imager_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -590,8 +590,8 @@ impl Db {
             .query_map(
                 rusqlite::params![board_id, parent_id, config::Flasher::SdCardNoBootloader],
                 |value| {
-                    Ok(bb_imager_ui::image_selection::ImageItem {
-                        id: bb_imager_ui::image_selection::ImageId::OsSublist((
+                    Ok(bb_imager_gui_ui::image_selection::ImageItem {
+                        id: bb_imager_gui_ui::image_selection::ImageId::OsSublist((
                             value.get("id")?,
                             value.get("flasher")?,
                         )),
@@ -717,7 +717,7 @@ impl Db {
         &self,
         board_id: i64,
         search: &str,
-    ) -> rusqlite::Result<Vec<bb_imager_ui::image_selection::ImageItem>> {
+    ) -> rusqlite::Result<Vec<bb_imager_gui_ui::image_selection::ImageItem>> {
         let db = self.db.lock().unwrap();
         let mut stmt = db.prepare_cached(
             r#"
@@ -730,8 +730,8 @@ impl Db {
             .query_map(
                 rusqlite::params![board_id, format!("%{search}%")],
                 |value| {
-                    Ok(bb_imager_ui::image_selection::ImageItem {
-                        id: bb_imager_ui::image_selection::ImageId::OsImage(value.get("id")?),
+                    Ok(bb_imager_gui_ui::image_selection::ImageItem {
+                        id: bb_imager_gui_ui::image_selection::ImageId::OsImage(value.get("id")?),
                         icon: Some(Arc::new(value.get("icon")?)),
                         label: value.get::<_, String>("name")?.into(),
                     })
