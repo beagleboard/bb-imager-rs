@@ -222,7 +222,7 @@ endif
 _check_common:
 	$(_CARGO_CHECK) --all-features --workspace --exclude bb-flasher-bcf --exclude bb-flasher \
 		--exclude bb-imager-gui --exclude bb-imager-cli --exclude bb-config --exclude bb-downloader \
-		--exclude bb-iced-widgets --exclude bb-imager-ui --exclude bb-os-list-generator
+		--exclude bb-iced-widgets --exclude bb-imager-gui-ui --exclude bb-os-list-generator
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher-bcf --features msp430,static
 # bb-flasher is not on crates.io yet, so semver-checks has no baseline for it.
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-flasher --features bcf,bcf_msp430,pb2_mspm0,dfu,static,mspm0_uart,mspm0_i2c,piped_image,sd
@@ -234,7 +234,7 @@ _check_gui_common:
 	$(_CARGO_CHECK) --all-features -p bb-config -p bb-downloader
 
 _check_gui: _check_gui_common
-	$(_CARGO_CHECK) --all-features -p bb-iced-widgets -p bb-imager-ui -p bb-os-list-generator
+	$(_CARGO_CHECK) --all-features -p bb-iced-widgets -p bb-imager-gui-ui -p bb-os-list-generator
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-gui ${_RUST_ARGS_GUI} --features updater,zepto_i2c,pre-release
 	
 ## housekeeping: check: Run code quality checks.
@@ -415,7 +415,7 @@ package-bundle-pc-windows-msvc:
 	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
 	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
 	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
-	winapp manifest update-assets bb-imager-ui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
+	winapp manifest update-assets bb-imager-gui-ui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
 	winapp pack --manifest bb-imager-gui/Package.appxmanifest bb-imager-gui/dist/windows-temp/aarch64/ bb-imager-gui/dist/windows-temp/x64/
 	rm -rf bb-imager-gui/dist/windows-temp
 	mv *.msixbundle bb-imager-gui/dist/
@@ -508,7 +508,7 @@ _install_gui:
 	install -Dm755 $(_GUI_BIN) $(DESTDIR)$(BINDIR)/bb-imager-gui
 	install -Dm644 bb-imager-gui/assets/packages/linux/BeagleBoardImager.desktop $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
 	desktop-file-edit --set-icon=$(GUI_NAME) $(DESTDIR)$(DESKTOP_DIR)/$(GUI_NAME).desktop
-	install -Dm644 bb-imager-ui/assets/icons/icon.png $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
+	install -Dm644 bb-imager-gui-ui/assets/icons/icon.png $(DESTDIR)$(ICONS_DIR)/hicolor/128x128/apps/$(GUI_NAME).png
 	install -Dm644 bb-imager-gui/assets/packages/linux/flatpak/org.beagleboard.imagingutility.metainfo.xml $(DESTDIR)$(METAINFO_DIR)/$(GUI_NAME).metainfo.xml
 
 ## install: install-gui: Install GUI. Intended for use in Linux.
@@ -593,71 +593,71 @@ docs-serve: docs
 
 ## preview: preview-review: Preview Review page.
 preview-review:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example review --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example review --features debug
 
 ## preview: preview-flash-fail: Preview Flash Fail page.
 preview-flash-fail:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-fail --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-fail --features debug
 
 ## preview: preview-flash-success: Preview Flash Success page.
 preview-flash-success:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-success --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-success --features debug
 
 ## preview: preview-flash-cancel: Preview Flash Cancel page.
 preview-flash-cancel:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flash-cancel --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-cancel --features debug
 
 ## preview: preview-flashing: Preview Flashing progress page.
 preview-flashing:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example flashing --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flashing --features debug
 
 ## preview: preview-app-info: Preview App options page.
 preview-app-info:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example app-info --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example app-info --features debug
 
 ## preview: preview-configuration-sysconfig: Preview Configuration page for sysconf images.
 preview-configuration-sysconfig:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-sysconfig --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example configuration-sysconfig --features debug
 
 ## preview: preview-configuration-cloudinit: Preview Configuration page for cloud-init images.
 preview-configuration-cloudinit:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example configuration-cloudinit --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example configuration-cloudinit --features debug
 
 ## preview: preview-board-selection: Preview Board selection page.
 preview-board-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example board-selection --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example board-selection --features debug
 
 ## preview: preview-image-selection: Preview OS image selection page.
 preview-image-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example image-selection --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example image-selection --features debug
 
 ## preview: preview-destination-selection: Preview Destination selection page.
 preview-destination-selection:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example destination-selection --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example destination-selection --features debug
 
 #preview: preview-sandbox-notice: Preview sandbox notice page.
 preview-sandbox-notice:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example sandbox-notice --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example sandbox-notice --features debug
 
 ## preview: preview-format-media-destination: Preview format media destination page.
 preview-format-media-destination:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-destination --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-destination --features debug
 
 ## preview: preview-format-media-review: Preview format media review page.
 preview-format-media-review:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-review --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-review --features debug
 
 ## preview: preview-format-media-progress: Preview format media progress page.
 preview-format-media-progress:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-progress --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-progress --features debug
 
 ## preview: preview-format-media-success: Preview format media success page.
 preview-format-media-success:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-success --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-success --features debug
 
 ## preview: preview-format-media-fail: Preview format media fail page.
 preview-format-media-fail:
-	$(_DIOXUS_CLI) serve -p bb-imager-ui --example format-media-fail --features debug
+	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-fail --features debug
 
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks

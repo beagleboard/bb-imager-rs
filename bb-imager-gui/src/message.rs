@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
-use bb_imager_ui::{Message, SidebarEntry};
+use bb_imager_gui_ui::{Message, SidebarEntry};
 use iced::Task;
 
-use bb_imager_ui::image_selection::ImageId;
+use bb_imager_gui_ui::image_selection::ImageId;
 
 use crate::BBImager;
 use crate::helpers::{self, blocking_future};
@@ -17,7 +17,7 @@ use crate::state::{FormatMediaFailState, FormatMediaState};
 
 #[derive(Debug, Clone)]
 pub(crate) enum BBImagerMessage {
-    UiState(bb_imager_ui::Message),
+    UiState(bb_imager_gui_ui::Message),
 
     /// Messages to ignore
     Null,
@@ -33,11 +33,16 @@ pub(crate) enum BBImagerMessage {
     UpdateAvailable(semver::Version),
 
     /// Select a board by index. Can only be used in Board selection page.
-    UpdateBoardList(Box<[bb_imager_ui::board_selection::Board]>),
+    UpdateBoardList(Box<[bb_imager_gui_ui::board_selection::Board]>),
     SelectBoard(crate::db::Board),
 
     /// ChooseOs Page
-    UpdateOsList((Vec<bb_imager_ui::image_selection::ImageItem>, Option<i64>)),
+    UpdateOsList(
+        (
+            Vec<bb_imager_gui_ui::image_selection::ImageItem>,
+            Option<i64>,
+        ),
+    ),
     SelectLocalOs {
         path: Box<std::path::Path>,
         flasher: bb_config::config::Flasher,
@@ -46,7 +51,7 @@ pub(crate) enum BBImagerMessage {
     SelectRemoteOs((crate::db::OsImage, bb_config::config::Flasher)),
 
     /// Choose Destination page. Toggles the destination in the selection.
-    SelectDest(bb_imager_ui::destination_selection::DestId),
+    SelectDest(bb_imager_gui_ui::destination_selection::DestId),
 
     // Flashing Page
     /// Progress of the destination at this index.
@@ -311,7 +316,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     .iter()
                     .any(|x| x.identifier().as_ref() == ident.as_ref())
                 {
-                    inner.toggle_dest(bb_imager_ui::destination_selection::DestId::Device(ident));
+                    inner.toggle_dest(bb_imager_gui_ui::destination_selection::DestId::Device(
+                        ident,
+                    ));
                 } else {
                     tracing::warn!("Destination {ident} is gone; ignoring selection")
                 }
@@ -352,7 +359,7 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 },
                 move |x| match x {
                     Some(y) => BBImagerMessage::SelectDest(
-                        bb_imager_ui::destination_selection::DestId::SaveToFile(y.into()),
+                        bb_imager_gui_ui::destination_selection::DestId::SaveToFile(y.into()),
                     ),
                     None => BBImagerMessage::Null,
                 },
@@ -380,11 +387,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 // ones (USB DHCP on macOS) survive.
                 let default = crate::persistance::SdSysconfCustomization::default();
                 inner.state.customization = match inner.state.customization {
-                    bb_imager_ui::configuration::Customization::SysConfig(_) => {
-                        bb_imager_ui::configuration::Customization::SysConfig(default.into())
+                    bb_imager_gui_ui::configuration::Customization::SysConfig(_) => {
+                        bb_imager_gui_ui::configuration::Customization::SysConfig(default.into())
                     }
-                    bb_imager_ui::configuration::Customization::CloudInit(_) => {
-                        bb_imager_ui::configuration::Customization::CloudInit(default.into())
+                    bb_imager_gui_ui::configuration::Customization::CloudInit(_) => {
+                        bb_imager_gui_ui::configuration::Customization::CloudInit(default.into())
                     }
                 };
             }
@@ -718,8 +725,9 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         },
         BBImagerMessage::UiState(Message::UpdateInitFormat(f)) => {
             if let BBImager::ChooseOs(inner) = state
-                && let Some(bb_imager_ui::image_selection::ImageDetails::Local {
-                    init_format, ..
+                && let Some(bb_imager_gui_ui::image_selection::ImageDetails::Local {
+                    init_format,
+                    ..
                 }) = &mut inner.state.selected
             {
                 *init_format = f;

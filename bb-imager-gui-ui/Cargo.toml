@@ -1,0 +1,27 @@
+[package]
+name = "bb-imager-gui-ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+iced = { version = "0.14", features = ["image", "svg", "tokio"] }
+bb-iced-widgets = { path = "../bb-iced-widgets" }
+chrono-tz = "0.10"
+url = "2.5"
+bb-config = { path = "../bb-config" }
+iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
+
+[dev-dependencies]
+tempfile = "3.27"
+serde_json = "1.0.150"
+bb-downloader = { path = "../bb-downloader" }
+
+[features]
+debug = ["iced/hot"]
+
+[lints]
+workspace = true

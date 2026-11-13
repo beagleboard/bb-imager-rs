@@ -7,9 +7,9 @@ use iced::{Task, widget};
 
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
-use bb_imager_ui::SidebarEntry;
-use bb_imager_ui::destination_selection::DestId;
-use bb_imager_ui::image_selection::ImageId;
+use bb_imager_gui_ui::SidebarEntry;
+use bb_imager_gui_ui::destination_selection::DestId;
+use bb_imager_gui_ui::image_selection::ImageId;
 
 use crate::{
     BBImager, constants,
@@ -86,7 +86,7 @@ impl SandboxNoticeState {
 #[derive(Debug)]
 pub(crate) struct ChooseBoardState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) state: bb_imager_ui::board_selection::State,
+    pub(crate) state: bb_imager_gui_ui::board_selection::State,
 }
 
 impl ChooseBoardState {
@@ -118,7 +118,7 @@ impl ChooseBoardState {
     }
 }
 
-impl From<Board> for bb_imager_ui::board_selection::BoardDetails {
+impl From<Board> for bb_imager_gui_ui::board_selection::BoardDetails {
     fn from(value: Board) -> Self {
         let mut btns = Vec::with_capacity(2);
         if let Some(x) = value.documentation.as_ref() {
@@ -149,7 +149,7 @@ pub(crate) struct ChooseOsState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) flasher: config::Flasher,
-    pub(crate) state: bb_imager_ui::image_selection::State,
+    pub(crate) state: bb_imager_gui_ui::image_selection::State,
 }
 
 impl ChooseOsState {
@@ -164,10 +164,10 @@ impl ChooseOsState {
 
     pub(crate) fn update_images(
         &mut self,
-        mut imgs: Vec<bb_imager_ui::image_selection::ImageItem>,
+        mut imgs: Vec<bb_imager_gui_ui::image_selection::ImageItem>,
         pos: Option<i64>,
     ) {
-        imgs.push(bb_imager_ui::image_selection::ImageItem {
+        imgs.push(bb_imager_gui_ui::image_selection::ImageItem {
             id: ImageId::Local(self.flasher),
             icon: None,
             label: "Select Local Image".into(),
@@ -183,7 +183,7 @@ impl ChooseOsState {
         flasher: config::Flasher,
         size: u64,
     ) {
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Local {
+        self.state.selected = Some(bb_imager_gui_ui::image_selection::ImageDetails::Local {
             flasher,
             path,
             size,
@@ -218,7 +218,7 @@ impl ChooseOsState {
         ]
         .into();
 
-        self.state.selected = Some(bb_imager_ui::image_selection::ImageDetails::Remote {
+        self.state.selected = Some(bb_imager_gui_ui::image_selection::ImageDetails::Remote {
             id: image.id,
             icon: image.icon,
             title: image.name,
@@ -345,7 +345,7 @@ pub(crate) struct ChooseDestState {
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
     pub(crate) destinations: Box<[helpers::Destination]>,
-    pub(crate) state: bb_imager_ui::destination_selection::State,
+    pub(crate) state: bb_imager_gui_ui::destination_selection::State,
 }
 
 impl ChooseDestState {
@@ -372,7 +372,7 @@ impl ChooseDestState {
             selected_board,
             selected_image,
             destinations: Box::default(),
-            state: bb_imager_ui::destination_selection::State {
+            state: bb_imager_gui_ui::destination_selection::State {
                 instruction,
                 image_file_name,
                 ..Default::default()
@@ -508,14 +508,14 @@ impl FlashingContext {
 pub(crate) struct CustomizeState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: Box<bb_imager_ui::configuration::State>,
+    pub(crate) state: Box<bb_imager_gui_ui::configuration::State>,
 }
 
 impl CustomizeState {
     pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
         Self {
             common,
-            state: Box::new(bb_imager_ui::configuration::State {
+            state: Box::new(bb_imager_gui_ui::configuration::State {
                 customization: ctx.customization.clone().into(),
                 default_username: helpers::default_user(),
                 default_timezone: helpers::system_timezone(),
@@ -566,14 +566,14 @@ impl From<FlashingCancelState> for CustomizeState {
 pub(crate) struct ReviewState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::review::State,
+    pub(crate) state: bb_imager_gui_ui::review::State,
 }
 
 impl ReviewState {
     pub(crate) fn new(common: BBImagerCommon, ctx: FlashingContext) -> Self {
         Self {
             common,
-            state: bb_imager_ui::review::State {
+            state: bb_imager_gui_ui::review::State {
                 is_download: ctx.is_download(),
                 board: ctx.selected_board.name.clone(),
                 image: ctx.selected_image.1.to_string().into(),
@@ -609,7 +609,7 @@ pub(crate) struct FlashingState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
     pub(crate) cancel_flashing: iced::task::Handle,
-    pub(crate) state: Box<bb_imager_ui::flashing::State>,
+    pub(crate) state: Box<bb_imager_gui_ui::flashing::State>,
 }
 
 impl FlashingState {
@@ -632,8 +632,8 @@ impl FlashingState {
 /// Both types are foreign to this crate, so this cannot be a `From` impl.
 const fn progress_from(
     value: bb_flasher::DownloadFlashingStatus,
-) -> bb_imager_ui::flashing::Progress {
-    use bb_imager_ui::flashing::Progress;
+) -> bb_imager_gui_ui::flashing::Progress {
+    use bb_imager_gui_ui::flashing::Progress;
 
     match value {
         bb_flasher::DownloadFlashingStatus::Preparing => Progress::Preparing,
@@ -647,13 +647,13 @@ const fn progress_from(
 pub(crate) struct FlashingSuccessState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::flash_success::State,
+    pub(crate) state: bb_imager_gui_ui::flash_success::State,
 }
 
 impl From<FlashingState> for FlashingSuccessState {
     fn from(value: FlashingState) -> Self {
         Self {
-            state: bb_imager_ui::flash_success::State {
+            state: bb_imager_gui_ui::flash_success::State {
                 board: value.ctx.selected_board.name.clone(),
                 image: value.ctx.selected_image.1.to_string().into(),
                 destinations: value.ctx.selected_destinations(),
@@ -670,13 +670,13 @@ impl From<FlashingState> for FlashingSuccessState {
 pub(crate) struct FlashingCancelState {
     pub(crate) common: BBImagerCommon,
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::flash_cancel::State,
+    pub(crate) state: bb_imager_gui_ui::flash_cancel::State,
 }
 
 impl From<FlashingState> for FlashingCancelState {
     fn from(value: FlashingState) -> Self {
         Self {
-            state: bb_imager_ui::flash_cancel::State {
+            state: bb_imager_gui_ui::flash_cancel::State {
                 has_customization: value.ctx.has_customization,
             },
             common: value.common,
@@ -689,7 +689,7 @@ pub(crate) struct FlashingFailState {
     pub(crate) common: BBImagerCommon,
     /// Its destinations are only the ones that failed, kept for Retry.
     pub(crate) ctx: FlashingContext,
-    pub(crate) state: bb_imager_ui::flash_fail::State,
+    pub(crate) state: bb_imager_gui_ui::flash_fail::State,
 }
 
 /// A fail page's log view, scrolled to the end, where the error is.
@@ -713,7 +713,7 @@ impl FlashingFailState {
             .unzip();
 
         Self {
-            state: bb_imager_ui::flash_fail::State {
+            state: bb_imager_gui_ui::flash_fail::State {
                 failures: failures.into(),
                 logs: log_view(logs),
                 has_customization: state.ctx.has_customization,
@@ -731,7 +731,7 @@ impl FlashingFailState {
 /// running flash or format still gets its messages (see `BBImager::active_mut`).
 pub(crate) struct OverlayState {
     pub(crate) page: Box<BBImager>,
-    pub(crate) state: bb_imager_ui::app_info::State,
+    pub(crate) state: bb_imager_gui_ui::app_info::State,
 }
 
 impl OverlayState {
@@ -772,7 +772,7 @@ impl OverlayState {
 
         Self {
             page: Box::new(page),
-            state: bb_imager_ui::app_info::State {
+            state: bb_imager_gui_ui::app_info::State {
                 app_name: constants::APP_NAME,
                 app_release: constants::APP_RELEASE,
                 app_desc: constants::APP_DESC,
@@ -802,7 +802,7 @@ impl OverlayState {
 pub(crate) struct FormatMediaState {
     pub(crate) common: BBImagerCommon,
     pub(crate) destinations: Box<[bb_flasher::sd::Target]>,
-    pub(crate) state: bb_imager_ui::format_media_destination::State,
+    pub(crate) state: bb_imager_gui_ui::format_media_destination::State,
 }
 
 #[cfg(feature = "sd")]
@@ -811,7 +811,7 @@ impl FormatMediaState {
         Self {
             common,
             destinations: Box::default(),
-            state: bb_imager_ui::format_media_destination::State {
+            state: bb_imager_gui_ui::format_media_destination::State {
                 ..Default::default()
             },
         }
@@ -822,7 +822,7 @@ impl FormatMediaState {
         self.state.destinations = destinations
             .iter()
             .map(
-                |x| bb_imager_ui::format_media_destination::DestinationItem {
+                |x| bb_imager_gui_ui::format_media_destination::DestinationItem {
                     id: x.identifier().into(),
                     label: x.to_string().into(),
                     subtitle: Some(helpers::pretty_bytes(x.size()).into()),
@@ -857,7 +857,7 @@ pub(crate) struct FormatMediaReviewState {
     pub(crate) common: BBImagerCommon,
     /// The card to format.
     pub(crate) selected_dest: Box<[bb_flasher::sd::Target]>,
-    pub(crate) state: bb_imager_ui::format_media_review::State,
+    pub(crate) state: bb_imager_gui_ui::format_media_review::State,
 }
 
 #[cfg(feature = "sd")]
@@ -867,7 +867,7 @@ impl FormatMediaReviewState {
 
         Self {
             common,
-            state: bb_imager_ui::format_media_review::State { destinations },
+            state: bb_imager_gui_ui::format_media_review::State { destinations },
             selected_dest: dests,
         }
     }
@@ -878,7 +878,7 @@ impl FormatMediaReviewState {
 pub(crate) struct FormatMediaProgressState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_dest: Box<[bb_flasher::sd::Target]>,
-    pub(crate) state: bb_imager_ui::format_media_progress::State,
+    pub(crate) state: bb_imager_gui_ui::format_media_progress::State,
 }
 
 #[cfg(feature = "sd")]
@@ -887,7 +887,7 @@ impl From<FormatMediaReviewState> for FormatMediaProgressState {
         Self {
             common: value.common,
             selected_dest: value.selected_dest,
-            state: bb_imager_ui::format_media_progress::State {
+            state: bb_imager_gui_ui::format_media_progress::State {
                 destinations: value.state.destinations,
             },
         }
@@ -907,7 +907,7 @@ impl From<FormatMediaFailState> for FormatMediaProgressState {
         Self {
             common: value.common,
             selected_dest: value.selected_dest,
-            state: bb_imager_ui::format_media_progress::State { destinations },
+            state: bb_imager_gui_ui::format_media_progress::State { destinations },
         }
     }
 }
@@ -916,7 +916,7 @@ impl From<FormatMediaFailState> for FormatMediaProgressState {
 #[derive(Debug)]
 pub(crate) struct FormatMediaSuccessState {
     pub(crate) common: BBImagerCommon,
-    pub(crate) state: bb_imager_ui::format_media_success::State,
+    pub(crate) state: bb_imager_gui_ui::format_media_success::State,
 }
 
 #[cfg(feature = "sd")]
@@ -924,7 +924,7 @@ impl From<FormatMediaProgressState> for FormatMediaSuccessState {
     fn from(value: FormatMediaProgressState) -> Self {
         Self {
             common: value.common,
-            state: bb_imager_ui::format_media_success::State {
+            state: bb_imager_gui_ui::format_media_success::State {
                 destinations: value.state.destinations,
             },
         }
@@ -936,7 +936,7 @@ pub(crate) struct FormatMediaFailState {
     pub(crate) common: BBImagerCommon,
     /// The cards that failed, kept for Retry.
     pub(crate) selected_dest: Box<[bb_flasher::sd::Target]>,
-    pub(crate) state: bb_imager_ui::format_media_fail::State,
+    pub(crate) state: bb_imager_gui_ui::format_media_fail::State,
 }
 
 #[cfg(feature = "sd")]
@@ -954,7 +954,7 @@ impl FormatMediaFailState {
         Self {
             common: state.common,
             selected_dest: selected_dest.into(),
-            state: bb_imager_ui::format_media_fail::State {
+            state: bb_imager_gui_ui::format_media_fail::State {
                 failures: failures.into(),
                 logs: log_view(logs),
             },

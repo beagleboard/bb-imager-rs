@@ -508,7 +508,7 @@ fn os_image_by_id_returns_correct_data() {
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) =
+    let bb_imager_gui_ui::image_selection::ImageId::OsImage(image_id) =
         items.iter().find(|x| x.label == "Test OS").unwrap().id
     else {
         panic!("Incorrect ID");
@@ -1316,7 +1316,7 @@ fn insert_image_helper(
         .os_image_items(board_id, None)
         .expect("os_image_items should succeed");
 
-    let bb_imager_ui::image_selection::ImageId::OsImage(image_id) = items
+    let bb_imager_gui_ui::image_selection::ImageId::OsImage(image_id) = items
         .iter()
         .find(|x| x.label == name.as_ref())
         .expect("Inserted image should exist")

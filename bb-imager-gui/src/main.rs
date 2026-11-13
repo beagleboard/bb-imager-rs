@@ -53,7 +53,7 @@ fn main() -> iced::Result {
     let _ = notify_rust::set_application("org.beagleboard.imagingutility");
 
     let app = iced::application(BBImager::new, message::update, ui::view);
-    bb_imager_ui::application(app)
+    bb_imager_gui_ui::application(app)
         .title(helpers::app_title)
         .subscription(BBImager::subscription)
         .run()
@@ -355,7 +355,7 @@ impl BBImager {
                 },
             ),
             Self::Customize(_) | Self::AppInfo(_) => {
-                bb_imager_ui::focus_subscription().map(BBImagerMessage::UiState)
+                bb_imager_gui_ui::focus_subscription().map(BBImagerMessage::UiState)
             }
             _ => Subscription::none(),
         }
@@ -484,7 +484,7 @@ impl BBImager {
             common,
             cancel_flashing: h,
             // Built before `ctx` is moved in below.
-            state: Box::new(bb_imager_ui::flashing::State {
+            state: Box::new(bb_imager_gui_ui::flashing::State {
                 destinations: ctx
                     .selected_dests
                     .iter()
@@ -553,10 +553,10 @@ impl BBImager {
                     .selected
                     .iter()
                     .map(|id| match id {
-                        bb_imager_ui::destination_selection::DestId::Device(ident) => {
+                        bb_imager_gui_ui::destination_selection::DestId::Device(ident) => {
                             inner.find_dest_by_id(ident).cloned()
                         }
-                        bb_imager_ui::destination_selection::DestId::SaveToFile(path) => {
+                        bb_imager_gui_ui::destination_selection::DestId::SaveToFile(path) => {
                             Some(helpers::Destination::LocalFile(path.clone()))
                         }
                     })

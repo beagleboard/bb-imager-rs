@@ -2,7 +2,7 @@ use super::*;
 use crate::persistance::{
     GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
 };
-use bb_imager_ui::destination_selection::DestId;
+use bb_imager_gui_ui::destination_selection::DestId;
 
 #[test]
 fn pretty_bytes_scales_units() {
@@ -245,7 +245,7 @@ fn flashing_customization_round_trips_through_the_page_types() {
     };
 
     let orig = FlashingCustomization::LinuxSdSysconfig(sysconf);
-    let page: bb_imager_ui::configuration::Customization = orig.clone().into();
+    let page: bb_imager_gui_ui::configuration::Customization = orig.clone().into();
     let back: FlashingCustomization = (&page).into();
 
     match (orig, back) {
@@ -270,7 +270,7 @@ fn flashing_customization_round_trips_through_the_page_types() {
         hostname: Some("beagle".into()),
         ..Default::default()
     });
-    let page: bb_imager_ui::configuration::Customization = cloudinit.into();
+    let page: bb_imager_gui_ui::configuration::Customization = cloudinit.into();
     match (&page).into() {
         FlashingCustomization::LinuxSdCloudInit(c) => {
             assert_eq!(c.hostname.as_deref(), Some("beagle"));
@@ -326,7 +326,7 @@ fn dest_item_projects_a_row() {
 fn dest_item_and_details_agree_on_identity() {
     let p = PathBuf::from("/tmp/os.img").into_boxed_path();
     let dst = Destination::LocalFile(p.clone());
-    let details = bb_imager_ui::destination_selection::DestId::from(dst.clone());
+    let details = bb_imager_gui_ui::destination_selection::DestId::from(dst.clone());
 
     // A `LocalFile` only ever reaches the detail pane, never the device list,
     // so its details carry the file identity while a row carries the raw id.
