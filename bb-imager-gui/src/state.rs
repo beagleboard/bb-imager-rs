@@ -506,7 +506,7 @@ impl CustomizeState {
                 default_timezone: helpers::system_timezone(),
                 default_keymap: helpers::system_keymap(),
                 timezones: widget::combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
-                keymaps: widget::combo_box::State::new(constants::KEYMAP_LAYOUTS.to_vec()),
+                keymaps: widget::combo_box::State::new(bb_flasher::sd::KEYMAP_LAYOUTS.to_vec()),
             }),
             ctx,
         }
