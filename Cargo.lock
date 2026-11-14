@@ -652,6 +652,7 @@ version = "1.0.21"
 dependencies = [
  "bb-flasher",
  "bb-flasher-sd",
+ "bb-helper",
  "clap",
  "clap_complete",
  "clap_mangen",
@@ -717,6 +718,7 @@ version = "1.0.21"
 dependencies = [
  "bb-config",
  "bb-downloader",
+ "bb-helper",
  "bb-iced-widgets",
  "chrono-tz",
  "iced",

@@ -418,15 +418,14 @@ fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: boo
         DestinationsTarget::Sd => {
             const NAME_HEADER: &str = "SD Card";
             const PATH_HEADER: &str = "Path";
-            const SIZE_HEADER: &str = "Size (in G)";
-            const BYTES_IN_GB: u64 = 1024 * 1024 * 1024;
+            const SIZE_HEADER: &str = "Size";
 
             let dsts_str: Vec<_> = bb_flasher::sd::Target::destinations(!no_filter)
                 .map(|x| {
                     (
                         x.to_string().trim().to_string(),
                         x.identifier().to_string(),
-                        (x.size() / BYTES_IN_GB).to_string(),
+                        bb_helper::fmt::pretty_bytes(x.size()),
                     )
                 })
                 .collect();
@@ -454,7 +453,7 @@ fn list_destinations(target: DestinationsTarget, no_frills: bool, no_filter: boo
                 "+-{}-+-{}-+-{}-+",
                 std::iter::repeat_n('-', max_name_len).collect::<String>(),
                 std::iter::repeat_n('-', max_path_len).collect::<String>(),
-                std::iter::repeat_n('-', SIZE_HEADER.len()).collect::<String>(),
+                std::iter::repeat_n('-', max_size_len).collect::<String>(),
             );
 
             term.write_line(&table_border).unwrap();

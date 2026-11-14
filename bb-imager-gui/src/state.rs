@@ -193,11 +193,11 @@ impl ChooseOsState {
             ("Release Date", image.release_date.to_string().into()),
             (
                 "Image Size",
-                helpers::pretty_bytes(image.extract_size as u64).into(),
+                bb_helper::fmt::pretty_bytes(image.extract_size as u64),
             ),
             (
                 "Download Size",
-                helpers::pretty_bytes(image.image_download_size as u64).into(),
+                bb_helper::fmt::pretty_bytes(image.image_download_size as u64),
             ),
         ]
         .into();
@@ -810,7 +810,7 @@ impl FormatMediaState {
                 |x| bb_imager_gui_ui::format_media_destination::DestinationItem {
                     id: x.identifier().into(),
                     label: x.to_string().into(),
-                    subtitle: Some(helpers::pretty_bytes(x.size()).into()),
+                    subtitle: Some(bb_helper::fmt::pretty_bytes(x.size())),
                 },
             )
             .collect();
