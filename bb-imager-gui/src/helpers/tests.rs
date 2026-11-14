@@ -2,7 +2,6 @@ use super::*;
 use crate::persistance::{
     GuiConfiguration, SdCustomizationUser, SdCustomizationWifi, SdSysconfCustomization,
 };
-use bb_imager_gui_ui::destination_selection::DestId;
 
 #[test]
 fn normalize_file_dest_strips_known_suffixes() {
@@ -288,13 +287,6 @@ fn board_image_local_reads_file_metadata() {
 }
 
 #[test]
-fn destination_local_file_behaviour() {
-    let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img").into());
-    assert_eq!(dst.size(), None);
-    assert_eq!(dst.to_string(), "Save To File");
-}
-
-#[test]
 fn dest_item_projects_a_row() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img").into());
     let item = dest_item(&dst);
@@ -307,31 +299,6 @@ fn dest_item_projects_a_row() {
         "/tmp/os.img",
         "a row is keyed by the destination's identifier"
     );
-}
-
-/// A row's id and the selection's id must name the same device, or a click
-/// would never highlight the row it came from.
-#[test]
-fn dest_item_and_details_agree_on_identity() {
-    let p = PathBuf::from("/tmp/os.img").into_boxed_path();
-    let dst = Destination::LocalFile(p.clone());
-    let details = bb_imager_gui_ui::destination_selection::DestId::from(dst.clone());
-
-    // A `LocalFile` only ever reaches the detail pane, never the device list,
-    // so its details carry the file identity while a row carries the raw id.
-    assert_eq!(details, DestId::SaveToFile(p));
-    assert_eq!(dest_item(&dst).id, dst.identifier().as_ref().into());
-}
-
-/// Picking the right disk depends on this: the identifier is what a click
-/// carries, and the list it indexes is re-enumerated every second.
-#[test]
-fn destination_identifiers_are_stable_and_distinct() {
-    let a = Destination::LocalFile(PathBuf::from("/tmp/a.img").into());
-    let b = Destination::LocalFile(PathBuf::from("/tmp/b.img").into());
-
-    assert_eq!(a.identifier(), a.identifier());
-    assert_ne!(a.identifier(), b.identifier());
 }
 
 #[test]

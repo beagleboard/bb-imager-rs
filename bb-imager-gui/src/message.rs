@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
+use bb_flasher::Destination;
 use bb_imager_gui_ui::{Message, SidebarEntry};
 use iced::Task;
 
@@ -60,7 +61,7 @@ pub(crate) enum BBImagerMessage {
     FlashSuccess,
     /// Each destination that failed to flash, with its error.
     FlashFail {
-        failures: Box<[(helpers::Destination, Box<str>)]>,
+        failures: Box<[(Destination, Box<str>)]>,
         /// The session log, read off the UI thread.
         logs: Box<str>,
     },
@@ -76,7 +77,7 @@ pub(crate) enum BBImagerMessage {
     FilterResolveImages(Vec<Arc<url::Url>>),
 
     /// Update destinations
-    Destinations(Box<[helpers::Destination]>),
+    Destinations(Box<[Destination]>),
     /// Update the SD cards listed for formatting
     #[cfg(feature = "sd")]
     FormatDestinations(Box<[bb_flasher::sd::Target]>),

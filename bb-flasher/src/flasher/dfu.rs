@@ -11,7 +11,7 @@ use std::sync::mpsc;
 use bb_helper::cancel::CancellationToken;
 
 /// USB DFU device
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Target(bb_flasher_dfu::Device);
 
 impl Target {
