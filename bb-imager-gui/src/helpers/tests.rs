@@ -290,7 +290,6 @@ fn board_image_local_reads_file_metadata() {
 #[test]
 fn destination_local_file_behaviour() {
     let dst = Destination::LocalFile(PathBuf::from("/tmp/os.img").into());
-    assert!(dst.is_download_action());
     assert_eq!(dst.size(), None);
     assert_eq!(dst.to_string(), "Save To File");
 }

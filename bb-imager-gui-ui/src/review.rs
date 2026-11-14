@@ -5,7 +5,6 @@ use crate::helpers::{SidebarEntry, page_type2};
 
 #[derive(Debug)]
 pub struct State {
-    pub is_download: bool,
     pub board: Box<str>,
     pub image: Box<str>,
     pub destinations: Box<[Box<str>]>,
@@ -30,17 +29,11 @@ impl<'a> From<&'a State> for crate::review_inner::State<'a> {
 }
 
 pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
-    let btn_label = if state.is_download {
-        "DOWNLOAD"
-    } else {
-        "WRITE"
-    };
-
     page_type2(
         SidebarEntry::Review,
         state.has_customization,
         false,
         crate::review_inner::State::from(state).view(scroll_id),
-        [widget::button(btn_label).on_press(Message::FlashStart)],
+        [widget::button("WRITE").on_press(Message::FlashStart)],
     )
 }

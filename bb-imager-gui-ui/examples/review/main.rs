@@ -5,7 +5,6 @@ struct State(review::State);
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
         let res = State(review::State {
-            is_download: true,
             board: "BeagleY-AI".into(),
             image: "BeagleY-AI Debian 13 v7.1.x-k3 XFCE".into(),
             destinations: ["Test SD Card".into()].into(),
