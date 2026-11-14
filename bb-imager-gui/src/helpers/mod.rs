@@ -222,7 +222,7 @@ pub(crate) async fn flash(
     img: BoardImage,
     customization: FlashingCustomization,
     dsts: Box<[Destination]>,
-    db: crate::db::Db,
+    db: bb_imager_db::Db,
     downloader: bb_downloader::Downloader,
     chan: mpsc::SyncSender<(usize, DownloadFlashingStatus)>,
     cancel_sync: bb_helper::cancel::CancellationToken,
@@ -262,7 +262,7 @@ pub(crate) async fn flash(
                     #[cfg(not(feature = "sd"))]
                     let bmap = None;
 
-                    Ok::<(_, _), rusqlite::Error>((img.into(), bmap))
+                    Ok::<(_, _), bb_imager_db::Error>((img.into(), bmap))
                 })
                 .await?
             }
@@ -837,6 +837,24 @@ pub(crate) fn normalize_file_dest(name: &str) -> String {
     }
 
     name.to_string()
+}
+
+/// Convert db image rows into image-selection page rows.
+pub(crate) fn image_items(
+    imgs: Vec<bb_imager_db::ImageItem>,
+) -> Vec<bb_imager_gui_ui::image_selection::ImageItem> {
+    use bb_imager_gui_ui::image_selection::{ImageId, ImageItem};
+
+    imgs.into_iter()
+        .map(|x| ImageItem {
+            id: match x.id {
+                bb_imager_db::ImageId::OsImage(id) => ImageId::OsImage(id),
+                bb_imager_db::ImageId::OsSublist(s) => ImageId::OsSublist(s),
+            },
+            icon: x.icon,
+            label: x.label,
+        })
+        .collect()
 }
 
 pub(crate) fn fetch_images(

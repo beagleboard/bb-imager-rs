@@ -7,13 +7,13 @@ use iced::{Task, widget};
 
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
+use bb_imager_db::Db;
 use bb_imager_gui_ui::SidebarEntry;
 use bb_imager_gui_ui::destination_selection::DestId;
 use bb_imager_gui_ui::image_selection::ImageId;
 
 use crate::{
     BBImager, constants,
-    db::{self, Board},
     helpers::{self, blocking_future},
     message::BBImagerMessage,
     persistance, updater,
@@ -27,7 +27,7 @@ pub(crate) struct BBImagerCommon {
     pub(crate) img_handle_cache: bb_iced_widgets::cached_icon::Cache<std::sync::Arc<url::Url>>,
 
     pub(crate) scroll_id: widget::Id,
-    pub(crate) db: db::Db,
+    pub(crate) db: Db,
 }
 
 impl BBImagerCommon {
@@ -98,8 +98,8 @@ impl ChooseBoardState {
     }
 
     /// Record `board` as the selection, both for the flow and for the page.
-    pub(crate) fn select_board(&mut self, board: Board) {
-        self.state.selected = Some(board.into());
+    pub(crate) fn select_board(&mut self, board: bb_imager_gui_ui::board_selection::BoardDetails) {
+        self.state.selected = Some(board);
     }
 
     pub(crate) fn refresh_board_list(&self) -> Task<BBImagerMessage> {
@@ -107,7 +107,17 @@ impl ChooseBoardState {
         let search = self.state.search.clone();
 
         Task::perform(
-            blocking_future(move || db.board_list(&search).unwrap()),
+            blocking_future(move || {
+                db.board_list(&search)
+                    .unwrap()
+                    .into_iter()
+                    .map(|b| bb_imager_gui_ui::board_selection::Board {
+                        id: b.id,
+                        icon: b.icon,
+                        name: b.name,
+                    })
+                    .collect()
+            }),
             BBImagerMessage::UpdateBoardList,
         )
     }
@@ -115,32 +125,6 @@ impl ChooseBoardState {
     pub(crate) fn update_search(&mut self, search: Arc<str>) -> Task<BBImagerMessage> {
         self.state.search = search;
         self.refresh_board_list()
-    }
-}
-
-impl From<Board> for bb_imager_gui_ui::board_selection::BoardDetails {
-    fn from(value: Board) -> Self {
-        let mut btns = Vec::with_capacity(2);
-        if let Some(x) = value.documentation.as_ref() {
-            btns.push(("Documentation", x.clone()));
-        }
-        if let Some(x) = value.oshw.as_ref() {
-            btns.push((
-                "OSHW",
-                url::Url::parse(&format!("{}/{x}.html", constants::OSHW_BASE_URL)).unwrap(),
-            ));
-        }
-
-        Self {
-            id: value.id,
-            name: value.name,
-            icon: value.icon,
-            description: value.description,
-            specification: value.specification.into(),
-            buttons: btns.into(),
-            flasher: value.flasher,
-            instructions: value.instructions,
-        }
     }
 }
 
@@ -193,7 +177,7 @@ impl ChooseOsState {
 
     pub(crate) fn select_remote_image(
         &mut self,
-        image: crate::db::OsImage,
+        image: bb_imager_db::OsImage,
         flasher: config::Flasher,
     ) {
         let mut buttons = Vec::with_capacity(2);
@@ -270,7 +254,7 @@ impl ChooseOsState {
         if self.state.search.is_empty() {
             Task::perform(
                 blocking_future(move || {
-                    let imgs = db.os_image_items(board_id, pos).unwrap();
+                    let imgs = helpers::image_items(db.os_image_items(board_id, pos).unwrap());
                     (imgs, pos)
                 }),
                 BBImagerMessage::UpdateOsList,
@@ -279,7 +263,8 @@ impl ChooseOsState {
             let search = self.state.search.clone();
             Task::perform(
                 blocking_future(move || {
-                    let imgs = db.os_images_by_name(board_id, &search).unwrap();
+                    let imgs =
+                        helpers::image_items(db.os_images_by_name(board_id, &search).unwrap());
                     (imgs, pos)
                 }),
                 BBImagerMessage::UpdateOsList,

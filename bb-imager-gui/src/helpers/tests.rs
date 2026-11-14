@@ -396,7 +396,7 @@ async fn flash_local_image(
         local_image(src.path().to_path_buf(), flasher),
         FlashingCustomization::NoneSd,
         [Destination::LocalFile(dst.path().into())].into(),
-        crate::db::Db::new().unwrap(),
+        bb_imager_db::Db::new(flasher_supported).unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
@@ -429,7 +429,7 @@ async fn flash_writes_every_destination() {
         dsts.iter()
             .map(|x| Destination::LocalFile(x.path().into()))
             .collect(),
-        crate::db::Db::new().unwrap(),
+        bb_imager_db::Db::new(flasher_supported).unwrap(),
         bb_downloader::Downloader::new(cache.path()).unwrap(),
         mpsc::sync_channel(8).0,
         bb_helper::cancel::CancellationToken::default(),
