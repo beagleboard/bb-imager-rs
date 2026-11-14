@@ -556,7 +556,7 @@ impl BBImager {
                             inner.find_dest_by_id(ident).cloned()
                         }
                         bb_imager_gui_ui::destination_selection::DestId::SaveToFile(path) => {
-                            Some(helpers::Destination::LocalFile(path.clone()))
+                            Some(bb_flasher::Destination::LocalFile(path.clone()))
                         }
                     })
                     .collect()

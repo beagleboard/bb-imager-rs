@@ -56,12 +56,14 @@
 //!   BeagleConnect Freedom.
 
 mod common;
+mod destination;
 mod flasher;
 pub mod img;
 
 use std::path::Path;
 
 pub use common::*;
+pub use destination::Destination;
 // Empty when no flasher features are enabled.
 #[allow(unused_imports)]
 pub use flasher::*;

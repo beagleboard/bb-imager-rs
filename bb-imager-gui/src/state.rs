@@ -7,6 +7,7 @@ use iced::{Task, widget};
 
 #[cfg(feature = "sd")]
 use bb_flasher::BBFlasherTarget;
+use bb_flasher::Destination;
 use bb_imager_db::Db;
 use bb_imager_gui_ui::SidebarEntry;
 use bb_imager_gui_ui::destination_selection::DestId;
@@ -329,7 +330,7 @@ pub(crate) struct ChooseDestState {
     pub(crate) common: BBImagerCommon,
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
-    pub(crate) destinations: Box<[helpers::Destination]>,
+    pub(crate) destinations: Box<[Destination]>,
     pub(crate) state: bb_imager_gui_ui::destination_selection::State,
 }
 
@@ -367,7 +368,7 @@ impl ChooseDestState {
 
     /// Rebuild the page's device rows. The "Save To File" row is derived by the
     /// page from `image_file_name`, so it is unaffected by this.
-    pub(crate) fn update_destinations(&mut self, destinations: Box<[helpers::Destination]>) {
+    pub(crate) fn update_destinations(&mut self, destinations: Box<[Destination]>) {
         self.state.destinations = destinations.iter().map(helpers::dest_item).collect();
         self.destinations = destinations;
     }
@@ -389,7 +390,7 @@ impl ChooseDestState {
             .retain(|x| !matches!(x, DestId::SaveToFile(_)));
     }
 
-    pub(crate) fn find_dest_by_id(&self, id: &str) -> Option<&helpers::Destination> {
+    pub(crate) fn find_dest_by_id(&self, id: &str) -> Option<&Destination> {
         self.destinations
             .iter()
             .find(|x| x.identifier().as_ref() == id)
@@ -402,8 +403,14 @@ impl ChooseDestState {
             .any(|x| matches!(x, DestId::SaveToFile(_)))
     }
 
-    fn select_dests(&mut self, dests: impl IntoIterator<Item = helpers::Destination>) {
-        self.state.selected = dests.into_iter().map(Into::into).collect();
+    fn select_dests(&mut self, dests: impl IntoIterator<Item = Destination>) {
+        self.state.selected = dests
+            .into_iter()
+            .map(|x| match x {
+                Destination::LocalFile(p) => DestId::SaveToFile(p),
+                _ => DestId::Device(x.identifier().into()),
+            })
+            .collect();
     }
 
     pub(crate) fn update_search(&mut self, search: Arc<str>) {
@@ -462,7 +469,7 @@ pub(crate) struct FlashingContext {
     pub(crate) selected_board: helpers::SelectedBoard,
     pub(crate) selected_image: (ImageId, helpers::BoardImage),
     /// Never empty, and unique.
-    pub(crate) selected_dests: Box<[helpers::Destination]>,
+    pub(crate) selected_dests: Box<[Destination]>,
     pub(crate) customization: helpers::FlashingCustomization,
     /// Whether the Customize page is part of this flow.
     ///
@@ -475,10 +482,7 @@ pub(crate) struct FlashingContext {
 impl FlashingContext {
     /// One label per destination.
     pub(crate) fn selected_destinations(&self) -> Box<[Box<str>]> {
-        self.selected_dests
-            .iter()
-            .map(helpers::Destination::label)
-            .collect()
+        self.selected_dests.iter().map(Destination::label).collect()
     }
 }
 
@@ -681,7 +685,7 @@ fn log_view(logs: &str) -> widget::text_editor::Content {
 impl FlashingFailState {
     pub(crate) fn new(
         state: FlashingState,
-        failures: Box<[(helpers::Destination, Box<str>)]>,
+        failures: Box<[(Destination, Box<str>)]>,
         logs: &str,
     ) -> Self {
         let (failures, selected_dests): (Vec<_>, Vec<_>) = failures

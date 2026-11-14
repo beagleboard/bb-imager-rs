@@ -1,5 +1,5 @@
 use std::io;
-use std::{fmt::Display, path::PathBuf, sync::LazyLock};
+use std::{path::PathBuf, sync::LazyLock};
 
 use crate::img::RemoteSource;
 use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
@@ -7,7 +7,7 @@ use bb_config::config;
 #[cfg(feature = "sd")]
 use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
-use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
+use bb_flasher::{BBFlasherTarget, Destination, DownloadFlashingStatus};
 use bb_helper::fmt::pretty_bytes;
 use std::sync::{Arc, mpsc};
 use url::Url;
@@ -449,70 +449,6 @@ fn flash_inner(
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub(crate) enum Destination {
-    LocalFile(Box<std::path::Path>),
-    #[cfg(feature = "sd")]
-    SdCard(bb_flasher::sd::Target),
-    #[cfg(feature = "bcf_cc1352p7")]
-    BeagleConnectFreedom(bb_flasher::bcf::cc1352p7::Target),
-    #[cfg(feature = "bcf_msp430")]
-    Msp430(bb_flasher::bcf::msp430::Target),
-    #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-    Mspm0(bb_flasher::mspm0::Target),
-}
-
-impl Display for Destination {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Destination::LocalFile(_) => write!(f, "Save To File"),
-            #[cfg(feature = "sd")]
-            Destination::SdCard(target) => target.fmt(f),
-            #[cfg(feature = "bcf_cc1352p7")]
-            Destination::BeagleConnectFreedom(target) => target.fmt(f),
-            #[cfg(feature = "bcf_msp430")]
-            Destination::Msp430(target) => target.fmt(f),
-            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-            Destination::Mspm0(target) => target.fmt(f),
-        }
-    }
-}
-
-impl Destination {
-    pub(crate) const fn size(&self) -> Option<u64> {
-        #[cfg(feature = "sd")]
-        if let Destination::SdCard(item) = self {
-            return Some(item.size());
-        }
-
-        None
-    }
-
-    /// What the summary pages call this destination: its name, with the size where there is one.
-    pub(crate) fn label(&self) -> Box<str> {
-        match self.size() {
-            Some(x) => format!("{} ({})", self, pretty_bytes(x)).into(),
-            None => self.to_string().into(),
-        }
-    }
-
-    /// Stable identity of this destination, used to match a click back to a
-    /// device after the list has been re-enumerated.
-    pub(crate) fn identifier(&self) -> std::borrow::Cow<'_, str> {
-        match self {
-            Self::LocalFile(p) => p.to_string_lossy(),
-            #[cfg(feature = "sd")]
-            Self::SdCard(t) => t.identifier(),
-            #[cfg(feature = "bcf_cc1352p7")]
-            Self::BeagleConnectFreedom(t) => t.identifier(),
-            #[cfg(feature = "bcf_msp430")]
-            Self::Msp430(t) => t.identifier(),
-            #[cfg(any(feature = "zepto_uart", feature = "zepto_i2c"))]
-            Self::Mspm0(t) => t.identifier(),
-        }
-    }
-}
-
 pub(crate) fn destinations(
     flasher: config::Flasher,
     filter: bool,
@@ -694,15 +630,6 @@ pub(crate) fn dest_item(
         id: value.identifier().into(),
         label: value.to_string().into(),
         subtitle: value.size().map(pretty_bytes),
-    }
-}
-
-impl From<Destination> for bb_imager_gui_ui::destination_selection::DestId {
-    fn from(value: Destination) -> Self {
-        match value {
-            Destination::LocalFile(x) => Self::SaveToFile(x),
-            _ => Self::Device(value.identifier().into()),
-        }
     }
 }
 
