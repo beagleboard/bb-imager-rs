@@ -1,3 +1,5 @@
+use bb_flasher::sd::KEYMAP_LAYOUTS;
+
 pub(crate) const OSHW_BASE_URL: &str = "https://certification.oshwa.org";
 
 pub(crate) const LATEST_RELEASE_URL: &str =
@@ -13,16 +15,6 @@ pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
 };
 pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LICENSE: &str = include_str!("../../LICENSE");
-
-pub(crate) const KEYMAP_LAYOUTS: &[&str] = &[
-    "af", "al", "am", "ara", "at", "au", "az", "ba", "bd", "be", "bg", "br", "brai", "bt", "bw",
-    "by", "ca", "cd", "ch", "cm", "cn", "cz", "de", "dk", "dz", "ee", "epo", "es", "et", "fi",
-    "fo", "fr", "gb", "ge", "gh", "gn", "gr", "hr", "hu", "id", "ie", "il", "in", "iq", "ir", "is",
-    "it", "jp", "jv", "ke", "kg", "kh", "kr", "kz", "la", "latam", "lk", "lt", "lv", "ma", "mao",
-    "md", "me", "mk", "ml", "mm", "mn", "mt", "mv", "my", "ng", "nl", "no", "np", "ph", "pk", "pl",
-    "pt", "ro", "rs", "ru", "se", "si", "sk", "sn", "sy", "tg", "th", "tj", "tm", "tr", "tw", "tz",
-    "ua", "us", "uz", "vn", "za",
-];
 
 /// Resolve a keymap name to its entry in [`KEYMAP_LAYOUTS`].
 ///

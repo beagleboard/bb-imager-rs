@@ -144,7 +144,7 @@ pub(crate) fn system_keymap() -> &'static str {
         if let Some(region) = parts.next() {
             let region = region.split('@').next().unwrap_or(region).trim();
             if !region.is_empty()
-                && let Some(&canon) = crate::constants::KEYMAP_LAYOUTS
+                && let Some(&canon) = bb_flasher::sd::KEYMAP_LAYOUTS
                     .iter()
                     .find(|k| k.eq_ignore_ascii_case(region))
             {
