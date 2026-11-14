@@ -8,6 +8,7 @@ use bb_config::config;
 use bb_flasher::img::OsArchive;
 use bb_flasher::img::OsImage;
 use bb_flasher::{BBFlasherTarget, DownloadFlashingStatus};
+use bb_helper::fmt::pretty_bytes;
 use std::sync::{Arc, mpsc};
 use url::Url;
 
@@ -697,7 +698,7 @@ pub(crate) fn dest_item(
     bb_imager_gui_ui::destination_selection::DestinationItem {
         id: value.identifier().into(),
         label: value.to_string().into(),
-        subtitle: value.size().map(|x| pretty_bytes(x).into()),
+        subtitle: value.size().map(pretty_bytes),
     }
 }
 
@@ -773,28 +774,6 @@ pub(crate) async fn read_logs() -> Box<str> {
         },
         |x| String::from_utf8_lossy(&x).into(),
     )
-}
-
-pub(crate) fn pretty_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
-
-    if bytes == 0 {
-        return "0 B".to_string();
-    }
-
-    let mut size = bytes as f64;
-    let mut unit = 0;
-
-    while size >= 1024.0 && unit < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit += 1;
-    }
-
-    if unit == 0 {
-        format!("{} {}", bytes, UNITS[unit])
-    } else {
-        format!("{:.2} {}", size, UNITS[unit])
-    }
 }
 
 /// Return customization enum variant for cases where no customization is present

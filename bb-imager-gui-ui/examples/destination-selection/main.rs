@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use bb_helper::fmt::pretty_bytes;
 use bb_imager_gui_ui::{
     Message,
     destination_selection::{self, DestId},
@@ -16,19 +17,6 @@ const DEVICES: [(&str, &str, u64); 4] = [
         1_024_209_543_168,
     ),
 ];
-
-fn pretty_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
-
-    let mut size = bytes as f64;
-    let mut unit = 0;
-    while size >= 1024.0 && unit < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit += 1;
-    }
-
-    format!("{size:.2} {}", UNITS[unit])
-}
 
 struct State {
     inner: destination_selection::State,
@@ -83,7 +71,7 @@ fn devices(filter: bool, search: &str) -> Box<[destination_selection::Destinatio
             |(_, (ident, label, size))| destination_selection::DestinationItem {
                 id: (*ident).into(),
                 label: (*label).into(),
-                subtitle: Some(pretty_bytes(*size).into()),
+                subtitle: Some(pretty_bytes(*size)),
             },
         )
         .filter(|x| search.is_empty() || x.label.to_lowercase().contains(&search))

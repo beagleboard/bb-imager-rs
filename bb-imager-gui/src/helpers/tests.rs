@@ -5,16 +5,6 @@ use crate::persistance::{
 use bb_imager_gui_ui::destination_selection::DestId;
 
 #[test]
-fn pretty_bytes_scales_units() {
-    assert_eq!(pretty_bytes(0), "0 B");
-    assert_eq!(pretty_bytes(512), "512 B");
-    assert_eq!(pretty_bytes(1024), "1.00 KiB");
-    assert_eq!(pretty_bytes(1536), "1.50 KiB");
-    assert_eq!(pretty_bytes(1024 * 1024), "1.00 MiB");
-    assert_eq!(pretty_bytes(1024 * 1024 * 1024), "1.00 GiB");
-}
-
-#[test]
 fn normalize_file_dest_strips_known_suffixes() {
     assert_eq!(normalize_file_dest("os.zip"), "os");
     assert_eq!(normalize_file_dest("os.img.xz"), "os.img");

@@ -25,6 +25,7 @@ tar = "0.4"
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 bb-flasher = { path = "../bb-flasher", features = ["sd"], version = "0.2" }
+bb-helper = { path = "../bb-helper", features = ["fmt"], version = "0.1.1" }
 indicatif = "0.18"
 console = "0.16"
 clap_complete = "4.6"

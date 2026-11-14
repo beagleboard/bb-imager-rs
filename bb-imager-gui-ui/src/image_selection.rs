@@ -199,7 +199,7 @@ fn os_view_pane<'a>(
                 svg_big(constants::FILE_ADD_ICON.clone()),
                 title(path.clone()),
                 detail_entry("Path", path),
-                detail_entry("Size", size.to_string()),
+                detail_entry("Size", bb_helper::fmt::pretty_bytes(*size).into_string()),
             ];
 
             let formats = init_formats(*flasher);

@@ -22,6 +22,7 @@ file_stream = ["tokio/fs", "tokio/io-util", "dep:tempfile"]
 reader_progress = []
 cancel = []
 status = []
+fmt = []
 
 [package.metadata.docs.rs]
 all-features = true

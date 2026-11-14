@@ -12,6 +12,8 @@
 pub mod cancel;
 #[cfg(feature = "file_stream")]
 pub mod file_stream;
+#[cfg(feature = "fmt")]
+pub mod fmt;
 #[cfg(feature = "reader_progress")]
 pub mod reader_progress;
 #[cfg(feature = "status")]
