@@ -480,13 +480,6 @@ impl FlashingContext {
             .map(helpers::Destination::label)
             .collect()
     }
-
-    /// Whether this only saves the image to a file, rather than writing any device.
-    pub(crate) fn is_download(&self) -> bool {
-        self.selected_dests
-            .iter()
-            .all(helpers::Destination::is_download_action)
-    }
 }
 
 #[derive(Debug)]
@@ -559,7 +552,6 @@ impl ReviewState {
         Self {
             common,
             state: bb_imager_gui_ui::review::State {
-                is_download: ctx.is_download(),
                 board: ctx.selected_board.name.clone(),
                 image: ctx.selected_image.1.to_string().into(),
                 destinations: ctx.selected_destinations(),

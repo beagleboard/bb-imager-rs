@@ -488,11 +488,6 @@ impl Destination {
         None
     }
 
-    /// Download instead of flashing
-    pub(crate) const fn is_download_action(&self) -> bool {
-        matches!(self, Self::LocalFile(_))
-    }
-
     /// What the summary pages call this destination: its name, with the size where there is one.
     pub(crate) fn label(&self) -> Box<str> {
         match self.size() {

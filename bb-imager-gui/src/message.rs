@@ -428,16 +428,12 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::UiState(Message::FlashCancel)
             if matches!(state.active(), BBImager::Flashing(_)) =>
         {
-            let mut msg = "Flashing cancelled by user";
+            let msg = "Writing cancelled by user";
 
             let page = state.active_mut();
             *page = match std::mem::take(page) {
                 BBImager::Flashing(inner) => {
                     inner.cancel_flashing.abort();
-
-                    if inner.ctx.is_download() {
-                        msg = "Download cancelled by user";
-                    }
                     BBImager::FlashingCancel(inner.into())
                 }
                 _ => unreachable!(),
@@ -451,19 +447,13 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
         BBImagerMessage::FlashFail { failures, logs }
             if matches!(state.active(), BBImager::Flashing(_)) =>
         {
-            let mut msg = "Flashing failed";
+            let msg = "Writing failed";
 
             let page = state.active_mut();
             *page = match std::mem::take(page) {
-                BBImager::Flashing(inner) => {
-                    if inner.ctx.is_download() {
-                        msg = "Download failed";
-                    }
-
-                    BBImager::FlashingFail(crate::state::FlashingFailState::new(
-                        inner, failures, &logs,
-                    ))
-                }
+                BBImager::Flashing(inner) => BBImager::FlashingFail(
+                    crate::state::FlashingFailState::new(inner, failures, &logs),
+                ),
                 _ => unreachable!(),
             };
 
@@ -510,16 +500,11 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             return state.start_flashing();
         }
         BBImagerMessage::FlashSuccess if state.active().is_running() => {
-            let mut msg = "Flashing finished successfully";
+            let mut msg = "Writing finished successfully";
 
             let page = state.active_mut();
             *page = match std::mem::take(page) {
-                BBImager::Flashing(inner) => {
-                    if inner.ctx.is_download() {
-                        msg = "Download finished successfully";
-                    }
-                    BBImager::FlashingSuccess(inner.into())
-                }
+                BBImager::Flashing(inner) => BBImager::FlashingSuccess(inner.into()),
                 #[cfg(feature = "sd")]
                 BBImager::FormatMediaProgress(inner) => {
                     msg = "Formatting finished successfully";
