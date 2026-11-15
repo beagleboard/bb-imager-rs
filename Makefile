@@ -660,6 +660,94 @@ preview-format-media-success:
 preview-format-media-fail:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-fail --features debug
 
+# Screenshots are taken from the bb-imager-gui-ui page examples, in their
+# default state. KDE Plasma is assumed: Flathub wants window decorations in
+# screenshots, which spectacle captures (GNOME/sway screenshots do not).
+SCREENSHOT_DELAY ?= 3
+SCREENSHOT_DIR ?= assets/screenshots
+# Inside a toolbox/distrobox the tools usually only exist on the host.
+_SCREENSHOT_HOST = $(if $(wildcard /run/.containerenv),flatpak-spawn --host)
+SPECTACLE ?= $(if $(shell command -v spectacle),spectacle,$(_SCREENSHOT_HOST) spectacle)
+CWEBP ?= $(if $(shell command -v cwebp),cwebp,$(_SCREENSHOT_HOST) cwebp)
+_SCREENSHOT_BIN = target/debug/examples
+# Kept inside the repo (not /tmp) so it is shared with the host when $(SPECTACLE) runs there.
+_SCREENSHOT_TMP = target/screenshots
+
+# $(1): bb-imager-gui-ui example name, $(2): output file name in $(SCREENSHOT_DIR)
+define _screenshot
+	@echo "Capturing $(1) -> $(SCREENSHOT_DIR)/$(2)"
+	@tmp="$(abspath $(_SCREENSHOT_TMP))/$(1).png"; \
+	$(_SCREENSHOT_BIN)/$(1) >/dev/null 2>&1 & pid=$$!; \
+	trap 'kill $$pid 2>/dev/null; wait $$pid 2>/dev/null; rm -f "$$tmp"' EXIT; \
+	sleep $(SCREENSHOT_DELAY); \
+	kill -0 $$pid || { echo "error: $(1) exited early" >&2; exit 1; }; \
+	$(SPECTACLE) --background --nonotify --activewindow --output "$$tmp" && \
+	$(CWEBP) -quiet -lossless -z 9 "$$tmp" -o "$(abspath $(SCREENSHOT_DIR))/$(2)"
+endef
+
+.PHONY: _screenshot-deps
+_screenshot-deps:
+	@$(SPECTACLE) --version >/dev/null 2>&1 || { echo "error: '$(SPECTACLE)' not runnable (KDE Plasma required)" >&2; exit 1; }
+	@$(CWEBP) -version >/dev/null 2>&1 || { echo "error: '$(CWEBP)' not runnable (install libwebp-tools / webp)" >&2; exit 1; }
+	$(if $(findstring KDE,$(XDG_CURRENT_DESKTOP)),,$(warning Not a KDE Plasma session; window decorations may be missing))
+	$(CARGO_PATH) build --locked -p bb-imager-gui-ui --examples
+	mkdir -p $(_SCREENSHOT_TMP) $(SCREENSHOT_DIR)
+
+## preview: screenshot-<page>: Capture one page screenshot (e.g. screenshot-review). See screenshots for the list.
+.PHONY: screenshot-board-selection
+screenshot-board-selection: _screenshot-deps
+	$(call _screenshot,board-selection,1_board_selection.webp)
+
+.PHONY: screenshot-image-selection
+screenshot-image-selection: _screenshot-deps
+	$(call _screenshot,image-selection,2_image_selection.webp)
+
+.PHONY: screenshot-destination-selection
+screenshot-destination-selection: _screenshot-deps
+	$(call _screenshot,destination-selection,3_dest_selection.webp)
+
+.PHONY: screenshot-configuration-sysconfig
+screenshot-configuration-sysconfig: _screenshot-deps
+	$(call _screenshot,configuration-sysconfig,4_customization.webp)
+
+.PHONY: screenshot-review
+screenshot-review: _screenshot-deps
+	$(call _screenshot,review,5_review.webp)
+
+.PHONY: screenshot-flashing
+screenshot-flashing: _screenshot-deps
+	$(call _screenshot,flashing,6_flashing.webp)
+
+.PHONY: screenshot-flash-success
+screenshot-flash-success: _screenshot-deps
+	$(call _screenshot,flash-success,7_sucess.webp)
+
+.PHONY: screenshot-format-media-destination
+screenshot-format-media-destination: _screenshot-deps
+	$(call _screenshot,format-media-destination,8_format_media_destination.webp)
+
+.PHONY: screenshot-format-media-review
+screenshot-format-media-review: _screenshot-deps
+	$(call _screenshot,format-media-review,9_format_media_review.webp)
+
+.PHONY: screenshot-format-media-progress
+screenshot-format-media-progress: _screenshot-deps
+	$(call _screenshot,format-media-progress,10_format_media_progress.webp)
+
+.PHONY: screenshot-format-media-success
+screenshot-format-media-success: _screenshot-deps
+	$(call _screenshot,format-media-success,11_format_media_success.webp)
+
+## preview: screenshots: Capture all app screenshots into assets/screenshots (KDE Plasma + spectacle).
+.PHONY: screenshots
+screenshots: screenshot-board-selection screenshot-image-selection screenshot-destination-selection \
+	screenshot-configuration-sysconfig screenshot-review screenshot-flashing screenshot-flash-success \
+	screenshot-format-media-destination screenshot-format-media-review screenshot-format-media-progress \
+	screenshot-format-media-success
+
+# spectacle grabs whichever window is focused, so pages must be captured one at a time.
+.NOTPARALLEL: screenshots
+
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
 semver-checks:

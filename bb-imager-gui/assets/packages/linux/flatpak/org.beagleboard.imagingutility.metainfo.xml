@@ -43,32 +43,48 @@
 
 	<screenshots>
 		<screenshot type="default">
-			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/1_board_selection.webp</image>
+			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/1_board_selection.webp</image>
 			<caption>Board Selection</caption>
         	</screenshot>
 		<screenshot type="default">
-			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/2_image_selection.webp</image>
+			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/2_image_selection.webp</image>
 			<caption>Image Selection</caption>
         	</screenshot>
 		<screenshot type="default">
-			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/3_dest_selection.webp</image>
+			<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/3_dest_selection.webp</image>
 			<caption>Destination Selection</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/4_customization.webp</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/4_customization.webp</image>
 			<caption>Image customization</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/5_review.webp</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/5_review.webp</image>
 			<caption>Review</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/6_flashing.webp</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/6_flashing.webp</image>
 			<caption>Flashing progress</caption>
         	</screenshot>
         	<screenshot>
-        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.13/assets/screenshots/7_sucess.webp</image>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/7_sucess.webp</image>
 			<caption>Flashing Success</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/8_format_media_destination.webp</image>
+			<caption>Format Media Destination</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/9_format_media_review.webp</image>
+			<caption>Format Media Review</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/10_format_media_progress.webp</image>
+			<caption>Format Media Progress</caption>
+        	</screenshot>
+        	<screenshot>
+        		<image>https://media.githubusercontent.com/media/beagleboard/bb-imager-rs/refs/tags/1.0.22/assets/screenshots/11_format_media_success.webp</image>
+			<caption>Format Media Success</caption>
         	</screenshot>
 	</screenshots>
 

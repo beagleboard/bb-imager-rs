@@ -79,3 +79,18 @@ git revert -s
 ----
 
 will take care of this for you.
+
+== Updating Screenshots
+
+The screenshots in `assets/screenshots` (used by the README and the Flathub metainfo) are generated from the `bb-imager-gui-ui` page examples:
+
+[source,shell]
+----
+make screenshots          # all pages
+make screenshot-review    # a single page
+----
+
+* A KDE Plasma session is required. Flathub wants window decorations in screenshots, and GNOME/sway screenshots do not include them. Capturing uses `spectacle`, and conversion to webp uses `cwebp` (`libwebp-tools` on Fedora, `webp` on Debian/Ubuntu). Inside a toolbox/distrobox, both are run on the host via `flatpak-spawn --host` automatically.
+* Each page is shown in the example's default state. To change what a screenshot shows, change the default state of the corresponding example in `bb-imager-gui-ui/examples`.
+* Keep the mouse pointer away from the window that opens, and do not switch focus while capturing: `spectacle` captures the active window, and hover states would show up in the image.
+* If remote icons are missing in the result, increase the delay before capture, e.g. `make screenshots SCREENSHOT_DELAY=6`.
