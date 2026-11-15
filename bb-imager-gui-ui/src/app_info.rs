@@ -4,8 +4,6 @@ use crate::helpers::{SidebarEntry, VIEW_COL_PADDING, page_type2_overlay};
 use crate::{Message, constants};
 
 pub struct State {
-    pub app_name: &'static str,
-    pub app_release: &'static str,
     pub app_desc: &'static str,
     pub license: widget::text_editor::Content,
     pub cache_dir: std::sync::Arc<str>,
@@ -31,8 +29,8 @@ pub fn view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message>
 fn review_view<'a>(state: &'a State, scroll_id: widget::Id) -> Element<'a, Message> {
     let col = widget::column![
         widget::image(constants::WINDOW_ICON.clone()),
-        state.app_name,
-        state.app_release,
+        constants::APP_NAME,
+        constants::APP_RELEASE,
         state.app_desc,
         widget::rule::horizontal(2),
         input_with_label("Cache Directory", &state.cache_dir),

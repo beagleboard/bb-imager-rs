@@ -5,8 +5,6 @@ struct State(app_info::State);
 impl State {
     fn new() -> (Self, iced::Task<Message>) {
         let res = State(app_info::State {
-            app_name: "BeagleBoard Imager", 
-            app_release: env!("CARGO_PKG_VERSION"), 
             app_desc: env!("CARGO_PKG_DESCRIPTION"), 
             license: iced::widget::text_editor::Content::with_text(include_str!("../../../LICENSE")),
             cache_dir:
