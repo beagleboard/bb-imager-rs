@@ -2,7 +2,7 @@ use std::io;
 use std::{path::PathBuf, sync::LazyLock};
 
 use crate::img::RemoteSource;
-use crate::{BBImagerMessage, PACKAGE_QUALIFIER, constants};
+use crate::{BBImagerMessage, PACKAGE_QUALIFIER};
 use bb_config::config;
 #[cfg(feature = "sd")]
 use bb_flasher::img::OsArchive;
@@ -717,14 +717,6 @@ pub(crate) fn no_customization(
         config::Flasher::BeagleConnectFreedom => Some(FlashingCustomization::Bcf),
         config::Flasher::Mspm0 => Some(FlashingCustomization::Zepto),
         _ => None,
-    }
-}
-
-pub(crate) fn app_title(_: &crate::BBImager) -> String {
-    if cfg!(feature = "pre-release") {
-        format!("{} (pre-release)", constants::APP_NAME)
-    } else {
-        format!("{} v{}", constants::APP_NAME, env!("CARGO_PKG_VERSION"))
     }
 }
 

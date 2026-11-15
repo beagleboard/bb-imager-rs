@@ -53,7 +53,6 @@ fn main() -> iced::Result {
 
     let app = iced::application(BBImager::new, message::update, ui::view);
     bb_imager_gui_ui::application(app)
-        .title(helpers::app_title)
         .subscription(BBImager::subscription)
         .run()
 }

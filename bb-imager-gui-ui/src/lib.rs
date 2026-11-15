@@ -123,4 +123,5 @@ where
         .font(constants::FONT_BOLD_BYTES)
         .default_font(constants::FONT_REGULAR)
         .window(settings)
+        .title(constants::APP_TITLE)
 }

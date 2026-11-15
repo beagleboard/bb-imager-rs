@@ -23,6 +23,7 @@ bb-downloader = { path = "../bb-downloader" }
 
 [features]
 debug = ["iced/hot"]
+pre-release = []
 
 [lints]
 workspace = true

@@ -3,6 +3,18 @@ use std::sync::LazyLock;
 use iced::{color, widget};
 
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(850.0, 500.0);
+pub const APP_NAME: &str = "BeagleBoard Imager";
+pub const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
+    "pre-release"
+} else {
+    env!("CARGO_PKG_VERSION")
+};
+/// Window title. `concat!` needs literals, hence [`APP_NAME`] is repeated.
+pub(crate) const APP_TITLE: &str = if cfg!(feature = "pre-release") {
+    "BeagleBoard Imager (pre-release)"
+} else {
+    concat!("BeagleBoard Imager v", env!("CARGO_PKG_VERSION"))
+};
 
 // Icons Bytes
 pub(crate) const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../assets/icons/icon.png");

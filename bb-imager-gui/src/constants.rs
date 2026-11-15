@@ -7,12 +7,6 @@ pub(crate) const LATEST_RELEASE_URL: &str =
 
 pub(crate) const PACKAGE_QUALIFIER: (&str, &str, &str) = ("org", "beagleboard", "imagingutility");
 
-pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
-pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {
-    "pre-release"
-} else {
-    env!("CARGO_PKG_VERSION")
-};
 pub(crate) const APP_DESC: &str = env!("CARGO_PKG_DESCRIPTION");
 pub(crate) const APP_LICENSE: &str = include_str!("../../LICENSE");
 

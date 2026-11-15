@@ -754,8 +754,6 @@ impl OverlayState {
         Self {
             page: Box::new(page),
             state: bb_imager_gui_ui::app_info::State {
-                app_name: constants::APP_NAME,
-                app_release: constants::APP_RELEASE,
                 app_desc: constants::APP_DESC,
                 license,
                 // TODO: Make Arc
