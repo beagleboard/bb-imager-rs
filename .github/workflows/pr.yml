@@ -48,6 +48,37 @@ jobs:
     - name: Run semver checks
       run: make semver-checks
 
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        lfs: true
+    - name: Install dependencies
+      run: make setup-debian-deps
+    - name: Select rust toolchain
+      run: rustup toolchain install stable --profile minimal
+    - name: Use caching
+      uses: Swatinem/rust-cache@v2
+    - name: Install cargo-release
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-release
+    # Bump to a never-published version so workspace-versioned crates (bb-imager-cli)
+    # get packaged against crates.io, exactly as release.yml does after a real bump.
+    - name: Version bump
+      env:
+        GIT_AUTHOR_NAME: ci
+        GIT_AUTHOR_EMAIL: ci@localhost
+        GIT_COMMITTER_NAME: ci
+        GIT_COMMITTER_EMAIL: ci@localhost
+      run: |
+        git checkout -b release-check
+        yes | make version-bump VERSION=0.0.0-release-check
+    - name: Dry-run release
+      run: cargo release publish --workspace
+
   cargo-deny:
     runs-on: ubuntu-22.04
     strategy:
