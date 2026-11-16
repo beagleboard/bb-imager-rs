@@ -14,7 +14,7 @@
   <Identity
     Name="AyushSingh.BBImager"
     Publisher="CN=F5E8CD3E-8D26-4FF9-8451-11E54B4B02A4"
-    Version="1.0.21.0" />
+    Version="1.0.22.0" />
 
   <Properties>
     <DisplayName>BeagleBoard Imager</DisplayName>

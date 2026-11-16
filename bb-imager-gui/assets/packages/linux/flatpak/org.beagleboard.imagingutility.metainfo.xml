@@ -89,6 +89,9 @@
 	</screenshots>
 
 	<releases>
+		<release version="1.0.22" date="2026-11-16">
+			<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/1.0.22</url>
+		</release>
 		<release version="1.0.21" date="2026-11-12">
 			<url>https://github.com/beagleboard/bb-imager-rs/releases/tag/1.0.21</url>
 		</release>
