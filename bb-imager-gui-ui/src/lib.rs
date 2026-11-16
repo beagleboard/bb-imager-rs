@@ -111,12 +111,17 @@ where
 
     let icon = iced::window::icon::from_file_data(constants::WINDOW_ICON_BYTES, None).ok();
     assert!(icon.is_some());
-    let settings = iced::window::Settings {
+    let mut settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
         icon,
         ..Default::default()
     };
+
+    #[cfg(target_os = "linux")]
+    if let Some(id) = constants::APP_ID {
+        settings.platform_specific.application_id = id.into();
+    }
 
     app.theme(theme)
         .font(constants::FONT_NORMAL_BYTES)
