@@ -17,7 +17,7 @@ tracing = "0.1"
 zerocopy = { version = "0.8", features = ["std", "derive"] }
 bin_file = "0.2"
 crc32fast = "1.5"
-bb-helper = { version = "0.1.1", path = "../bb-helper", features = ["cancel", "status"] }
+bb-helper = { version = "0.1", path = "../bb-helper", features = ["cancel", "status"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 i2cdev = { version = "0.6", optional = true }

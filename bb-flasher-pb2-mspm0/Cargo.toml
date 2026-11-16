@@ -11,7 +11,7 @@ keywords = ["pocketbeagle", "mspm0", "flasher", "beagle"]
 categories = ["embedded", "hardware-support", "os::linux-apis"]
 
 [dependencies]
-bb-helper = { version = "0.1.1", path = "../bb-helper", features = ["status"] }
+bb-helper = { version = "0.1", path = "../bb-helper", features = ["status"] }
 thiserror = "2.0"
 
 [dev-dependencies]
