@@ -411,8 +411,8 @@ package-aarch64-pc-windows-msvc: package-checks
 ## package: package-bundle-pc-windows-msvc: Create aarch64 + x64 msixbundle for Windows.
 .PHONY: package-bundle-pc-windows-msvc
 package-bundle-pc-windows-msvc:
-	$(MAKE) build-gui TARGET=aarch64-pc-windows-msvc UPDATER=1
-	$(MAKE) build-gui TARGET=x86_64-pc-windows-msvc UPDATER=1
+	$(MAKE) build-gui TARGET=aarch64-pc-windows-msvc
+	$(MAKE) build-gui TARGET=x86_64-pc-windows-msvc
 	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
 	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
 	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
