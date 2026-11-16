@@ -12,13 +12,13 @@
   IgnorableNamespaces="uap uap2 uap3 uap10 desktop desktop6 rescap">
 
   <Identity
-    Name="BeagleBoard.org.BBImager"
-    Publisher="CN=BeagleBoard.org"
+    Name="AyushSingh.BBImager"
+    Publisher="CN=F5E8CD3E-8D26-4FF9-8451-11E54B4B02A4"
     Version="1.0.21.0" />
 
   <Properties>
     <DisplayName>BeagleBoard Imager</DisplayName>
-    <PublisherDisplayName>BeagleBoard.org</PublisherDisplayName>
+    <PublisherDisplayName>Ayush Singh</PublisherDisplayName>
     <Logo>assets\icons\icon.scale-50.png</Logo>
   </Properties>
 
