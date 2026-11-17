@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
-use iced::{Length, widget};
+use iced_widget::{self as widget, core::Length};
 
 #[derive(Debug)]
 pub struct Cache<K: Eq + Hash>(HashMap<K, Option<crate::icon::Handle>>);
@@ -58,7 +58,9 @@ impl<'a, M> CachedIcon<'a, M> {
     }
 }
 
-impl<'a, M: 'a> From<CachedIcon<'a, M>> for iced::Element<'a, M> {
+impl<'a, M: 'a> From<CachedIcon<'a, M>>
+    for widget::core::Element<'a, M, widget::Theme, widget::Renderer>
+{
     fn from(value: CachedIcon<'a, M>) -> Self {
         match value {
             CachedIcon::Icon(icon) => icon.into(),

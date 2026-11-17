@@ -641,8 +641,8 @@ dependencies = [
 name = "bb-iced-widgets"
 version = "1.0.22"
 dependencies = [
- "iced",
  "iced_aw",
+ "iced_widget",
  "image",
 ]
 
