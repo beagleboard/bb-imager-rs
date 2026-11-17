@@ -43,7 +43,12 @@ impl FedoraItem {
             image_download_sha256: self.sha256,
             extract_size,
             release_date: release_date.date_naive(),
-            devices: ["beagle-am67".into()].into(),
+            devices: [
+                "beagle-am67".into(),
+                "beagle-am62".into(),
+                "beagle-tda4vm".into(),
+            ]
+            .into(),
             init_format: bb_config::config::InitFormat::None,
             bmap: None,
             sbom: None,
