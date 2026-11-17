@@ -14,7 +14,6 @@ rfd = { version = "0.18.0", features = ["file-handle-inner"] }
 bb-flasher = { path = "../bb-flasher", features = ["piped_image"], version = "0.2" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
-image = "0.25"
 tokio = { version = "1.52", default-features = false, features = ["macros", "time"] }
 webbrowser = "1.2.1"
 notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"], optional = true }
@@ -30,7 +29,6 @@ bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel", "reade
 semver = "1.0.28"
 anyhow = "1.0"
 tokio-util = { version = "0.7", features = ["rt"] }
-chrono = "0.4"
 chrono-tz = { version = "0.10", features = ["serde"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 bb-imager-gui-ui = { path = "../bb-imager-gui-ui" }
