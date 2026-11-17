@@ -8,9 +8,9 @@ license.workspace = true
 publish = false
 
 [dependencies]
-iced = { version = "0.14", features = ["image", "svg"] }
-image = "0.25"
 iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
+iced_widget = { version = "0.14", features = ["image", "svg"] }
+image = { version = "0.25", default-features = false }
 
 [lints]
 workspace = true

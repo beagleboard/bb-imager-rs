@@ -1,6 +1,6 @@
 use std::{io::Read, path::PathBuf};
 
-use iced::{Length, widget};
+use iced_widget::{self as widget, core::Length};
 
 #[derive(Debug, Clone)]
 pub enum Handle {
@@ -61,7 +61,7 @@ impl<'a> Icon<'a> {
     }
 }
 
-impl<'a, M> From<Icon<'a>> for iced::Element<'a, M> {
+impl<'a, M> From<Icon<'a>> for widget::core::Element<'a, M, widget::Theme, widget::Renderer> {
     fn from(value: Icon<'a>) -> Self {
         match value {
             Icon::Svg(svg) => svg.into(),
