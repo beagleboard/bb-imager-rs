@@ -109,7 +109,15 @@ where
         },
     );
 
-    let icon = iced::window::icon::from_file_data(constants::WINDOW_ICON_BYTES, None).ok();
+    // iced's `from_file_data` needs its `image` feature, which enables every image codec.
+    let icon =
+        image::load_from_memory_with_format(constants::WINDOW_ICON_BYTES, image::ImageFormat::Png)
+            .ok()
+            .and_then(|img| {
+                let pixels = img.into_rgba8();
+                let (width, height) = pixels.dimensions();
+                iced::window::icon::from_rgba(pixels.into_raw(), width, height).ok()
+            });
     assert!(icon.is_some());
     let mut settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
