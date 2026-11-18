@@ -28,9 +28,6 @@ bb-flasher-dfu = { version = "0.2", path = "../bb-flasher-dfu", optional = true 
 bb-flasher-mspm0 = { version = "0.2", path = "../bb-flasher-mspm0", optional = true }
 tar = { version = "0.4", optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-liblzma = { version = "0.4", features = ["parallel"] }
-
 [dev-dependencies]
 tokio = { version = "1.52", default-features = false, features = ["rt-multi-thread", "macros"] }
 tempfile = "3.27"
