@@ -154,7 +154,7 @@ pub(crate) struct LinuxDrive {
 #[cfg(feature = "udev")]
 impl Eject for LinuxDrive {
     fn eject(self) -> io::Result<()> {
-        let _ = self.file.sync_all();
+        self.file.sync_all()?;
         let dst = self.drive.clone();
 
         std::mem::drop(self);
@@ -182,7 +182,7 @@ impl Eject for LinuxDrive {
 #[cfg(not(feature = "udev"))]
 impl Eject for LinuxDrive {
     fn eject(self) -> std::io::Result<()> {
-        let _ = self.file.sync_all();
+        self.file.sync_all()?;
         let drive = self.drive.clone();
         std::mem::drop(self);
 
@@ -191,7 +191,7 @@ impl Eject for LinuxDrive {
             Ok(())
         } else {
             Err(std::io::Error::other(
-                String::from_utf8(output.stderr).unwrap(),
+                String::from_utf8_lossy(&output.stderr).into_owned(),
             ))
         }
     }
