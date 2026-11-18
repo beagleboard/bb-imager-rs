@@ -12,6 +12,15 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+    /// The image is too large to be firmware for this flasher (e.g. an SD card image picked by
+    /// mistake).
+    #[error("Image is too large for this flasher: {size} bytes, at most {max} bytes supported.")]
+    ImageTooLarge {
+        /// Image size in bytes (reported or read so far).
+        size: u64,
+        /// Largest supported size in bytes.
+        max: u64,
+    },
     /// Flashing an SD card failed.
     #[cfg(feature = "sd")]
     #[error(transparent)]
@@ -67,6 +76,17 @@ where
     fn identifier<'a>(&'a self) -> Cow<'a, str>;
 }
 
+/// Largest image [`resolve_img`] reads into memory. Microcontroller firmware is at most a few MiB
+/// even as text (CC1352P7: 704 KiB flash, ~2 MiB as Intel HEX).
+#[cfg(any(
+    feature = "bcf",
+    feature = "bcf_msp430",
+    feature = "pb2_mspm0",
+    feature = "mspm0_uart",
+    feature = "mspm0_i2c"
+))]
+const MAX_IMG_SIZE: u64 = 16 * 1024 * 1024;
+
 // Should only be used when image is expected to rather small and can fit in heap.
 #[cfg(any(
     feature = "bcf",
@@ -80,13 +100,73 @@ pub(crate) fn resolve_img(
 ) -> Result<Vec<u8>> {
     use std::io::Read;
 
-    let (mut img, size) = img().map_err(|source| Error::Image { source })?;
+    let (img, size) = img().map_err(|source| Error::Image { source })?;
+    let too_large = |size| Error::ImageTooLarge {
+        size,
+        max: MAX_IMG_SIZE,
+    };
+    if size > MAX_IMG_SIZE {
+        return Err(too_large(size));
+    }
 
-    // If size > usize::MAX, this function should never have been called in the first place. So
-    // panic is fine
-    let mut data = Vec::with_capacity(usize::try_from(size).expect("Image size too big"));
-    img.read_to_end(&mut data)
+    let mut data = Vec::with_capacity(usize::try_from(size).expect("bounded by MAX_IMG_SIZE"));
+    // The size comes from image metadata (xz index, remote config), so cap the read as well.
+    img.take(MAX_IMG_SIZE + 1)
+        .read_to_end(&mut data)
         .map_err(|source| Error::Image { source })?;
+    if data.len() as u64 > MAX_IMG_SIZE {
+        return Err(too_large(data.len() as u64));
+    }
 
     Ok(data)
+}
+
+#[cfg(all(
+    test,
+    any(
+        feature = "bcf",
+        feature = "bcf_msp430",
+        feature = "pb2_mspm0",
+        feature = "mspm0_uart",
+        feature = "mspm0_i2c"
+    )
+))]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// xz file of `len` zero bytes; compresses to a few KiB, so the test stays cheap.
+    fn zeros_xz(len: usize) -> tempfile::NamedTempFile {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        f.write_all(&liblzma::encode_all(&vec![0u8; len][..], 1).unwrap())
+            .unwrap();
+        f
+    }
+
+    #[test]
+    fn resolve_img_rejects_oversized_reported_size() {
+        let f = zeros_xz(MAX_IMG_SIZE as usize + 1);
+        let err = resolve_img(|| {
+            let img = crate::img::OsImage::from_path(f.path())?;
+            let size = img.size();
+            Ok((img, size))
+        })
+        .unwrap_err();
+        assert!(matches!(err, Error::ImageTooLarge { size, .. } if size == MAX_IMG_SIZE + 1));
+    }
+
+    #[test]
+    fn resolve_img_caps_read_when_size_lies() {
+        let f = zeros_xz(MAX_IMG_SIZE as usize + 1);
+        // Metadata claims a tiny image, as a wrong remote `extract_size` would.
+        let err = resolve_img(|| Ok((crate::img::OsImage::from_path(f.path())?, 10))).unwrap_err();
+        assert!(matches!(err, Error::ImageTooLarge { .. }));
+    }
+
+    #[test]
+    fn resolve_img_reads_small_image() {
+        let f = zeros_xz(1024);
+        let data = resolve_img(|| Ok((crate::img::OsImage::from_path(f.path())?, 1024))).unwrap();
+        assert_eq!(data.len(), 1024);
+    }
 }
