@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use iced::{color, widget};
 
 pub(crate) const WINDOW_SIZE: iced::Size = iced::Size::new(850.0, 500.0);
+#[cfg(target_os = "linux")]
 pub(crate) const APP_ID: Option<&str> = option_env!("GUI_NAME");
 pub(crate) const APP_NAME: &str = "BeagleBoard Imager";
 pub(crate) const APP_RELEASE: &str = if cfg!(feature = "pre-release") {

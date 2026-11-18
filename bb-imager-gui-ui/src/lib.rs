@@ -119,17 +119,17 @@ where
                 iced::window::icon::from_rgba(pixels.into_raw(), width, height).ok()
             });
     assert!(icon.is_some());
-    let mut settings = iced::window::Settings {
+    let settings = iced::window::Settings {
         min_size: Some(constants::WINDOW_SIZE),
         size: constants::WINDOW_SIZE,
         icon,
+        #[cfg(target_os = "linux")]
+        platform_specific: iced::window::settings::PlatformSpecific {
+            application_id: constants::APP_ID.unwrap_or_default().into(),
+            ..Default::default()
+        },
         ..Default::default()
     };
-
-    #[cfg(target_os = "linux")]
-    if let Some(id) = constants::APP_ID {
-        settings.platform_specific.application_id = id.into();
-    }
 
     app.theme(theme)
         .font(constants::FONT_NORMAL_BYTES)

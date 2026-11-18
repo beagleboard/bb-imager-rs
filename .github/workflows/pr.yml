@@ -22,13 +22,13 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: make setup-debian-deps
     - name: Select rust toolchain
-      run: rustup toolchain install stable --profile minimal
+      run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
     - name: Use caching
       uses: Swatinem/rust-cache@v2
     - name: Run checks
-      run: make check
+      run: make check WERROR=1
     - name: Run tests
-      run: make test
+      run: make test WERROR=1
 
   semver-checks:
     runs-on: ubuntu-latest
