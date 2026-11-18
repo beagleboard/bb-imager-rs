@@ -15,6 +15,70 @@ fn test_downloader_new_fails_if_path_is_file() {
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::NotADirectory);
 }
 
+#[test]
+fn test_downloader_new_fails_if_cache_dir_cannot_be_created() {
+    let tmp_dir = TempDir::new().unwrap();
+    let file_path = tmp_dir.path().join("some_file.txt");
+    std::fs::write(&file_path, "a file").unwrap();
+
+    // Parent is a file, so the directory can never be created. Previously returned Ok.
+    assert!(Downloader::new(file_path.join("cache")).is_err());
+}
+
+#[tokio::test]
+async fn test_download_rejects_error_status_and_caches_nothing() {
+    let server = MockServer::start();
+    let tmp_dir = TempDir::new().unwrap();
+    let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+    let mut not_found = server.mock(|when, then| {
+        when.method(GET).path("/icon.png");
+        then.status(404).body("<html>Not Found</html>");
+    });
+    let url = server.url("/icon.png");
+
+    let err = downloader.download(&url).await.unwrap_err();
+    assert!(err.to_string().contains("404"), "{err}");
+    assert_eq!(std::fs::read_dir(tmp_dir.path()).unwrap().count(), 0);
+
+    // Once the server recovers, the real file is fetched instead of a cached error page.
+    not_found.delete();
+    server.mock(|when, then| {
+        when.method(GET).path("/icon.png");
+        then.status(200).body("png bytes");
+    });
+    let path = downloader.download(&url).await.unwrap();
+    assert_eq!(std::fs::read(path).unwrap(), b"png bytes");
+}
+
+#[cfg(feature = "json")]
+#[tokio::test]
+async fn test_download_json_no_cache_rejects_error_status() {
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct TestData {
+        status: String,
+        code: u32,
+    }
+
+    let server = MockServer::start();
+    let tmp_dir = TempDir::new().unwrap();
+    let downloader = Downloader::new(tmp_dir.path()).unwrap();
+
+    server.mock(|when, then| {
+        when.method(GET).path("/api/status");
+        then.status(500).body(r#"{"status": "ok", "code": 200}"#);
+    });
+
+    let err = downloader
+        .download_json_no_cache::<TestData, _>(server.url("/api/status"))
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("500"), "{err}");
+}
+
 #[tokio::test]
 async fn test_download_and_cache_by_url() {
     // Start a standalone mock server
