@@ -53,6 +53,8 @@ NO_BUILD ?= 0
 VERBOSE ?= 0
 ## variable: OFFLINE: Should be used when building flatpak.
 OFFLINE ?= 0
+## variable: WERROR: Treat compiler and clippy warnings as errors (used by CI).
+WERROR ?= 0
 ## variable: PREFIX: Install Prefix
 PREFIX ?= /usr/local
 ## variable: BINDIR: Directory to install binary
@@ -134,6 +136,11 @@ endif
 # Add offline flag is needed
 ifeq ($(OFFLINE),1)
 	_RUST_ARGS_BASE += --offline
+endif
+
+# Fail on warnings. Exported so recipes that re-enter `$(MAKE) check` inherit it.
+ifeq ($(WERROR),1)
+export RUSTFLAGS += -Dwarnings
 endif
 
 # Add pb2_mspm0 feature
@@ -238,9 +245,14 @@ _check_gui: _check_gui_common
 	$(_CARGO_CHECK) --all-features -p bb-iced-widgets -p bb-imager-gui-ui -p bb-os-list-generator -p bb-imager-db
 	$(_CARGO_CHECK) $(_CARGO_CHECK_NON_WORKSPACE_FLAGS) -p bb-imager-gui ${_RUST_ARGS_GUI} --features updater,zepto_i2c,pre-release
 	
+## housekeeping: fmt-check: Check formatting of all crates.
+.PHONY: fmt-check
+fmt-check:
+	$(CARGO_PATH) fmt --all --check
+
 ## housekeeping: check: Run code quality checks.
 .PHONY: check
-check: check-cli check-gui
+check: fmt-check check-cli check-gui
 
 ## housekeeping: check-cli: Run code quality checks on CLI.
 .PHONY: check-cli
