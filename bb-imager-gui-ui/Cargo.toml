@@ -8,13 +8,14 @@ license.workspace = true
 publish = false
 
 [dependencies]
-iced = { version = "0.14", default-features = false, features = ["image", "svg"] }
+iced = { version = "0.14", default-features = false, features = ["image-without-codecs", "svg"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 chrono-tz = "0.10"
 url = "2.5"
 bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", default-features = false, features = ["fmt"] }
 iced_aw = { version = "0.14.1", default-features = false, features = ["spinner"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
 [dev-dependencies]
 iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "web-colors", "x11", "wayland", "tokio"] }
