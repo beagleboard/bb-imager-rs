@@ -191,7 +191,11 @@ impl Read for MockSd {
 
 impl crate::helpers::Eject for MockSd {
     fn eject(self) -> io::Result<()> {
-        self.as_file().sync_all()
+        if self.fail.is_cancelled() {
+            Err(io::Error::new(io::ErrorKind::QuotaExceeded, "Fail"))
+        } else {
+            self.as_file().sync_all()
+        }
     }
 }
 

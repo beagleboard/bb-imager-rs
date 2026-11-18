@@ -325,7 +325,7 @@ where
         }
 
         tracing::info!("Ejecting SD Card");
-        let _ = sd.into_inner().eject();
+        sd.into_inner().eject()?;
 
         Ok(())
     }

@@ -339,6 +339,20 @@ mod tests {
     }
 
     #[test]
+    fn sd_card_wrapper_eject_reports_first_block_failure() {
+        use crate::helpers::Eject;
+
+        let mock = crate::mock_sd::MockSd::new();
+        let fail = mock.fail_token();
+        let mut sd = SdCardWrapper::new(mock);
+
+        std::io::copy(&mut test_data(), &mut sd).unwrap();
+        drop(fail.drop_guard());
+
+        assert!(sd.eject().is_err());
+    }
+
+    #[test]
     fn sd_card_wrapper() {
         let mut test_data = test_data();
         let mut temp_buf = Vec::with_capacity(FILE_LEN);

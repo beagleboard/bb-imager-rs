@@ -41,18 +41,23 @@ impl std::fmt::Debug for MacOSFile {
 }
 
 fn unmount_disk(path: &str) -> std::io::Result<()> {
-    std::process::Command::new("diskutil")
+    let output = std::process::Command::new("diskutil")
         .args(["unmountDisk", path])
-        .output()
-        .map(|_| ())
+        .output()?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
+    }
 }
 
 impl crate::helpers::Eject for MacOSFile {
     fn eject(self) -> std::io::Result<()> {
         self.inner.sync_all()?;
-        let _ = unmount_disk(&self.path.to_string_lossy());
-
-        Ok(())
+        unmount_disk(&self.path.to_string_lossy())
     }
 }
 
@@ -76,7 +81,7 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
     check_dst(dst)?;
 
     let dst_str = dst.to_string_lossy();
-    let _ = unmount_disk(&dst_str);
+    unmount_disk(&dst_str).map_err(|source| Error::FailedToOpenDestination { source })?;
 
     let f = std::fs::OpenOptions::new()
         .read(true)
@@ -177,7 +182,8 @@ pub(crate) fn open(dst: &Path) -> Result<MacOSFile> {
 
     check_dst(dst)?;
     let p = dst.to_owned();
-    let _ = unmount_disk(dst.to_str().unwrap());
+    unmount_disk(dst.to_str().unwrap())
+        .map_err(|source| Error::FailedToOpenDestination { source })?;
     let f = inner(p).map_err(|source| Error::FailedToOpenDestination { source })?;
 
     Ok(MacOSFile {

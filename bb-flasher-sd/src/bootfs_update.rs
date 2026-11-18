@@ -41,7 +41,7 @@ where
     internal((&mut img).into_iter(), &mut sd, cancel)?;
 
     tracing::info!("Ejecting SD Card");
-    let _ = sd.eject();
+    sd.eject()?;
 
     Ok(())
 }
