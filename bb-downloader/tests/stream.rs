@@ -84,3 +84,25 @@ async fn download_to_stream_rejects_sha_mismatch() {
         "no file should be persisted when the checksum does not match"
     );
 }
+
+#[tokio::test]
+async fn download_to_stream_rejects_error_status() {
+    let server = MockServer::start();
+    let tmp = TempDir::new().unwrap();
+    let downloader = Downloader::new(tmp.path()).unwrap();
+
+    let body = b"<html>Not Found</html>";
+    server.mock(|when, then| {
+        when.method(GET).path("/img");
+        then.status(404).body(body);
+    });
+
+    let (writer, _reader) = file_stream().unwrap();
+    let err = downloader
+        .download_to_stream(server.url("/img"), sha256(body), writer)
+        .await
+        .expect_err("error status must fail even if the body hash matches");
+
+    assert!(err.to_string().contains("404"), "{err}");
+    assert!(single_file(tmp.path()).is_none());
+}

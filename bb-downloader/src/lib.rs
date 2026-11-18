@@ -57,7 +57,7 @@ impl Downloader {
         let cache_dir = cache_dir.into();
 
         if !cache_dir.exists() {
-            let _ = std::fs::create_dir_all(&cache_dir);
+            std::fs::create_dir_all(&cache_dir)?;
         }
 
         if cache_dir.exists() && !cache_dir.is_dir() {
@@ -72,7 +72,7 @@ impl Downloader {
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(15))
             .build()
-            .expect("Unsupported OS");
+            .map_err(io::Error::other)?;
 
         Ok(Self {
             client,
@@ -111,6 +111,8 @@ impl Downloader {
             .send()
             .await
             .map_err(io::Error::other)?
+            .error_for_status()
+            .map_err(io::Error::other)?
             .json()
             .await
             .map_err(io::Error::other)
@@ -142,14 +144,25 @@ impl Downloader {
             .send()
             .await
             .map_err(io::Error::other)?
+            .error_for_status()
+            .map_err(io::Error::other)?
             .bytes()
             .await
             .map_err(io::Error::other)?;
 
+        let cache_dir = self.cache_dir.clone();
         let fp_clone = file_path.clone();
-        tokio::task::spawn_blocking(move || std::fs::write(fp_clone, response))
-            .await
-            .unwrap()?;
+        tokio::task::spawn_blocking(move || {
+            use std::io::Write as _;
+
+            // Same directory as the destination, so `persist` is a rename.
+            let mut tmp = tempfile::NamedTempFile::new_in(&cache_dir)?;
+            tmp.write_all(&response)?;
+            tmp.persist(fp_clone)?;
+            io::Result::Ok(())
+        })
+        .await
+        .unwrap()?;
 
         Ok(file_path)
     }
@@ -181,6 +194,8 @@ impl Downloader {
                 .get(url)
                 .send()
                 .await
+                .map_err(io::Error::other)?
+                .error_for_status()
                 .map_err(io::Error::other)?;
 
             let mut response_stream = response.bytes_stream().map_err(io::Error::other);

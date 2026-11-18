@@ -19,6 +19,7 @@ tokio = { version = "1.52", default-features = false, features = ["fs"] }
 const-hex = "1.19"
 bb-helper = { version = "0.1", path = "../bb-helper", features = ["file_stream"] }
 futures-util = "0.3"
+tempfile = "3.27"
 
 [features]
 default = ["rustls"]
@@ -29,7 +30,6 @@ rustls = ["reqwest/rustls"]
 [dev-dependencies]
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
 httpmock = "0.9"
-tempfile = "3.27"
 
 [target.'cfg(not(windows))'.dependencies]
 sha2 = { version = "0.10", features = ["asm"] }
