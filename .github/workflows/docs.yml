@@ -3,9 +3,20 @@ name: Docs
 on:
   pull_request:
     branches: ['main']
+    paths:
+      - 'docs/**'
+      - 'antora-playbook-local.yml'
+      - 'assets/screenshots/**'
+      - 'bb-imager-gui/assets/packages/linux/udev/10-beagle.rules'
+      - 'Makefile'
+      - '.github/workflows/docs.yml'
   push:
     branches: ['main']
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
