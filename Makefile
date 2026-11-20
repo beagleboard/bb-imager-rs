@@ -7,7 +7,7 @@ _RUST_ARGS_BASE ?= --locked
 _RUST_ARGS = ${_RUST_ARGS_BASE} --features bcf_cc1352p7,zepto_uart
 _RUST_ARGS_CLI = ${_RUST_ARGS} --features dfu
 _RUST_ARGS_GUI = ${_RUST_ARGS} --features sd
-_PACKAGER_ARGS = -r -vvv --verbose
+_PACKAGER_ARGS = --profile $(CARGO_PROFILE) -vvv --verbose
 _CARGO_CHECK ?= $(CARGO_PATH) $(if $(shell cargo clippy --version >/dev/null 2>&1 && echo yes),clippy,check) --all-targets
 _CARGO_CHECK_NON_WORKSPACE_FLAGS ?=
 _ARCH = $(firstword $(subst -, ,$(TARGET)))
@@ -23,7 +23,7 @@ _ANTORA_IMAGE = ghcr.io/beagleboard/antora-docker:main
 _DOCS_IN_WORKTREE = $(shell test -f .git && echo 1)
 _DOCS_DIR = $(if $(_DOCS_IN_WORKTREE),target/docs,.)
 
-_CLI_BIN = target/${TARGET}/release/bb-imager-cli
+_CLI_BIN = target/${TARGET}/$(CARGO_PROFILE)/bb-imager-cli
 _CLI_COMP_BASH = bb-imager-cli/dist/.target/shell-comp/bb-imager-cli.bash
 _CLI_COMP_ZSH = bb-imager-cli/dist/.target/shell-comp/_bb-imager-cli
 _CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
@@ -34,7 +34,7 @@ _CLI_MAN = bb-imager-cli/dist/.target/man/bb-imager-cli.1.gz
 _CLI_BUILD_JSON = target/$(TARGET)/bb-imager-cli-build.json
 _CLI_OUT_DIR = $(patsubst /target/%,target/%,$(shell jq -rR 'fromjson? | select(.reason == "build-script-executed" and (.package_id | contains("bb-imager-cli"))) | .out_dir' $(_CLI_BUILD_JSON) 2>/dev/null))
 
-_GUI_BIN = target/${TARGET}/release/bb-imager-gui
+_GUI_BIN = target/${TARGET}/$(CARGO_PROFILE)/bb-imager-gui
 _GUI_PORTABLE_EXE = bb-imager-gui/dist/bb-imager-gui_$(VERSION)_$(word 1,$(subst -, ,$(TARGET))).exe
 
 ## variable: GUI_NAME: Change name for GUI related files.
@@ -43,6 +43,8 @@ GUI_NAME ?= BeagleBoardImager
 CARGO_PATH ?= $(shell which cargo)
 ## variable: RUST_BUILDER: The Rust builder to use. Possble choices - cargo (default), cross.
 RUST_BUILDER ?= $(CARGO_PATH)
+## variable: CARGO_PROFILE: Cargo profile for builds and packages: release (default) or dist (LTO, for shipped packages).
+CARGO_PROFILE ?= release
 ## variable: VERSION: Release versions for bb-imager-cli and bb-imager-gui
 VERSION := $(if $(strip $(VERSION)),$(VERSION),$(_CARGO_TOML_VERSION))
 ## variable: PRE_RELEASE: Flag to denote if this is not a stable version.
@@ -425,8 +427,8 @@ package-bundle-pc-windows-msvc:
 	$(MAKE) build-gui TARGET=aarch64-pc-windows-msvc
 	$(MAKE) build-gui TARGET=x86_64-pc-windows-msvc
 	mkdir -p bb-imager-gui/dist/windows-temp/{x64,aarch64}
-	cp target/aarch64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
-	cp target/x86_64-pc-windows-msvc/release/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
+	cp target/aarch64-pc-windows-msvc/$(CARGO_PROFILE)/bb-imager-gui bb-imager-gui/dist/windows-temp/aarch64/
+	cp target/x86_64-pc-windows-msvc/$(CARGO_PROFILE)/bb-imager-gui bb-imager-gui/dist/windows-temp/x64/
 	winapp manifest update-assets bb-imager-gui-ui/assets/icons/icon.png --manifest bb-imager-gui/Package.appxmanifest
 	winapp pack --manifest bb-imager-gui/Package.appxmanifest bb-imager-gui/dist/windows-temp/aarch64/ bb-imager-gui/dist/windows-temp/x64/
 	rm -rf bb-imager-gui/dist/windows-temp
@@ -460,7 +462,7 @@ coverage:
 _build-cli-bin:
 	$(info Build CLI for $(TARGET))
 	mkdir -p $(dir $(_CLI_BUILD_JSON))
-	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) --message-format=json-render-diagnostics > $(_CLI_BUILD_JSON)
+	$(RUST_BUILD) --profile $(CARGO_PROFILE) -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) --message-format=json-render-diagnostics > $(_CLI_BUILD_JSON)
 
 .PHONY: _build-cli-comp
 _build-cli-comp: _build-cli-bin
@@ -483,7 +485,7 @@ _build-cli-man: _build-cli-bin
 .PHONY: build-gui
 build-gui:
 	$(info Build GUI for $(TARGET))
-	$(RUST_BUILD) -r -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
+	$(RUST_BUILD) --profile $(CARGO_PROFILE) -p bb-imager-gui --target $(TARGET) $(_RUST_ARGS_GUI)
 
 ## build: build-cli: Build CLI and complementary stuff.
 .PHONY: build-cli
@@ -527,7 +529,7 @@ _fetch-gui-deps:
 ## package: package-gui-flatpak: Build and install package in flatpak. Intended for use in flatpak manifest.
 .PHONY: package-gui-flatpak
 package-gui-flatpak:
-	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0 SANDBOXED=1
+	$(MAKE) _fetch-gui-deps build-gui _install_gui SYSTEM_DEPS=1 PREFIX=${FLATPAK_DEST} GUI_NAME=${FLATPAK_ID} OFFLINE=1 NOTIFY_RUST=0 SANDBOXED=1 CARGO_PROFILE=dist
 
 ## install: uninstall-gui: Uninstall GUI. Intended for use in Linux.
 .PHONY: uninstall-gui

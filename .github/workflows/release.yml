@@ -15,6 +15,8 @@ env:
   CARGO_TERM_COLOR: always
   VERBOSE: 1
   PRE_RELEASE: ${{ github.ref_type != 'tag' && '1' || '0' }}
+  # Shipped builds (tags, main pre-releases) use the LTO `dist` profile; PR test artifacts don't.
+  CARGO_PROFILE: ${{ github.event_name == 'pull_request' && 'release' || 'dist' }}
   VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
   APPIMAGE_RELEASE_TAG: ${{ github.ref_type == 'tag' && 'latest' || 'continuous-release' }}
 
@@ -106,7 +108,7 @@ jobs:
       uses: Swatinem/rust-cache@v2
     - run: make vendor
 
-    - run: echo PRE_RELEASE=$PRE_RELEASE > .envrc
+    - run: printf 'PRE_RELEASE=%s\nCARGO_PROFILE=%s\n' "$PRE_RELEASE" "$CARGO_PROFILE" > .envrc
 
     - run: ln -sf snapcraft.gui.yaml snapcraft.yaml
     - uses: snapcore/action-build@v1
