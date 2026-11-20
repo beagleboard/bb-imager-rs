@@ -457,13 +457,6 @@ coverage:
 	$(info Check test coverage)
 	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} llvm-cov"
 
-## housekeeping: bloat: Check dependency contribution to bin size.
-.PHONY: bloat
-bloat:
-	$(info Check dependency bloat)
-	$(CARGO_PATH) bloat -p bb-imager-cli --crates --all-features --release --locked > bloat-cli.txt
-	$(CARGO_PATH) bloat -p bb-imager-gui --crates --all-features --release --locked > bloat-gui.txt
-
 .PHONY: _build-cli-bin
 _build-cli-bin:
 	$(info Build CLI for $(TARGET))
