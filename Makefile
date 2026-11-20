@@ -461,8 +461,8 @@ coverage:
 .PHONY: bloat
 bloat:
 	$(info Check dependency bloat)
-	$(CARGO_PATH) bloat -p bb-imager-cli --crates --all-features --release --locked > bloat-cli.txt
-	$(CARGO_PATH) bloat -p bb-imager-gui --crates --all-features --release --locked > bloat-gui.txt
+	$(CARGO_PATH) bloat -p bb-imager-cli --crates --release $(_RUST_ARGS_CLI) > bloat-cli.txt
+	$(CARGO_PATH) bloat -p bb-imager-gui --crates --release $(_RUST_ARGS_GUI) > bloat-gui.txt
 
 .PHONY: _build-cli-bin
 _build-cli-bin:
