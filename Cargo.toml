@@ -21,13 +21,16 @@ members = [
         "bb-imager-db",
 ]
 
-[profile.release]
+# Shipped packages: opt in with `make ... CARGO_PROFILE=dist`. `release` keeps Rust's defaults so
+# local release builds and PR artifacts stay fast.
+[profile.dist]
+inherits = "release"
 lto = true
 codegen-units = 1
 strip = true
 
 [profile.profiling]
-inherits = "release"
+inherits = "dist"
 debug = 1
 
 [workspace.package]
