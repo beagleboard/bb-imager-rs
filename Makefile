@@ -212,7 +212,6 @@ clean:
 	rm -rf target
 	rm -rf bb-imager-gui/dist
 	rm -rf bb-imager-cli/dist
-	rm -rf bb-imager-service/dist
 	rm -rf cargo-vendor.tar.zst
 	rm -rf vendor .cargo
 	rm -f *.snap
@@ -461,7 +460,7 @@ coverage:
 _build-cli-bin:
 	$(info Build CLI for $(TARGET))
 	mkdir -p $(dir $(_CLI_BUILD_JSON))
-	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) $(_RUST_ARGS-linux) --message-format=json-render-diagnostics > $(_CLI_BUILD_JSON)
+	$(RUST_BUILD) -r -p bb-imager-cli --target $(TARGET) $(_RUST_ARGS_CLI) --message-format=json-render-diagnostics > $(_CLI_BUILD_JSON)
 
 .PHONY: _build-cli-comp
 _build-cli-comp: _build-cli-bin
