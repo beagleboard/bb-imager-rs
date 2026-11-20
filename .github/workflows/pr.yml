@@ -14,8 +14,18 @@ env:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-26-intel]
+        # Clippy output does not depend on the architecture (no `target_arch` cfgs), so lint
+        # once per OS. `make test WERROR=1` still catches rustc warnings on every runner.
+        include:
+          - os: ubuntu-latest
+            clippy: true
+          - os: windows-latest
+            clippy: true
+          - os: macos-latest
+            clippy: true
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
@@ -30,6 +40,7 @@ jobs:
     - name: Use caching
       uses: Swatinem/rust-cache@v2
     - name: Run checks
+      if: matrix.clippy
       run: make check WERROR=1
     - name: Run tests
       run: make test WERROR=1
