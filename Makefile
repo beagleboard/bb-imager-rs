@@ -265,17 +265,17 @@ check-gui: _check_common _check_gui
 ## housekeeping: test: Run tests on workspace
 .PHONY: test
 test:
-	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} test --all-targets"
+	$(MAKE) check _CARGO_CHECK="${CARGO_PATH} test"
 
 ## housekeeping: test-cli: Run tests on CLI.
 .PHONY: test-cli
 test-cli:
-	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH} test --all-targets"
+	$(MAKE) check-cli _CARGO_CHECK="${CARGO_PATH} test"
 
 ## housekeeping: test-gui: Run tests on GUI.
 .PHONY: test-gui
 test-gui:
-	$(MAKE) check-gui _CARGO_CHECK="${CARGO_PATH} test --all-targets"
+	$(MAKE) check-gui _CARGO_CHECK="${CARGO_PATH} test"
 
 ## setup: setup-debian-deps: Install debian dependencies for building. For creating packages, also run setup-packaging-deps
 .PHONY: setup-debian-deps
