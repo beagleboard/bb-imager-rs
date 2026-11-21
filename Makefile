@@ -598,72 +598,89 @@ endif
 docs-serve: docs
 	python3 -m http.server --directory $(_DOCS_DIR)/build/site
 
-## preview: preview-review: Preview Review page.
-preview-review:
+## preview: preview-gui-review: Preview GUI Review page.
+.PHONY: preview-gui-review
+preview-gui-review:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example review --features debug
 
-## preview: preview-flash-fail: Preview Flash Fail page.
-preview-flash-fail:
+## preview: preview-gui-flash-fail: Preview GUI Flash Fail page.
+.PHONY: preview-gui-flash-fail
+preview-gui-flash-fail:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-fail --features debug
 
-## preview: preview-flash-success: Preview Flash Success page.
-preview-flash-success:
+## preview: preview-gui-flash-success: Preview GUI Flash Success page.
+.PHONY: preview-gui-flash-success
+preview-gui-flash-success:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-success --features debug
 
-## preview: preview-flash-cancel: Preview Flash Cancel page.
-preview-flash-cancel:
+## preview: preview-gui-flash-cancel: Preview GUI Flash Cancel page.
+.PHONY: preview-gui-flash-cancel
+preview-gui-flash-cancel:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flash-cancel --features debug
 
-## preview: preview-flashing: Preview Flashing progress page.
-preview-flashing:
+## preview: preview-gui-flashing: Preview GUI Flashing progress page.
+.PHONY: preview-gui-flashing
+preview-gui-flashing:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example flashing --features debug
 
-## preview: preview-app-info: Preview App options page.
-preview-app-info:
+## preview: preview-gui-app-info: Preview GUI App options page.
+.PHONY: preview-gui-app-info
+preview-gui-app-info:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example app-info --features debug
 
-## preview: preview-configuration-sysconfig: Preview Configuration page for sysconf images.
-preview-configuration-sysconfig:
+## preview: preview-gui-configuration-sysconfig: Preview GUI Configuration page for sysconf images.
+.PHONY: preview-gui-configuration-sysconfig
+preview-gui-configuration-sysconfig:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example configuration-sysconfig --features debug
 
-## preview: preview-configuration-cloudinit: Preview Configuration page for cloud-init images.
-preview-configuration-cloudinit:
+## preview: preview-gui-configuration-cloudinit: Preview GUI Configuration page for cloud-init images.
+.PHONY: preview-gui-configuration-cloudinit
+preview-gui-configuration-cloudinit:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example configuration-cloudinit --features debug
 
-## preview: preview-board-selection: Preview Board selection page.
-preview-board-selection:
+## preview: preview-gui-board-selection: Preview GUI Board selection page.
+.PHONY: preview-gui-board-selection
+preview-gui-board-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example board-selection --features debug
 
-## preview: preview-image-selection: Preview OS image selection page.
-preview-image-selection:
+## preview: preview-gui-image-selection: Preview GUI OS image selection page.
+.PHONY: preview-gui-image-selection
+preview-gui-image-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example image-selection --features debug
 
-## preview: preview-destination-selection: Preview Destination selection page.
-preview-destination-selection:
+## preview: preview-gui-destination-selection: Preview GUI Destination selection page.
+.PHONY: preview-gui-destination-selection
+preview-gui-destination-selection:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example destination-selection --features debug
 
-#preview: preview-sandbox-notice: Preview sandbox notice page.
-preview-sandbox-notice:
+## preview: preview-gui-sandbox-notice: Preview GUI sandbox notice page.
+.PHONY: preview-gui-sandbox-notice
+preview-gui-sandbox-notice:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example sandbox-notice --features debug
 
-## preview: preview-format-media-destination: Preview format media destination page.
-preview-format-media-destination:
+## preview: preview-gui-format-media-destination: Preview GUI format media destination page.
+.PHONY: preview-gui-format-media-destination
+preview-gui-format-media-destination:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-destination --features debug
 
-## preview: preview-format-media-review: Preview format media review page.
-preview-format-media-review:
+## preview: preview-gui-format-media-review: Preview GUI format media review page.
+.PHONY: preview-gui-format-media-review
+preview-gui-format-media-review:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-review --features debug
 
-## preview: preview-format-media-progress: Preview format media progress page.
-preview-format-media-progress:
+## preview: preview-gui-format-media-progress: Preview GUI format media progress page.
+.PHONY: preview-gui-format-media-progress
+preview-gui-format-media-progress:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-progress --features debug
 
-## preview: preview-format-media-success: Preview format media success page.
-preview-format-media-success:
+## preview: preview-gui-format-media-success: Preview GUI format media success page.
+.PHONY: preview-gui-format-media-success
+preview-gui-format-media-success:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-success --features debug
 
-## preview: preview-format-media-fail: Preview format media fail page.
-preview-format-media-fail:
+## preview: preview-gui-format-media-fail: Preview GUI format media fail page.
+.PHONY: preview-gui-format-media-fail
+preview-gui-format-media-fail:
 	$(_DIOXUS_CLI) serve -p bb-imager-gui-ui --example format-media-fail --features debug
 
 # Screenshots are taken from the bb-imager-gui-ui page examples, in their
@@ -699,60 +716,60 @@ _screenshot-deps:
 	$(CARGO_PATH) build --locked -p bb-imager-gui-ui --examples
 	mkdir -p $(_SCREENSHOT_TMP) $(SCREENSHOT_DIR)
 
-## preview: screenshot-<page>: Capture one page screenshot (e.g. screenshot-review). See screenshots for the list.
-.PHONY: screenshot-board-selection
-screenshot-board-selection: _screenshot-deps
+## preview: screenshot-gui-<page>: Capture one GUI page screenshot (e.g. screenshot-gui-review). See screenshots-gui for the list.
+.PHONY: screenshot-gui-board-selection
+screenshot-gui-board-selection: _screenshot-deps
 	$(call _screenshot,board-selection,1_board_selection.webp)
 
-.PHONY: screenshot-image-selection
-screenshot-image-selection: _screenshot-deps
+.PHONY: screenshot-gui-image-selection
+screenshot-gui-image-selection: _screenshot-deps
 	$(call _screenshot,image-selection,2_image_selection.webp)
 
-.PHONY: screenshot-destination-selection
-screenshot-destination-selection: _screenshot-deps
+.PHONY: screenshot-gui-destination-selection
+screenshot-gui-destination-selection: _screenshot-deps
 	$(call _screenshot,destination-selection,3_dest_selection.webp)
 
-.PHONY: screenshot-configuration-sysconfig
-screenshot-configuration-sysconfig: _screenshot-deps
+.PHONY: screenshot-gui-configuration-sysconfig
+screenshot-gui-configuration-sysconfig: _screenshot-deps
 	$(call _screenshot,configuration-sysconfig,4_customization.webp)
 
-.PHONY: screenshot-review
-screenshot-review: _screenshot-deps
+.PHONY: screenshot-gui-review
+screenshot-gui-review: _screenshot-deps
 	$(call _screenshot,review,5_review.webp)
 
-.PHONY: screenshot-flashing
-screenshot-flashing: _screenshot-deps
+.PHONY: screenshot-gui-flashing
+screenshot-gui-flashing: _screenshot-deps
 	$(call _screenshot,flashing,6_flashing.webp)
 
-.PHONY: screenshot-flash-success
-screenshot-flash-success: _screenshot-deps
+.PHONY: screenshot-gui-flash-success
+screenshot-gui-flash-success: _screenshot-deps
 	$(call _screenshot,flash-success,7_sucess.webp)
 
-.PHONY: screenshot-format-media-destination
-screenshot-format-media-destination: _screenshot-deps
+.PHONY: screenshot-gui-format-media-destination
+screenshot-gui-format-media-destination: _screenshot-deps
 	$(call _screenshot,format-media-destination,8_format_media_destination.webp)
 
-.PHONY: screenshot-format-media-review
-screenshot-format-media-review: _screenshot-deps
+.PHONY: screenshot-gui-format-media-review
+screenshot-gui-format-media-review: _screenshot-deps
 	$(call _screenshot,format-media-review,9_format_media_review.webp)
 
-.PHONY: screenshot-format-media-progress
-screenshot-format-media-progress: _screenshot-deps
+.PHONY: screenshot-gui-format-media-progress
+screenshot-gui-format-media-progress: _screenshot-deps
 	$(call _screenshot,format-media-progress,10_format_media_progress.webp)
 
-.PHONY: screenshot-format-media-success
-screenshot-format-media-success: _screenshot-deps
+.PHONY: screenshot-gui-format-media-success
+screenshot-gui-format-media-success: _screenshot-deps
 	$(call _screenshot,format-media-success,11_format_media_success.webp)
 
-## preview: screenshots: Capture all app screenshots into assets/screenshots (KDE Plasma + spectacle).
-.PHONY: screenshots
-screenshots: screenshot-board-selection screenshot-image-selection screenshot-destination-selection \
-	screenshot-configuration-sysconfig screenshot-review screenshot-flashing screenshot-flash-success \
-	screenshot-format-media-destination screenshot-format-media-review screenshot-format-media-progress \
-	screenshot-format-media-success
+## preview: screenshots-gui: Capture all GUI screenshots into assets/screenshots (KDE Plasma + spectacle).
+.PHONY: screenshots-gui
+screenshots-gui: screenshot-gui-board-selection screenshot-gui-image-selection screenshot-gui-destination-selection \
+	screenshot-gui-configuration-sysconfig screenshot-gui-review screenshot-gui-flashing screenshot-gui-flash-success \
+	screenshot-gui-format-media-destination screenshot-gui-format-media-review screenshot-gui-format-media-progress \
+	screenshot-gui-format-media-success
 
 # spectacle grabs whichever window is focused, so pages must be captured one at a time.
-.NOTPARALLEL: screenshots
+.NOTPARALLEL: screenshots-gui
 
 ## housekeeping: semver-checks: Perform checks to ensure that semver is being followed in published packages.
 .PHONY: semver-checks
