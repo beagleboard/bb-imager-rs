@@ -126,9 +126,39 @@ impl From<bb_imager_gui_ui::image_selection::ImageDetails> for BoardImage {
     }
 }
 
-pub(crate) fn system_timezone() -> Option<chrono_tz::Tz> {
-    static SYSTEM_TIMEZONE: LazyLock<Option<chrono_tz::Tz>> =
-        LazyLock::new(|| iana_time_zone::get_timezone().ok()?.parse().ok());
+/// IANA zone names from the tz database, sorted in byte order.
+///
+/// Built once: on Linux, listing the database walks the system zoneinfo
+/// directory. jiff hands out owned names; each is leaked exactly once here
+/// (it would live in this static for the whole run anyway) so the table can be
+/// `&'static str`, like [`bb_flasher::sd::KEYMAP_LAYOUTS`].
+pub(crate) fn timezones() -> &'static [&'static str] {
+    static TIMEZONES: LazyLock<Box<[&'static str]>> = LazyLock::new(|| {
+        let mut tzs: Vec<&'static str> = jiff::tz::db()
+            .available()
+            .map(|name| &*Box::leak(Box::<str>::from(name.as_str())))
+            .collect();
+        tzs.sort_unstable();
+        tzs.into_boxed_slice()
+    });
+    &TIMEZONES
+}
+
+/// Resolve a zone name to its entry in [`timezones`].
+///
+/// Customization carries zones as `&'static str` borrowed from the table, while
+/// the persisted config stores a plain `String`. Returns `None` for a name the
+/// database does not know, which a hand-edited config file can contain.
+pub(crate) fn timezone(name: &str) -> Option<&'static str> {
+    let tzs = timezones();
+    tzs.binary_search(&name).ok().map(|i| tzs[i])
+}
+
+pub(crate) fn system_timezone() -> Option<&'static str> {
+    // `iana_name()` is `None` when `/etc/localtime` is a plain copy rather than
+    // a symlink; iana-time-zone could not name it either.
+    static SYSTEM_TIMEZONE: LazyLock<Option<&'static str>> =
+        LazyLock::new(|| timezone(jiff::tz::TimeZone::try_system().ok()?.iana_name()?));
     *SYSTEM_TIMEZONE
 }
 

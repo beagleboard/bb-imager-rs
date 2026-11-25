@@ -46,7 +46,7 @@ fn sd_modifications_common_lists_configured_fields() {
 
     let full = SdSysconfCustomization {
         hostname: Some("h".into()),
-        timezone: Some("UTC".parse().unwrap()),
+        timezone: Some("UTC".into()),
         keymap: Some("us".into()),
         ssh: Some("k".into()),
         user: Some(SdCustomizationUser {
@@ -411,4 +411,23 @@ async fn plain_sd_image_ignores_the_boards_bootfs() {
         "a plain SD image must not pick up the board's bootfs: {failures:?}"
     );
     assert_eq!(std::fs::read(dst.path()).unwrap(), data);
+}
+
+#[test]
+fn timezone_resolves_known_names() {
+    assert_eq!(timezone("UTC"), Some("UTC"));
+    assert_eq!(timezone("Asia/Kolkata"), Some("Asia/Kolkata"));
+    assert!(!timezones().is_empty());
+}
+
+/// [`timezone`] uses `binary_search`, so the table must stay byte-sorted.
+#[test]
+fn timezones_sorted() {
+    assert!(timezones().is_sorted());
+}
+
+#[test]
+fn timezone_rejects_unknown_names() {
+    assert_eq!(timezone("Bogus/Zone"), None);
+    assert_eq!(timezone(""), None);
 }
