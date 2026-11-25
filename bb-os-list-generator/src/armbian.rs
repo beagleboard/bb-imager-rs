@@ -30,7 +30,7 @@ struct ArbianImage {
     /// Upstream uses an empty string, not `null`, when an image is not an application build.
     #[serde_as(as = "NoneAsEmptyString")]
     file_application: Option<String>,
-    file_date: chrono::DateTime<chrono::Utc>,
+    file_date: jiff::Timestamp,
 }
 
 impl ArbianImage {
@@ -62,7 +62,7 @@ impl ArbianImage {
             image_download_size: self.file_size,
             image_download_sha256: const_hex::decode(sha256).unwrap().try_into().unwrap(),
             extract_size,
-            release_date: self.file_date.date_naive(),
+            release_date: jiff::tz::TimeZone::UTC.to_datetime(self.file_date).date(),
             devices: Box::new([dev.into()]),
             init_format: bb_config::config::InitFormat::Armbian,
             bmap: None,

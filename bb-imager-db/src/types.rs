@@ -66,7 +66,7 @@ pub struct OsImage {
     pub image_download_size: i64,
     pub image_download_sha256: [u8; 32],
     pub extract_size: i64,
-    pub release_date: chrono::NaiveDate,
+    pub release_date: jiff::civil::Date,
     pub init_format: bb_config::config::InitFormat,
     pub bmap: Option<Box<Url>>,
     pub sbom: Option<Url>,

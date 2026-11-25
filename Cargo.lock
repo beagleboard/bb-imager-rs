@@ -276,10 +276,10 @@ dependencies = [
 
 [[package]]
 name = "bb-config"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
- "chrono",
  "const-hex",
+ "jiff",
  "rusqlite",
  "serde",
  "serde_json",
@@ -453,7 +453,7 @@ name = "bb-imager-db"
 version = "1.0.22"
 dependencies = [
  "bb-config",
- "chrono",
+ "jiff",
  "rusqlite",
  "serde_json",
  "tempfile",
@@ -515,8 +515,8 @@ version = "1.0.22"
 dependencies = [
  "anyhow",
  "bb-config",
- "chrono",
  "const-hex",
+ "jiff",
  "reqwest",
  "serde",
  "serde_json",
@@ -2832,10 +2832,12 @@ dependencies = [
  "jiff-core",
  "jiff-static",
  "jiff-tzdb-platform",
+ "js-sys",
  "log",
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -4668,10 +4670,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4edff0039f148731aee2fd80f76dbfeb12d204ab3d1c544838d34e02151049b"
 dependencies = [
  "bitflags 2.13.2",
- "chrono",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "hashlink",
+ "jiff",
  "libsqlite3-sys",
  "smallvec",
  "sqlite-wasm-rs",

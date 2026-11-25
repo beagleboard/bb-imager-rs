@@ -15,7 +15,7 @@ serde_json = "1.0"
 url = { version = "2.5", features = ["serde"] }
 bb-config = { path = "../bb-config" }
 const-hex = { version = "1.19" }
-chrono = { version = "0.4" }
+jiff = { version = "0.2", default-features = false, features = ["std", "serde"] }
 anyhow = "1.0"
 serde_with = "3.19"
 
