@@ -1,5 +1,4 @@
 use bb_config::config::{OsImage, OsListItem, OsSubList};
-use chrono::DateTime;
 use reqwest::header::LAST_MODIFIED;
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -28,7 +27,7 @@ impl FedoraItem {
         let header = client.head(self.link.clone()).send().await.unwrap();
 
         let release_date = header.headers().get(LAST_MODIFIED)?.to_str().unwrap();
-        let release_date = DateTime::parse_from_rfc2822(release_date).unwrap();
+        let release_date = jiff::fmt::rfc2822::parse(release_date).unwrap();
 
         let extract_size = crate::helpers::xz_extract_size(&client, &self.link, self.size)
             .await
@@ -42,7 +41,7 @@ impl FedoraItem {
             image_download_size: self.size,
             image_download_sha256: self.sha256,
             extract_size,
-            release_date: release_date.date_naive(),
+            release_date: release_date.date(),
             devices: [
                 "beagle-am67".into(),
                 "beagle-am62".into(),

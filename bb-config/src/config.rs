@@ -205,7 +205,7 @@ pub struct OsImage {
     /// Os Image size after extraction
     pub extract_size: u64,
     /// Os Image release date
-    pub release_date: chrono::NaiveDate,
+    pub release_date: jiff::civil::Date,
     /// Devices the Os Image can be used with
     pub devices: Box<[Box<str>]>,
     /// Initialization Format. Currently only used by SD Card Images
