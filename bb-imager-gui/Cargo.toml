@@ -19,7 +19,6 @@ webbrowser = "1.2.1"
 notify-rust = { version = "4.17.0", default-features = false, features = ["z-with-tokio"], optional = true }
 url = "2.5.4"
 whoami = "2.1"
-iana-time-zone = "0.1"
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = { version = "1.0.150" }
 directories = "6.0.0"
@@ -29,7 +28,7 @@ bb-helper = { path = "../bb-helper", features = ["file_stream", "cancel", "reade
 semver = "1.0.28"
 anyhow = "1.0"
 tokio-util = { version = "0.7", features = ["rt"] }
-chrono-tz = { version = "0.10", features = ["serde"] }
+jiff = "0.2"
 bb-iced-widgets = { path = "../bb-iced-widgets" }
 bb-imager-gui-ui = { path = "../bb-imager-gui-ui" }
 bb-imager-db = { path = "../bb-imager-db" }

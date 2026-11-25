@@ -10,7 +10,6 @@ publish = false
 [dependencies]
 iced = { version = "0.14", default-features = false, features = ["image-without-codecs", "svg"] }
 bb-iced-widgets = { path = "../bb-iced-widgets" }
-chrono-tz = "0.10"
 url = "2.5"
 bb-config = { path = "../bb-config" }
 bb-helper = { path = "../bb-helper", default-features = false, features = ["fmt"] }

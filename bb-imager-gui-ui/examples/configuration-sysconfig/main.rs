@@ -8,9 +8,14 @@ impl State {
         let res = State(configuration::State {
             customization: configuration::Customization::SysConfig(Default::default()),
             default_username: "myuser",
-            default_timezone: Some(chrono_tz::Tz::Asia__Kolkata),
+            default_timezone: Some("Asia/Kolkata"),
             default_keymap: "us",
-            timezones: combo_box::State::new(chrono_tz::TZ_VARIANTS.to_vec()),
+            timezones: combo_box::State::new(vec![
+                "America/New_York",
+                "Asia/Kolkata",
+                "Europe/London",
+                "UTC",
+            ]),
             keymaps: combo_box::State::new(vec!["ua", "us", "uz", "vn", "za"]),
         });
 

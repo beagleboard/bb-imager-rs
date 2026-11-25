@@ -59,7 +59,7 @@ pub(crate) struct SdSysconfCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) hostname: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) timezone: Option<chrono_tz::Tz>,
+    pub(crate) timezone: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) keymap: Option<Arc<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,7 +76,9 @@ impl From<SdSysconfCustomization> for bb_imager_gui_ui::configuration::CloudInit
     fn from(value: SdSysconfCustomization) -> Self {
         Self {
             hostname: value.hostname,
-            timezone: value.timezone,
+            // Stored as a `String`; the page works in the `&'static str`s from
+            // the cached tz list. Unknown names read as unset.
+            timezone: value.timezone.as_deref().and_then(crate::helpers::timezone),
             // The stored keymap is a `String`; the page works in the
             // `&'static str`s from `KEYMAP_LAYOUTS`, so it has to be resolved
             // back through the table.
@@ -104,7 +106,7 @@ impl From<&bb_imager_gui_ui::configuration::CloudInit> for SdSysconfCustomizatio
     fn from(value: &bb_imager_gui_ui::configuration::CloudInit) -> Self {
         Self {
             hostname: value.hostname.clone(),
-            timezone: value.timezone,
+            timezone: value.timezone.map(Into::into),
             keymap: value.keymap.map(Into::into),
             user: value
                 .user
@@ -155,7 +157,7 @@ impl SdSysconfCustomization {
     pub(crate) fn sysconfig(&self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::sysconfig(
             self.hostname.as_deref(),
-            self.timezone.map(|x| x.to_string()).as_deref(),
+            self.timezone.as_deref(),
             self.keymap.as_deref(),
             self.user
                 .as_ref()
@@ -172,7 +174,7 @@ impl SdSysconfCustomization {
     pub(crate) fn cloudinit(&self) -> bb_flasher::sd::FlashingSdLinuxConfig {
         bb_flasher::sd::FlashingSdLinuxConfig::cloud_init(
             self.hostname.as_deref(),
-            self.timezone.map(|x| x.to_string()).as_deref(),
+            self.timezone.as_deref(),
             self.keymap.as_deref(),
             self.user
                 .as_ref()

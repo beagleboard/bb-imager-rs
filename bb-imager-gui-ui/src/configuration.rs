@@ -12,7 +12,7 @@ const INPUT_WIDTH: u32 = 200;
 #[derive(Default, Debug, Clone)]
 pub struct CloudInit {
     pub hostname: Option<Arc<str>>,
-    pub timezone: Option<chrono_tz::Tz>,
+    pub timezone: Option<&'static str>,
     pub keymap: Option<&'static str>,
     pub user: Option<(Arc<str>, Arc<str>)>,
     pub wifi: Option<(Arc<str>, Arc<str>)>,
@@ -61,10 +61,10 @@ pub struct State {
     /// Username filled in when the user toggle is switched on.
     pub default_username: &'static str,
     /// Timezone filled in when the timezone toggle is switched on.
-    pub default_timezone: Option<chrono_tz::Tz>,
+    pub default_timezone: Option<&'static str>,
     /// Keymap filled in when the keymap toggle is switched on.
     pub default_keymap: &'static str,
-    pub timezones: widget::combo_box::State<chrono_tz::Tz>,
+    pub timezones: widget::combo_box::State<&'static str>,
     pub keymaps: widget::combo_box::State<&'static str>,
 }
 
@@ -135,7 +135,8 @@ fn linux_sd_common<'a>(
     state: &'a State,
     c: &'a CloudInit,
 ) -> impl IntoIterator<Item = Element<'a, CloudInit>> {
-    let default_timezone = state.default_timezone.unwrap_or_default();
+    // `Tz::default()` was UTC; keep that fallback.
+    let default_timezone = state.default_timezone.unwrap_or("UTC");
     let default_username = state.default_username;
     let default_keymap = state.default_keymap;
 
@@ -439,7 +440,7 @@ mod tests {
     fn fully_configured_customization_is_valid() {
         let c = CloudInit {
             hostname: Some("beagle".into()),
-            timezone: Some(chrono_tz::Tz::UTC),
+            timezone: Some("UTC"),
             keymap: Some("us"),
             user: Some(("beagle".into(), "pw".into())),
             wifi: Some(("net".into(), "pw".into())),
