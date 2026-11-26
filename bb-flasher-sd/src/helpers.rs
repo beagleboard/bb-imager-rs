@@ -1,4 +1,7 @@
 use std::io::{self, Write};
+use std::num::NonZeroUsize;
+
+use lru::LruCache;
 
 use bb_helper::cancel::CancellationToken;
 
@@ -29,13 +32,34 @@ impl Eject for std::fs::File {
 
 const BLOCK_SIZE: usize = 4096;
 
+/// Blocks kept by [`DeviceWrapper`]. fatfs alternates between FAT and data blocks for every
+/// cluster, so a single block thrashes.
+const CACHE_BLOCKS: NonZeroUsize = NonZeroUsize::new(8).unwrap();
+
 #[derive(Debug)]
-/// Wrapper to perform aligned read/write operations.
+struct CacheBlock {
+    dirty: bool,
+    buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
+}
+
+impl CacheBlock {
+    fn flush(&mut self, offset: u64, mut writer: impl io::Write + io::Seek) -> io::Result<()> {
+        if self.dirty {
+            writer.seek(io::SeekFrom::Start(offset))?;
+            writer.write_all(self.buf.as_slice())?;
+            self.dirty = false;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+/// Wrapper to perform aligned read/write operations through a small write-back LRU block cache.
+/// Writes reach `f` on eviction, [`io::Write::flush`] or [`DeviceWrapper::into_inner`].
 pub(crate) struct DeviceWrapper<F> {
     f: F,
     offset: u64,
-    buf: Box<DirectIoBuffer<BLOCK_SIZE>>,
-    cache_offset: u64,
+    cache: LruCache<u64, CacheBlock>,
 }
 
 impl<F> DeviceWrapper<F> {
@@ -51,56 +75,65 @@ impl<F> DeviceWrapper<F> {
 
     /// Number of bytes from `Self::cache_buf_offset` that can be used
     const fn cache_buf_hit_len(&self) -> usize {
-        self.buf.len() - self.cache_buf_offset()
-    }
-
-    pub(crate) fn into_inner(self) -> F {
-        self.f
+        BLOCK_SIZE - self.cache_buf_offset()
     }
 }
 
 impl<F> DeviceWrapper<F>
 where
-    F: io::Seek,
+    F: io::Read + io::Write + io::Seek,
 {
     pub(crate) fn new(mut f: F) -> io::Result<Self> {
         f.rewind()?;
         Ok(Self {
             f,
             offset: 0,
-            // Hack to make reading from 0 working
-            cache_offset: 1,
-            buf: Box::new(DirectIoBuffer::new()),
+            cache: LruCache::new(CACHE_BLOCKS),
         })
     }
-}
 
-impl<F> DeviceWrapper<F>
-where
-    F: io::Read + io::Seek,
-{
-    fn fill_cache(&mut self) -> io::Result<()> {
-        if self.cache_offset != self.block_offset() {
-            self.cache_offset = self.block_offset();
-            self.f.seek(io::SeekFrom::Start(self.cache_offset))?;
-            self.f.read_exact(self.buf.as_mut_slice())
-        } else {
-            Ok(())
+    /// Cached block containing `self.offset`, loading it (and evicting the LRU block) on a miss.
+    fn block(&mut self) -> io::Result<&mut CacheBlock> {
+        let offset = self.block_offset();
+
+        if !self.cache.contains(&offset) {
+            let mut block = if self.cache.len() == self.cache.cap().get() {
+                // Write back before popping, so a failed write keeps the block cached.
+                let (&old_offset, old) = self.cache.iter_mut().next_back().expect("cache is full");
+                old.flush(old_offset, &mut self.f)?;
+                self.cache.pop_lru().expect("cache is full").1
+            } else {
+                CacheBlock {
+                    dirty: false,
+                    buf: Box::new(DirectIoBuffer::new()),
+                }
+            };
+
+            self.f.seek(io::SeekFrom::Start(offset))?;
+            self.f.read_exact(block.buf.as_mut_slice())?;
+            self.cache.put(offset, block);
         }
+
+        Ok(self.cache.get_mut(&offset).expect("block is cached"))
+    }
+
+    /// Write back cached blocks and return the inner device.
+    pub(crate) fn into_inner(mut self) -> io::Result<F> {
+        self.flush()?;
+        Ok(self.f)
     }
 }
 
 impl<F> io::Read for DeviceWrapper<F>
 where
-    F: io::Read + io::Seek,
+    F: io::Read + io::Write + io::Seek,
 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.fill_cache()?;
         let count = std::cmp::min(buf.len(), self.cache_buf_hit_len());
+        let start = self.cache_buf_offset();
+        let block = self.block()?;
 
-        buf[..count].copy_from_slice(
-            &self.buf.as_slice()[self.cache_buf_offset()..(self.cache_buf_offset() + count)],
-        );
+        buf[..count].copy_from_slice(&block.buf.as_slice()[start..(start + count)]);
 
         self.offset += count as u64;
 
@@ -113,14 +146,12 @@ where
     F: io::Write + io::Read + io::Seek,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.fill_cache()?;
         let count = std::cmp::min(buf.len(), self.cache_buf_hit_len());
         let start = self.cache_buf_offset();
+        let block = self.block()?;
 
-        self.buf.as_mut_slice()[start..(start + count)].copy_from_slice(&buf[..count]);
-
-        self.f.seek(io::SeekFrom::Start(self.cache_offset))?;
-        self.f.write(self.buf.as_slice())?;
+        block.buf.as_mut_slice()[start..(start + count)].copy_from_slice(&buf[..count]);
+        block.dirty = true;
 
         self.offset += count as u64;
 
@@ -128,6 +159,10 @@ where
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        for (&offset, block) in self.cache.iter_mut() {
+            block.flush(offset, &mut self.f)?;
+        }
+
         self.f.flush()
     }
 }
@@ -336,6 +371,29 @@ mod tests {
         temp.read_exact(&mut buf).unwrap();
 
         assert_eq!(ans, buf);
+    }
+
+    #[test]
+    fn dev_wrapper_write_back() {
+        const LEN: usize = 16 * BLOCK_SIZE;
+        let f = tempfile::tempfile().unwrap();
+        f.set_len(LEN as u64).unwrap();
+        let mut dev = super::DeviceWrapper::new(f).unwrap();
+
+        let data: Vec<u8> = (0..LEN).map(|x| (x % 251) as u8).collect();
+        // 512 B writes like fatfs, revisiting block 0 between blocks like FAT lookups.
+        for (i, chunk) in data.chunks(512).enumerate() {
+            dev.seek(SeekFrom::Start(0)).unwrap();
+            dev.read_exact(&mut [0u8; 4]).unwrap();
+            dev.seek(SeekFrom::Start((i * 512) as u64)).unwrap();
+            dev.write_all(chunk).unwrap();
+        }
+
+        let mut f = dev.into_inner().unwrap();
+        let mut actual = Vec::new();
+        f.rewind().unwrap();
+        f.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, data);
     }
 
     #[test]
