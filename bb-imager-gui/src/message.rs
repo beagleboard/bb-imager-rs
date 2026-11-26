@@ -36,6 +36,7 @@ pub(crate) enum BBImagerMessage {
     /// Select a board by index. Can only be used in Board selection page.
     UpdateBoardList(Box<[bb_imager_gui_ui::board_selection::Board]>),
     SelectBoard(bb_imager_gui_ui::board_selection::BoardDetails),
+    DoubleSelectBoard(bb_imager_gui_ui::board_selection::BoardDetails),
 
     /// ChooseOs Page
     UpdateOsList(
@@ -50,6 +51,7 @@ pub(crate) enum BBImagerMessage {
         size: u64,
     },
     SelectRemoteOs((bb_imager_db::OsImage, bb_config::config::Flasher)),
+    DoubleSelectRemoteOs((bb_imager_db::OsImage, bb_config::config::Flasher)),
 
     /// Choose Destination page. Toggles the destination in the selection.
     SelectDest(bb_imager_gui_ui::destination_selection::DestId),
@@ -137,6 +139,47 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                 inner.select_board(b)
             }
         }
+        BBImagerMessage::UiState(Message::DoubleSelectBoardById(id)) => {
+            let db = state.common().db.clone();
+            return Task::perform(
+                blocking_future(move || {
+                    let board = db.board_by_id(id).expect("Incorrect board id");
+
+                    let mut btns = Vec::with_capacity(2);
+                    if let Some(x) = board.documentation.as_ref() {
+                        btns.push(("Documentation", x.clone()));
+                    }
+                    if let Some(x) = board.oshw.as_ref() {
+                        btns.push((
+                            "OSHW",
+                            url::Url::parse(&format!(
+                                "{}/{x}.html",
+                                crate::constants::OSHW_BASE_URL
+                            ))
+                            .unwrap(),
+                        ));
+                    }
+
+                    bb_imager_gui_ui::board_selection::BoardDetails {
+                        id: board.id,
+                        name: board.name,
+                        icon: board.icon,
+                        description: board.description,
+                        specification: board.specification.into(),
+                        buttons: btns.into(),
+                        flasher: board.flasher,
+                        instructions: board.instructions,
+                    }
+                }),
+                BBImagerMessage::DoubleSelectBoard,
+            );
+        }
+        BBImagerMessage::DoubleSelectBoard(b) => {
+            if let BBImager::ChooseBoard(inner) = state.active_mut() {
+                inner.select_board(b);
+            }
+            return state.next();
+        }
         BBImagerMessage::UpdateOsList((imgs, pos)) => {
             if let BBImager::ChooseOs(inner) = state.active_mut() {
                 inner.update_images(imgs, pos)
@@ -201,6 +244,32 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
             if let BBImager::ChooseOs(inner) = state.active_mut() {
                 inner.select_remote_image(image, flasher);
             }
+        }
+        BBImagerMessage::UiState(Message::DoubleSelectOs(id)) => match state {
+            BBImager::ChooseOs(inner) => match id {
+                ImageId::OsImage(id) => {
+                    let db = inner.common.db.clone();
+                    let flasher = inner.flasher;
+                    return Task::perform(
+                        blocking_future(move || db.os_image_by_id(id)),
+                        move |x| match x {
+                            Ok(i) => BBImagerMessage::DoubleSelectRemoteOs((i, flasher)),
+                            Err(e) => {
+                                tracing::error!("Failed to get os image {e}");
+                                BBImagerMessage::Null
+                            }
+                        },
+                    );
+                }
+                _ => return update(state, BBImagerMessage::UiState(Message::SelectOs(id))),
+            },
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::DoubleSelectRemoteOs((image, flasher)) => {
+            if let BBImager::ChooseOs(inner) = state.active_mut() {
+                inner.select_remote_image(image, flasher);
+            }
+            return state.next();
         }
         BBImagerMessage::SelectLocalOs {
             path,
@@ -360,6 +429,39 @@ pub(crate) fn update(state: &mut BBImager, message: BBImagerMessage) -> Task<BBI
                     .any(|x| x.identifier().as_ref() == ident.as_ref())
                 {
                     inner.toggle_dest(ident);
+                } else {
+                    tracing::warn!("Destination {ident} is gone; ignoring selection")
+                }
+            }
+            _ => panic!("Unexpected message"),
+        },
+        BBImagerMessage::UiState(Message::DoubleSelectDest(ident)) => match state {
+            BBImager::ChooseDest(inner) => {
+                if inner
+                    .destinations
+                    .iter()
+                    .any(|x| x.identifier().as_ref() == ident.as_ref())
+                {
+                    let dest_id = bb_imager_gui_ui::destination_selection::DestId::Device(ident);
+                    if !inner.state.selected.contains(&dest_id) {
+                        inner.toggle_dest(dest_id);
+                    }
+                    return state.next();
+                } else {
+                    tracing::warn!("Destination {ident} is gone; ignoring selection")
+                }
+            }
+            #[cfg(feature = "sd")]
+            BBImager::FormatMedia(inner) => {
+                if inner
+                    .destinations
+                    .iter()
+                    .any(|x| x.identifier().as_ref() == ident.as_ref())
+                {
+                    if !inner.state.selected.contains(&ident) {
+                        inner.toggle_dest(ident);
+                    }
+                    return state.next();
                 } else {
                     tracing::warn!("Destination {ident} is gone; ignoring selection")
                 }

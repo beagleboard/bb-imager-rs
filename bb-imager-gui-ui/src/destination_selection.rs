@@ -121,6 +121,7 @@ pub(crate) fn device_list_pane<'a>(
             [sized_icon(constants::USB_ICON.clone()), label],
             is_selected(&dest.id),
             Message::SelectDest(dest.id.clone()),
+            Some(Message::DoubleSelectDest(dest.id.clone())),
         )
         .into()
     });
@@ -158,6 +159,7 @@ fn dest_list_pane<'a>(state: &'a State, scroll_id: &widget::Id) -> Element<'a, M
                     ],
                     is_selected,
                     Message::SelectFileDest(name.clone()),
+                    None,
                 )
                 .into(),
             ]

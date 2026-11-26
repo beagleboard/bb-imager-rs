@@ -75,7 +75,7 @@ fn main() {
                     s.inner.filter_destination = x;
                     s.refresh();
                 }
-                Message::SelectDest(ident) => s.toggle(ident),
+                Message::SelectDest(ident) | Message::DoubleSelectDest(ident) => s.toggle(ident),
                 _ => {}
             }
             iced::Task::none()

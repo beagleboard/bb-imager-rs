@@ -91,7 +91,9 @@ fn main() {
                     s.inner.filter_destination = x;
                     s.refresh();
                 }
-                Message::SelectDest(ident) => s.toggle(DestId::Device(ident)),
+                Message::SelectDest(ident) | Message::DoubleSelectDest(ident) => {
+                    s.toggle(DestId::Device(ident))
+                }
                 Message::SelectFileDest(x) => {
                     s.toggle(DestId::SaveToFile(PathBuf::from(x.as_ref()).into()));
                 }

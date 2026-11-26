@@ -250,15 +250,22 @@ pub(crate) fn list_item<'a>(
     contents: impl IntoIterator<Item = Element<'a, Message>>,
     is_selected: bool,
     msg: Message,
-) -> widget::Button<'a, Message> {
-    widget::button(
+    double_click_msg: Option<Message>,
+) -> Element<'a, Message> {
+    let btn = widget::button(
         widget::row(contents)
             .spacing(12)
             .padding(8)
             .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(msg)
-    .style(move |theme, status| card_btn_style(theme, status, is_selected))
+    .style(move |theme, status| card_btn_style(theme, status, is_selected));
+
+    if let Some(double_click) = double_click_msg {
+        bb_iced_widgets::double_click(btn, double_click).into()
+    } else {
+        btn.into()
+    }
 }
 
 /// The primary label of a [`list_item`].

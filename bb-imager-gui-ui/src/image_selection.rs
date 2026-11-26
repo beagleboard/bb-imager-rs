@@ -154,7 +154,17 @@ fn os_list_pane<'a>(
                 );
             }
 
-            list_item(contents, is_selected, Message::SelectOs(img.id))
+            let double_click = match img.id {
+                ImageId::OsImage(_) => Some(Message::DoubleSelectOs(img.id)),
+                _ => None,
+            };
+
+            list_item(
+                contents,
+                is_selected,
+                Message::SelectOs(img.id),
+                double_click,
+            )
         })
         .map(Into::into);
 
@@ -170,6 +180,7 @@ fn os_list_pane<'a>(
                 ],
                 false,
                 Message::GotoOsListParent,
+                None,
             )
             .into(),
         ]
