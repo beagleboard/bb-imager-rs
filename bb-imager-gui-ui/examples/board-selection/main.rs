@@ -102,7 +102,9 @@ fn main() {
                     s.inner.search = search;
                 }
                 Message::ResolveImage(u, p) => s.cache.insert(u, p).expect("Failed to load icon"),
-                Message::SelectBoardById(id) => s.inner.selected = s.select(id),
+                Message::SelectBoardById(id) | Message::DoubleSelectBoardById(id) => {
+                    s.inner.selected = s.select(id)
+                }
                 _ => {}
             }
             iced::Task::none()

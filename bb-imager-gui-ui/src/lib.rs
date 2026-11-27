@@ -34,16 +34,22 @@ pub enum Message {
 
     /// Select a board by its id. Only valid on the board selection page.
     SelectBoardById(i64),
+    /// Select a board by its id and advance to the next screen on double-click.
+    DoubleSelectBoardById(i64),
     /// Copy a board's config entry, looked up by id, to the clipboard.
     CopyBoardConfig(i64),
     /// Copy an OS image's config entry, looked up by id, to the clipboard.
     CopyImageConfig(i64),
     /// Select an OS image, or open a sublist. Only valid on the image page.
     SelectOs(image_selection::ImageId),
+    /// Select an OS image and advance to the next screen on double-click.
+    DoubleSelectOs(image_selection::ImageId),
     /// Leave the current OS sublist for its parent.
     GotoOsListParent,
     /// Select an enumerated destination, by its device identifier.
     SelectDest(Box<str>),
+    /// Select an enumerated destination and advance to the next screen on double-click.
+    DoubleSelectDest(Box<str>),
     /// Open a save dialog for the image, with this suggested file name.
     SelectFileDest(std::sync::Arc<str>),
     /// Whether to hide destinations that are probably not removable media.

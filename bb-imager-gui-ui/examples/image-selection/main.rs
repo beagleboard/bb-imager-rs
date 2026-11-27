@@ -166,7 +166,9 @@ fn main() {
                 Message::UpdateSearchText(search) => s.inner.search = search,
                 Message::ResolveImage(u, p) => s.cache.insert(u, p).expect("Failed to load icon"),
                 Message::SelectOs(image_selection::ImageId::OsSublist((id, _))) => s.goto(Some(id)),
-                Message::SelectOs(id) => s.inner.selected = s.select(id),
+                Message::SelectOs(id) | Message::DoubleSelectOs(id) => {
+                    s.inner.selected = s.select(id)
+                }
                 Message::GotoOsListParent => {
                     // "Back" only renders inside a sublist.
                     let parent = s.catalog.parent(s.inner.pos.unwrap());

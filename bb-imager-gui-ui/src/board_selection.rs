@@ -76,6 +76,7 @@ fn board_list_pane<'a>(
                 [img, list_label(dev.name.as_ref()).into()],
                 is_selected,
                 Message::SelectBoardById(dev.id),
+                Some(Message::DoubleSelectBoardById(dev.id)),
             )
         })
         .map(Into::into);
