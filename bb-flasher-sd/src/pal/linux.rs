@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "udev")]
 use std::{
     collections::HashMap,
-    os::fd::{FromRawFd, IntoRawFd},
+    os::fd::OwnedFd,
     sync::{LazyLock, Mutex, PoisonError},
 };
 
@@ -105,8 +105,7 @@ pub(crate) fn open(dst: &Path) -> Result<LinuxDrive> {
             .open_device("rw", HashMap::from([("flags", libc::O_DIRECT.into())]))
             .await
             .map_err(io::Error::other)?;
-        let file =
-            unsafe { std::fs::File::from_raw_fd(std::os::fd::OwnedFd::from(fd).into_raw_fd()) };
+        let file = std::fs::File::from(OwnedFd::from(fd));
 
         Ok(LinuxDrive {
             file,
