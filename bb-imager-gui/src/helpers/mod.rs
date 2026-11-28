@@ -266,16 +266,21 @@ pub(crate) async fn flash(
         #[cfg(feature = "sd")]
         let bootfs = if flasher == config::Flasher::SdCardNoBootloader {
             let db = db.clone();
-            let bootfs = blocking_future(move || db.board_by_id(board))
-                .await?
-                .bootfs
-                .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
-            Some(RemoteSource::new(
-                bootfs.url,
-                bootfs.image_download_sha256,
-                bootfs.image_download_size,
-                downloader.clone(),
-            ))
+            let downloader = downloader.clone();
+            let bootfs = blocking_future(move || {
+                let bootfs = db
+                    .board_by_id(board)?
+                    .bootfs
+                    .ok_or(anyhow::anyhow!("No bootloader available for this board"))?;
+                Ok::<_, anyhow::Error>(RemoteSource::new(
+                    bootfs.url,
+                    bootfs.image_download_sha256,
+                    bootfs.image_download_size,
+                    downloader,
+                ))
+            })
+            .await?;
+            Some(bootfs)
         } else {
             None
         };
