@@ -375,7 +375,7 @@ dependencies = [
  "crc32fast",
  "gpiocdev",
  "i2cdev",
- "nix 0.31.3",
+ "nix 0.32.0",
  "serialport",
  "thiserror 2.0.21",
  "tracing",
@@ -404,7 +404,7 @@ dependencies = [
  "libc",
  "lru 0.19.2",
  "mbrman",
- "nix 0.31.3",
+ "nix 0.32.0",
  "security-framework",
  "tempfile",
  "thiserror 2.0.21",
@@ -1958,7 +1958,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13bd684d0cdb92e5993c63ef59bb8d1e959ff32ae131e5614fc143612f8544cc"
 dependencies = [
  "crc",
- "nix 0.31.3",
+ "nix 0.31.4",
  "thiserror 2.0.21",
  "wincode",
 ]
@@ -3418,9 +3418,21 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.31.3"
+version = "0.31.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+checksum = "2bc81ce8148d3b4f3274da811f11cdd824ae661ee4ef732cdb229825cf5be7f7"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77730ed34f01f4990cb2ea67fec715ecebc6fab9a6396cf83c5529b13f581bdc"
 dependencies = [
  "bitflags 2.13.2",
  "cfg-if",
@@ -7355,7 +7367,7 @@ dependencies = [
  "indexmap 2.14.2",
  "libc",
  "memchr",
- "nix 0.31.3",
+ "nix 0.31.4",
  "typed-path",
  "windows-sys 0.61.2",
  "zeroize",

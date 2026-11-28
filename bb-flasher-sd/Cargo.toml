@@ -36,7 +36,7 @@ windows = { version = "0.62", features = ["Win32", "Win32_Storage", "Win32_Stora
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = { version = "3.7", optional = true }
-nix = { version = "0.31", features = ["socket", "uio"], optional = true }
+nix = { version = "0.32", features = ["socket", "uio"], optional = true }
 
 [features]
 macos_authopen = ["dep:security-framework", "dep:nix"]
