@@ -39,11 +39,13 @@ async fn download_to_stream_persists_on_sha_match() {
         then.status(200).body(content);
     });
 
-    let (writer, _reader) = file_stream().unwrap();
+    let (writer, reader) = file_stream(tmp.path()).unwrap();
     downloader
         .download_to_stream(server.url("/img"), sha, writer)
         .await
         .expect("matching sha should succeed");
+    // The backing temp file shares the cache dir until both halves drop.
+    drop(reader);
 
     mock.assert_calls(1);
 
@@ -71,11 +73,12 @@ async fn download_to_stream_rejects_sha_mismatch() {
         then.status(200).body(content);
     });
 
-    let (writer, _reader) = file_stream().unwrap();
+    let (writer, reader) = file_stream(tmp.path()).unwrap();
     let err = downloader
         .download_to_stream(server.url("/img"), wrong_sha, writer)
         .await
         .expect_err("mismatched sha must fail");
+    drop(reader);
 
     mock.assert_calls(1);
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
@@ -97,11 +100,12 @@ async fn download_to_stream_rejects_error_status() {
         then.status(404).body(body);
     });
 
-    let (writer, _reader) = file_stream().unwrap();
+    let (writer, reader) = file_stream(tmp.path()).unwrap();
     let err = downloader
         .download_to_stream(server.url("/img"), sha256(body), writer)
         .await
         .expect_err("error status must fail even if the body hash matches");
+    drop(reader);
 
     assert!(err.to_string().contains("404"), "{err}");
     assert!(single_file(tmp.path()).is_none());

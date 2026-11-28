@@ -14,7 +14,7 @@ All functionality is behind feature flags, so only what is enabled gets compiled
 
 ```toml
 [dependencies]
-bb-helper = { version = "0.1", features = ["cancel", "reader_progress"] }
+bb-helper = { version = "0.2", features = ["cancel", "reader_progress"] }
 ```
 
 ```rust

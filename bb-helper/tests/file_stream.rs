@@ -6,7 +6,7 @@ use tokio::io::AsyncWriteExt;
 
 #[tokio::test]
 async fn seek_from_start_works() {
-    let (mut writer, mut reader) = file_stream().unwrap();
+    let (mut writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"abcdef").await.unwrap();
     writer.flush().await.unwrap();
@@ -25,7 +25,7 @@ async fn seek_from_start_works() {
 
 #[tokio::test]
 async fn seek_from_current_works() {
-    let (mut writer, mut reader) = file_stream().unwrap();
+    let (mut writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"abcdef").await.unwrap();
     writer.flush().await.unwrap();
@@ -45,7 +45,7 @@ async fn seek_from_current_works() {
 
 #[tokio::test]
 async fn seek_from_end_fails_while_writer_alive() {
-    let (_writer, mut reader) = file_stream().unwrap();
+    let (_writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     tokio::task::spawn_blocking(move || {
         let err = reader.seek(SeekFrom::End(0)).unwrap_err();
@@ -57,7 +57,7 @@ async fn seek_from_end_fails_while_writer_alive() {
 
 #[tokio::test]
 async fn seek_from_end_works_after_writer_drop() {
-    let (mut writer, mut reader) = file_stream().unwrap();
+    let (mut writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"abcdef").await.unwrap();
     writer.flush().await.unwrap();
@@ -78,7 +78,7 @@ async fn seek_from_end_works_after_writer_drop() {
 
 #[tokio::test]
 async fn invalid_negative_seek_fails() {
-    let (mut writer, mut reader) = file_stream().unwrap();
+    let (mut writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"abc").await.unwrap();
     writer.flush().await.unwrap();
@@ -97,7 +97,7 @@ async fn invalid_negative_seek_fails() {
 /// reader starts first to make it likely the blocking-wait branch is taken.
 #[tokio::test]
 async fn blocking_read_receives_all_data_then_eof_on_writer_drop() {
-    let (mut writer, mut reader) = file_stream().unwrap();
+    let (mut writer, mut reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     let reader_task = tokio::task::spawn_blocking(move || {
         let mut out = Vec::new();
@@ -128,7 +128,7 @@ async fn persist_writes_byte_exact_file() {
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("out.bin");
 
-    let (mut writer, _reader) = file_stream().unwrap();
+    let (mut writer, _reader) = file_stream(dir.path()).unwrap();
     writer.write_all(b"persist me").await.unwrap();
     writer.flush().await.unwrap();
 
@@ -141,7 +141,7 @@ async fn persist_writes_byte_exact_file() {
 /// the others, including data written before it was opened.
 #[tokio::test]
 async fn multiple_readers_each_receive_all_data() {
-    let (mut writer, reader) = file_stream().unwrap();
+    let (mut writer, reader) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"hello ").await.unwrap();
     writer.flush().await.unwrap();
@@ -170,7 +170,7 @@ async fn multiple_readers_each_receive_all_data() {
 /// file, is dropped.
 #[tokio::test]
 async fn reader_outlives_writer() {
-    let (mut writer, reader1) = file_stream().unwrap();
+    let (mut writer, reader1) = file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(b"still here").await.unwrap();
     writer.flush().await.unwrap();

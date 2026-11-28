@@ -9,7 +9,6 @@ use std::{
 };
 
 use tempfile::NamedTempFile;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 type SharedState = Arc<(Mutex<bool>, Condvar)>;
 
@@ -20,26 +19,24 @@ type SharedState = Arc<(Mutex<bool>, Condvar)>;
 pub struct WriterFileStream {
     file: tokio::fs::File,
     writing: SharedState,
+    inner: Arc<NamedTempFile>,
 }
 
 impl WriterFileStream {
-    const fn new(file: tokio::fs::File, writing: SharedState) -> Self {
-        Self { file, writing }
+    fn new(inner: Arc<NamedTempFile>, writing: SharedState) -> io::Result<Self> {
+        Ok(Self {
+            file: inner.reopen()?.into(),
+            writing,
+            inner,
+        })
     }
 
-    /// Persists the written data to a permanent file location.
+    /// Persists the written data to a permanent file location by hard linking the backing file.
     ///
-    /// Copies all data from the temporary file to the specified path.
+    /// `path` must be on the same filesystem as the `dir` passed to [`file_stream`] and must not
+    /// exist yet.
     pub async fn persist(&mut self, path: &Path) -> io::Result<()> {
-        let mut f = tokio::fs::File::create(path).await?;
-        self.file.seek(io::SeekFrom::Start(0)).await?;
-
-        tokio::io::copy(&mut self.file, &mut f).await?;
-
-        // Causes errors if not present
-        f.flush().await?;
-
-        Ok(())
+        tokio::fs::hard_link(self.inner.path(), path).await
     }
 }
 
@@ -102,12 +99,12 @@ impl Clone for ReaderFileStream {
 }
 
 impl ReaderFileStream {
-    fn new(inner: Arc<NamedTempFile>, writing: SharedState) -> Self {
-        Self {
-            file: inner.reopen().unwrap(),
+    fn new(inner: Arc<NamedTempFile>, writing: SharedState) -> io::Result<Self> {
+        Ok(Self {
+            file: inner.reopen()?,
             writing,
             inner,
-        }
+        })
     }
 }
 
@@ -181,14 +178,16 @@ impl std::io::Seek for ReaderFileStream {
 
 /// Creates a new file-backed stream with separate reader and writer halves.
 ///
-/// Returns a tuple of (writer, reader) that share a temporary file.
+/// Returns a tuple of (writer, reader) that share a temporary file created in `dir`. Use the
+/// filesystem that [`WriterFileStream::persist`] will link into, and avoid the system temp dir,
+/// which is RAM-backed tmpfs on some Linux distros.
 /// The writer can write asynchronously, while the reader provides synchronous access.
-pub fn file_stream() -> io::Result<(WriterFileStream, ReaderFileStream)> {
-    let file = Arc::new(tempfile::NamedTempFile::new()?);
+pub fn file_stream(dir: &Path) -> io::Result<(WriterFileStream, ReaderFileStream)> {
+    let file = Arc::new(tempfile::NamedTempFile::new_in(dir)?);
     let flag = Arc::new((Mutex::new(true), Condvar::new()));
 
-    let reader = ReaderFileStream::new(file.clone(), flag.clone());
-    let writer = WriterFileStream::new(file.reopen()?.into(), flag);
+    let reader = ReaderFileStream::new(file.clone(), flag.clone())?;
+    let writer = WriterFileStream::new(file, flag)?;
 
     Ok((writer, reader))
 }
