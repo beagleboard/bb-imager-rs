@@ -203,7 +203,7 @@ async fn file_stream_uncompressed_image_reads_contents() {
 
     let data = b"plain raw image data";
 
-    let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
+    let (mut writer, reader) = bb_helper::file_stream::file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(data).await.unwrap();
     writer.flush().await.unwrap();
@@ -251,7 +251,7 @@ async fn file_stream_xz_image_reports_uncompressed_size_and_reads_contents() {
     let original = b"this is the uncompressed payload";
     let compressed = liblzma::encode_all(original.as_slice(), 6).unwrap();
 
-    let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
+    let (mut writer, reader) = bb_helper::file_stream::file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(&compressed).await.unwrap();
     writer.flush().await.unwrap();
@@ -303,7 +303,7 @@ async fn file_stream_zip_image_reads_first_entry_contents() {
         writer.finish().unwrap();
     }
 
-    let (mut writer, reader) = bb_helper::file_stream::file_stream().unwrap();
+    let (mut writer, reader) = bb_helper::file_stream::file_stream(&std::env::temp_dir()).unwrap();
 
     writer.write_all(zip_data.get_ref()).await.unwrap();
     writer.flush().await.unwrap();

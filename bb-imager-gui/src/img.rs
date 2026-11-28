@@ -84,7 +84,10 @@ impl RemoteSource {
         }
 
         tracing::info!("Remote image not found in cache. Downloading");
-        let (tx_stream, rx) = bb_helper::file_stream::file_stream().unwrap();
+        let (tx_stream, rx) = bb_helper::file_stream::file_stream(
+            crate::helpers::project_dirs().unwrap().cache_dir(),
+        )
+        .unwrap();
 
         let t: tokio::task::JoinHandle<io::Result<()>> = rt.spawn(async move {
             downloader
